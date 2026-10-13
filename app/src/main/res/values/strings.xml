@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">CloudPlay</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+    <string name="vpn_status_connected">Japan VPN Connected (Bypassing Region)</string>
+    <string name="vpn_status_disconnected">Direct ISP Network (Low Latency)</string>
+    <string name="auto_bypass_enabled">Auto-Bypass Active: Switching network on game launch</string>
+    <string name="auto_bypass_triggered">Game stream detected! Switched to Direct Network without reload.</string>
+</resources>

@@ -1,0 +1,8 @@
+{
+  "name": "CloudPlay",
+  "description": "Xbox Cloud Gaming with auto Japan VPN bypass for direct low-latency gameplay without reloading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -63,7 +63,7 @@ jobs:
           SDK_MGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ -f "$SDK_MGR" ]; then
             yes | "$SDK_MGR" --licenses || true
-            "$SDK_MGR" --install "platforms;android-36" "platform-tools" || true
+            "$SDK_MGR" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools" || true
           fi
 
       - name: Prepare Keystore and Environment

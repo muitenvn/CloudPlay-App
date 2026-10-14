@@ -352,12 +352,31 @@ fun SignInScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = onAuthSuccess,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("skip_login_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00D26A)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00D26A).copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            text = "Vào ứng dụng ngay (Không cần đăng nhập)",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Được bảo vệ bởi Firebase Authentication & Firestore Enterprise",
+                        text = "Tài khoản Microsoft/Xbox được đăng nhập trực tiếp trên trình duyệt khi chơi",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF64748B),
+                        color = Color(0xFF8892B0),
                         textAlign = TextAlign.Center
                     )
                 }

@@ -826,7 +826,7 @@ private fun FortniteDedicatedHeroCard(
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Image(
-                painter = painterResource(id = R.drawable.fortnite_loading_art_1791800671299),
+                painter = painterResource(id = R.drawable.fortnite_cloud_poster_1791719536404),
                 contentDescription = "Fortnite Battle Royale",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

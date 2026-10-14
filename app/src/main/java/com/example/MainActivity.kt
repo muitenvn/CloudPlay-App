@@ -31,28 +31,10 @@ import com.example.ui.DashboardScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.vpn.VpnManager
 
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.auth.AuthManager
-import com.example.ui.auth.SignInScreen
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 sealed class AppScreen {
     data object Dashboard : AppScreen()
     data class Browser(val url: String) : AppScreen()
-}
-
-fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
-    val listener = FirebaseAuth.AuthStateListener { auth ->
-        trySend(auth.currentUser)
-    }
-    addAuthStateListener(listener)
-    awaitClose { removeAuthStateListener(listener) }
 }
 
 class MainActivity : ComponentActivity() {
@@ -71,33 +53,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MyApplicationTheme {
-                val auth = FirebaseAuth.getInstance()
-                val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-
-                val context = androidx.compose.ui.platform.LocalContext.current
-                val credentialManager = remember { androidx.credentials.CredentialManager.create(context) }
-                val scope = rememberCoroutineScope()
-
-                LaunchedEffect(Unit) {
-                    AuthManager.attemptAutoSignIn(
-                        context = context,
-                        credentialManager = credentialManager,
-                        onAuthSuccess = {},
-                        onUnauthenticated = {},
-                        scope = scope
-                    )
-                }
-
-                if (currentUser == null) {
-                    SignInScreen(
-                        onAuthSuccess = {}
-                    )
-                } else {
-                    MainContent(
-                        streamController = streamController,
-                        onConnectVpnRequested = { handleVpnConnect() }
-                    )
-                }
+                MainContent(
+                    streamController = streamController,
+                    onConnectVpnRequested = { handleVpnConnect() }
+                )
             }
         }
     }

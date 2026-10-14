@@ -102,10 +102,16 @@ fun SettingsScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Section: TÀI KHOẢN & ĐỒNG BỘ ĐÁM MÂY (FIREBASE)
+        // Section: TÀI KHOẢN & TRUY CẬP (ACCOUNT & ACCESS)
         item {
-            val authUser = remember { FirebaseAuth.getInstance().currentUser }
-            SettingsCard(title = "TÀI KHOẢN & ĐỒNG BỘ ĐÁM MÂY (FIREBASE)") {
+            val authUser = remember {
+                try {
+                    FirebaseAuth.getInstance().currentUser
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            SettingsCard(title = "TÀI KHOẢN & TRUY CẬP (XBOX & CLOUD)") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -128,13 +134,13 @@ fun SettingsScreen(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = authUser?.displayName ?: "Game thủ CloudPlay",
+                                text = if (authUser != null) (authUser.displayName ?: "Game thủ CloudPlay") else "Chế độ Trực Tiếp (Không cần đăng nhập)",
                                 color = TextPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = authUser?.email ?: "Đã liên kết tài khoản Google",
+                                text = if (authUser != null) (authUser.email ?: "Tài khoản Google liên kết") else "Tài khoản Microsoft/Xbox đăng nhập trực tiếp trên trình duyệt khi chơi",
                                 color = TextSecondary,
                                 fontSize = 11.sp
                             )
@@ -150,33 +156,42 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(Icons.Default.CloudDone, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(12.dp))
-                                Text("Đã đồng bộ", color = XboxNeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Sẵn sàng chơi", color = XboxNeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                val credManager = CredentialManager.create(context)
-                                AuthManager.signOut(
-                                    credentialManager = credManager,
-                                    onSignOutComplete = {
-                                        Toast.makeText(context, "Đã đăng xuất tài khoản", Toast.LENGTH_SHORT).show()
-                                    },
-                                    scope = coroutineScope
-                                )
-                            },
+                    if (authUser != null) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Đăng Xuất Tài Khoản", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            OutlinedButton(
+                                onClick = {
+                                    try {
+                                        val credManager = CredentialManager.create(context)
+                                        AuthManager.signOut(
+                                            credentialManager = credManager,
+                                            onSignOutComplete = {
+                                                Toast.makeText(context, "Đã đăng xuất tài khoản", Toast.LENGTH_SHORT).show()
+                                            },
+                                            scope = coroutineScope
+                                        )
+                                    } catch (e: Exception) {
+                                        try {
+                                            FirebaseAuth.getInstance().signOut()
+                                        } catch (_: Exception) {}
+                                        Toast.makeText(context, "Đã đăng xuất", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                            ) {
+                                Icon(Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Đăng Xuất Tài Khoản", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }

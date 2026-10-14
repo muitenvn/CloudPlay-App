@@ -54,10 +54,13 @@ jobs:
 
           # Pre-accept all standard Android SDK licenses
           mkdir -p "$ANDROID_HOME/licenses"
-          printf "24333f8a63061b1290586ac4e1419e6750add54b\n84831b9409646a918e30573bab4c9c91346d8abd\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
-          printf "89337d0207f9f1e1684c7987150e609e5b9330f1\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
-          printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
-          printf "601085b94cd77f0b54ff86406957099fed7926e4\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\n24333f8a63061b1290586ac4e1419e6750add54b\n84831b9409646a918e30573bab4c9c91346d8abd\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n89337d0207f9f1e1684c7987150e609e5b9330f1\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "601085b94cd77f0b54ff86406957099ebe79c4d6\n601085b94cd77f0b54ff86406957099fed7926e4\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "ceff83576aac4f7f37cb98fe189e9fb3c49d3b81\n" > "$ANDROID_HOME/licenses/android-googlexr-license"
+          printf "e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
+          printf "33b6a2b64607f11b759f320ef9dff4ae5c47d97a\n" > "$ANDROID_HOME/licenses/google-gdk-license"
 
           # Run sdkmanager to accept licenses and install SDK 36 and 36.1 components
           SDK_MGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"

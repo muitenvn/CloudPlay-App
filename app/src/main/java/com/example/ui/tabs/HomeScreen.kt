@@ -103,7 +103,7 @@ fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Hero Quick Play Deck (Console Style with Dual Direct Launch)
+        // 1. Hero Quick Play Deck (Direct Launch for Xbox Cloud & Fortnite)
         HeroConsolePlayDeck(
             vpnState = vpnState,
             gamepadStatus = gamepadStatus,
@@ -113,14 +113,7 @@ fun HomeScreen(
             }
         )
 
-        // 2. Dedicated Fortnite Optimization Deck (100% Free • Touch Epic • Zero-Delay)
-        FortniteDedicatedHeroCard(
-            onLaunchFortnite = {
-                onLaunchGame("https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2")
-            }
-        )
-
-        // 3. Unified Hardware & Network Cockpit (Ping, Bypass & Gamepad in 1 clean card)
+        // 2. Unified Hardware & Network Cockpit (Ping, Bypass & Gamepad in 1 clean card)
         QuickNetworkCockpitCard(
             vpnState = vpnState,
             gamepadStatus = gamepadStatus,
@@ -128,17 +121,14 @@ fun HomeScreen(
             onDisconnectVpn = onDisconnectVpn
         )
 
-        // 4. Featured Games Carousel
+        // 3. Featured Games Carousel (1-Tap Launch)
         FeaturedGamesSection(
             featuredGames = featuredGames,
             onLaunchGame = onLaunchGame,
             onNavigateToLibrary = onNavigateToLibrary
         )
 
-        // 5. 3-Step Quick Start Guide
-        QuickStartStepsCard(onOpenGuide = onOpenGuide)
-
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -719,238 +709,7 @@ private fun FeaturedGameCard(
     }
 }
 
-@Composable
-private fun QuickStartStepsCard(
-    onOpenGuide: (GuideSection) -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))
-            .testTag("quick_start_steps_card"),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.9f))
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.RocketLaunch,
-                        contentDescription = null,
-                        tint = XboxNeonGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "3 BƯỚC BẮT ĐẦU DỄ DÀNG",
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
 
-                Text(
-                    text = "Chi tiết ➜",
-                    color = XboxNeonGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onOpenGuide(GuideSection.QUICK_START) }
-                )
-            }
 
-            StepRow("1", "Kích hoạt tối ưu kết nối (chạm nút bên trên)")
-            StepRow("2", "Bấm 'Vào Chơi Xbox Cloud' để mở luồng game")
-            StepRow("3", "Đăng nhập tài khoản Xbox Game Pass và tận hưởng!")
-        }
-    }
-}
 
-@Composable
-private fun StepRow(step: String, text: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFF16291E)
-        ) {
-            Text(
-                text = step,
-                color = XboxNeonGreen,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-            )
-        }
-        Text(
-            text = text,
-            color = TextSecondary,
-            fontSize = 11.sp
-        )
-    }
-}
-
-@Composable
-private fun FortniteDedicatedHeroCard(
-    onLaunchFortnite: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .border(
-                1.5.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        Color(0xFF0074E4),
-                        Color(0xFF9C27B0),
-                        Color(0xFF0074E4)
-                    )
-                ),
-                RoundedCornerShape(20.dp)
-            )
-            .clickable { onLaunchFortnite() }
-            .testTag("fortnite_dedicated_hero_card"),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Image(
-                painter = painterResource(id = R.drawable.fortnite_cloud_poster_1791719536404),
-                contentDescription = "Fortnite Battle Royale",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(
-                                Color.Black.copy(alpha = 0.3f),
-                                Color(0xD90A111C),
-                                Color(0xF7070B12)
-                            )
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color(0xFF0074E4).copy(alpha = 0.25f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0074E4))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFF00E5FF),
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "TỐI ƯU ĐỘC QUYỀN FORTNITE",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF00C853).copy(alpha = 0.25f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00C853).copy(alpha = 0.6f))
-                    ) {
-                        Text(
-                            text = "MIỄN PHÍ 100%",
-                            color = Color(0xFF69F0AE),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "FORTNITE BATTLE ROYALE",
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.5.sp
-                )
-
-                Text(
-                    text = "Màn hình loading riêng • Hỗ trợ Touch Cảm Ứng Native Epic • Không cần nạp Game Pass Ultimate",
-                    color = Color(0xFFB0BEC5),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
-                )
-
-                Button(
-                    onClick = onLaunchFortnite,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(42.dp)
-                        .testTag("launch_fortnite_button"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF0074E4),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "VÀO CHƠI FORTNITE NGAY (TỐI ƯU RIÊNG)",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 

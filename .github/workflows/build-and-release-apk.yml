@@ -59,11 +59,14 @@ jobs:
           printf "84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
           printf "601085b94cd77f0b54ff86406957099fed7926e4\n" > "$ANDROID_HOME/licenses/android-googletv-license"
 
-          # Run sdkmanager to accept licenses and install SDK 36 components
+          # Run sdkmanager to accept licenses and install SDK 36 and 36.1 components
           SDK_MGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ -f "$SDK_MGR" ]; then
+          if [ ! -f "$SDK_MGR" ]; then
+            SDK_MGR=$(which sdkmanager || true)
+          fi
+          if [ -n "$SDK_MGR" ]; then
             yes | "$SDK_MGR" --licenses || true
-            "$SDK_MGR" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools" || true
+            "$SDK_MGR" --install "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" "platform-tools" || true
           fi
 
       - name: Prepare Keystore and Environment
@@ -79,15 +82,16 @@ jobs:
             fi
           fi
 
-          # 2. Khôi phục hoặc tạo debug.keystore
+          # 2. Khôi phục hoặc tạo debug.keystore an toàn (tránh lỗi file 0 byte)
           if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
             if [ -f "debug.keystore.base64" ]; then
-              (base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null) || (base64 --decode debug.keystore.base64 > debug.keystore 2>/dev/null) || true
+              python3 -c "import base64; open('debug.keystore', 'wb').write(base64.b64decode(open('debug.keystore.base64').read().strip()))" 2>/dev/null || true
             fi
           fi
 
           if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
             echo "Generating clean debug.keystore for CI build..."
+            rm -f debug.keystore
             keytool -genkeypair -v \
               -keystore debug.keystore \
               -storepass android \
@@ -105,12 +109,14 @@ jobs:
 
       - name: Make Gradlew Executable
         run: |
-          chmod +x ./gradlew || true
+          if [ -f "./gradlew" ]; then
+            sed -i 's/\r$//' ./gradlew || true
+            chmod +x ./gradlew || true
+          fi
 
       - name: Build APK with Gradle
         run: |
           if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
             ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
           else
             gradle assembleDebug --no-daemon --no-configuration-cache --stacktrace

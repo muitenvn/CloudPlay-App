@@ -83,6 +83,8 @@ fun HowToUseGuideDialog(
 ) {
     var selectedSection by remember { mutableStateOf(initialSection) }
 
+    val isVi = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language?.lowercase()?.startsWith("vi") == true
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -133,14 +135,14 @@ fun HowToUseGuideDialog(
                         }
                         Column {
                             Text(
-                                text = "HƯỚNG DẪN CÁCH DÙNG",
+                                text = if (isVi) "HƯỚNG DẪN CÁCH DÙNG" else "HOW TO PLAY GUIDE",
                                 color = TextPrimary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.8.sp
                             )
                             Text(
-                                text = "Cẩm nang chơi Xbox Cloud 0ms lag tại Việt Nam",
+                                text = if (isVi) "Cẩm nang chơi Xbox Cloud 0ms lag tại Việt Nam" else "Zero-latency Xbox Cloud Gaming handbook",
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -157,7 +159,7 @@ fun HowToUseGuideDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Đóng",
+                            contentDescription = if (isVi) "Đóng" else "Close",
                             tint = TextSecondary,
                             modifier = Modifier.size(18.dp)
                         )
@@ -175,6 +177,13 @@ fun HowToUseGuideDialog(
                 ) {
                     GuideSection.entries.forEach { section ->
                         val isSelected = selectedSection == section
+                        val tabTitle = when (section) {
+                            GuideSection.QUICK_START -> if (isVi) "Bắt Đầu" else "Start"
+                            GuideSection.REVOLUTION -> if (isVi) "5 Tầng" else "5 Layers"
+                            GuideSection.ZERO_LAG -> if (isVi) "0ms Ping" else "0ms Ping"
+                            GuideSection.CONTROLLER -> if (isVi) "Tay Cầm" else "Gamepad"
+                            GuideSection.FAQS -> if (isVi) "Sửa Lỗi" else "FAQs"
+                        }
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
@@ -196,7 +205,7 @@ fun HowToUseGuideDialog(
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
-                                    text = section.title,
+                                    text = tabTitle,
                                     color = if (isSelected) Color.White else TextSecondary,
                                     fontSize = 10.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -219,33 +228,33 @@ fun HowToUseGuideDialog(
                             item {
                                 GuideStepCard(
                                     stepNum = "1",
-                                    badge = "Tài khoản",
-                                    title = "Chuẩn bị tài khoản chơi game",
-                                    desc = "• Nếu đã có tài khoản Xbox Game Pass Ultimate: Bạn có thể chơi hàng trăm game như Forza Horizon 5, Starfield, GTA V...\n• Nếu CHƯA có Game Pass: Game FORTNITE hoàn toàn MIỄN PHÍ 100%! Chỉ cần có tài khoản Microsoft thường là chơi được ngay mà không tốn tiền."
+                                    badge = if (isVi) "Tài khoản" else "Account",
+                                    title = if (isVi) "Chuẩn bị tài khoản chơi game" else "Prepare your gaming account",
+                                    desc = if (isVi) "• Nếu có tài khoản Game Pass Ultimate: Bạn có thể chơi hàng trăm game AAA như Forza Horizon 5, Starfield, GTA V...\n• Nếu CHƯA có Game Pass: FORTNITE hoàn toàn MIỄN PHÍ! Đăng nhập tài khoản Microsoft thường là chơi được ngay." else "• With Xbox Game Pass Ultimate: Play hundreds of games like Forza, Starfield, and GTA V.\n• No Game Pass? FORTNITE is 100% FREE! Just log in with a free Microsoft account."
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "2",
-                                    badge = "Vượt rào",
-                                    title = "Bấm 'CHƠI XBOX CLOUD' hoặc chọn game",
-                                    desc = "• Bạn không cần tự bật VPN thủ công!\n• Hệ thống Smart VPN của ứng dụng sẽ tự động mượn IP Nhật Bản để Microsoft cấp quyền truy cập phòng chờ game (bypass kiểm tra vùng)."
+                                    badge = if (isVi) "Vượt rào" else "Bypass",
+                                    title = if (isVi) "Bấm 'CHƠI XBOX CLOUD' hoặc chọn game" else "Tap 'PLAY XBOX CLOUD' or select game",
+                                    desc = if (isVi) "• Bạn không cần tự bật VPN thủ công!\n• Hệ thống Smart VPN sẽ tự động kết nối IP Nhật Bản để Microsoft cấp quyền truy cập phòng chờ game (vượt qua kiểm tra vùng)." else "• No need to manually toggle VPN!\n• Smart VPN automatically routes initial handshake via Japan nodes to bypass geo-restrictions."
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "3",
                                     badge = "0ms Lag",
-                                    title = "Tự động tắt VPN khi vào trận",
-                                    desc = "• Ngay khi màn hình game bắt đầu chạy luồng video WebRTC, hệ thống sẽ TỰ ĐỘNG TẮT VPN và chuyển về mạng nhà (Direct ISP Viettel/VNPT/FPT).\n• Trang web KHÔNG reload, luồng game giữ nguyên 100%, Ping tụt từ ~140ms xuống chỉ còn 25-35ms cực mượt mà!"
+                                    title = if (isVi) "Tự động tắt VPN khi vào trận" else "Auto-disconnect VPN once stream connects",
+                                    desc = if (isVi) "• Ngay khi luồng video WebRTC bắt đầu, hệ thống TỰ ĐỘNG NGẮT VPN và chuyển về mạng nhà trực tiếp (Direct ISP).\n• Trang web KHÔNG reload, luồng game giữ nguyên 100%, Ping tụt từ ~140ms xuống chỉ còn 25-35ms cực mượt!" else "• Once WebRTC stream launches, VPN is instantly dropped without page reload.\n• Latency plummets from 140ms to 25-35ms direct esports-grade speed!"
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "4",
-                                    badge = "Thanh HUD",
-                                    title = "Dùng thanh điều khiển nổi (Floating HUD)",
-                                    desc = "• Trong lúc chơi, thanh HUD tròn nổi trên góc màn hình cho phép bạn: Đổi mạng tức thì, bật/tắt tay cầm ảo, làm nét Clarity Boost và quay về Trang Chủ bất kỳ lúc nào."
+                                    badge = if (isVi) "Thanh HUD" else "HUD Dock",
+                                    title = if (isVi) "Dùng thanh điều khiển nổi (Floating HUD)" else "Floating Telemetry HUD controls",
+                                    desc = if (isVi) "• Thanh HUD tròn nổi trên màn hình cho phép: Chuyển mạng tức thì, bật tay cầm ảo, bật Clarity Boost và quay về Trang Chủ." else "• In-game floating pill lets you toggle bypass, turn on virtual controller, boost clarity and return home anytime."
                                 )
                             }
                         }
@@ -378,7 +387,7 @@ fun HowToUseGuideDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = "Đã Hiểu • Bắt Đầu Chơi Ngay 🎮",
+                        text = if (isVi) "Đã Hiểu • Bắt Đầu Chơi Ngay 🎮" else "Got It • Play Now 🎮",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

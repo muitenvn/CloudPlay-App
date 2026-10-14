@@ -73,10 +73,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.TextPrimary
@@ -873,7 +875,7 @@ fun FloatingHud(
                                     ) {
                                         Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = JapanRed, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = "Về Trang Chủ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                        Text(text = stringResource(R.string.hud_return_home), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                                     }
                                 }
 
@@ -894,7 +896,7 @@ fun FloatingHud(
                                     ) {
                                         Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(13.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = "Cài Đặt", color = TextSecondary, fontSize = 11.sp)
+                                        Text(text = stringResource(R.string.tab_settings), color = TextSecondary, fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -910,11 +912,11 @@ fun FloatingHud(
         AlertDialog(
             onDismissRequest = { showExitConfirmDialog = false },
             title = {
-                Text(text = "Thoát Khỏi Game?", color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(text = stringResource(R.string.dialog_exit_title), color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             },
             text = {
                 Text(
-                    text = "Bạn có chắc chắn muốn quay về Trang Chủ không? Tiến trình chơi sẽ tiếp tục trên đám mây.",
+                    text = stringResource(R.string.dialog_exit_message),
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
@@ -928,12 +930,12 @@ fun FloatingHud(
                     colors = ButtonDefaults.buttonColors(containerColor = JapanRed),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Thoát Game", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text(stringResource(R.string.btn_confirm_exit), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showExitConfirmDialog = false }) {
-                    Text("Ở Lại Chơi", color = TextSecondary, fontSize = 12.sp)
+                    Text(stringResource(R.string.btn_cancel), color = TextSecondary, fontSize = 12.sp)
                 }
             },
             containerColor = XboxSurface,

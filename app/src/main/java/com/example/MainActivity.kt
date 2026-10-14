@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,11 +53,43 @@ class MainActivity : ComponentActivity() {
         streamController = StreamController(applicationContext)
 
         setContent {
-            MyApplicationTheme {
-                MainContent(
-                    streamController = streamController,
-                    onConnectVpnRequested = { handleVpnConnect() }
-                )
+            val config by SettingsRepository.config.collectAsState()
+            val targetLocale: java.util.Locale = remember(config.appLanguage) {
+                when (config.appLanguage) {
+                    com.example.data.AppLanguage.SYSTEM -> {
+                        val sys = java.util.Locale.getDefault()
+                        if (sys.language.lowercase().startsWith("vi")) java.util.Locale("vi") else java.util.Locale.ENGLISH
+                    }
+                    com.example.data.AppLanguage.VIETNAMESE -> java.util.Locale("vi")
+                    com.example.data.AppLanguage.ENGLISH -> java.util.Locale.ENGLISH
+                }
+            }
+
+            val baseContext = androidx.compose.ui.platform.LocalContext.current
+            val localizedContext = remember(targetLocale, baseContext) {
+                val conf = android.content.res.Configuration(baseContext.resources.configuration)
+                conf.setLocale(targetLocale)
+                conf.setLayoutDirection(targetLocale)
+                baseContext.createConfigurationContext(conf)
+            }
+            val baseConfiguration = androidx.compose.ui.platform.LocalConfiguration.current
+            val localizedConfiguration = remember(targetLocale, baseConfiguration) {
+                val conf = android.content.res.Configuration(baseConfiguration)
+                conf.setLocale(targetLocale)
+                conf.setLayoutDirection(targetLocale)
+                conf
+            }
+
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalConfiguration provides localizedConfiguration,
+                androidx.compose.ui.platform.LocalContext provides localizedContext
+            ) {
+                MyApplicationTheme {
+                    MainContent(
+                        streamController = streamController,
+                        onConnectVpnRequested = { handleVpnConnect() }
+                    )
+                }
             }
         }
     }

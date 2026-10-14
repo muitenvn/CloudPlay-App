@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App & General -->
+    <string name="app_name">CloudPlay</string>
+    <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_home">Trang chủ</string>
+    <string name="tab_library">Thư viện</string>
+    <string name="tab_servers">Máy chủ</string>
+    <string name="tab_settings">Cài đặt</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">NGÔN NGỮ ỨNG DỤNG</string>
+    <string name="app_language_desc">Tự động chọn ngôn ngữ theo hệ điều hành hoặc thiết lập thủ công.</string>
+    <string name="lang_system_default">Theo hệ thống (Tự động)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Mặc định VN)</string>
+    <string name="lang_english">English (Tiếng Anh)</string>
+    <string name="current_language">Ngôn ngữ</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">NGÔN NGỮ HIỂN THỊ XBOX CLOUD</string>
+    <string name="xbox_web_language_desc">Chọn ngôn ngữ cho giao diện Xbox.com. Loại bỏ hoàn toàn tình trạng bị ép đọc tiếng Nhật khi máy chủ kết nối qua Tokyo.</string>
+    <string name="xbox_lang_system_match">Tự động theo hệ thống (Fallback en-US)</string>
+    <string name="xbox_lang_custom">Khu vực Xbox tùy chỉnh</string>
+    <string name="anti_japanese_enforcer">Chống Ép Tiếng Nhật (Anti-Japanese)</string>
+    <string name="anti_japanese_enforcer_desc">Tự động chuyển hướng trang jp-JP/ja-JP về en-US mượt mà không gây gián đoạn.</string>
+
+    <!-- Hero / Quick Play -->
+    <string name="hero_tag">BỘ TĂNG TỐC CLOUD GAMING</string>
+    <string name="hero_title">CHƠI XBOX CLOUD NGAY</string>
+    <string name="hero_subtitle">Băng thông VIP 20 Mbps • Đã Bật Bypass • 60 FPS Cố Định</string>
+    <string name="btn_launch_xcloud">VÀO XCLOUD NGAY</string>
+    <string name="btn_play_fortnite">Chiến Fortnite Free (Không Cần Pass)</string>
+
+    <!-- Network & Hardware Cockpit -->
+    <string name="cockpit_title">Trạm Điều Khiển Mạng &amp; Tay Cầm</string>
+    <string name="cockpit_subtitle">Tự Động Vượt Rào &amp; Đường Truyền Trực Tiếp Độ Trễ Cực Thấp</string>
+    <string name="net_mode_direct">Chế độ Mạng Trực Tiếp</string>
+    <string name="net_mode_vpn">Đang Bật VPN Vượt Rào</string>
+    <string name="net_desc_direct">Đã kết nối trực tiếp nhà mạng ISP. Độ trễ cực thấp (~28ms) tối ưu cho chơi game.</string>
+    <string name="net_desc_vpn">Đang mở đường hầm VPN Nhật Bản để vượt kiểm tra khu vực khi vào game.</string>
+    <string name="btn_enable_vpn">Bật Vượt Rào VPN</string>
+    <string name="btn_switch_direct">Chế Độ Trực Tiếp (Ping Thấp)</string>
+    <string name="vpn_status_connected">Japan VPN Đang Kết Nối (Vượt Rào Khu Vực)</string>
+    <string name="vpn_status_disconnected">Mạng Trực Tiếp ISP (Độ Trễ Thấp)</string>
+    <string name="auto_bypass_enabled">Auto-Bypass Đang Bật: Tự động chuyển mạng khi vào game</string>
+    <string name="auto_bypass_triggered">Đã phát hiện luồng game! Chuyển sang mạng trực tiếp không cần reload.</string>
+    <string name="hardware_controller">Tay Cầm</string>
+    <string name="controller_connected">Đã kết nối</string>
+    <string name="controller_disconnected">Chưa kết nối</string>
+    <string name="controller_touch">Cảm ứng màn hình</string>
+    <string name="guide_button">Hướng Dẫn</string>
+
+    <!-- Featured Games -->
+    <string name="featured_games_title">Game Nổi Bật</string>
+    <string name="featured_games_subtitle">Khởi động 1 chạm vào thẳng luồng game</string>
+    <string name="btn_view_all">Xem tất cả</string>
+    <string name="btn_play_now">Chơi ngay</string>
+    <string name="badge_free">Miễn phí</string>
+    <string name="badge_touch">Cảm ứng</string>
+    <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
+    <string name="search_games_placeholder">Tìm kiếm game trong thư viện...</string>
+    <string name="filter_all">Tất cả</string>
+    <string name="filter_free">Miễn phí</string>
+    <string name="filter_touch">Hỗ trợ Cảm ứng</string>
+    <string name="filter_gamepass">Xbox Game Pass</string>
+    <string name="btn_add_game">Thêm Game</string>
+    <string name="dialog_add_game_title">Thêm Game Yêu Thích</string>
+    <string name="input_game_title">Tên game</string>
+    <string name="input_game_url">Đường dẫn game trên Xbox</string>
+    <string name="input_game_category">Thể loại</string>
+    <string name="input_game_cover">Ảnh bìa URL (Tùy chọn)</string>
+    <string name="btn_save">Lưu lại</string>
+    <string name="btn_cancel">Hủy</string>
+    <string name="btn_delete">Xóa</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">Máy Chủ VPN Vượt Rào &amp; Proxy Mesh</string>
+    <string name="servers_subtitle">Chọn máy chủ độ trễ thấp để vượt kiểm tra khu vực xCloud</string>
+    <string name="cat_japan">Nhật Bản (Tokyo/Osaka)</string>
+    <string name="cat_korea">Hàn Quốc (Seoul)</string>
+    <string name="cat_sea">Đông Nam Á (Singapore)</string>
+    <string name="cat_usa">Hoa Kỳ (US)</string>
+    <string name="btn_ping_all">Kiểm Tra Tất Cả Ping</string>
+    <string name="btn_fetch_live">Cập Nhật Proxy Mới</string>
+    <string name="btn_add_custom_server">Thêm Máy Chủ Mới</string>
+    <string name="server_active">Đang kết nối</string>
+    <string name="server_optimal">Tối ưu nhất</string>
+    <string name="server_testing">Đang đo ping...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">TỰ ĐỘNG VƯỢT RÀO &amp; ĐIỀU CHỈNH MẠNG</string>
+    <string name="smart_vpn_title">Tự Động Vượt Rào Thông Minh</string>
+    <string name="smart_vpn_desc">Tự động kết nối VPN khi khởi chạy game, sau đó ngắt về mạng ISP trực tiếp để đạt độ trễ thấp nhất.</string>
+    <string name="stealth_headers_title">Stealth Headers &amp; Proxy Mesh</string>
+    <string name="stealth_headers_desc">Tối ưu tiêu đề định tuyến và chống nghẽn mạng từ nhà mạng.</string>
+    <string name="section_cellular_wifi">TỐI ƯU 4G &amp; WI-FI</string>
+    <string name="cellular_mode_saver">4G Tiết Kiệm (Tốc Độ Cao)</string>
+    <string name="cellular_mode_saver_desc">Tiết kiệm 50% data, 60 FPS cố định, độ trễ 0ms.</string>
+    <string name="cellular_mode_max">4G Có Nhiêu Sài Hết (Max Speed)</string>
+    <string name="cellular_mode_max_desc">Bung hết băng thông 20 Mbps cho chất lượng hình ảnh sắc nét nhất.</string>
+    <string name="wifi_speed_first">Ưu Tiên Tốc Độ Wi-Fi</string>
+    <string name="wifi_speed_first_desc">Ưu tiên độ trễ cực thấp thay vì đệm nhiều gói tin.</string>
+    <string name="section_clarity">ĐỒ HỌA &amp; TĂNG NÉT (CLARITY BOOST)</string>
+    <string name="clarity_boost_title">Làm Nét Hình Ảnh (AMD CAS / Bicubic)</string>
+    <string name="clarity_boost_desc">Làm nét vân bề mặt luồng stream WebRTC và loại bỏ hiện tượng mờ nhòe.</string>
+    <string name="preset_off">Tắt</string>
+    <string name="preset_balanced">Cân Bằng (Khuyên dùng)</string>
+    <string name="preset_sharp">Ultra Sharp</string>
+    <string name="preset_oled">OLED Punch</string>
+    <string name="section_controls">ĐIỀU KHIỂN &amp; TIỆN ÍCH</string>
+    <string name="anti_afk_title">Chống Ngắt Phiên AFK (15 Phút)</string>
+    <string name="anti_afk_desc">Ngăn Xbox tự động ngắt phiên kết nối sau 15 phút không thao tác.</string>
+    <string name="polling_boost_title">Tăng Tần Số Lấy Mẫu Tay Cầm (120Hz/240Hz)</string>
+    <string name="polling_boost_desc">Giảm thời gian phản hồi phím bấm tay cầm xuống gần như bằng 0.</string>
+    <string name="floating_hud_title">Thanh Tiện Ích HUD Nổi</string>
+    <string name="floating_hud_desc">Hiển thị ping thực, FPS, bitrate và phím tắt nhanh trong khi đang chơi game.</string>
+    <string name="virtual_gamepad_title">Tay Cầm Ảo Trên Màn Hình</string>
+    <string name="virtual_gamepad_desc">Chơi game bằng các phím bấm ảo trên màn hình khi không gắn tay cầm vật lý.</string>
+    <string name="section_storage">LƯU TRỮ &amp; DỌN DẸP</string>
+    <string name="clear_cookies_title">Xóa Bộ Nhớ Đệm &amp; Cookies Web</string>
+    <string name="clear_cookies_desc">Dọn dẹp phiên đăng nhập và cache web để khắc phục lỗi không tải được game.</string>
+    <string name="btn_clear_cookies">Dọn Dẹp Dữ Liệu Ngay</string>
+    <string name="toast_cookies_cleared">Đã dọn sạch bộ nhớ đệm và cookies!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">ĐỘ TRỄ STREAM</string>
+    <string name="hud_controller">TAY CẦM</string>
+    <string name="hud_clarity_boost">LÀM NÉT (CLARITY BOOST)</string>
+    <string name="hud_vietnamese_translator">BỘ DỊCH TIẾNG VIỆT</string>
+    <string name="hud_return_home">Về Trang Chủ</string>
+    <string name="hud_reload">Tải Lại Trang</string>
+    <string name="hud_virtual_gamepad">Tay Cầm Ảo</string>
+    <string name="hud_network_switch">Chuyển Đổi Mạng</string>
+    <string name="dialog_exit_title">Thoát Phiên Game?</string>
+    <string name="dialog_exit_message">Bạn có chắc muốn thoát luồng game Xbox hiện tại và quay về màn hình chính?</string>
+    <string name="btn_confirm_exit">Thoát Game</string>
+    <string name="loading_stream">Đang kết nối luồng game Xbox Cloud...</string>
+    <string name="loading_tip">Mẹo: Auto-Bypass sẽ tự động chuyển sang mạng trực tiếp khi vào game để đạt ping ~28ms!</string>
+</resources>

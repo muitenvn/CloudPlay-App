@@ -56,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import com.example.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -203,12 +205,27 @@ fun DashboardScreen(
                                 }
                             }
 
-                            // Language badge
+                            // Language badge with direct toggle & sync with system
+                            val currentLangLabel = when (config.appLanguage) {
+                                com.example.data.AppLanguage.SYSTEM -> {
+                                    val sys = java.util.Locale.getDefault()
+                                    if (sys.language.lowercase().startsWith("vi")) "VI (Auto)" else "EN (Auto)"
+                                }
+                                com.example.data.AppLanguage.VIETNAMESE -> "Tiếng Việt"
+                                com.example.data.AppLanguage.ENGLISH -> "English"
+                            }
                             Surface(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
                                     .border(1.dp, XboxNeonGreen.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                                    .clickable { currentTab = DashboardTab.SETTINGS }
+                                    .clickable {
+                                        val nextLang = when (config.appLanguage) {
+                                            com.example.data.AppLanguage.SYSTEM -> com.example.data.AppLanguage.VIETNAMESE
+                                            com.example.data.AppLanguage.VIETNAMESE -> com.example.data.AppLanguage.ENGLISH
+                                            com.example.data.AppLanguage.ENGLISH -> com.example.data.AppLanguage.SYSTEM
+                                        }
+                                        SettingsRepository.updateAppLanguage(nextLang)
+                                    }
                                     .testTag("topbar_language_button"),
                                 color = XboxSurfaceVariant.copy(alpha = 0.9f)
                             ) {
@@ -219,12 +236,12 @@ fun DashboardScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Language,
-                                        contentDescription = "Ngôn ngữ",
+                                        contentDescription = stringResource(R.string.current_language),
                                         tint = XboxNeonGreen,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = config.getEffectiveLocale(),
+                                        text = currentLangLabel,
                                         color = TextPrimary,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
@@ -257,8 +274,8 @@ fun DashboardScreen(
                     NavigationBarItem(
                         selected = currentTab == DashboardTab.HOME,
                         onClick = { currentTab = DashboardTab.HOME },
-                        icon = { Icon(Icons.Default.Home, contentDescription = "Trang Chủ") },
-                        label = { Text("Trang Chủ", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Home, contentDescription = stringResource(R.string.tab_home)) },
+                        label = { Text(stringResource(R.string.tab_home), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.Black,
                             selectedTextColor = XboxNeonGreen,
@@ -271,8 +288,8 @@ fun DashboardScreen(
                     NavigationBarItem(
                         selected = currentTab == DashboardTab.LIBRARY,
                         onClick = { currentTab = DashboardTab.LIBRARY },
-                        icon = { Icon(Icons.Default.SportsEsports, contentDescription = "Thư Viện") },
-                        label = { Text("Thư Viện", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.SportsEsports, contentDescription = stringResource(R.string.tab_library)) },
+                        label = { Text(stringResource(R.string.tab_library), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.Black,
                             selectedTextColor = XboxNeonGreen,
@@ -285,8 +302,8 @@ fun DashboardScreen(
                     NavigationBarItem(
                         selected = currentTab == DashboardTab.SERVERS,
                         onClick = { currentTab = DashboardTab.SERVERS },
-                        icon = { Icon(Icons.Default.Speed, contentDescription = "Máy Chủ") },
-                        label = { Text("Máy Chủ", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Speed, contentDescription = stringResource(R.string.tab_servers)) },
+                        label = { Text(stringResource(R.string.tab_servers), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.Black,
                             selectedTextColor = XboxNeonGreen,
@@ -299,8 +316,8 @@ fun DashboardScreen(
                     NavigationBarItem(
                         selected = currentTab == DashboardTab.SETTINGS,
                         onClick = { currentTab = DashboardTab.SETTINGS },
-                        icon = { Icon(Icons.Default.Tune, contentDescription = "Cài Đặt") },
-                        label = { Text("Cài Đặt", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        icon = { Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.tab_settings)) },
+                        label = { Text(stringResource(R.string.tab_settings), fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color.Black,
                             selectedTextColor = XboxNeonGreen,

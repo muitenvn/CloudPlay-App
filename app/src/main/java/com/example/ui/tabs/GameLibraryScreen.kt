@@ -57,9 +57,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.GameBookmark
 import com.example.data.GameFilterTab
 import com.example.data.GameLibraryRepository
@@ -116,7 +118,7 @@ fun GameLibraryScreen(
                     .fillMaxWidth()
                     .height(52.dp)
                     .testTag("library_search_input"),
-                placeholder = { Text("Tìm kiếm game trong thư viện...", fontSize = 13.sp, color = TextSecondary) },
+                placeholder = { Text(stringResource(R.string.search_games_placeholder), fontSize = 13.sp, color = TextSecondary) },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
@@ -149,10 +151,10 @@ fun GameLibraryScreen(
 
             // Category Tabs Carousel
             val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
-                GameFilterTab.ALL to "Tất cả (${games.size})",
-                GameFilterTab.FREE_TO_PLAY to "Miễn phí (Free)",
-                GameFilterTab.TOUCH_FRIENDLY to "Hỗ trợ Cảm ứng",
-                GameFilterTab.GAME_PASS to "Xbox Game Pass"
+                GameFilterTab.ALL to "${stringResource(R.string.filter_all)} (${games.size})",
+                GameFilterTab.FREE_TO_PLAY to stringResource(R.string.filter_free),
+                GameFilterTab.TOUCH_FRIENDLY to stringResource(R.string.filter_touch),
+                GameFilterTab.GAME_PASS to stringResource(R.string.filter_gamepass)
             )
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -406,7 +408,7 @@ private fun AddGameDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "Thêm Game Xbox Yêu Thích",
+                stringResource(R.string.dialog_add_game_title),
                 color = TextPrimary,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 17.sp
@@ -415,14 +417,14 @@ private fun AddGameDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Dán tên game và link Xbox Cloud Gaming vào ô bên dưới:",
+                    stringResource(R.string.dialog_add_game_title),
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Tên Game") },
+                    label = { Text(stringResource(R.string.input_game_title)) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
                         unfocusedBorderColor = XboxCardBorder,
@@ -434,7 +436,7 @@ private fun AddGameDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Đường link Xbox Play") },
+                    label = { Text(stringResource(R.string.input_game_url)) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
                         unfocusedBorderColor = XboxCardBorder,
@@ -451,12 +453,12 @@ private fun AddGameDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                 enabled = title.isNotBlank() && url.isNotBlank()
             ) {
-                Text("Lưu & Chơi", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.btn_save), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Hủy", color = TextSecondary)
+                Text(stringResource(R.string.btn_cancel), color = TextSecondary)
             }
         },
         containerColor = XboxSurface,

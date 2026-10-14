@@ -1,8 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
+    <string name="app_subtitle">Xbox Cloud Gaming</string>
     <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_servers">Servers</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">APP LANGUAGE</string>
+    <string name="app_language_desc">Automatically select language based on system or set manually.</string>
+    <string name="lang_system_default">System Default (Auto)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Vietnamese)</string>
+    <string name="lang_english">English (Tiếng Anh)</string>
+    <string name="current_language">Language</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">XBOX CLOUD WEB REGION</string>
+    <string name="xbox_web_language_desc">Select display region for Xbox.com interface. Eliminates forced Japanese when using Tokyo servers.</string>
+    <string name="xbox_lang_system_match">System Auto (en-US fallback)</string>
+    <string name="xbox_lang_custom">Custom Xbox Region</string>
+    <string name="anti_japanese_enforcer">Anti-Japanese Enforcer</string>
+    <string name="anti_japanese_enforcer_desc">Auto-redirects jp-JP/ja-JP pages to en-US seamlessly.</string>
+
+    <!-- Hero / Quick Play -->
+    <string name="hero_tag">CLOUDGAMING BOOSTER</string>
+    <string name="hero_title">PLAY XBOX CLOUD NOW</string>
+    <string name="hero_subtitle">VIP 20 Mbps • Bypass Active • Locked 60 FPS</string>
+    <string name="btn_launch_xcloud">PLAY XCLOUD NOW</string>
+    <string name="btn_play_fortnite">Free Fortnite (No Pass Req.)</string>
+
+    <!-- Network & Hardware Cockpit -->
+    <string name="cockpit_title">Network &amp; Controller Cockpit</string>
+    <string name="cockpit_subtitle">Smart Auto-Bypass &amp; Direct Low-Latency Pipeline</string>
+    <string name="net_mode_direct">Direct Network Mode</string>
+    <string name="net_mode_vpn">Bypass VPN Active</string>
+    <string name="net_desc_direct">Direct ISP connection active. Low latency (~28ms) for gaming.</string>
+    <string name="net_desc_vpn">Japan VPN tunnel active. Bypasses geo-restrictions for game launch.</string>
+    <string name="btn_enable_vpn">Enable Bypass VPN</string>
+    <string name="btn_switch_direct">Direct Mode (Low Ping)</string>
     <string name="vpn_status_connected">Japan VPN Connected (Bypassing Region)</string>
     <string name="vpn_status_disconnected">Direct ISP Network (Low Latency)</string>
     <string name="auto_bypass_enabled">Auto-Bypass Active: Switching network on game launch</string>
     <string name="auto_bypass_triggered">Game stream detected! Switched to Direct Network without reload.</string>
+    <string name="hardware_controller">Controller</string>
+    <string name="controller_connected">Connected</string>
+    <string name="controller_disconnected">Disconnected</string>
+    <string name="controller_touch">Screen Touch</string>
+    <string name="guide_button">User Guide</string>
+
+    <!-- Featured Games -->
+    <string name="featured_games_title">Featured Games</string>
+    <string name="featured_games_subtitle">1-Tap launch directly into game stream</string>
+    <string name="btn_view_all">View All</string>
+    <string name="btn_play_now">Play Now</string>
+    <string name="badge_free">Free</string>
+    <string name="badge_touch">Touch</string>
+    <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
+    <string name="search_games_placeholder">Search games in library...</string>
+    <string name="filter_all">All</string>
+    <string name="filter_free">Free to Play</string>
+    <string name="filter_touch">Touch Friendly</string>
+    <string name="filter_gamepass">Xbox Game Pass</string>
+    <string name="btn_add_game">Add Game</string>
+    <string name="dialog_add_game_title">Add Custom Bookmark</string>
+    <string name="input_game_title">Game Title</string>
+    <string name="input_game_url">Xbox Game URL</string>
+    <string name="input_game_category">Category</string>
+    <string name="input_game_cover">Cover Image URL (Optional)</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_delete">Delete</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">Bypass VPN &amp; Proxy Mesh</string>
+    <string name="servers_subtitle">Select low-latency server nodes to bypass xCloud geo-blocks</string>
+    <string name="cat_japan">Japan (Tokyo/Osaka)</string>
+    <string name="cat_korea">Korea (Seoul)</string>
+    <string name="cat_sea">SE Asia (Singapore)</string>
+    <string name="cat_usa">United States</string>
+    <string name="btn_ping_all">Ping All Servers</string>
+    <string name="btn_fetch_live">Fetch Live Proxies</string>
+    <string name="btn_add_custom_server">Add Custom Node</string>
+    <string name="server_active">Connected</string>
+    <string name="server_optimal">Optimal</string>
+    <string name="server_testing">Testing ping...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">AUTO BYPASS &amp; NETWORK TUNING</string>
+    <string name="smart_vpn_title">Smart Auto-Bypass</string>
+    <string name="smart_vpn_desc">Automatically connects VPN to launch game, then switches to direct ISP network for lowest latency.</string>
+    <string name="stealth_headers_title">Stealth Headers &amp; Mesh</string>
+    <string name="stealth_headers_desc">Spoofs low-latency routing headers and bypasses ISP throttling.</string>
+    <string name="section_cellular_wifi">4G &amp; WI-FI OPTIMIZATION</string>
+    <string name="cellular_mode_saver">4G Data Saver (High Speed)</string>
+    <string name="cellular_mode_saver_desc">Saves 50% data, locked 60 FPS, zero input lag.</string>
+    <string name="cellular_mode_max">4G Max Speed (Uncapped)</string>
+    <string name="cellular_mode_max_desc">Uncapped 20 Mbps bandwidth for maximum visual fidelity.</string>
+    <string name="wifi_speed_first">Wi-Fi Low Latency Priority</string>
+    <string name="wifi_speed_first_desc">Prioritizes packet arrival time over heavy buffering.</string>
+    <string name="section_clarity">GRAPHICS &amp; CLARITY BOOST</string>
+    <string name="clarity_boost_title">Clarity Boost (AMD CAS / Bicubic)</string>
+    <string name="clarity_boost_desc">Sharpens WebRTC stream textures and removes stream blur.</string>
+    <string name="preset_off">Off</string>
+    <string name="preset_balanced">Balanced (Recommended)</string>
+    <string name="preset_sharp">Ultra Sharp</string>
+    <string name="preset_oled">OLED Punch</string>
+    <string name="section_controls">CONTROLS &amp; UTILITIES</string>
+    <string name="anti_afk_title">Anti-AFK Keep-Alive</string>
+    <string name="anti_afk_desc">Prevents Xbox session disconnect after 15 minutes of inactivity.</string>
+    <string name="polling_boost_title">Input Polling Boost (120Hz/240Hz)</string>
+    <string name="polling_boost_desc">Reduces controller input response time to near-zero.</string>
+    <string name="floating_hud_title">Floating Telemetry HUD</string>
+    <string name="floating_hud_desc">Shows live ping, FPS, bitrate and quick controls while gaming.</string>
+    <string name="virtual_gamepad_title">On-Screen Virtual Gamepad</string>
+    <string name="virtual_gamepad_desc">Play games using on-screen virtual buttons when no physical gamepad is attached.</string>
+    <string name="section_storage">STORAGE &amp; MAINTENANCE</string>
+    <string name="clear_cookies_title">Clear Web Cache &amp; Cookies</string>
+    <string name="clear_cookies_desc">Cleans login sessions and cached data to resolve loading issues.</string>
+    <string name="btn_clear_cookies">Clear Data Now</string>
+    <string name="toast_cookies_cleared">Web cache and cookies cleared successfully!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">STREAM LATENCY</string>
+    <string name="hud_controller">CONTROLLER</string>
+    <string name="hud_clarity_boost">CLARITY BOOST</string>
+    <string name="hud_vietnamese_translator">VIETNAMESE TRANSLATOR</string>
+    <string name="hud_return_home">Return to Home</string>
+    <string name="hud_reload">Reload Page</string>
+    <string name="hud_virtual_gamepad">Virtual Gamepad</string>
+    <string name="hud_network_switch">Switch Network</string>
+    <string name="dialog_exit_title">Leave Game Session?</string>
+    <string name="dialog_exit_message">Do you want to exit the current Xbox game stream and return to the main dashboard?</string>
+    <string name="btn_confirm_exit">Exit Game</string>
+    <string name="loading_stream">Loading Xbox Cloud Gaming stream...</string>
+    <string name="loading_tip">Tip: Auto-Bypass will switch to direct network once stream connects for ~28ms ping!</string>
 </resources>

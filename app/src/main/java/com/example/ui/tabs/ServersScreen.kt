@@ -60,9 +60,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.TextPrimary
@@ -97,6 +99,12 @@ fun ServersScreen(
     var isTestingAll by remember { mutableStateOf(false) }
     var isFetchingLive by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
+
+    val jpLabel = stringResource(R.string.cat_japan)
+    val krLabel = stringResource(R.string.cat_korea)
+    val usLabel = stringResource(R.string.cat_usa)
+    val seaLabel = stringResource(R.string.cat_sea)
+    val allLabel = stringResource(R.string.filter_all)
 
     val allServers = remember(vpnState.customServers) {
         mutableStateListOf<ServerLocation>().apply {
@@ -168,7 +176,7 @@ fun ServersScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "HỆ THỐNG MÁY CHỦ DỰ PHÒNG XBOX",
+                                text = stringResource(R.string.servers_title),
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -177,7 +185,7 @@ fun ServersScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${allServers.size} Máy chủ Nhật Bản & Quốc Tế",
+                                text = "${allServers.size} " + stringResource(R.string.servers_subtitle),
                                 color = TextSecondary,
                                 fontSize = 12.sp,
                                 maxLines = 1,
@@ -223,7 +231,7 @@ fun ServersScreen(
                                 Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    "Kiểm Tra Ping",
+                                    stringResource(R.string.btn_ping_all),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -248,7 +256,7 @@ fun ServersScreen(
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    "Tải Proxy Sống",
+                                    stringResource(R.string.btn_fetch_live),
                                     color = TextPrimary,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -270,7 +278,7 @@ fun ServersScreen(
                             Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(2.dp))
                             Text(
-                                "Thêm",
+                                stringResource(R.string.btn_add_custom_server),
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -289,11 +297,11 @@ fun ServersScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val categories = listOf(
-                    "JP" to "🇯🇵 Nhật Bản (${allServers.count { it.countryCode == "JP" }})",
-                    "KR" to "🇰🇷 Hàn Quốc (${allServers.count { it.countryCode == "KR" }})",
-                    "US" to "🇺🇸 Hoa Kỳ (${allServers.count { it.countryCode == "US" }})",
-                    "SG" to "🇸🇬 Singapore (${allServers.count { it.countryCode == "SG" }})",
-                    "ALL" to "🌐 Tất Cả (${allServers.size})"
+                    "JP" to "🇯🇵 $jpLabel (${allServers.count { it.countryCode == "JP" }})",
+                    "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
+                    "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
+                    "SG" to "🇸🇬 $seaLabel (${allServers.count { it.countryCode == "SG" }})",
+                    "ALL" to "🌐 $allLabel (${allServers.size})"
                 )
 
                 items(categories) { (code, title) ->

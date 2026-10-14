@@ -83,7 +83,14 @@ enum class NetworkTuningMode(
     )
 }
 
+enum class AppLanguage(val code: String, val title: String) {
+    SYSTEM("system", "Theo hệ thống (Tự động)"),
+    VIETNAMESE("vi", "Tiếng Việt"),
+    ENGLISH("en", "English")
+}
+
 data class AppConfig(
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM, // Tự động chọn tiếng Việt / tiếng Anh theo hệ thống
     val smartVpnEnabled: Boolean = true, // Tự động kiểm tra IP & điều khiển bật/tắt thông minh
     val autoBypassEnabled: Boolean = true,
     val autoBypassDelaySeconds: Int = 2,
@@ -231,6 +238,10 @@ object SettingsRepository {
     fun adaptPlayUrl(url: String, countryCode: String? = null): String {
         val effectiveLocale = _config.value.getEffectiveLocale()
         return formatXboxUrlWithLocale(url, effectiveLocale)
+    }
+
+    fun updateAppLanguage(language: AppLanguage) {
+        _config.value = _config.value.copy(appLanguage = language)
     }
 
     fun updateUseSystemLanguage(useSystem: Boolean) {

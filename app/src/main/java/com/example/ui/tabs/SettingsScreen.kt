@@ -57,8 +57,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.AppConfig
+import com.example.data.AppLanguage
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
@@ -99,12 +102,163 @@ fun SettingsScreen(
     ) {
 
 
-        // Section 1: Language Settings (CRITICAL for user request)
+        // Section 0: App Language (Multilingual UI Support)
         item {
-            SettingsCard(title = "NGÔN NGỮ HIỂN THỊ XBOX CLOUD") {
+            SettingsCard(title = stringResource(R.string.section_app_language)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.app_language_desc),
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    // 1. System Default (Auto)
+                    val isSystemSelected = config.appLanguage == AppLanguage.SYSTEM
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isSystemSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateAppLanguage(AppLanguage.SYSTEM) }
+                            .testTag("app_lang_system_button"),
+                        color = if (isSystemSelected) XboxSurfaceVariant else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("🌐", fontSize = 16.sp)
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.lang_system_default),
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    val sys = Locale.getDefault()
+                                    val detectedStr = if (sys.language.lowercase().startsWith("vi")) "Tiếng Việt (${sys.displayName})" else "English (${sys.displayName})"
+                                    Text(
+                                        text = "Hệ thống: $detectedStr",
+                                        color = DirectCyan,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            if (isSystemSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    // 2. Tiếng Việt (Vietnamese)
+                    val isViSelected = config.appLanguage == AppLanguage.VIETNAMESE
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isViSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateAppLanguage(AppLanguage.VIETNAMESE) }
+                            .testTag("app_lang_vi_button"),
+                        color = if (isViSelected) XboxSurfaceVariant else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("🇻🇳", fontSize = 16.sp)
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.lang_vietnamese),
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "Giao diện tiếng Việt chuẩn, tự nhiên",
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            if (isViSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    // 3. English
+                    val isEnSelected = config.appLanguage == AppLanguage.ENGLISH
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isEnSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateAppLanguage(AppLanguage.ENGLISH) }
+                            .testTag("app_lang_en_button"),
+                        color = if (isEnSelected) XboxSurfaceVariant else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("🇺🇸", fontSize = 16.sp)
+                                Column {
+                                    Text(
+                                        text = stringResource(R.string.lang_english),
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "Clean, native English UI",
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            if (isEnSelected) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section 1: Xbox Cloud Web Region
+        item {
+            SettingsCard(title = stringResource(R.string.section_xbox_web_language)) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Chọn tiếng Anh hoặc ngôn ngữ hệ thống cho giao diện Xbox. Bạn không còn bị ép đọc tiếng Nhật khi máy chủ kết nối qua Tokyo/Nhật Bản.",
+                        text = stringResource(R.string.xbox_web_language_desc),
                         color = TextSecondary,
                         fontSize = 11.sp,
                         lineHeight = 16.sp

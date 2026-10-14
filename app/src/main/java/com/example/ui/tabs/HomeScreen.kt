@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -220,7 +221,7 @@ private fun HeroConsolePlayDeck(
                                 text = when (vpnState.mode) {
                                     NetworkMode.DIRECT_NETWORK -> "Direct Handshake ⚡"
                                     NetworkMode.VPN_JAPAN -> "Tokyo Proxy 🇯🇵"
-                                    NetworkMode.DISCONNECTED -> "Sẵn sàng kết nối"
+                                    NetworkMode.DISCONNECTED -> stringResource(R.string.server_testing)
                                 },
                                 color = TextPrimary,
                                 fontSize = 11.sp,
@@ -247,14 +248,14 @@ private fun HeroConsolePlayDeck(
                 // Title & Subtitle
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Xbox Game Pass Cloud",
+                        text = stringResource(R.string.hero_title),
                         color = TextPrimary,
-                        fontSize = 21.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = (-0.5).sp
                     )
                     Text(
-                        text = "Chơi game Xbox 60FPS mượt mà trực tiếp không cần máy console.",
+                        text = stringResource(R.string.hero_subtitle),
                         color = TextSecondary,
                         fontSize = 11.5.sp,
                         lineHeight = 15.sp
@@ -291,8 +292,8 @@ private fun HeroConsolePlayDeck(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "XBOX CLOUD",
-                                fontSize = 13.sp,
+                                text = stringResource(R.string.btn_launch_xcloud),
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.5.sp
                             )
@@ -324,8 +325,8 @@ private fun HeroConsolePlayDeck(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "FORTNITE FREE",
-                                fontSize = 11.sp,
+                                text = stringResource(R.string.btn_play_fortnite),
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.3.sp
                             )
@@ -343,7 +344,7 @@ private fun HeroConsolePlayDeck(
                         color = Color.Black.copy(alpha = 0.45f)
                     ) {
                         Text(
-                            text = "🇻🇳 Dịch Tiếng Việt Tối Ưu xCloud",
+                            text = "🌐 " + stringResource(R.string.section_app_language),
                             color = XboxNeonGreen,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -355,7 +356,7 @@ private fun HeroConsolePlayDeck(
                         color = Color.Black.copy(alpha = 0.45f)
                     ) {
                         Text(
-                            text = "⚡ 0ms Không Lag Stream",
+                            text = "⚡ 0ms Direct Lag Free",
                             color = DirectCyan,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
@@ -415,7 +416,7 @@ private fun QuickNetworkCockpitCard(
                     }
                     Column {
                         Text(
-                            text = "MÁY CHỦ XCLOUD",
+                            text = stringResource(R.string.cockpit_title),
                             color = TextPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.ExtraBold
@@ -483,7 +484,7 @@ private fun QuickNetworkCockpitCard(
                             text = if (gamepadStatus.hasPhysicalController)
                                 gamepadStatus.controllerName
                             else
-                                "Tay Cầm Ảo Touch (Sẵn sàng + Haptic)",
+                                stringResource(R.string.virtual_gamepad_title),
                             color = TextPrimary,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
@@ -491,7 +492,7 @@ private fun QuickNetworkCockpitCard(
                     }
 
                     Text(
-                        text = if (gamepadStatus.hasPhysicalController) "VẬT LÝ" else "CẢM ỨNG",
+                        text = if (gamepadStatus.hasPhysicalController) stringResource(R.string.controller_connected) else stringResource(R.string.controller_touch),
                         color = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else DirectCyan,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.ExtraBold
@@ -525,7 +526,7 @@ private fun QuickNetworkCockpitCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isConnected) "Đã Kích Hoạt Tối Ưu (Chạm để tắt)" else "Kích Hoạt Tối Ưu Smart Bypass",
+                        text = if (isConnected) stringResource(R.string.net_mode_direct) else stringResource(R.string.btn_enable_vpn),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -549,7 +550,7 @@ private fun FeaturedGamesSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "GAME NỔI BẬT",
+                text = stringResource(R.string.featured_games_title),
                 color = TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Black,
@@ -564,7 +565,7 @@ private fun FeaturedGamesSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Xem tất cả",
+                    text = stringResource(R.string.btn_view_all),
                     color = XboxNeonGreen,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -696,7 +697,7 @@ private fun FeaturedGameCard(
                         color = XboxGreen
                     ) {
                         Text(
-                            text = "Chơi",
+                            text = stringResource(R.string.btn_play_now),
                             color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,

@@ -110,6 +110,18 @@ jobs:
           echo "Keystore verified successfully:"
           ls -l debug.keystore
 
+          # 3. Đảm bảo default_web_client_id luôn có mặt để tránh lỗi Unresolved reference trên CI
+          mkdir -p app/src/main/res/values
+          if [ ! -f "app/src/main/res/values/default_web_client.xml" ]; then
+            cat << 'EOF' > app/src/main/res/values/default_web_client.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_web_client_id" translatable="false">placeholder_web_client_id.apps.googleusercontent.com</string>
+</resources>
+EOF
+            echo "Created fallback default_web_client.xml"
+          fi
+
       - name: Make Gradlew Executable
         run: |
           if [ -f "./gradlew" ]; then

@@ -67,6 +67,15 @@ import kotlinx.coroutines.tasks.await
 
 object AuthManager {
 
+    private fun getWebClientId(context: Context): String? {
+        return try {
+            val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+            if (resId != 0) context.getString(resId) else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun attemptAutoSignIn(
         context: Context,
         credentialManager: CredentialManager,
@@ -78,9 +87,7 @@ object AuthManager {
             onAuthSuccess()
             return
         }
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
+        val clientId = getWebClientId(context) ?: run {
             onUnauthenticated()
             return
         }
@@ -119,9 +126,7 @@ object AuthManager {
         scope: CoroutineScope,
         onAuthCancelled: () -> Unit = {}
     ) {
-        val clientId = try {
-            context.getString(R.string.default_web_client_id)
-        } catch (e: Exception) {
+        val clientId = getWebClientId(context) ?: run {
             onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
             return
         }

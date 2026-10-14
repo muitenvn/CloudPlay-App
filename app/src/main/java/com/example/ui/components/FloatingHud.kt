@@ -179,7 +179,7 @@ fun FloatingHud(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // MINIMIZED STATE: Ultra-compact Capsule Pill (~75dp) with quick Home button
+                // MINIMIZED STATE: Ultra-compact Capsule Pill (tap to expand)
                 if (hudMode == HudMode.MINIMIZED) {
                     val activePing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs ?: 29 else vpnState.latencyMs ?: 75
                     val pingColor = when {
@@ -193,74 +193,33 @@ fun FloatingHud(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable {
+                                lastInteractionTime = System.currentTimeMillis()
+                                isInteracting = true
+                                hudMode = HudMode.COMPACT
+                            }
+                            .padding(horizontal = 7.dp, vertical = 4.dp)
                             .testTag("hud_minimized_pill")
                     ) {
-                        // Prominent Home button in minimized pill
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = DirectCyan.copy(alpha = 0.28f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f)),
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    showExitConfirmDialog = true
-                                }
-                                .testTag("hud_minimized_home_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Home,
-                                    contentDescription = "Trang chủ",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = "Home",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Ping & Gamepad badge (tap to expand compact bar)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier
-                                .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    hudMode = HudMode.COMPACT
-                                }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(pingColor)
-                            )
-                            Text(
-                                text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${activePing}ms" else "🇯🇵${activePing}ms",
-                                color = TextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.5.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Default.Gamepad,
-                                contentDescription = null,
-                                tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                        }
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(pingColor)
+                        )
+                        Text(
+                            text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${activePing}ms" else "🇯🇵${activePing}ms",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Gamepad,
+                            contentDescription = null,
+                            tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
+                            modifier = Modifier.size(13.dp)
+                        )
                     }
                 } else {
                     // ==========================================

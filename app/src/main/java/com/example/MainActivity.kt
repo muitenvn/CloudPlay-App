@@ -66,23 +66,30 @@ class MainActivity : ComponentActivity() {
             }
 
             val baseContext = androidx.compose.ui.platform.LocalContext.current
-            val localizedContext = remember(targetLocale, baseContext) {
-                val conf = android.content.res.Configuration(baseContext.resources.configuration)
-                conf.setLocale(targetLocale)
-                conf.setLayoutDirection(targetLocale)
-                baseContext.createConfigurationContext(conf)
-            }
-            val baseConfiguration = androidx.compose.ui.platform.LocalConfiguration.current
-            val localizedConfiguration = remember(targetLocale, baseConfiguration) {
-                val conf = android.content.res.Configuration(baseConfiguration)
+            val localizedConfiguration = remember(targetLocale) {
+                val conf = android.content.res.Configuration()
                 conf.setLocale(targetLocale)
                 conf.setLayoutDirection(targetLocale)
                 conf
             }
+            val localizedWrapper = remember(targetLocale, baseContext) {
+                val conf = android.content.res.Configuration(baseContext.resources.configuration)
+                conf.setLocale(targetLocale)
+                conf.setLayoutDirection(targetLocale)
+                val localizedCtx = baseContext.createConfigurationContext(conf)
+                object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
+                    override fun getResources(): android.content.res.Resources = localizedCtx.resources
+                    override fun getAssets(): android.content.res.AssetManager = localizedCtx.assets
+                    override fun getTheme(): android.content.res.Resources.Theme = localizedCtx.theme
+                    override val activityResultRegistry: androidx.activity.result.ActivityResultRegistry
+                        get() = this@MainActivity.activityResultRegistry
+                }
+            }
 
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalConfiguration provides localizedConfiguration,
-                androidx.compose.ui.platform.LocalContext provides localizedContext
+                androidx.compose.ui.platform.LocalContext provides localizedWrapper,
+                androidx.activity.compose.LocalActivityResultRegistryOwner provides this@MainActivity
             ) {
                 MyApplicationTheme {
                     MainContent(

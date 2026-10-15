@@ -495,7 +495,7 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "Được tối ưu riêng cho Xbox Cloud, không phải Google Translate đại trà",
+                                    text = "Google Dịch Thông Minh Cho Xbox Cloud (Smart Gaming Translator)",
                                     color = TextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -503,7 +503,7 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "✓ Không làm đơ lag stream WebRTC video hay hỏng phím tay cầm.\n✓ Dịch chuẩn 250+ thuật ngữ gaming, nút bấm, hàng chờ và hướng dẫn.\n✓ Bảo vệ tên các tựa game nổi tiếng (Fortnite, Forza, Halo...) không bị dịch sai nghĩa ngớ ngẩn.\n✓ Tốc độ 0ms chạy ngay trên thiết bị mà không cần gửi dữ liệu ra máy chủ ngoài.",
+                                text = "✓ Dịch y chang Google Dịch tự nhiên 100% mọi mô tả cốt truyện, hướng dẫn, đánh giá và menu game.\n✓ Biết hết chỗ nào để né: Không đụng thẻ video stream WebRTC, không làm giật lag hay mất 60 FPS.\n✓ Tự động bảo vệ tên game (Fortnite, Forza, Halo, Starfield...) và phím tay cầm (RT, LT, D-pad).\n✓ Kết hợp từ điển 0ms tức thì cho giao diện và Google Translate mượt mà cho đoạn văn dài.",
                                 color = TextSecondary,
                                 fontSize = 11.sp,
                                 lineHeight = 16.sp

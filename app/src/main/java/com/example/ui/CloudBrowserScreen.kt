@@ -182,8 +182,10 @@ fun CloudBrowserScreen(
                         cookieManager.setCookie("https://www.xbox.com", "MSPC-LOCALE=$effectiveLocale; domain=.xbox.com; path=/")
                     }
 
-                    // Add JavaScript bridge for stream / launch detection
-                    addJavascriptInterface(XboxBridge(streamController), "CloudPlayBridge")
+                    // Add JavaScript bridge for stream / launch detection & smart translation
+                    val bridge = XboxBridge(streamController)
+                    bridge.setWebView(this)
+                    addJavascriptInterface(bridge, "CloudPlayBridge")
 
                     val injectionScript = XboxBridge.getInjectionScript(
                         clarityBoost = config.clarityBoostEnabled,

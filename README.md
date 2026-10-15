@@ -25,6 +25,13 @@
 - 🎮 **Floating Gaming HUD (Thanh công cụ nổi thông minh)**:
   - **Chế độ thu nhỏ (Minimized Pill):** Thiết kế dạng viên thuốc siêu gọn gàng, hiển thị ping mạng thời gian thực (`⚡29ms`) và icon tay cầm (`🎮`), hoàn toàn không che khuất màn hình chơi game (đã loại bỏ các nút thừa). Chạm vào viên thuốc để mở rộng menu.
   - **Chế độ mở rộng (Expanded / Compact):** Đầy đủ các nút điều hướng tiện lợi như **Home** ("Về Trang Chủ"), xoay màn hình (Landscape/Portrait), xem chi tiết tình trạng kết nối mạng và đổi server nhanh.
+- 🌐 **Bộ Dịch Google Dịch Thông Minh (Smart Gaming Translator)**:
+  - Dịch tự nhiên 100% như Google Dịch mọi mô tả game, cốt truyện, hướng dẫn, patch notes và menu xCloud.
+  - **Tự động né những chỗ không nên dịch:** Bảo vệ hơn 300+ tên game nổi tiếng (Fortnite, Forza Horizon, Halo Infinite, Starfield, Sea of Thieves...) không bị dịch sai nghĩa ngớ ngẩn; né hoàn toàn các thẻ video stream WebRTC, canvas và nút bấm tay cầm (RT, LT, D-pad) giúp đạt 60 FPS mượt mà 0% giật lag.
+  - Kết hợp từ điển 0ms tức thì cho giao diện và Google Translate mượt mà cho các đoạn văn dài.
+  - Hỗ trợ chế độ song ngữ (Bilingual: Tiếng Việt + Tiếng Anh gốc trong ngoặc).
+- 🌍 **Đa ngôn ngữ thông minh (Tiếng Việt & English)**:
+  - Tự động nhận diện ngôn ngữ hệ thống điện thoại của người dùng (System Locale) hoặc tùy chỉnh nhanh bằng 1 chạm trên thanh tiêu đề TopBar.
 - 🚀 **Hiệu năng cao & Tiết kiệm pin (High Performance)**:
   - Giao diện xây dựng hoàn toàn bằng **Jetpack Compose (Material 3)** mượt mà, hiện đại.
   - Tối ưu bộ tăng tốc phần cứng WebKit WebView, tối thiểu hóa độ trễ cảm ứng và giật khung hình.

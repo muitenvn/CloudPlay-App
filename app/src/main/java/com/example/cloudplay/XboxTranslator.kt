@@ -330,18 +330,26 @@ object XboxTranslator {
         "계속하기" to "Tiếp tục"
     )
 
-    // Game Titles Protected from translation
+    // Game Titles Protected from translation (Never mistranslate titles like "Sea of Thieves" -> "Biển của những tên trộm")
     val PROTECTED_GAME_TITLES = listOf(
         "Fortnite", "Forza Horizon", "Forza Motorsport", "Forza", "Halo Infinite", "Halo",
         "Starfield", "Minecraft", "Sea of Thieves", "Gears of War", "Gears 5", "Fallout",
-        "The Elder Scrolls", "Skyrim", "Doom", "Doom Eternal", "Palworld", "Persona",
+        "The Elder Scrolls", "Skyrim", "Oblivion", "Doom", "Doom Eternal", "Palworld", "Persona",
         "Yakuza", "Like a Dragon", "Assassin's Creed", "Rainbow Six", "Far Cry",
         "Dead Island", "Lies of P", "Monster Hunter", "Mortal Kombat", "Tekken",
         "Street Fighter", "Dead Cells", "Hades", "Hollow Knight", "Overcooked",
         "It Takes Two", "ARK", "Rust", "No Man's Sky", "Cities: Skylines",
         "Microsoft Flight Simulator", "Battlefield", "Need for Speed", "FIFA", "EA Sports FC",
         "NBA 2K", "PUBG", "Apex Legends", "Roblox", "Grand Theft Auto", "GTA",
-        "Cyberpunk 2077", "Elden Ring", "Hi-Fi RUSH", "Lies of P", "Remnant", "Valheim"
+        "Cyberpunk 2077", "Elden Ring", "Hi-Fi RUSH", "Remnant", "Valheim",
+        "Call of Duty", "Modern Warfare", "Warzone", "Black Ops",
+        "Resident Evil", "Silent Hill", "Deathloop", "Control", "Alan Wake",
+        "Dishonored", "Wolfenstein", "Prey", "The Evil Within", "Quake",
+        "Senua's Saga: Hellblade", "Hellblade", "Avowed", "Fable", "Outer Worlds",
+        "Grounded", "Pentiment", "Sea of Stars", "Dead Space", "Mass Effect",
+        "Dragon Age", "Titanfall", "State of Decay", "Crackdown", "Sunset Overdrive",
+        "Psychonauts", "Ori and the Blind Forest", "Ori and the Will of the Wisps",
+        "Slay the Spire", "Dead by Daylight", "Deep Rock Galactic", "Terraria"
     )
 
     // Dynamic cache for community GitHub updates
@@ -580,6 +588,37 @@ object XboxTranslator {
                     return modified ? s : null;
                 }
 
+                // Dynamic cache and pending callbacks for Google Translate
+                const DYNAMIC_CACHE = Object.create(null);
+                const pendingCallbacks = Object.create(null);
+                let callbackSeq = 0;
+
+                window.__onSmartTranslateResult = function(callbackId, translatedText) {
+                    if (!translatedText) return;
+                    const entry = pendingCallbacks[callbackId];
+                    if (!entry) return;
+                    delete pendingCallbacks[callbackId];
+
+                    const node = entry.node;
+                    const orig = entry.orig;
+                    if (!node || !node.parentElement) return;
+
+                    const clean = orig.trim();
+                    DYNAMIC_CACHE[clean] = translatedText;
+
+                    if (node._xcloudOrig === undefined) {
+                        node._xcloudOrig = orig;
+                    }
+                    if (isBilingual && translatedText !== clean) {
+                        node.nodeValue = translatedText + ' (' + clean + ')';
+                    } else {
+                        node.nodeValue = translatedText;
+                    }
+                    delete node._cpPending;
+                    translatedCount++;
+                    reportStatus();
+                };
+
                 function processTextNode(node) {
                     if (!isTranslationEnabled) return;
                     const parent = node.parentElement;
@@ -590,6 +629,7 @@ object XboxTranslator {
 
                     if (shouldPreserveTitle(original)) return;
 
+                    // 1. Instant 0ms Local Dictionary match
                     const translated = translateString(original);
                     if (translated && translated !== original) {
                         if (node._xcloudOrig === undefined) {
@@ -601,6 +641,38 @@ object XboxTranslator {
                             node.nodeValue = translated;
                         }
                         translatedCount++;
+                        return;
+                    }
+
+                    // 2. Instant Cache Hit from prior Google Translation
+                    const trimmed = original.trim();
+                    if (DYNAMIC_CACHE[trimmed]) {
+                        const cached = DYNAMIC_CACHE[trimmed];
+                        if (node._xcloudOrig === undefined) {
+                            node._xcloudOrig = original;
+                        }
+                        if (isBilingual && cached !== trimmed) {
+                            node.nodeValue = cached + ' (' + trimmed + ')';
+                        } else {
+                            node.nodeValue = cached;
+                        }
+                        translatedCount++;
+                        return;
+                    }
+
+                    // 3. Smart Google Translate: Translates descriptions, guides, reviews, synopsis
+                    // Intelligently avoids numbers, single punctuation, codes, URLs
+                    if (trimmed.length >= 4 && !node._cpPending) {
+                        if (/^[\d\s\.,:\-_/\\#\$%&*()+=\[\]{}|<>?!@~`^;'"0-9]+$/.test(trimmed)) return;
+                        if (/^(https?:\/\/|www\.)/i.test(trimmed)) return;
+
+                        node._cpPending = true;
+                        const callId = 'cb_' + (++callbackSeq);
+                        pendingCallbacks[callId] = { node: node, orig: original };
+
+                        if (window.CloudPlayBridge && window.CloudPlayBridge.requestSmartTranslate) {
+                            window.CloudPlayBridge.requestSmartTranslate(trimmed, callId, isBilingual);
+                        }
                     }
                 }
 
@@ -647,6 +719,7 @@ object XboxTranslator {
                                 currentNode.nodeValue = currentNode._xcloudOrig;
                                 delete currentNode._xcloudOrig;
                             }
+                            delete currentNode._cpPending;
                             currentNode = walker.nextNode();
                         }
                     } catch(e) {}
@@ -660,7 +733,7 @@ object XboxTranslator {
                     } catch(e) {}
                 }
 
-                // Global APIs for Android Bridge
+                // Global APIs for Android Bridge & Floating HUD
                 window.__toggleXCloudTranslation = function(enabled) {
                     isTranslationEnabled = !!enabled;
                     if (isTranslationEnabled) {
@@ -670,6 +743,12 @@ object XboxTranslator {
                         revertAllTextNodes(document.body);
                         translatedCount = 0;
                     }
+                    reportStatus();
+                };
+
+                window.__forceTranslateEntirePage = function() {
+                    isTranslationEnabled = true;
+                    runTreeWalkerPass(document.body);
                     reportStatus();
                 };
 

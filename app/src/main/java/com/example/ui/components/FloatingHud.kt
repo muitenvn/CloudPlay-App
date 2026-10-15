@@ -817,7 +817,7 @@ fun FloatingHud(
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Text(
-                                                text = "BỘ DỊCH TIẾNG VIỆT (GITHUB 550+ TỪ)",
+                                                text = "GOOGLE DỊCH THÔNG MINH (xCLOUD EDITION)",
                                                 color = TextPrimary,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold
@@ -826,14 +826,14 @@ fun FloatingHud(
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = if (translationActive) {
-                                                if (translatedCount > 0) "Đang bật: Đã dịch $translatedCount mục UI xCloud (0ms O(1))"
-                                                else "Đang bật: Từ điển Better-xCloud GitHub 0ms"
-                                            } else "Đang tắt (Hiển thị tiếng Anh nguyên bản)",
+                                                if (translatedCount > 0) "Đang bật: Đã dịch $translatedCount mục (Google Dịch + 0ms UI)"
+                                                else "Đang bật: Tự động dịch mô tả game & giao diện"
+                                            } else "Đang tắt (Hiển thị ngôn ngữ gốc)",
                                             color = if (translationActive) XboxNeonGreen else TextSecondary,
                                             fontSize = 11.sp
                                         )
                                         Text(
-                                            text = "✓ Trọn bộ từ điển GitHub  ✓ Tốc độ 0ms  ✓ Bảo vệ tên game",
+                                            text = "✓ Dịch y hệt Google Dịch  ✓ Đã né tên game gốc  ✓ Không chạm stream",
                                             color = TextSecondary.copy(alpha = 0.8f),
                                             fontSize = 9.sp
                                         )

@@ -3,17 +3,31 @@ package com.example.cloudplay
 import android.util.Log
 import android.webkit.JavascriptInterface
 import com.example.vpn.VpnManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.lang.ref.WeakReference
 
 data class TranslationInfo(
     val isEnabled: Boolean = true,
     val translatedCount: Int = 0
 )
 
-class XboxBridge(private val controller: StreamController) {
+class XboxBridge(
+    private val controller: StreamController,
+    private var webViewRef: WeakReference<android.webkit.WebView>? = null
+) {
+    private val scope = CoroutineScope(Dispatchers.Main + Job())
+
+    fun setWebView(webView: android.webkit.WebView) {
+        webViewRef = WeakReference(webView)
+    }
 
     companion object {
         private const val TAG = "XboxBridge"
@@ -574,7 +588,50 @@ class XboxBridge(private val controller: StreamController) {
     }
 
     @JavascriptInterface
+    fun requestSmartTranslate(rawText: String?, callbackId: String?, isBilingual: Boolean) {
+        if (rawText.isNullOrBlank() || callbackId.isNullOrBlank()) return
+        scope.launch(Dispatchers.IO) {
+            val translated = GoogleGamingTranslator.translate(rawText, "vi", isBilingual)
+            withContext(Dispatchers.Main) {
+                val escapedText = JSONObject.quote(translated)
+                webViewRef?.get()?.evaluateJavascript(
+                    "if (window.__onSmartTranslateResult) window.__onSmartTranslateResult('$callbackId', $escapedText);",
+                    null
+                )
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun requestBatchTranslate(jsonTexts: String?, batchId: String?, isBilingual: Boolean) {
+        if (jsonTexts.isNullOrBlank() || batchId.isNullOrBlank()) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val array = org.json.JSONArray(jsonTexts)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    list.add(array.getString(i))
+                }
+                val resultMap = org.json.JSONObject()
+                for (item in list) {
+                    val translated = GoogleGamingTranslator.translate(item, "vi", isBilingual)
+                    resultMap.put(item, translated)
+                }
+                withContext(Dispatchers.Main) {
+                    webViewRef?.get()?.evaluateJavascript(
+                        "if (window.__onBatchTranslateResult) window.__onBatchTranslateResult('$batchId', ${resultMap.toString()});",
+                        null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error in requestBatchTranslate", e)
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun log(msg: String?) {
         Log.d("XboxBridgeJS", msg ?: "")
     }
 }
+

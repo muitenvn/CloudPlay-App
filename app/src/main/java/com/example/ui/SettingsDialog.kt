@@ -254,7 +254,7 @@ fun SettingsDialog(
                         ) {
                             Icon(Icons.Default.Language, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                             Text(
-                                text = "Tối ưu hóa riêng cho xCloud, không phải Google Translate đại trà",
+                                text = "Bộ Dịch Google Dịch Thông Minh (Smart xCloud Translator)",
                                 color = TextPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -262,7 +262,7 @@ fun SettingsDialog(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Khác với Google Translate làm đơ luồng stream, lỗi kết nối WebRTC và dịch sai tên game; bộ dịch này chạy 0ms nội bộ, bỏ qua thẻ video/tay cầm và dịch chuẩn 250+ thuật ngữ game.",
+                            text = "Dịch trọn vẹn mọi mô tả, cốt truyện, thông báo và menu xCloud tự nhiên như Google Dịch. Hệ thống thông minh tự động né tên game bản quyền (Forza, Halo, Starfield,...), phím điều khiển (RT, LT, D-pad) và luồng video để chơi 60 FPS mượt mà 0% gián đoạn.",
                             color = TextSecondary,
                             fontSize = 10.sp,
                             lineHeight = 14.sp

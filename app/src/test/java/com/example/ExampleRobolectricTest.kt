@@ -135,4 +135,10 @@ class ExampleRobolectricTest {
         assertTrue(config.autoBypassEnabled)
         assertEquals(15, config.maxBitrateMbps)
     }
+
+    @Test
+    fun `test launch MainActivity`() {
+        org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
+    }
 }
+

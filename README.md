@@ -9,78 +9,29 @@
 
 ---
 
-## 📖 Giới thiệu (Overview)
+## Tiếng Việt / Vietnamese
 
-**CloudPlay** là ứng dụng Android chuyên dụng tối ưu hóa trải nghiệm chơi game đám mây **Xbox Cloud Gaming (xCloud)** dành cho game thủ Việt Nam và Đông Nam Á. 
+### 📖 Giới thiệu
 
-Ứng dụng tích hợp công nghệ **Direct Handshake Bypass** độc quyền, cho phép vượt qua rào cản khu vực (Region Lock) để truy cập máy chủ xCloud Nhật Bản (Japan), Hàn Quốc (Korea), Mỹ (US)... sau đó tự động chuyển về luồng truyền mạng trực tiếp của thiết bị. Nhờ đó, bạn đạt được độ trễ cực thấp (**chỉ từ ~25 - 35ms**) và hình ảnh sắc nét chuẩn 60 FPS mà **không cần duy trì kết nối VPN liên tục hay cài đặt app VPN thứ 3**.
+CloudPlay là một ứng dụng Android mã nguồn mở được phát triển để tối ưu hóa trải nghiệm chơi game trên Xbox Cloud Gaming (xCloud) cho người dùng ở Việt Nam và khu vực Đông Nam Á. Ứng dụng cung cấp các công cụ tối ưu hóa mạng và trải nghiệm hiển thị; kết quả có thể khác nhau tùy vào nhà mạng, thiết bị và vị trí địa lý.
 
----
+Lưu ý pháp lý: Bạn có trách nhiệm tuân thủ Điều khoản Dịch vụ (Terms of Service) của Microsoft và các luật địa phương. Ứng dụng này không khuyến khích hoặc hướng dẫn hành vi vi phạm bản quyền, lách luật hay can thiệp trái phép vào các dịch vụ của bên thứ ba.
 
-## ✨ Tính năng nổi bật (Key Features)
+### ✨ Tính năng chính
 
-- ⚡ **Direct Handshake Bypass (Không cần VPN rườm rà)**:
-  - Tự động bắt tay và khởi tạo phiên chơi qua máy chủ tối ưu (Nhật Bản, Hàn Quốc, Mỹ...).
-  - Tự động chuyển về mạng trực tiếp nội địa (Direct Stream) khi luồng video bắt đầu, giúp đường truyền không bị bóp băng thông và ping thấp nhất có thể (~25 - 35ms).
-- 🎮 **Floating Gaming HUD (Thanh công cụ nổi thông minh)**:
-  - **Chế độ thu nhỏ (Minimized Pill):** Thiết kế dạng viên thuốc siêu gọn gàng, hiển thị ping mạng thời gian thực (`⚡29ms`) và icon tay cầm (`🎮`), hoàn toàn không che khuất màn hình chơi game (đã loại bỏ các nút thừa). Chạm vào viên thuốc để mở rộng menu.
-  - **Chế độ mở rộng (Expanded / Compact):** Đầy đủ các nút điều hướng tiện lợi như **Home** ("Về Trang Chủ"), xoay màn hình (Landscape/Portrait), xem chi tiết tình trạng kết nối mạng và đổi server nhanh.
-- 🌐 **Bộ Dịch Google Dịch Thông Minh (Smart Gaming Translator)**:
-  - Dịch tự nhiên 100% như Google Dịch mọi mô tả game, cốt truyện, hướng dẫn, patch notes và menu xCloud.
-  - **Tự động né những chỗ không nên dịch:** Bảo vệ hơn 300+ tên game nổi tiếng (Fortnite, Forza Horizon, Halo Infinite, Starfield, Sea of Thieves...) không bị dịch sai nghĩa ngớ ngẩn; né hoàn toàn các thẻ video stream WebRTC, canvas và nút bấm tay cầm (RT, LT, D-pad) giúp đạt 60 FPS mượt mà 0% giật lag.
-  - Kết hợp từ điển 0ms tức thì cho giao diện và Google Translate mượt mà cho các đoạn văn dài.
-  - Hỗ trợ chế độ song ngữ (Bilingual: Tiếng Việt + Tiếng Anh gốc trong ngoặc).
-- 🌍 **Đa ngôn ngữ thông minh (Tiếng Việt & English)**:
-  - Tự động nhận diện ngôn ngữ hệ thống điện thoại của người dùng (System Locale) hoặc tùy chỉnh nhanh bằng 1 chạm trên thanh tiêu đề TopBar.
-- 🚀 **Hiệu năng cao & Tiết kiệm pin (High Performance)**:
-  - Giao diện xây dựng hoàn toàn bằng **Jetpack Compose (Material 3)** mượt mà, hiện đại.
-  - Tối ưu bộ tăng tốc phần cứng WebKit WebView, tối thiểu hóa độ trễ cảm ứng và giật khung hình.
-- 🛡️ **Bảo mật & Riêng tư tuyệt đối**:
-  - Đăng nhập trực tiếp trên cổng xác thực chính thức của Microsoft Xbox.
-  - Không thu thập thông tin đăng nhập, mật khẩu hay dữ liệu cá nhân của người dùng.
+- Tối ưu hóa kết nối mạng để giảm độ trễ và cải thiện chất lượng luồng (không đảm bảo với mọi trường hợp).
+- Thanh HUD nổi tiện lợi hiển thị trạng thái mạng và các phím tắt thao tác nhanh.
+- Dịch nội dung giao diện / mô tả game (Google Translate + từ điển nội bộ) với chế độ song ngữ (Tiếng Việt ↔ English).
+- Giao diện hiện đại xây dựng bằng Jetpack Compose (Material 3);
+- Tôn trọng quyền riêng tư: không lưu trữ mật khẩu hay thông tin đăng nhập của bạn trên máy chủ của project.
 
----
+### 📥 Tải & Cài đặt
 
-## 📥 Hướng dẫn Tải và Cài đặt APK (Download APK)
+- Releases (Khuyên dùng): https://github.com/muitenvn/CloudPlay-App/releases/latest
+- Hoặc tải artifact từ Actions nếu cần bản build mới nhất.
 
-Bạn có thể tải file APK cài đặt bằng một trong hai cách dưới đây:
+### ⚙️ Dành cho lập trình viên
 
-### 🌟 Cách 1: Tải trực tiếp từ mục Releases (Khuyên dùng - Nhanh nhất)
-
-👉 **Truy cập ngay:** **[Tải CloudPlay APK mới nhất (Releases)](https://github.com/muitenvn/CloudPlay-App/releases/latest)**
-
-1. Nhấp vào đường link trên (hoặc bấm vào mục **Releases** ở cột bên phải trang GitHub).
-2. Cuộn xuống phần **Assets** ở cuối bản phát hành mới nhất.
-3. Nhấp vào file **`CloudPlay-Xbox-v1.0.apk`** để tải trực tiếp về điện thoại Android.
-4. Mở file vừa tải về và chọn **Cài đặt** (Cho phép cài đặt ứng dụng không rõ nguồn gốc nếu điện thoại yêu cầu).
-
----
-
-### 🛠️ Cách 2: Tải từ mục GitHub Actions (Bản build tự động mới nhất)
-
-Nếu muốn trải nghiệm bản build mới nhất theo từng commit mới:
-1. Truy cập tab **[Actions](https://github.com/muitenvn/CloudPlay-App/actions)** ở menu phía trên repository.
-2. Chọn workflow chạy gần nhất có dấu tích xanh ✅ (ví dụ: *"Build & Release Android APK"*).
-3. Cuộn xuống mục **Artifacts** ở cuối trang.
-4. Nhấp vào **`CloudPlay-Xbox-APK`** để tải file nén chứa APK đã biên dịch sẵn.
-
----
-
-## 💡 Mẹo chơi game xCloud mượt nhất tại Việt Nam
-
-1. **Kết nối mạng:**
-   - Khuyến khích sử dụng băng tần Wi-Fi **5GHz** hoặc mạng di động **4G/5G** có tín hiệu ổn định.
-   - Hạn chế chơi trên Wi-Fi 2.4GHz vì dễ bị nhiễu sóng và tăng jitter.
-2. **Chọn máy chủ:**
-   - Ưu tiên chọn cụm server **Nhật Bản (Japan)** hoặc **Hàn Quốc (Korea)** trong cài đặt ứng dụng để có khoảng cách địa lý gần nhất và ping tối ưu nhất (~25ms đến 40ms).
-3. **Tay cầm điều khiển (Controller):**
-   - Ứng dụng hỗ trợ hoàn hảo tất cả các tay cầm Bluetooth tiêu chuẩn: Xbox Wireless Controller, PlayStation DualSense / DualShock 4, Gamesir, Razer Kishi, v.v.
-
----
-
-## ⚙️ Dành cho lập trình viên & Tự Build (For Developers)
-
-### 1. Tự biên dịch cục bộ (Local Build)
 Yêu cầu: Android SDK 36 (hoặc 35+), JDK 21.
 
 ```bash
@@ -94,35 +45,61 @@ chmod +x gradlew
 # Biên dịch file APK Debug
 ./gradlew assembleDebug
 ```
-File APK sau khi build nằm tại: `app/build/outputs/apk/debug/app-debug.apk`
 
-### 2. Cấu hình GitHub Actions khi Fork repository
-Nếu bạn Fork repo này về tài khoản cá nhân và muốn GitHub Actions tự động build ra file APK trong mục Releases:
-1. Vào **Settings** của repository trên GitHub của bạn.
-2. Chọn menu **Actions** -> **General**.
-3. Cuộn xuống mục **Workflow permissions**:
-   - Chọn **Read and write permissions**.
-   - Tích chọn **Allow GitHub Actions to create and approve pull requests**.
-4. Nhấn **Save**.
-5. Vào lại tab **Actions** -> bấm vào workflow và chọn **Run workflow**.
+### 📄 Bản quyền & Tuyên bố từ chối trách nhiệm
+
+- CloudPlay là dự án độc lập, không liên kết chính thức với Microsoft hoặc dịch vụ Xbox.
+- Tất cả thương hiệu (Xbox, Xbox Cloud Gaming, Xbox Game Pass...) thuộc sở hữu của chủ sở hữu tương ứng.
+- Tác giả không chịu trách nhiệm cho việc sử dụng trái phép hoặc vi phạm Điều khoản Dịch vụ bởi người dùng.
 
 ---
 
-## ☕ Ủng hộ tác giả (Donate)
+## English / Tiếng Anh
 
-Nếu ứng dụng giúp bạn có những giờ phút giải trí chơi game mượt mà hơn, bạn có thể mời tác giả một ly cà phê nhé! Cảm ơn sự đồng hành của bạn!
+### 📖 Overview
 
-* **Ngân hàng:** MB Bank (Ngân hàng TMCP Quân Đội)
-* **Chủ tài khoản:** NGUYEN THE NGOC
-* **Số tài khoản:** `0385351613`
+CloudPlay is an open-source Android application developed to improve the Xbox Cloud Gaming (xCloud) experience for users in Vietnam and Southeast Asia. The app provides network optimization tools and interface enhancements; results may vary depending on ISP, device, and geographic location.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/muitenvn0990/bombanana/main/Screenshot_20261012_133457.jpg" alt="MB Bank QR Code" width="280px" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-</p>
+Legal notice: You are responsible for complying with Microsoft's Terms of Service and local laws. This project does not encourage or instruct actions that violate copyrights, bypass protections, or interfere with third-party services.
+
+### ✨ Key Features
+
+- Network optimization to reduce latency and improve stream quality (no guarantee in all scenarios).
+- Floating HUD shows network status and quick controls.
+- Smart translation for UI/game descriptions (Google Translate + local dictionary) with bilingual mode (Vietnamese ↔ English).
+- Modern UI built with Jetpack Compose (Material 3).
+- Privacy-conscious: does not collect or store user login credentials.
+
+### 📥 Download & Install
+
+- Recommended: download from Releases: https://github.com/muitenvn/CloudPlay-App/releases/latest
+- Alternatively, download the latest build artifact from the Actions tab.
+
+### ⚙️ For Developers
+
+Requirements: Android SDK 36 (or 35+), JDK 21.
+
+```bash
+# Clone repository
+git clone https://github.com/muitenvn/CloudPlay-App.git
+cd CloudPlay-App
+
+# Make gradlew executable
+chmod +x gradlew
+
+# Build Debug APK
+./gradlew assembleDebug
+```
+
+### 📄 Copyright & Disclaimer
+
+- CloudPlay is an independent project and is not affiliated with Microsoft or Xbox services.
+- All trademarks (Xbox, Xbox Cloud Gaming, Xbox Game Pass, etc.) are the property of their respective owners.
+- The author is not responsible for any misuse of this software that violates third-party terms or local regulations.
 
 ---
 
-## 📄 Bản quyền & Tuyên bố từ chối trách nhiệm (Disclaimer)
+### ☕ Support / Ủng hộ
 
-- **CloudPlay** là ứng dụng mã nguồn mở độc lập được phát triển vì mục đích học tập và tối ưu hóa trải nghiệm cộng đồng game thủ.
-- **Xbox**, **Xbox Cloud Gaming**, **Xbox Game Pass** và các thương hiệu liên quan là tài sản thuộc bản quyền của **Microsoft Corporation**. Ứng dụng này không có liên kết chính thức hay được ủy quyền bởi Microsoft.
+If you enjoy the app and want to support development, you may donate. Use at your own discretion and be mindful of sharing sensitive payment information publicly.
+

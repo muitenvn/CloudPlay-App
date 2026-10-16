@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.net.Socket
-import kotlin.random.Random
 
 object PingTester {
 
@@ -41,8 +40,8 @@ object PingTester {
                 // Try next endpoint
             }
         }
-        // If all strict TCP syns failed, compute realistic base ping based on standard ISP baseline (28-35ms)
-        28 + Random.nextInt(-3, 5)
+        // If all probes failed, return -1 indicating measurement failed (never return fake random numbers)
+        -1
     }
 
     /**
@@ -62,29 +61,12 @@ object PingTester {
                     }
                 }
             } catch (_: Exception) {
-                // Server might be firewall-filtering direct SYN; probe Tokyo backbone fallback
+                // Server might be unreachable or filtered
             }
         }
 
-        // 2. Measure actual transit time to Tokyo cloud datacenter nodes
-        for (target in TOKYO_FALLBACK_ENDPOINTS) {
-            val start = System.nanoTime()
-            try {
-                Socket().use { socket ->
-                    socket.tcpNoDelay = true
-                    socket.connect(InetSocketAddress(target.first, target.second), timeoutMs)
-                    val durationMs = ((System.nanoTime() - start) / 1_000_000.0).toInt()
-                    if (durationMs in 30..600) {
-                        return@withContext durationMs
-                    }
-                }
-            } catch (_: Exception) {
-                // Try next
-            }
-        }
-
-        // Realistic Japan transit latency (68-88ms) with natural jitter
-        72 + Random.nextInt(-4, 7)
+        // Return -1 if unreachable (never return fake numbers)
+        -1
     }
 
     /**

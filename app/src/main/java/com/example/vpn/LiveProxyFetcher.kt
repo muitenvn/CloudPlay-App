@@ -82,7 +82,7 @@ object LiveProxyFetcher {
                         protocol = if (port == 1080 || port == 1081 || port == 4145) "socks5" else "http",
                         azureEndpoint = if (countryCode == "JP") "japaneast.cloudapp.azure.com" else "koreacentral.cloudapp.azure.com",
                         description = "Proxy $regionName trực tiếp • Ping ${ping}ms",
-                        speedMbps = (180..320).random(),
+                        speedMbps = if (ping in 1..80) 100 else if (ping in 81..150) 50 else 20,
                         countryCode = countryCode.uppercase(),
                         lastPingMs = ping,
                         isVerified = true

@@ -121,7 +121,7 @@ fun ServersScreen(
             val deferreds = allServers.map { server ->
                 async {
                     val ping = PingTester.measureLatency(server.azureEndpoint)
-                    val realPing = if (ping > 0) ping else (65..95).random()
+                    val realPing = if (ping > 0) ping else -1
                     server.id to realPing
                 }
             }
@@ -328,13 +328,7 @@ fun ServersScreen(
         // Servers list
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
-            val ping = serverPings[server.id] ?: server.lastPingMs ?: when (server.countryCode) {
-                "JP" -> 72
-                "KR" -> 58
-                "SG" -> 32
-                "US" -> 145
-                else -> 80
-            }
+            val ping = serverPings[server.id] ?: server.lastPingMs ?: -1
 
             ServerCard(
                 server = server,
@@ -369,6 +363,7 @@ private fun ServerCard(
     onClick: () -> Unit
 ) {
     val pingColor = when {
+        pingMs <= 0 -> Color.Gray
         pingMs < 60 -> DirectCyan
         pingMs < 100 -> XboxNeonGreen
         pingMs < 160 -> WarningAmber
@@ -463,7 +458,7 @@ private fun ServerCard(
                             .background(pingColor)
                     )
                     Text(
-                        text = "${pingMs}ms",
+                        text = if (pingMs > 0) "${pingMs}ms" else "-- ms",
                         color = pingColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp

@@ -74,7 +74,12 @@ class XboxCloudVpnService : VpnService() {
             ACTION_DISCONNECT -> {
                 stopTunnel()
                 try {
-                    stopForeground(true)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
                 } catch (ignored: Exception) {
                 }
                 stopSelf()
@@ -171,7 +176,7 @@ class XboxCloudVpnService : VpnService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("CloudPlay Switcher")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(com.example.R.drawable.cloudplay_launcher_icon_1791392788421)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)

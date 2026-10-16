@@ -414,7 +414,7 @@ data class VpnConnectionState(
     val currentServer: ServerLocation = DEFAULT_SERVERS[0],
     val latencyMs: Int? = null,
     val directLatencyMs: Int? = null,
-    val pingHistory: List<Int> = listOf(71, 74, 69, 72, 71),
+    val pingHistory: List<Int> = emptyList(),
     val autoBypassTriggered: Boolean = false,
     val statusMessage: String = "Sẵn sàng kết nối",
     val lastError: String? = null,

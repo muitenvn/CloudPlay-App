@@ -5,11 +5,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.TimeUnit
 
 data class GeoIpResult(
     val ip: String,
@@ -29,6 +28,11 @@ object GeoIpDetector {
 
     private val _isChecking = MutableStateFlow(false)
     val isChecking: StateFlow<Boolean> = _isChecking.asStateFlow()
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
 
     // Xbox Cloud officially supported countries
     val SUPPORTED_COUNTRIES = setOf("JP", "US", "KR", "SG", "DE", "GB", "FR", "NL", "AU", "CA", "SE", "NO", "DK", "FI", "PL", "BR", "MX")
@@ -96,18 +100,16 @@ object GeoIpDetector {
         _isChecking.value = true
         var result: GeoIpResult? = null
 
-        // Try api.country.is first (fastest, lightweight)
+        // 1. Try api.country.is first (fastest, lightweight)
         try {
-            val url = URL("https://api.country.is/")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 3000
-                readTimeout = 3000
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "Mozilla/5.0")
-            }
-            if (conn.responseCode == 200) {
-                val response = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-                val json = JSONObject(response)
+            val req = Request.Builder()
+                .url("https://api.country.is/")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            if (resp.isSuccessful) {
+                val bodyStr = resp.body?.string() ?: ""
+                val json = JSONObject(bodyStr)
                 val ip = json.optString("ip", "")
                 val countryCode = json.optString("country", "VN").uppercase()
                 val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
@@ -121,20 +123,17 @@ object GeoIpDetector {
                     isXboxSupported = isSupported
                 )
             }
-            conn.disconnect()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fallback 1: ipwho.is
             try {
-                val url = URL("http://ipwho.is/")
-                val conn = (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 3000
-                    readTimeout = 3000
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "Mozilla/5.0")
-                }
-                if (conn.responseCode == 200) {
-                    val response = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-                    val json = JSONObject(response)
+                val req = Request.Builder()
+                    .url("http://ipwho.is/")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val bodyStr = resp.body?.string() ?: ""
+                    val json = JSONObject(bodyStr)
                     val ip = json.optString("ip", "")
                     val countryCode = json.optString("country_code", "VN").uppercase()
                     val countryName = json.optString("country", getCountryDisplayName(countryCode))
@@ -150,20 +149,17 @@ object GeoIpDetector {
                         isXboxSupported = isSupported
                     )
                 }
-                conn.disconnect()
-            } catch (ignored: Exception) {
+            } catch (_: Exception) {
                 // Fallback 2: ipapi.co
                 try {
-                    val url = URL("https://ipapi.co/json/")
-                    val conn = (url.openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 3000
-                        readTimeout = 3000
-                        requestMethod = "GET"
-                        setRequestProperty("User-Agent", "Mozilla/5.0")
-                    }
-                    if (conn.responseCode == 200) {
-                        val response = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-                        val json = JSONObject(response)
+                    val req = Request.Builder()
+                        .url("https://ipapi.co/json/")
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
+                    val resp = httpClient.newCall(req).execute()
+                    if (resp.isSuccessful) {
+                        val bodyStr = resp.body?.string() ?: ""
+                        val json = JSONObject(bodyStr)
                         val ip = json.optString("ip", "")
                         val countryCode = json.optString("country_code", "VN").uppercase()
                         val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
@@ -179,17 +175,16 @@ object GeoIpDetector {
                             isXboxSupported = isSupported
                         )
                     }
-                    conn.disconnect()
-                } catch (ignored2: Exception) {
+                } catch (_: Exception) {
                 }
             }
         }
 
         // If completely offline or DNS block, default to device locale country so user is never stuck
-        if (result == null) {
+        val finalResult = result ?: run {
             val localCountry = java.util.Locale.getDefault().country.ifBlank { "VN" }.uppercase()
             val isSupported = SUPPORTED_COUNTRIES.contains(localCountry)
-            result = GeoIpResult(
+            GeoIpResult(
                 ip = "127.0.0.1 (Mạng nội bộ)",
                 countryCode = localCountry,
                 countryName = getCountryDisplayName(localCountry),
@@ -200,9 +195,7 @@ object GeoIpDetector {
         }
 
         _isChecking.value = false
-        if (result != null) {
-            _currentGeoIp.value = result
-        }
-        result
+        _currentGeoIp.value = finalResult
+        finalResult
     }
 }

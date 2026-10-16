@@ -123,6 +123,7 @@ fun FloatingHud(
     onToggleWifiSpeedFirst: (Boolean) -> Unit = {},
     gameProfile: com.example.data.GameOptimizationProfile? = null,
     onOpenGuide: (GuideSection) -> Unit = {},
+    onOpenTranslator: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var hudMode by remember { mutableStateOf(HudMode.MINIMIZED) }
@@ -838,17 +839,36 @@ fun FloatingHud(
                                             fontSize = 9.sp
                                         )
                                     }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (translationActive) XboxNeonGreen.copy(alpha = 0.25f) else Color.DarkGray
+                                    Column(
+                                        horizontalAlignment = Alignment.End,
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        Text(
-                                            text = if (translationActive) "BẬT" else "TẮT",
-                                            color = if (translationActive) XboxNeonGreen else TextSecondary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (translationActive) XboxNeonGreen.copy(alpha = 0.25f) else Color.DarkGray,
+                                            modifier = Modifier.clickable { onToggleTranslation(!translationActive) }
+                                        ) {
+                                            Text(
+                                                text = if (translationActive) "BẬT" else "TẮT",
+                                                color = if (translationActive) XboxNeonGreen else TextSecondary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = DirectCyan.copy(alpha = 0.2f),
+                                            modifier = Modifier.clickable { onOpenTranslator() }
+                                        ) {
+                                            Text(
+                                                text = "CÔNG CỤ DỊCH",
+                                                color = DirectCyan,
+                                                fontSize = 8.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }

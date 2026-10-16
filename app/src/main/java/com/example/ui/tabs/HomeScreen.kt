@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -49,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +95,7 @@ fun HomeScreen(
     onOpenXboxCloud: () -> Unit,
     onNavigateToLibrary: () -> Unit,
     onOpenGuide: (GuideSection) -> Unit = {},
+    onOpenTranslator: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -122,7 +125,12 @@ fun HomeScreen(
             onDisconnectVpn = onDisconnectVpn
         )
 
-        // 3. Featured Games Carousel (1-Tap Launch)
+        // 3. Smart Translator Deck (Google Translate with Game Title & Button Immunity)
+        SmartTranslatorHomeCard(
+            onOpenTranslator = onOpenTranslator
+        )
+
+        // 4. Featured Games Carousel (1-Tap Launch)
         FeaturedGamesSection(
             featuredGames = featuredGames,
             onLaunchGame = onLaunchGame,
@@ -709,6 +717,112 @@ private fun FeaturedGameCard(
         }
     }
 }
+
+@Composable
+private fun SmartTranslatorHomeCard(
+    onOpenTranslator: () -> Unit
+) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    listOf(XboxNeonGreen.copy(alpha = 0.6f), DirectCyan.copy(alpha = 0.5f))
+                ),
+                RoundedCornerShape(18.dp)
+            )
+            .clickable { onOpenTranslator() }
+            .testTag("home_smart_translator_card"),
+        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.95f))
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxNeonGreen.copy(alpha = 0.16f),
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "BỘ DỊCH THÔNG MINH (GOOGLE DỊCH xCLOUD)",
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Dịch chuẩn như Google Dịch • Tự động né tên game gốc",
+                            color = XboxNeonGreen,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.22f) else Color.DarkGray
+                ) {
+                    Text(
+                        text = if (config.xcloudTranslateEnabled) "ĐANG BẬT" else "ĐANG TẮT",
+                        color = if (config.xcloudTranslateEnabled) XboxNeonGreen else TextSecondary,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Quick rules highlight
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF0F1813))
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "🛡️ Né: Halo, Forza, Nút A/B/X/Y, Video stream\n✨ Dịch: Mô tả game, menu xCloud, cốt truyện",
+                    color = TextSecondary,
+                    fontSize = 9.5.sp,
+                    lineHeight = 14.sp
+                )
+                Text(
+                    text = "Mở bảng dịch ›",
+                    color = DirectCyan,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
 
 
 

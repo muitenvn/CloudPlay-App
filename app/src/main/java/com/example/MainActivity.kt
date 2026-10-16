@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
         // Keep screen awake while streaming Xbox games
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        SettingsRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
 

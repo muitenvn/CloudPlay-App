@@ -140,5 +140,28 @@ class ExampleRobolectricTest {
     fun `test launch MainActivity`() {
         org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
     }
+
+    @Test
+    fun `test GoogleGamingTranslator tokenization preserves game titles and buttons`() {
+        val input = "Press A button to play Forza Horizon 5 at 60fps on https://xbox.com with @GamerOne"
+        val (tokenized, placeholderMap) = com.example.cloudplay.GoogleGamingTranslator.tokenizeProtectedContent(input)
+
+        // Assert placeholders replaced protected terms
+        assertTrue(placeholderMap.values.contains("Forza Horizon 5"))
+        assertTrue(placeholderMap.values.contains("A button"))
+        assertTrue(placeholderMap.values.contains("60fps"))
+        assertTrue(placeholderMap.values.contains("https://xbox.com"))
+        assertTrue(placeholderMap.values.contains("@GamerOne"))
+
+        // Restoring must give back the protected terms
+        val fakeTranslated = tokenized.replace("Press", "Nhấn").replace("to play", "để chơi")
+        val restored = com.example.cloudplay.GoogleGamingTranslator.restoreProtectedContent(fakeTranslated, placeholderMap)
+        assertTrue(restored.contains("Forza Horizon 5"))
+        assertTrue(restored.contains("A button"))
+        assertTrue(restored.contains("60fps"))
+        assertTrue(restored.contains("https://xbox.com"))
+        assertTrue(restored.contains("@GamerOne"))
+        assertTrue(restored.contains("Nhấn"))
+    }
 }
 

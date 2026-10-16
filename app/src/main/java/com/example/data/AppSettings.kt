@@ -1,8 +1,11 @@
 package com.example.data
 
+import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.Locale
 
 data class XboxLanguage(
@@ -138,8 +141,86 @@ data class AppConfig(
 }
 
 object SettingsRepository {
+    private var prefs: SharedPreferences? = null
     private val _config = MutableStateFlow(AppConfig())
     val config: StateFlow<AppConfig> = _config.asStateFlow()
+
+    fun init(context: Context) {
+        val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
+        prefs = sp
+
+        val loaded = AppConfig(
+            appLanguage = try {
+                AppLanguage.valueOf(sp.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
+            } catch (_: Exception) { AppLanguage.SYSTEM },
+            useSystemLanguage = sp.getBoolean("use_system_language", true),
+            customLocale = sp.getString("custom_locale", "en-US") ?: "en-US",
+            smartVpnEnabled = sp.getBoolean("smart_vpn_enabled", true),
+            autoBypassEnabled = sp.getBoolean("auto_bypass_enabled", true),
+            autoBypassDelaySeconds = sp.getInt("auto_bypass_delay", 2),
+            forceDesktopUserAgent = sp.getBoolean("force_desktop_ua", true),
+            clarityBoostEnabled = sp.getBoolean("clarity_boost_enabled", true),
+            clarityPreset = try {
+                ClarityPreset.valueOf(sp.getString("clarity_preset", ClarityPreset.BALANCED.name) ?: ClarityPreset.BALANCED.name)
+            } catch (_: Exception) { ClarityPreset.BALANCED },
+            maxBitrateMbps = sp.getInt("max_bitrate", 15),
+            antiAfkKeepAlive = sp.getBoolean("anti_afk", true),
+            inputPollingBoost = sp.getBoolean("input_polling_boost", true),
+            showVirtualController = sp.getBoolean("show_virtual_controller", false),
+            systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
+            stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
+            autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),
+            sdpBitrateBoostEnabled = sp.getBoolean("sdp_bitrate_boost", true),
+            zeroDelayDirectHandshake = sp.getBoolean("zero_delay_handshake", true),
+            antiJapaneseEnforcer = sp.getBoolean("anti_jp_enforcer", true),
+            xcloudTranslateEnabled = sp.getBoolean("xcloud_translate", true),
+            preserveGameTitles = sp.getBoolean("preserve_titles", true),
+            bilingualMode = sp.getBoolean("bilingual_mode", false),
+            githubDictionaryEnabled = sp.getBoolean("github_dict", true),
+            hideStreamStatsOverlay = sp.getBoolean("hide_stream_stats", true),
+            cellularMode = try {
+                CellularOptimizationMode.valueOf(sp.getString("cellular_mode", CellularOptimizationMode.DATA_SAVER_HIGH_SPEED.name) ?: CellularOptimizationMode.DATA_SAVER_HIGH_SPEED.name)
+            } catch (_: Exception) { CellularOptimizationMode.DATA_SAVER_HIGH_SPEED },
+            networkTuningMode = try {
+                NetworkTuningMode.valueOf(sp.getString("network_tuning_mode", NetworkTuningMode.AUTO.name) ?: NetworkTuningMode.AUTO.name)
+            } catch (_: Exception) { NetworkTuningMode.AUTO },
+            wifiSpeedFirstPriority = sp.getBoolean("wifi_speed_first", true)
+        )
+        _config.value = loaded
+    }
+
+    private fun persist(c: AppConfig) {
+        prefs?.edit()?.apply {
+            putString("app_language", c.appLanguage.name)
+            putBoolean("use_system_language", c.useSystemLanguage)
+            putString("custom_locale", c.customLocale)
+            putBoolean("smart_vpn_enabled", c.smartVpnEnabled)
+            putBoolean("auto_bypass_enabled", c.autoBypassEnabled)
+            putInt("auto_bypass_delay", c.autoBypassDelaySeconds)
+            putBoolean("force_desktop_ua", c.forceDesktopUserAgent)
+            putBoolean("clarity_boost_enabled", c.clarityBoostEnabled)
+            putString("clarity_preset", c.clarityPreset.name)
+            putInt("max_bitrate", c.maxBitrateMbps)
+            putBoolean("anti_afk", c.antiAfkKeepAlive)
+            putBoolean("input_polling_boost", c.inputPollingBoost)
+            putBoolean("show_virtual_controller", c.showVirtualController)
+            putBoolean("system_revolution", c.systemRevolutionEnabled)
+            putBoolean("stealth_headers", c.stealthHeadersEnabled)
+            putBoolean("auto_healing_mesh", c.autoHealingProxyMesh)
+            putBoolean("sdp_bitrate_boost", c.sdpBitrateBoostEnabled)
+            putBoolean("zero_delay_handshake", c.zeroDelayDirectHandshake)
+            putBoolean("anti_jp_enforcer", c.antiJapaneseEnforcer)
+            putBoolean("xcloud_translate", c.xcloudTranslateEnabled)
+            putBoolean("preserve_titles", c.preserveGameTitles)
+            putBoolean("bilingual_mode", c.bilingualMode)
+            putBoolean("github_dict", c.githubDictionaryEnabled)
+            putBoolean("hide_stream_stats", c.hideStreamStatsOverlay)
+            putString("cellular_mode", c.cellularMode.name)
+            putString("network_tuning_mode", c.networkTuningMode.name)
+            putBoolean("wifi_speed_first", c.wifiSpeedFirstPriority)
+            apply()
+        }
+    }
 
     /**
      * Resolves system language into an officially supported Xbox Cloud Gaming locale.
@@ -240,123 +321,157 @@ object SettingsRepository {
         return formatXboxUrlWithLocale(url, effectiveLocale)
     }
 
+    fun update(newConfig: AppConfig) {
+        _config.update { newConfig }
+        persist(newConfig)
+    }
+
     fun updateAppLanguage(language: AppLanguage) {
-        _config.value = _config.value.copy(appLanguage = language)
+        _config.update { it.copy(appLanguage = language) }
+        persist(_config.value)
     }
 
     fun updateUseSystemLanguage(useSystem: Boolean) {
-        _config.value = _config.value.copy(useSystemLanguage = useSystem)
+        _config.update { it.copy(useSystemLanguage = useSystem) }
+        persist(_config.value)
     }
 
     fun updateCustomLocale(locale: String) {
         val parsed = parseLocaleFromInput(locale)
-        _config.value = _config.value.copy(
-            customLocale = parsed,
-            useSystemLanguage = false
-        )
+        _config.update {
+            it.copy(
+                customLocale = parsed,
+                useSystemLanguage = false
+            )
+        }
+        persist(_config.value)
     }
 
     fun updateSmartVpnEnabled(enabled: Boolean) {
-        _config.value = _config.value.copy(smartVpnEnabled = enabled)
+        _config.update { it.copy(smartVpnEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateAutoBypass(enabled: Boolean) {
-        _config.value = _config.value.copy(autoBypassEnabled = enabled)
+        _config.update { it.copy(autoBypassEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateAutoBypassDelay(seconds: Int) {
-        _config.value = _config.value.copy(autoBypassDelaySeconds = seconds)
+        _config.update { it.copy(autoBypassDelaySeconds = seconds) }
+        persist(_config.value)
     }
 
     fun updateDesktopUserAgent(enabled: Boolean) {
-        _config.value = _config.value.copy(forceDesktopUserAgent = enabled)
+        _config.update { it.copy(forceDesktopUserAgent = enabled) }
+        persist(_config.value)
     }
 
     fun updateClarityBoost(enabled: Boolean) {
-        _config.value = _config.value.copy(clarityBoostEnabled = enabled)
+        _config.update { it.copy(clarityBoostEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateClarityPreset(preset: ClarityPreset) {
-        _config.value = _config.value.copy(clarityPreset = preset)
+        _config.update { it.copy(clarityPreset = preset) }
+        persist(_config.value)
     }
 
     fun updateMaxBitrate(mbps: Int) {
-        _config.value = _config.value.copy(maxBitrateMbps = mbps)
+        _config.update { it.copy(maxBitrateMbps = mbps) }
+        persist(_config.value)
     }
 
     fun updateAntiAfk(enabled: Boolean) {
-        _config.value = _config.value.copy(antiAfkKeepAlive = enabled)
+        _config.update { it.copy(antiAfkKeepAlive = enabled) }
+        persist(_config.value)
     }
 
     fun updateInputPollingBoost(enabled: Boolean) {
-        _config.value = _config.value.copy(inputPollingBoost = enabled)
+        _config.update { it.copy(inputPollingBoost = enabled) }
+        persist(_config.value)
     }
 
     fun updateShowVirtualController(enabled: Boolean) {
-        _config.value = _config.value.copy(showVirtualController = enabled)
+        _config.update { it.copy(showVirtualController = enabled) }
+        persist(_config.value)
     }
 
     fun updateSystemRevolution(enabled: Boolean) {
-        _config.value = _config.value.copy(systemRevolutionEnabled = enabled)
+        _config.update { it.copy(systemRevolutionEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateStealthHeaders(enabled: Boolean) {
-        _config.value = _config.value.copy(stealthHeadersEnabled = enabled)
+        _config.update { it.copy(stealthHeadersEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateAutoHealingProxyMesh(enabled: Boolean) {
-        _config.value = _config.value.copy(autoHealingProxyMesh = enabled)
+        _config.update { it.copy(autoHealingProxyMesh = enabled) }
+        persist(_config.value)
     }
 
     fun updateSdpBitrateBoost(enabled: Boolean) {
-        _config.value = _config.value.copy(sdpBitrateBoostEnabled = enabled)
+        _config.update { it.copy(sdpBitrateBoostEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateZeroDelayDirectHandshake(enabled: Boolean) {
-        _config.value = _config.value.copy(zeroDelayDirectHandshake = enabled)
+        _config.update { it.copy(zeroDelayDirectHandshake = enabled) }
+        persist(_config.value)
     }
 
     fun updateAntiJapaneseEnforcer(enabled: Boolean) {
-        _config.value = _config.value.copy(antiJapaneseEnforcer = enabled)
+        _config.update { it.copy(antiJapaneseEnforcer = enabled) }
+        persist(_config.value)
     }
 
     fun updateXcloudTranslate(enabled: Boolean) {
-        _config.value = _config.value.copy(xcloudTranslateEnabled = enabled)
+        _config.update { it.copy(xcloudTranslateEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updatePreserveGameTitles(enabled: Boolean) {
-        _config.value = _config.value.copy(preserveGameTitles = enabled)
+        _config.update { it.copy(preserveGameTitles = enabled) }
+        persist(_config.value)
     }
 
     fun updateBilingualMode(enabled: Boolean) {
-        _config.value = _config.value.copy(bilingualMode = enabled)
+        _config.update { it.copy(bilingualMode = enabled) }
+        persist(_config.value)
     }
 
     fun updateGithubDictionaryEnabled(enabled: Boolean) {
-        _config.value = _config.value.copy(githubDictionaryEnabled = enabled)
+        _config.update { it.copy(githubDictionaryEnabled = enabled) }
+        persist(_config.value)
     }
 
     fun updateHideStreamStatsOverlay(hide: Boolean) {
-        _config.value = _config.value.copy(hideStreamStatsOverlay = hide)
+        _config.update { it.copy(hideStreamStatsOverlay = hide) }
+        persist(_config.value)
     }
 
     fun updateCellularMode(mode: CellularOptimizationMode) {
-        _config.value = _config.value.copy(cellularMode = mode)
+        _config.update { it.copy(cellularMode = mode) }
+        persist(_config.value)
     }
 
     fun updateNetworkTuningMode(mode: NetworkTuningMode) {
-        _config.value = _config.value.copy(networkTuningMode = mode)
+        _config.update { it.copy(networkTuningMode = mode) }
+        persist(_config.value)
     }
 
     fun updateWifiSpeedFirstPriority(enabled: Boolean) {
-        _config.value = _config.value.copy(wifiSpeedFirstPriority = enabled)
+        _config.update { it.copy(wifiSpeedFirstPriority = enabled) }
+        persist(_config.value)
     }
 
     /**
      * Cuộc Cách Mạng Hệ Thống 1.0: Tối ưu hóa toàn diện toàn bộ 5 tầng chỉ với 1 chạm.
      */
     fun optimizeEntireSystem() {
-        _config.value = _config.value.copy(
+        val optimized = _config.value.copy(
             systemRevolutionEnabled = true,
             stealthHeadersEnabled = true,
             autoHealingProxyMesh = true,
@@ -378,6 +493,8 @@ object SettingsRepository {
             networkTuningMode = NetworkTuningMode.AUTO,
             wifiSpeedFirstPriority = true
         )
+        _config.update { optimized }
+        persist(optimized)
     }
 
     fun updateTargetRegionUrl(url: String) {

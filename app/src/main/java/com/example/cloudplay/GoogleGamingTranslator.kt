@@ -33,14 +33,26 @@ object GoogleGamingTranslator {
     // In-memory persistent LRU-like translation cache
     private val translationCache = ConcurrentHashMap<String, String>()
 
-    // Hardware buttons and controller terms that MUST NOT be mistranslated
+    data class SmartTranslationResult(
+        val originalText: String,
+        val translatedText: String,
+        val protectedTerms: List<String>,
+        val translatedTerms: List<String>,
+        val executionTimeMs: Long,
+        val isFromCache: Boolean = false,
+        val engine: String = "Google Neural Translate (xCloud Gaming Engine)"
+    )
+
+    // Hardware buttons, gaming telemetry, and technical specs that MUST NOT be mistranslated
     private val PROTECTED_CONTROLLER_TERMS = listOf(
         "A button", "B button", "X button", "Y button",
         "Left stick", "Right stick", "Left bumper", "Right bumper",
         "Left trigger", "Right trigger", "D-pad", "D-Pad",
         "LB", "RB", "LT", "RT", "LS", "RS", "L3", "R3",
         "Menu button", "View button", "Share button", "Xbox button", "Nexus button",
-        "Clarity Boost", "Better-xCloud", "WebRTC", "H.264", "HEVC", "AV1"
+        "Clarity Boost", "Better-xCloud", "WebRTC", "H.264", "HEVC", "AV1",
+        "1080p", "720p", "1440p", "4K HDR", "4K", "HDR10", "Dolby Vision", "Dolby Atmos",
+        "FPS Boost", "DirectX", "Quick Resume", "Smart Delivery"
     )
 
     // Complete list of game titles to protect
@@ -74,6 +86,9 @@ object GoogleGamingTranslator {
                 "Metaphor: ReFantazio", "Shin Megami Tensei", "Yakuza: Like a Dragon",
                 "Like a Dragon: Infinite Wealth", "Like a Dragon Gaiden", "Judgment", "Lost Judgment",
                 "Minecraft Dungeons", "Minecraft Legends", "Terraria", "Stardew Valley",
+                "Forza Horizon 5", "Forza Horizon 4", "Forza Motorsport 7", "Forza Motorsport",
+                "Grand Theft Auto V", "Grand Theft Auto VI", "GTA V", "GTA VI",
+                "Doom Eternal", "The Elder Scrolls V: Skyrim", "Halo 5: Guardians",
                 "Subnautica", "Deep Rock Galactic", "Valheim", "Vampire Survivors", "Brotato",
                 "Slay the Spire", "Monster Train", "Inscryption", "Balatro", "Tunic", "Chained Echoes"
             )
@@ -91,7 +106,35 @@ object GoogleGamingTranslator {
         val placeholderMap = mutableMapOf<String, String>()
         var counter = 0
 
-        // 1. Protect controller buttons
+        // 1. Protect URLs and Email addresses
+        val urlPattern = Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE)
+        val urlMatcher = urlPattern.matcher(tokenized)
+        val urlBuffer = StringBuffer()
+        while (urlMatcher.find()) {
+            val matched = urlMatcher.group()
+            val placeholder = "__CPURL_${counter}__"
+            placeholderMap[placeholder] = matched
+            urlMatcher.appendReplacement(urlBuffer, placeholder)
+            counter++
+        }
+        urlMatcher.appendTail(urlBuffer)
+        tokenized = urlBuffer.toString()
+
+        // 2. Protect GamerTags / Handles (@UserName)
+        val tagPattern = Pattern.compile("@[a-zA-Z0-9_]{3,20}")
+        val tagMatcher = tagPattern.matcher(tokenized)
+        val tagBuffer = StringBuffer()
+        while (tagMatcher.find()) {
+            val matched = tagMatcher.group()
+            val placeholder = "__CPTAG_${counter}__"
+            placeholderMap[placeholder] = matched
+            tagMatcher.appendReplacement(tagBuffer, placeholder)
+            counter++
+        }
+        tagMatcher.appendTail(tagBuffer)
+        tokenized = tagBuffer.toString()
+
+        // 3. Protect controller buttons & hardware terms
         for (term in PROTECTED_CONTROLLER_TERMS) {
             val pattern = Pattern.compile("\\b" + Pattern.quote(term) + "\\b", Pattern.CASE_INSENSITIVE)
             val matcher = pattern.matcher(tokenized)
@@ -103,7 +146,7 @@ object GoogleGamingTranslator {
             }
         }
 
-        // 2. Protect immune game titles
+        // 4. Protect immune game titles
         for (title in IMMUNE_TITLES) {
             if (tokenized.contains(title, ignoreCase = true)) {
                 val pattern = Pattern.compile("\\b" + Pattern.quote(title) + "\\b", Pattern.CASE_INSENSITIVE)
@@ -117,8 +160,8 @@ object GoogleGamingTranslator {
             }
         }
 
-        // 3. Protect FPS, Bitrate, Ping telemetry
-        val telemetryPattern = Pattern.compile("(\\b\\d+\\s*(?:fps|fps|mbps|mb/s|ms|ping|kbit/s|mbit/s)\\b)", Pattern.CASE_INSENSITIVE)
+        // 5. Protect FPS, Bitrate, Ping telemetry
+        val telemetryPattern = Pattern.compile("(\\b\\d+\\s*(?:fps|mbps|mb/s|ms|ping|kbit/s|mbit/s|hz)\\b)", Pattern.CASE_INSENSITIVE)
         val telemMatcher = telemetryPattern.matcher(tokenized)
         val telemBuffer = StringBuffer()
         while (telemMatcher.find()) {
@@ -140,9 +183,16 @@ object GoogleGamingTranslator {
     fun restoreProtectedContent(translated: String, placeholderMap: Map<String, String>): String {
         var result = translated
         for ((placeholder, originalTerm) in placeholderMap) {
-            // Replace both exact and spaces variations Google Translate might insert (e.g. "__ CP TITLE _ 0 __")
-            val regex = Pattern.quote(placeholder).replace("_", "\\s*_\\s*")
-            result = result.replace(Regex(regex, RegexOption.IGNORE_CASE), originalTerm)
+            // First attempt exact replacement
+            result = result.replace(placeholder, originalTerm)
+
+            // Also handle any spacing variations that Google Translate might introduce
+            val nameOnly = placeholder.trim('_')
+            val parts = nameOnly.split("_")
+            if (parts.size == 2) {
+                val flexibleRegex = Regex("_*\\s*${parts[0]}\\s*_+\\s*${parts[1]}\\s*_*", RegexOption.IGNORE_CASE)
+                result = result.replace(flexibleRegex, originalTerm)
+            }
         }
         return result
     }
@@ -223,6 +273,48 @@ object GoogleGamingTranslator {
             Log.w(TAG, "Google Translate error for text: '$trimmed'", e)
             rawText
         }
+    }
+
+    /**
+     * Translates text and provides detailed analysis of what was protected (bypassed)
+     * versus what was translated into Vietnamese, ideal for user inspection.
+     */
+    suspend fun translateWithAnalysis(
+        rawText: String,
+        targetLang: String = "vi",
+        bilingual: Boolean = false
+    ): SmartTranslationResult = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        val trimmed = rawText.trim()
+        val cacheKey = "$targetLang:$trimmed"
+        val cached = translationCache[cacheKey]
+
+        val (_, placeholderMap) = tokenizeProtectedContent(trimmed)
+        val protectedList = placeholderMap.values.toList()
+
+        if (cached != null) {
+            val finalized = if (bilingual && cached != trimmed) "$cached ($trimmed)" else cached
+            return@withContext SmartTranslationResult(
+                originalText = rawText,
+                translatedText = finalized,
+                protectedTerms = protectedList,
+                translatedTerms = listOf("Đã tải tức thì từ bộ nhớ đệm (0ms)"),
+                executionTimeMs = System.currentTimeMillis() - startTime,
+                isFromCache = true
+            )
+        }
+
+        val translated = translate(rawText, targetLang, bilingual)
+        val timeSpent = System.currentTimeMillis() - startTime
+
+        SmartTranslationResult(
+            originalText = rawText,
+            translatedText = translated,
+            protectedTerms = protectedList,
+            translatedTerms = listOf("Mô tả game / Cốt truyện / Menu điều hướng"),
+            executionTimeMs = timeSpent,
+            isFromCache = false
+        )
     }
 
     /**

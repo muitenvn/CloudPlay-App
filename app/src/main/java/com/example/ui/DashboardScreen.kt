@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.ui.components.HowToUseGuideDialog
@@ -110,6 +111,7 @@ fun DashboardScreen(
     var currentTab by remember { mutableStateOf(DashboardTab.HOME) }
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.QUICK_START) }
+    var showTranslatorDialog by remember { mutableStateOf(false) }
 
     val vpnLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -248,6 +250,35 @@ fun DashboardScreen(
                                     )
                                 }
                             }
+
+                            // Quick Smart Translator button
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                                    .clickable { showTranslatorDialog = true }
+                                    .testTag("topbar_translator_button"),
+                                color = XboxSurfaceVariant.copy(alpha = 0.9f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Translate,
+                                        contentDescription = "Bộ Dịch Thông Minh",
+                                        tint = XboxNeonGreen,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "Dịch xCloud",
+                                        color = XboxNeonGreen,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -355,6 +386,9 @@ fun DashboardScreen(
                             onOpenGuide = { section ->
                                 guideInitialSection = section
                                 showGuideDialog = true
+                            },
+                            onOpenTranslator = {
+                                showTranslatorDialog = true
                             }
                         )
                     }
@@ -394,6 +428,12 @@ fun DashboardScreen(
         HowToUseGuideDialog(
             initialSection = guideInitialSection,
             onDismiss = { showGuideDialog = false }
+        )
+    }
+
+    if (showTranslatorDialog) {
+        com.example.ui.components.SmartTranslatorDialog(
+            onDismissRequest = { showTranslatorDialog = false }
         )
     }
 }

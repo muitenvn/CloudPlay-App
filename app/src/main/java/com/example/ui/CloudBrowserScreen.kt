@@ -105,6 +105,7 @@ fun CloudBrowserScreen(
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.ZERO_LAG) }
+    var showTranslatorDialog by remember { mutableStateOf(false) }
 
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
@@ -158,13 +159,12 @@ fun CloudBrowserScreen(
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
-                        databaseEnabled = true
                         mediaPlaybackRequiresUserGesture = false
-                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                         useWideViewPort = true
                         loadWithOverviewMode = true
-                        allowFileAccess = true
-                        allowContentAccess = true
+                        allowFileAccess = false
+                        allowContentAccess = false
                         setSupportZoom(false)
 
                         userAgentString = if (config.forceDesktopUserAgent) {
@@ -203,13 +203,13 @@ fun CloudBrowserScreen(
                         effectiveBitrateMbps = networkStatus.effectiveBitrateMbps
                     )
 
-                    // Inject document start script if WebKit supports it
+                    // Inject document start script exclusively on authorized Xbox & Microsoft domains
                     if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
                         try {
                             androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
                                 this,
                                 injectionScript,
-                                setOf("https://www.xbox.com", "https://xbox.com", "*")
+                                setOf("https://www.xbox.com", "https://xbox.com", "https://login.live.com", "https://login.microsoftonline.com")
                             )
                         } catch (e: Exception) {
                             android.util.Log.w("CloudBrowser", "Document start script not supported", e)
@@ -261,7 +261,19 @@ fun CloudBrowserScreen(
                         }
 
                         override fun onPermissionRequest(request: PermissionRequest?) {
-                            request?.grant(request.resources)
+                            if (request == null) return
+                            val originHost = request.origin?.host ?: ""
+                            val isXboxOrigin = originHost.endsWith("xbox.com") || originHost.endsWith("live.com") || originHost.endsWith("microsoft.com")
+                            if (isXboxOrigin) {
+                                val audioResources = request.resources.filter { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }.toTypedArray()
+                                if (audioResources.isNotEmpty()) {
+                                    request.grant(audioResources)
+                                } else {
+                                    request.deny()
+                                }
+                            } else {
+                                request.deny()
+                            }
                         }
                     }
 
@@ -427,6 +439,9 @@ fun CloudBrowserScreen(
             onOpenGuide = { section ->
                 guideInitialSection = section
                 showGuideDialog = true
+            },
+            onOpenTranslator = {
+                showTranslatorDialog = true
             }
         )
 
@@ -448,6 +463,16 @@ fun CloudBrowserScreen(
             com.example.ui.components.HowToUseGuideDialog(
                 initialSection = guideInitialSection,
                 onDismiss = { showGuideDialog = false }
+            )
+        }
+
+        // Smart Translator Dialog
+        if (showTranslatorDialog) {
+            com.example.ui.components.SmartTranslatorDialog(
+                onDismissRequest = { showTranslatorDialog = false },
+                onForceTranslatePage = {
+                    webViewInstance?.evaluateJavascript("if (window.__forceTranslateEntirePage) window.__forceTranslateEntirePage();", null)
+                }
             )
         }
     }

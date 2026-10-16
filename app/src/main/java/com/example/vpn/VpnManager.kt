@@ -381,12 +381,15 @@ object VpnManager {
 
         scope.launch(Dispatchers.IO) {
             val directPing = PingTester.measureDirectLatency()
-            val finalPing = if (directPing > 0) directPing else 29
-            val updatedHistory = (_state.value.pingHistory + finalPing).takeLast(16)
-            _state.value = _state.value.copy(
-                directLatencyMs = finalPing,
-                pingHistory = updatedHistory
-            )
+            if (directPing > 0) {
+                val updatedHistory = (_state.value.pingHistory + directPing).takeLast(16)
+                _state.value = _state.value.copy(
+                    directLatencyMs = directPing,
+                    pingHistory = updatedHistory
+                )
+            } else {
+                _state.value = _state.value.copy(directLatencyMs = null)
+            }
             startLatencyMonitoring()
         }
     }

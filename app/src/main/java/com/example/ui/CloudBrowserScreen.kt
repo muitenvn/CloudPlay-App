@@ -123,8 +123,67 @@ fun CloudBrowserScreen(
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.ZERO_LAG) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
-    var lastTrustedUrl by remember { mutableStateOf(initialUrl) }
+    var lastXboxUrl by remember { mutableStateOf(initialUrl) }
+    var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
+
+    val returnToGame: () -> Unit = {
+        val webView = webViewInstance
+        if (webView != null) {
+            val history = webView.copyBackForwardList()
+            val currentIndex = history.currentIndex
+            var targetOffset: Int? = null
+
+            // Tìm mục gần nhất trong lịch sử duyệt có host thuộc xbox.com
+            for (i in (currentIndex - 1) downTo 0) {
+                val item = history.getItemAtIndex(i)
+                val itemUrl = item?.url
+                if (XboxBridge.isXboxHost(itemUrl)) {
+                    targetOffset = i - currentIndex
+                    break
+                }
+            }
+
+            if (targetOffset != null && webView.canGoBackOrForward(targetOffset)) {
+                webView.goBackOrForward(targetOffset)
+            } else {
+                val targetUrl = if (lastXboxUrl.isNotBlank()) lastXboxUrl else initialUrl
+                webView.loadUrl(targetUrl)
+            }
+        }
+        showReturnButton = false
+        VpnManager.restoreProxyForGaming()
+    }
+
+    val handleMainFrameNavigation: (String) -> Unit = { targetUrl ->
+        val oldUrl = currentMainFrameUrl
+        val oldUri = try { android.net.Uri.parse(oldUrl) } catch (_: Exception) { null }
+        val newUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
+        val oldHost = oldUri?.host?.lowercase()
+        val newHost = newUri?.host?.lowercase()
+
+        // Bỏ qua việc hiện nút khi chuyển hướng http -> https cùng tên miền
+        val isHttpToHttpsSameDomain = oldHost != null && oldHost == newHost &&
+            oldUri?.scheme?.lowercase() == "http" && newUri?.scheme?.lowercase() == "https"
+
+        val isTrustedDomainHost = XboxBridge.isTrustedDomainHost(newHost)
+        val isTrusted = XboxBridge.isTrustedHost(targetUrl)
+
+        // Chỉ lưu URL có host thuộc xbox.com (bỏ login.live.com, microsoftonline.com...)
+        if (XboxBridge.isXboxHost(targetUrl)) {
+            lastXboxUrl = targetUrl
+        }
+
+        if (isTrusted || isTrustedDomainHost) {
+            showReturnButton = false
+            VpnManager.restoreProxyForGaming()
+        } else if (!isHttpToHttpsSameDomain) {
+            showReturnButton = true
+            VpnManager.pauseProxyForExternalNavigation()
+        }
+
+        currentMainFrameUrl = targetUrl
+    }
 
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
@@ -156,13 +215,8 @@ fun CloudBrowserScreen(
     }
 
     BackHandler {
-        if (showReturnButton && webViewInstance?.canGoBack() == true) {
-            webViewInstance?.goBack()
-        } else if (showReturnButton) {
-            val returnTarget = if (lastTrustedUrl.isNotBlank()) lastTrustedUrl else initialUrl
-            webViewInstance?.loadUrl(returnTarget)
-            showReturnButton = false
-            VpnManager.restoreProxyForGaming()
+        if (showReturnButton) {
+            returnToGame()
         } else {
             onNavigateBackToDashboard()
         }
@@ -251,15 +305,7 @@ fun CloudBrowserScreen(
                             bridge.updateCurrentUrl(url)
                             url?.let {
                                 streamController.onUrlChanged(it)
-                                val trusted = XboxBridge.isTrustedHost(it)
-                                if (trusted) {
-                                    lastTrustedUrl = it
-                                    showReturnButton = false
-                                    VpnManager.restoreProxyForGaming()
-                                } else {
-                                    showReturnButton = true
-                                    VpnManager.pauseProxyForExternalNavigation()
-                                }
+                                handleMainFrameNavigation(it)
                             }
                             // Early injection to intercept Xbox login and region check
                             if (XboxBridge.isTrustedHost(url)) {
@@ -277,15 +323,7 @@ fun CloudBrowserScreen(
                             isPageLoading = false
                             bridge.updateCurrentUrl(url)
                             url?.let {
-                                val trusted = XboxBridge.isTrustedHost(it)
-                                if (trusted) {
-                                    lastTrustedUrl = it
-                                    showReturnButton = false
-                                    VpnManager.restoreProxyForGaming()
-                                } else {
-                                    showReturnButton = true
-                                    VpnManager.pauseProxyForExternalNavigation()
-                                }
+                                handleMainFrameNavigation(it)
                             }
                             if (XboxBridge.isTrustedHost(url)) {
                                 // Re-apply hooks for dynamic single-page-app transitions
@@ -294,19 +332,12 @@ fun CloudBrowserScreen(
                         }
 
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
-                            bridge.updateCurrentUrl(targetUrl)
-                            targetUrl?.let { streamController.onUrlChanged(it) }
-                            if (request?.isForMainFrame == true && targetUrl != null) {
-                                val trusted = XboxBridge.isTrustedHost(targetUrl)
-                                if (trusted) {
-                                    lastTrustedUrl = targetUrl
-                                    showReturnButton = false
-                                    VpnManager.restoreProxyForGaming()
-                                } else {
-                                    showReturnButton = true
-                                    VpnManager.pauseProxyForExternalNavigation()
-                                }
+                            if (isMainFrame && targetUrl != null) {
+                                bridge.updateCurrentUrl(targetUrl)
+                                streamController.onUrlChanged(targetUrl)
+                                handleMainFrameNavigation(targetUrl)
                             }
                             return false
                         }
@@ -463,12 +494,7 @@ fun CloudBrowserScreen(
                 .padding(top = 16.dp, end = 16.dp)
         ) {
             Surface(
-                onClick = {
-                    val returnTarget = if (lastTrustedUrl.isNotBlank()) lastTrustedUrl else initialUrl
-                    webViewInstance?.loadUrl(returnTarget)
-                    showReturnButton = false
-                    VpnManager.restoreProxyForGaming()
-                },
+                onClick = { returnToGame() },
                 shape = RoundedCornerShape(20.dp),
                 color = XboxSurface.copy(alpha = 0.95f),
                 border = BorderStroke(1.5.dp, XboxNeonGreen),

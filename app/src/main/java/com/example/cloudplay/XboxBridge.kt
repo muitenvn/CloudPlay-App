@@ -54,6 +54,27 @@ class XboxBridge(
             "msauth.net"
         )
 
+        fun isTrustedDomainHost(host: String?): Boolean {
+            if (host.isNullOrBlank()) return false
+            val cleanHost = host.lowercase()
+            return TRUSTED_DOMAINS.any { domain -> cleanHost == domain || cleanHost.endsWith(".$domain") }
+        }
+
+        fun isXboxHost(url: String?): Boolean {
+            if (url.isNullOrBlank()) return false
+            val host: String = try {
+                android.net.Uri.parse(url)?.host?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: try {
+                java.net.URI(url).host?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: return false
+
+            return host == "xbox.com" || host.endsWith(".xbox.com")
+        }
+
         fun isTrustedHost(url: String?): Boolean {
             if (url.isNullOrBlank()) return false
             val parsedScheme: String? = try {
@@ -77,7 +98,7 @@ class XboxBridge(
                 null
             } ?: return false
 
-            return TRUSTED_DOMAINS.any { domain -> host == domain || host.endsWith(".$domain") }
+            return isTrustedDomainHost(host)
         }
 
         fun getInjectionScript(

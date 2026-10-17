@@ -3,6 +3,8 @@ package com.example.ui.tabs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
@@ -40,6 +43,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -301,6 +305,7 @@ fun ServersScreen(
                     "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
                     "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
                     "SG" to "🇸🇬 $seaLabel (${allServers.count { it.countryCode == "SG" }})",
+                    "CUSTOM" to "⚙️ Tùy Chỉnh (${allServers.count { it.isCustom }})",
                     "ALL" to "🌐 $allLabel (${allServers.size})"
                 )
 
@@ -334,7 +339,13 @@ fun ServersScreen(
                 server = server,
                 isSelected = isSelected,
                 pingMs = ping,
-                onClick = { onSelectServer(server) }
+                onClick = { onSelectServer(server) },
+                onDelete = if (server.isCustom) {
+                    {
+                        VpnManager.removeCustomServer(server.id)
+                        allServers.removeAll { it.id == server.id }
+                    }
+                } else null
             )
         }
 
@@ -360,7 +371,8 @@ private fun ServerCard(
     server: ServerLocation,
     isSelected: Boolean,
     pingMs: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: (() -> Unit)? = null
 ) {
     val pingColor = when {
         pingMs <= 0 -> Color.Gray
@@ -442,53 +454,74 @@ private fun ServerCard(
                 }
             }
 
-            // Ping & Selection state
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Ping & Selection state
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(pingColor)
-                    )
-                    Text(
-                        text = if (pingMs > 0) "${pingMs}ms" else "-- ms",
-                        color = pingColor,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-
-                if (isSelected) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = XboxNeonGreen,
-                            modifier = Modifier.size(14.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(pingColor)
                         )
                         Text(
-                            text = "Đang dùng",
-                            color = XboxNeonGreen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
+                            text = if (pingMs > 0) "${pingMs}ms" else "-- ms",
+                            color = pingColor,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
-                } else {
-                    Text(
-                        text = "${server.speedMbps} Mbps",
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
+
+                    if (isSelected) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Đang dùng",
+                                color = XboxNeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "${server.speedMbps} Mbps",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                if (onDelete != null) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("delete_server_${server.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Xóa proxy tùy chỉnh",
+                            tint = JapanRed,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
@@ -505,6 +538,9 @@ private fun CustomProxyDialog(
     var port by remember { mutableStateOf("8080") }
     var protocol by remember { mutableStateOf("http") }
     var countryCode by remember { mutableStateOf("JP") }
+    var description by remember { mutableStateOf("Proxy cá nhân") }
+    var speedMbps by remember { mutableStateOf("250") }
+    var azureEndpoint by remember { mutableStateOf("japaneast.cloudapp.azure.com") }
     var testResult by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -515,44 +551,22 @@ private fun CustomProxyDialog(
             Text("Thêm Proxy Tùy Chỉnh", color = TextPrimary, fontWeight = FontWeight.Bold)
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)",
-                    color = TextSecondary,
-                    fontSize = 12.sp
-                )
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Tên gợi nhớ") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = XboxNeonGreen
+            val scrollState = rememberScrollState()
+            Column(
+                modifier = Modifier.verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                    Text(
+                        text = "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)",
+                        color = TextSecondary,
+                        fontSize = 12.sp
                     )
-                )
 
-                OutlinedTextField(
-                    value = host,
-                    onValueChange = { host = it },
-                    label = { Text("Địa chỉ IP hoặc Hostname") },
-                    placeholder = { Text("vd: 127.0.0.1 hoặc 138.199.21.239") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = XboxNeonGreen
-                    )
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = port,
-                        onValueChange = { port = it },
-                        label = { Text("Cổng (Port)") },
-                        modifier = Modifier.weight(1f),
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Tên gợi nhớ") },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -561,59 +575,136 @@ private fun CustomProxyDialog(
                     )
 
                     OutlinedTextField(
-                        value = protocol,
-                        onValueChange = { protocol = it.lowercase() },
-                        label = { Text("Giao thức (http/socks5)") },
-                        modifier = Modifier.weight(1f),
+                        value = host,
+                        onValueChange = { host = it },
+                        label = { Text("Địa chỉ IP hoặc Hostname") },
+                        placeholder = { Text("vd: 127.0.0.1 hoặc 138.199.21.239") },
+                        modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             focusedBorderColor = XboxNeonGreen
                         )
                     )
-                }
 
-                // Test connection button
-                Button(
-                    onClick = {
-                        isTesting = true
-                        testResult = null
-                        scope.launch(Dispatchers.IO) {
-                            val p = port.toIntOrNull() ?: 8080
-                            val ok = PingTester.isHostReachable(host.trim(), p, 1500)
-                            testResult = if (ok) "✅ Kết nối thành công!" else "❌ Không thể kết nối tới IP/Port này"
-                            isTesting = false
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = port,
+                            onValueChange = { port = it },
+                            label = { Text("Cổng (Port)") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                focusedBorderColor = XboxNeonGreen
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = protocol,
+                            onValueChange = { protocol = it.lowercase() },
+                            label = { Text("Giao thức (http/socks5)") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                focusedBorderColor = XboxNeonGreen
+                            )
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Ghi chú mô tả") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = XboxNeonGreen
+                        )
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = speedMbps,
+                            onValueChange = { speedMbps = it },
+                            label = { Text("Tốc độ (Mbps)") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                focusedBorderColor = XboxNeonGreen
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = countryCode,
+                            onValueChange = { countryCode = it.uppercase() },
+                            label = { Text("Quốc gia (JP/KR/US)") },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                focusedBorderColor = XboxNeonGreen
+                            )
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = azureEndpoint,
+                        onValueChange = { azureEndpoint = it },
+                        label = { Text("Azure Endpoint để đo ping") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = XboxNeonGreen
+                        )
+                    )
+
+                    // Test connection button
+                    Button(
+                        onClick = {
+                            isTesting = true
+                            testResult = null
+                            scope.launch(Dispatchers.IO) {
+                                val p = port.toIntOrNull() ?: 8080
+                                val ok = PingTester.isHostReachable(host.trim(), p, 1500)
+                                testResult = if (ok) "✅ Kết nối thành công!" else "❌ Không thể kết nối tới IP/Port này"
+                                isTesting = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
+                    ) {
+                        if (isTesting) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
+                        } else {
+                            Text("Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
-                ) {
-                    if (isTesting) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
-                    } else {
-                        Text("Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
+                    }
+
+                    testResult?.let { msg ->
+                        Text(text = msg, color = if (msg.startsWith("✅")) XboxNeonGreen else JapanRed, fontSize = 12.sp)
                     }
                 }
-
-                testResult?.let { msg ->
-                    Text(text = msg, color = if (msg.startsWith("✅")) XboxNeonGreen else JapanRed, fontSize = 12.sp)
-                }
-            }
         },
         confirmButton = {
             Button(
                 onClick = {
                     val p = port.toIntOrNull() ?: 8080
+                    val speed = speedMbps.toIntOrNull() ?: 200
                     val server = ServerLocation(
                         id = "custom_${System.currentTimeMillis()}",
                         name = name.ifBlank { "Custom Proxy" },
-                        flag = if (countryCode == "JP") "🇯🇵" else "🌐",
+                        flag = if (countryCode.uppercase() == "JP") "🇯🇵" else "🌐",
                         ip = host.trim(),
                         port = p,
                         protocol = protocol.trim().lowercase(),
-                        azureEndpoint = "japaneast.cloudapp.azure.com",
-                        description = "Proxy cá nhân cấu hình bởi người dùng",
-                        speedMbps = 250,
+                        azureEndpoint = azureEndpoint.ifBlank { "japaneast.cloudapp.azure.com" },
+                        description = description.ifBlank { "Proxy cá nhân" },
+                        speedMbps = speed,
                         countryCode = countryCode.uppercase(),
                         isCustom = true,
                         isVerified = true

@@ -58,6 +58,9 @@ object VpnManager {
                         port = obj.getInt("port"),
                         protocol = obj.optString("protocol", "http"),
                         countryCode = obj.optString("countryCode", "JP"),
+                        azureEndpoint = obj.optString("azureEndpoint", "japaneast.cloudapp.azure.com"),
+                        description = obj.optString("description", "Proxy cá nhân"),
+                        speedMbps = obj.optInt("speedMbps", 200),
                         lastPingMs = null,
                         isCustom = true
                     )
@@ -93,6 +96,9 @@ object VpnManager {
                     put("port", s.port)
                     put("protocol", s.protocol)
                     put("countryCode", s.countryCode)
+                    put("description", s.description)
+                    put("speedMbps", s.speedMbps)
+                    put("azureEndpoint", s.azureEndpoint)
                 }
                 array.put(obj)
             }
@@ -500,6 +506,17 @@ object VpnManager {
         persistCustomServers(appContext, updated, server)
     }
 
+    fun removeCustomServer(serverId: String) {
+        val updated = _state.value.customServers.filterNot { it.id == serverId }
+        val newCurrent = if (_state.value.currentServer.id == serverId) {
+            updated.firstOrNull() ?: DEFAULT_SERVERS[0]
+        } else {
+            _state.value.currentServer
+        }
+        _state.value = _state.value.copy(customServers = updated, currentServer = newCurrent)
+        persistCustomServers(appContext, updated, newCurrent)
+    }
+
     fun getAllServers(): List<ServerLocation> {
         return _state.value.customServers + DEFAULT_SERVERS
     }
@@ -550,6 +567,27 @@ object VpnManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to clear WebView proxy", e)
+            }
+        }
+    }
+
+    @Volatile
+    private var isProxyPausedForExternal: Boolean = false
+
+    fun pauseProxyForExternalNavigation() {
+        if (_state.value.mode == NetworkMode.VPN_JAPAN && !isProxyPausedForExternal) {
+            isProxyPausedForExternal = true
+            clearWebViewProxy()
+            Log.d(TAG, "Temporarily bypassed proxy for external navigation (direct ISP for banking/3DSecure/login)")
+        }
+    }
+
+    fun restoreProxyForGaming() {
+        if (isProxyPausedForExternal) {
+            isProxyPausedForExternal = false
+            if (_state.value.mode == NetworkMode.VPN_JAPAN) {
+                applyMultiServerProxy(_state.value.currentServer)
+                Log.d(TAG, "Restored proxy for Xbox Cloud gaming")
             }
         }
     }

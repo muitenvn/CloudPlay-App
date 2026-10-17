@@ -163,5 +163,28 @@ class ExampleRobolectricTest {
         assertTrue(restored.contains("@GamerOne"))
         assertTrue(restored.contains("Nhấn"))
     }
+
+    @Test
+    fun `test isTrustedHost security and domain whitelist`() {
+        // Trusted Xbox and Microsoft domains
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://www.xbox.com/play"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://xbox.com/en-US/play"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://login.live.com/oauth20_authorize.srf"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://account.microsoft.com"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://login.microsoftonline.com/common/oauth2"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://auth.msauth.net"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://client.xboxservices.com/status"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://api.xboxlive.com"))
+        assertTrue(com.example.cloudplay.XboxBridge.isTrustedHost("https://sub.live.net"))
+
+        // Untrusted / non-https / external domains
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("http://www.xbox.com/play")) // Insecure http rejected
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("https://google.com"))
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("https://facebook.com"))
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("https://evil-xbox.com.attacker.com"))
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("https://fake-microsoft.com"))
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost(null))
+        org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost(""))
+    }
 }
 

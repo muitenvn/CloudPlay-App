@@ -25,14 +25,60 @@ class XboxBridge(
 ) {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
 
+    @Volatile
+    private var currentNavigatedUrl: String? = null
+
     fun setWebView(webView: android.webkit.WebView) {
         webViewRef = WeakReference(webView)
+    }
+
+    fun updateCurrentUrl(url: String?) {
+        if (!url.isNullOrBlank()) {
+            currentNavigatedUrl = url
+        }
     }
 
     companion object {
         private const val TAG = "XboxBridge"
         private val _translationInfo = MutableStateFlow(TranslationInfo())
         val translationInfo: StateFlow<TranslationInfo> = _translationInfo.asStateFlow()
+
+        val TRUSTED_DOMAINS = listOf(
+            "xbox.com",
+            "xboxlive.com",
+            "xboxservices.com",
+            "live.com",
+            "live.net",
+            "microsoft.com",
+            "microsoftonline.com",
+            "msauth.net"
+        )
+
+        fun isTrustedHost(url: String?): Boolean {
+            if (url.isNullOrBlank()) return false
+            val parsedScheme: String? = try {
+                android.net.Uri.parse(url)?.scheme?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: try {
+                java.net.URI(url).scheme?.lowercase()
+            } catch (_: Exception) {
+                null
+            }
+            if (parsedScheme != "https") return false
+
+            val host: String = try {
+                android.net.Uri.parse(url)?.host?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: try {
+                java.net.URI(url).host?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: return false
+
+            return TRUSTED_DOMAINS.any { domain -> host == domain || host.endsWith(".$domain") }
+        }
 
         fun getInjectionScript(
             clarityBoost: Boolean,
@@ -529,12 +575,7 @@ class XboxBridge(
     }
 
     private fun isCallerTrusted(): Boolean {
-        val currentUrl = webViewRef?.get()?.url ?: return false
-        val host = try { android.net.Uri.parse(currentUrl).host?.lowercase() } catch (_: Exception) { null } ?: return false
-        return host == "xbox.com" || host.endsWith(".xbox.com") ||
-               host == "live.com" || host.endsWith(".live.com") ||
-               host == "microsoft.com" || host.endsWith(".microsoft.com") ||
-               host == "microsoftonline.com" || host.endsWith(".microsoftonline.com")
+        return isTrustedHost(currentNavigatedUrl)
     }
 
     @JavascriptInterface

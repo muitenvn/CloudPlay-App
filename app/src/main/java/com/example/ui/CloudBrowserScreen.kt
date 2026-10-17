@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,6 +33,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOn
@@ -106,7 +109,10 @@ fun CloudBrowserScreen(
         (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
         onDispose {
             gamepadDetector.release()
-            (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(false)
+            (activity as? com.example.MainActivity)?.let { mainAct ->
+                mainAct.applyImmersiveFullscreen(false)
+                mainAct.resetOrientation()
+            }
         }
     }
 
@@ -117,6 +123,8 @@ fun CloudBrowserScreen(
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.ZERO_LAG) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
+    var lastTrustedUrl by remember { mutableStateOf(initialUrl) }
+    var showReturnButton by remember { mutableStateOf(false) }
 
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
@@ -148,7 +156,16 @@ fun CloudBrowserScreen(
     }
 
     BackHandler {
-        onNavigateBackToDashboard()
+        if (showReturnButton && webViewInstance?.canGoBack() == true) {
+            webViewInstance?.goBack()
+        } else if (showReturnButton) {
+            val returnTarget = if (lastTrustedUrl.isNotBlank()) lastTrustedUrl else initialUrl
+            webViewInstance?.loadUrl(returnTarget)
+            showReturnButton = false
+            VpnManager.restoreProxyForGaming()
+        } else {
+            onNavigateBackToDashboard()
+        }
     }
 
     Box(
@@ -196,6 +213,7 @@ fun CloudBrowserScreen(
                     // Add JavaScript bridge for stream / launch detection & smart translation
                     val bridge = XboxBridge(streamController)
                     bridge.setWebView(this)
+                    bridge.updateCurrentUrl(initialUrl)
                     addJavascriptInterface(bridge, "CloudPlayBridge")
 
                     val injectionScript = XboxBridge.getInjectionScript(
@@ -230,23 +248,66 @@ fun CloudBrowserScreen(
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             isPageLoading = true
-                            url?.let { streamController.onUrlChanged(it) }
+                            bridge.updateCurrentUrl(url)
+                            url?.let {
+                                streamController.onUrlChanged(it)
+                                val trusted = XboxBridge.isTrustedHost(it)
+                                if (trusted) {
+                                    lastTrustedUrl = it
+                                    showReturnButton = false
+                                    VpnManager.restoreProxyForGaming()
+                                } else {
+                                    showReturnButton = true
+                                    VpnManager.pauseProxyForExternalNavigation()
+                                }
+                            }
                             // Early injection to intercept Xbox login and region check
-                            view?.evaluateJavascript(injectionScript, null)
+                            if (XboxBridge.isTrustedHost(url)) {
+                                view?.evaluateJavascript(injectionScript, null)
+                            }
                         }
 
                         override fun onPageCommitVisible(view: WebView?, url: String?) {
-                            view?.evaluateJavascript(injectionScript, null)
+                            if (XboxBridge.isTrustedHost(url)) {
+                                view?.evaluateJavascript(injectionScript, null)
+                            }
                         }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             isPageLoading = false
-                            // Re-apply hooks for dynamic single-page-app transitions
-                            view?.evaluateJavascript(injectionScript, null)
+                            bridge.updateCurrentUrl(url)
+                            url?.let {
+                                val trusted = XboxBridge.isTrustedHost(it)
+                                if (trusted) {
+                                    lastTrustedUrl = it
+                                    showReturnButton = false
+                                    VpnManager.restoreProxyForGaming()
+                                } else {
+                                    showReturnButton = true
+                                    VpnManager.pauseProxyForExternalNavigation()
+                                }
+                            }
+                            if (XboxBridge.isTrustedHost(url)) {
+                                // Re-apply hooks for dynamic single-page-app transitions
+                                view?.evaluateJavascript(injectionScript, null)
+                            }
                         }
 
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                            request?.url?.toString()?.let { streamController.onUrlChanged(it) }
+                            val targetUrl = request?.url?.toString()
+                            bridge.updateCurrentUrl(targetUrl)
+                            targetUrl?.let { streamController.onUrlChanged(it) }
+                            if (request?.isForMainFrame == true && targetUrl != null) {
+                                val trusted = XboxBridge.isTrustedHost(targetUrl)
+                                if (trusted) {
+                                    lastTrustedUrl = targetUrl
+                                    showReturnButton = false
+                                    VpnManager.restoreProxyForGaming()
+                                } else {
+                                    showReturnButton = true
+                                    VpnManager.pauseProxyForExternalNavigation()
+                                }
+                            }
                             return false
                         }
 
@@ -388,6 +449,51 @@ fun CloudBrowserScreen(
                             Text("Hủy", fontSize = 11.sp, color = Color.White)
                         }
                     }
+                }
+            }
+        }
+
+        // Floating "Return to Game" Pill when navigating away to external untrusted websites (e.g. 3D Secure / Payment / External Links)
+        AnimatedVisibility(
+            visible = showReturnButton,
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 16.dp, end = 16.dp)
+        ) {
+            Surface(
+                onClick = {
+                    val returnTarget = if (lastTrustedUrl.isNotBlank()) lastTrustedUrl else initialUrl
+                    webViewInstance?.loadUrl(returnTarget)
+                    showReturnButton = false
+                    VpnManager.restoreProxyForGaming()
+                },
+                shape = RoundedCornerShape(20.dp),
+                color = XboxSurface.copy(alpha = 0.95f),
+                border = BorderStroke(1.5.dp, XboxNeonGreen),
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = 44.dp)
+                    .testTag("return_to_game_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Quay trở lại trò chơi",
+                        tint = XboxNeonGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Quay trở lại trò chơi",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
                 }
             }
         }

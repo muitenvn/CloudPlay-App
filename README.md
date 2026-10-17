@@ -1,132 +1,50 @@
 # 🎮 CloudPlay - Xbox Cloud Gaming Booster & Client
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/muitenvn/CloudPlay-App?color=00c853&label=Latest%20Release&style=for-the-badge" alt="Release Badge" />
-  <img src="https://img.shields.io/github/actions/workflow/status/muitenvn/CloudPlay-App/build-and-release-apk.yml?branch=main&label=Build%20Status&style=for-the-badge" alt="Build Badge" />
-  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-blue?style=for-the-badge&logo=android" alt="Android Badge" />
-  <img src="https://img.shields.io/badge/Ping%20Vietnam-25%E2%80%9335ms-brightgreen?style=for-the-badge" alt="Ping Badge" />
+  <img src="https://img.shields.io/github/v/release/muitenvn/CloudPlay-App?color=00c853&style=for-the-badge" alt="Release" />
+  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-blue?style=for-the-badge&logo=android" alt="Android" />
+  <img src="https://img.shields.io/badge/Ping%20VN-25%E2%80%9335ms-brightgreen?style=for-the-badge" alt="Ping" />
+  <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License" />
 </p>
 
----
-
-## Tiếng Việt
-
-### 📖 Giới thiệu
-
-CloudPlay là ứng dụng Android mã nguồn mở giúp cải thiện trải nghiệm chơi Xbox Cloud Gaming (xCloud) trên các thiết bị Android, đặc biệt phù hợp với người dùng ở Việt Nam và khu vực Đông Nam Á. Ứng dụng tập trung vào việc tối ưu hóa kết nối mạng, cải thiện trải nghiệm điều khiển và tăng khả năng sử dụng trên mạng di động và Wi‑Fi.
-
-Lưu ý quan trọng: Người dùng cần tuân thủ Điều khoản sử dụng của Microsoft, các chính sách của nền tảng và quy định pháp luật địa phương. Dự án này không khuyến khích hoặc hỗ trợ bất kỳ hành vi vi phạm bản quyền, phá khóa, lách luật hay can thiệp trái phép vào dịch vụ của bên thứ ba.
-
-### ✨ Tính năng nổi bật
-
-- ⚡ Tối ưu hóa kết nối mạng
-  - Giảm độ trễ và cải thiện chất lượng luồng trong điều kiện mạng thực tế.
-  - Hỗ trợ tối ưu cho các kết nối Wi‑Fi 5GHz và mạng di động 4G/5G.
-
-- 🎮 HUD nổi
-  - Hiển thị ping, trạng thái mạng và các nút điều khiển nhanh.
-
-- 🌐 Dịch nội dung và hỗ trợ đa ngôn ngữ
-  - Hỗ trợ dịch giao diện, mô tả game và thông tin trực quan.
-  - Chế độ song ngữ với trải nghiệm Tiếng Việt và Tiếng Anh.
-
-- 🧩 Giao diện hiện đại
-  - Thiết kế mượt, dễ sử dụng và xây dựng bằng Jetpack Compose (Material 3).
-
-- 🔒 Bảo mật và quyền riêng tư
-  - Không thu thập mật khẩu hay thông tin đăng nhập người dùng.
-
-### 📥 Tải xuống
-
-Bạn có thể tải APK mới nhất từ tab Releases của repository:
-
-- GitHub Releases: https://github.com/muitenvn/CloudPlay-App/releases/latest
-- GitHub Actions: https://github.com/muitenvn/CloudPlay-App/actions
-
-### ⚙️ Build / Tự build
-
-Yêu cầu: Android SDK 36 (hoặc 35+), JDK 21.
-
-```bash
-# Clone repository
-git clone https://github.com/muitenvn/CloudPlay-App.git
-cd CloudPlay-App
-
-# Cấp quyền thực thi cho gradlew
-chmod +x gradlew
-
-# Biên dịch APK Debug
-./gradlew assembleDebug
-```
-
-### 🧾 Bản quyền & Tuyên bố từ chối trách nhiệm
-
-- CloudPlay là dự án độc lập và không liên kết chính thức với Microsoft, Xbox hoặc các dịch vụ của họ.
-- Tất cả thương hiệu như Xbox, Xbox Cloud Gaming, Game Pass, v.v. thuộc quyền sở hữu của các chủ sở hữu tương ứng.
-- Tác giả không chịu trách nhiệm cho việc người dùng lạm dụng phần mềm để vi phạm thỏa thuận, pháp luật hoặc quyền của bên thứ ba.
+**CloudPlay** là ứng dụng Android mã nguồn mở tối ưu hóa trải nghiệm **Xbox Cloud Gaming (xCloud)** tại Việt Nam & Đông Nam Á với công nghệ **Smart Region Bypass** (Ping 25–35ms), bộ tối ưu **WebRTC 60 FPS**, **AI Gaming Translator** và **Floating Game Bar HUD**.
 
 ---
 
-## English
+### ⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM (LEGAL DISCLAIMER)
 
-### 📖 Overview
+> **QUAN TRỌNG:** Việc tải về, cài đặt hoặc sử dụng ứng dụng đồng nghĩa với việc bạn đồng ý với các điều khoản pháp lý sau:
 
-CloudPlay is an open-source Android application designed to improve the Xbox Cloud Gaming (xCloud) experience on Android devices, especially for users in Vietnam and Southeast Asia. The project focuses on network optimization, smoother controls, and better usability on mobile networks and Wi‑Fi.
-
-Important notice: Users must comply with Microsoft's terms of service, relevant platform policies, and local laws. This project does not encourage or support copyright violations, bypassing restrictions, or unauthorized interference with third-party services.
-
-### ✨ Key Features
-
-- ⚡ Network optimization
-  - Reduces latency and improves streaming quality under real-world conditions.
-  - Optimized for Wi‑Fi 5GHz and 4G/5G mobile connections.
-
-- 🎮 Floating HUD
-  - Displays ping, connection status, and quick controls.
-
-- 🌐 Translation and multilingual support
-  - Supports UI translation, game descriptions, and visual information.
-  - Bilingual experience with Vietnamese and English.
-
-- 🧩 Modern interface
-  - Smooth, user-friendly UI built with Jetpack Compose (Material 3).
-
-- 🔒 Security and privacy
-  - Does not collect user passwords or login credentials.
-
-### 📥 Download
-
-You can download the latest APK from the GitHub Releases page:
-
-- GitHub Releases: https://github.com/muitenvn/CloudPlay-App/releases/latest
-- GitHub Actions: https://github.com/muitenvn/CloudPlay-App/actions
-
-### ⚙️ Build
-
-Requirements: Android SDK 36 (or 35+), JDK 21.
-
-```bash
-# Clone repository
-git clone https://github.com/muitenvn/CloudPlay-App.git
-cd CloudPlay-App
-
-# Make gradlew executable
-chmod +x gradlew
-
-# Build Debug APK
-./gradlew assembleDebug
-```
-
-### 🧾 Copyright & Disclaimer
-
-- CloudPlay is an independent project and is not officially affiliated with Microsoft, Xbox, or their services.
-- All trademarks such as Xbox, Xbox Cloud Gaming, Game Pass, etc. belong to their respective owners.
-- The author is not responsible for any misuse of the software that violates agreements, laws, or third-party rights.
+1. **Không liên kết (Non-Affiliation):** CloudPlay là dự án mã nguồn mở độc lập, **KHÔNG** liên kết, ủy quyền, bảo trợ hay thuộc sở hữu của **Microsoft Corporation**, **Xbox**, hay các bên liên quan. Mọi nhãn hiệu (*Xbox, Game Pass, Halo, Forza...*) thuộc bản quyền của Microsoft.
+2. **Cung cấp "NGUYÊN TRẠNG" (AS IS):** Phần mềm được cung cấp không đi kèm bất kỳ sự bảo đảm nào về tính ổn định hay tính tương thích lâu dài.
+3. **Miễn trừ rủi ro tài khoản & thiệt hại:** Tác giả **KHÔNG** chịu trách nhiệm cho bất kỳ thiệt hại nào phát sinh đối với tài khoản Microsoft/Xbox của bạn (bao gồm tạm khóa/ban tài khoản, mất cloud saves) hoặc sự cố phần cứng/chi phí data 4G/5G.
+4. **Cam kết Chống vi phạm bản quyền (Anti-Piracy):** Ứng dụng **KHÔNG** chứa hack/crack, **KHÔNG** bypass trả phí. Người dùng **BẮT BUỘC** phải có tài khoản Microsoft & đăng ký gói **Xbox Game Pass Ultimate** chính chủ.
 
 ---
 
-## ☕ Ủng hộ / Support
+### ✨ Tính năng chính
 
-Nếu bạn thấy ứng dụng hữu ích và muốn hỗ trợ phát triển, bạn có thể đóng góp hoặc tài trợ theo hướng phù hợp với quy định hiện hành.
+- ⚡ **Smart Region Bypass:** Tự ngắt Proxy chuyển mạng nhà Direct ISP ngay khi stream thành công (Ping 25–35ms, 0ms VPN Overhead).
+- 🌐 **AI Gaming Translator:** Tự động dịch menu/cốt truyện sang Tiếng Việt, bảo vệ tên game & nút bấm tay cầm.
+- 🎮 **Floating Game Bar HUD:** Theo dõi Ping, FPS, Bitrate real-time; tích hợp Clarity Boost Ultra.
+- 📶 **Tối ưu hóa Mạng:** Chế độ tiết kiệm Data 4G/5G và tinh chỉnh chống giật lag Wi-Fi.
 
-If you find the app useful and want to support development, you can contribute or sponsor in a way that complies with applicable regulations.
+---
+
+### 📥 Tải về & Tự Build
+
+- 🚀 **Tải APK mới nhất:** [GitHub Releases](https://github.com/muitenvn/CloudPlay-App/releases/latest)
+- 🛠️ **Lệnh tự build:**
+  ```bash
+  git clone https://github.com/muitenvn/CloudPlay-App.git && cd CloudPlay-App
+  chmod +x gradlew && ./gradlew assembleDebug
+  ```
+  *(File xuất ra tại `app/build/outputs/apk/debug/app-debug.apk`)*
+
+---
+
+### 🇬🇧 Short English Legal Disclaimer
+
+**CloudPlay** is an independent open-source project and is **NOT affiliated with, endorsed, or sponsored by Microsoft Corporation or Xbox**. The software is provided **"AS IS"** without warranties. Developers accept **NO liability** for account bans, data loss, or system issues. Users **MUST** possess a valid **Xbox Game Pass Ultimate** subscription.
+
+📄 **License:** [MIT License](LICENSE)

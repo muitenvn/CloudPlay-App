@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Speed
@@ -124,6 +125,7 @@ fun FloatingHud(
     gameProfile: com.example.data.GameOptimizationProfile? = null,
     onOpenGuide: (GuideSection) -> Unit = {},
     onOpenTranslator: () -> Unit = {},
+    onToggleOrientation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var hudMode by remember { mutableStateOf(HudMode.MINIMIZED) }
@@ -184,12 +186,19 @@ fun FloatingHud(
             ) {
                 // MINIMIZED STATE: Ultra-compact Capsule Pill (tap to expand)
                 if (hudMode == HudMode.MINIMIZED) {
-                    val activePing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs ?: 29 else vpnState.latencyMs ?: 75
+                    val rawPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs
+                    val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
-                        activePing < 50 -> DirectCyan
-                        activePing < 90 -> XboxNeonGreen
-                        activePing < 130 -> Color(0xFFFFB300)
+                        !hasValidPing -> Color.Gray
+                        rawPing < 50 -> DirectCyan
+                        rawPing < 90 -> XboxNeonGreen
+                        rawPing < 130 -> Color(0xFFFFB300)
                         else -> JapanRed
+                    }
+                    val pingText = if (!hasValidPing) {
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡-- ms" else "${vpnState.currentServer.flag}-- ms"
+                    } else {
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
 
                     Row(
@@ -212,7 +221,7 @@ fun FloatingHud(
                                 .background(pingColor)
                         )
                         Text(
-                            text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${activePing}ms" else "🇯🇵${activePing}ms",
+                            text = pingText,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp
@@ -228,12 +237,19 @@ fun FloatingHud(
                     // ==========================================
                     // COMPACT STATE: ULTRA-SLIM ROW WITH HOME BUTTON (~145dp)
                     // ==========================================
-                    val activePing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs ?: 29 else vpnState.latencyMs ?: 75
+                    val compactRawPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs
+                    val compactHasValidPing = compactRawPing != null && compactRawPing > 0
                     val pingColor = when {
-                        activePing < 50 -> DirectCyan
-                        activePing < 90 -> XboxNeonGreen
-                        activePing < 130 -> Color(0xFFFFB300)
+                        !compactHasValidPing -> Color.Gray
+                        compactRawPing < 50 -> DirectCyan
+                        compactRawPing < 90 -> XboxNeonGreen
+                        compactRawPing < 130 -> Color(0xFFFFB300)
                         else -> JapanRed
+                    }
+                    val compactPingText = if (!compactHasValidPing) {
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡-- ms" else "${vpnState.currentServer.flag}-- ms"
+                    } else {
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${compactRawPing}ms" else "${vpnState.currentServer.flag}${compactRawPing}ms"
                     }
 
                     Row(
@@ -304,7 +320,7 @@ fun FloatingHud(
                                         .background(pingColor)
                                 )
                                 Text(
-                                    text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${activePing}ms" else "🇯🇵${activePing}ms",
+                                    text = compactPingText,
                                     color = TextPrimary,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -896,6 +912,27 @@ fun FloatingHud(
                                         Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = JapanRed, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(text = stringResource(R.string.hud_return_home), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                                    }
+                                }
+
+                                // Rotate Screen Button (Landscape/Portrait)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onToggleOrientation() }
+                                        .testTag("hud_expanded_rotate_button"),
+                                    color = Color.Black.copy(alpha = 0.5f),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(imageVector = Icons.Default.ScreenRotation, contentDescription = "Xoay màn hình", tint = DirectCyan, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(text = "Xoay", color = DirectCyan, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
                                     }
                                 }
 

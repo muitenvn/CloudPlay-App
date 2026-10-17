@@ -39,15 +39,11 @@
 
         <service
             android:name=".vpn.XboxCloudVpnService"
-            android:permission="android.permission.BIND_VPN_SERVICE"
             android:foregroundServiceType="specialUse"
             android:exported="false">
-            <intent-filter>
-                <action android:name="android.net.VpnService" />
-            </intent-filter>
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="VPN tunnel for Xbox Cloud gaming latency optimization" />
+                android:value="Foreground service maintaining low-latency Xbox Cloud gaming streaming connection" />
         </service>
 
     </application>

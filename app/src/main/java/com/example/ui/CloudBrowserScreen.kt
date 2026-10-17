@@ -93,9 +93,20 @@ fun CloudBrowserScreen(
     val gamepadDetector = remember { GamepadDetector(context) }
     val gamepadStatus by gamepadDetector.status.collectAsState()
 
-    DisposableEffect(Unit) {
+    val activity = remember(context) {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is android.app.Activity) break
+            ctx = ctx.baseContext
+        }
+        ctx as? android.app.Activity
+    }
+
+    DisposableEffect(activity) {
+        (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
         onDispose {
             gamepadDetector.release()
+            (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(false)
         }
     }
 
@@ -442,6 +453,9 @@ fun CloudBrowserScreen(
             },
             onOpenTranslator = {
                 showTranslatorDialog = true
+            },
+            onToggleOrientation = {
+                (activity as? com.example.MainActivity)?.toggleOrientation()
             }
         )
 

@@ -1,7 +1,6 @@
 package com.example
 
 import android.app.Activity
-import android.net.VpnService
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -49,6 +48,7 @@ class MainActivity : ComponentActivity() {
         // Keep screen awake while streaming Xbox games
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 MyApplicationTheme {
                     MainContent(
+                        activity = this@MainActivity,
                         streamController = streamController,
                         onConnectVpnRequested = { handleVpnConnect() }
                     )
@@ -102,51 +103,93 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun handleVpnConnect() {
-        val prepareIntent = VpnService.prepare(this)
-        if (prepareIntent != null) {
-            // Permission needed, handled by compose launcher in MainContent
-        } else {
-            VpnManager.connect(this)
+    private var isBrowserScreenActive = false
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && isBrowserScreenActive) {
+            applyImmersiveFullscreen(true)
         }
+    }
+
+    fun applyImmersiveFullscreen(enable: Boolean) {
+        isBrowserScreenActive = enable
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (enable) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+            )
+        } else {
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = android.view.View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+
+    fun toggleOrientation() {
+        requestedOrientation = if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
+
+    private fun handleVpnConnect() {
+        VpnManager.connect(this)
     }
 }
 
 @Composable
 fun MainContent(
+    activity: MainActivity,
     streamController: StreamController,
     onConnectVpnRequested: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = context as? Activity
 
     var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Dashboard) }
 
-    // Launcher for Android system VPN preparation intent
-    val vpnLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            VpnManager.connect(context)
+    // Runtime POST_NOTIFICATIONS permission request for Android 13+ (TIRAMISU / API 33+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        android.util.Log.d("MainActivity", "POST_NOTIFICATIONS permission granted: $isGranted")
+    }
+
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
     }
 
     // Fullscreen Immersive Mode controller for Cloud Gaming
     LaunchedEffect(currentScreen) {
-        activity?.let { act ->
-            val window = act.window
-            val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-            when (currentScreen) {
-                is AppScreen.Browser -> {
-                    insetsController.systemBarsBehavior =
-                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    insetsController.hide(WindowInsetsCompat.Type.systemBars())
-                }
-                is AppScreen.Dashboard -> {
-                    insetsController.show(WindowInsetsCompat.Type.systemBars())
-                }
-            }
-        }
+        val isBrowser = currentScreen is AppScreen.Browser
+        activity.applyImmersiveFullscreen(isBrowser)
     }
 
     AnimatedContent(

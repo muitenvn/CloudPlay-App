@@ -528,43 +528,59 @@ class XboxBridge(
         }
     }
 
+    private fun isCallerTrusted(): Boolean {
+        val currentUrl = webViewRef?.get()?.url ?: return false
+        val host = try { android.net.Uri.parse(currentUrl).host?.lowercase() } catch (_: Exception) { null } ?: return false
+        return host == "xbox.com" || host.endsWith(".xbox.com") ||
+               host == "live.com" || host.endsWith(".live.com") ||
+               host == "microsoft.com" || host.endsWith(".microsoft.com") ||
+               host == "microsoftonline.com" || host.endsWith(".microsoftonline.com")
+    }
+
     @JavascriptInterface
     fun onTranslationStatus(enabled: Boolean, count: Int) {
+        if (!isCallerTrusted()) return
         Log.d(TAG, "xCloud Native Translation: enabled=$enabled, count=$count")
         _translationInfo.value = TranslationInfo(isEnabled = enabled, translatedCount = count)
     }
 
     @JavascriptInterface
     fun onGameLaunchInitiated(gameTitle: String?) {
+        if (!isCallerTrusted()) return
         Log.d(TAG, "Game launch detected: $gameTitle")
         controller.onGameLaunchInitiated(gameTitle ?: "Xbox Game")
     }
 
     @JavascriptInterface
     fun onStreamConnected(detail: String?) {
+        if (!isCallerTrusted()) return
         Log.d(TAG, "Stream established: $detail")
         controller.onStreamConnected()
     }
 
     @JavascriptInterface
     fun onStreamDisconnected(detail: String?) {
+        if (!isCallerTrusted()) return
         Log.d(TAG, "Stream ended: $detail")
         controller.onStreamDisconnected()
     }
 
     @JavascriptInterface
     fun onUrlChanged(url: String?) {
+        if (!isCallerTrusted()) return
         url?.let { controller.onUrlChanged(it) }
     }
 
     @JavascriptInterface
     fun onRegionBypassed(info: String?) {
+        if (!isCallerTrusted()) return
         Log.d(TAG, "Region bypassed: $info")
         VpnManager.onRegionBypassed(info ?: "")
     }
 
     @JavascriptInterface
     fun onWebViewIpDetected(jsonStr: String?) {
+        if (!isCallerTrusted()) return
         if (jsonStr.isNullOrBlank()) return
         try {
             val json = JSONObject(jsonStr)
@@ -582,6 +598,7 @@ class XboxBridge(
 
     @JavascriptInterface
     fun onStreamTelemetry(telemetryJson: String?) {
+        if (!isCallerTrusted()) return
         // Real-time WebRTC telemetry received from stream
         Log.d(TAG, "Stream telemetry: $telemetryJson")
         NetworkOptimizer.onTelemetryReceived(telemetryJson)
@@ -589,6 +606,7 @@ class XboxBridge(
 
     @JavascriptInterface
     fun requestSmartTranslate(rawText: String?, callbackId: String?, isBilingual: Boolean) {
+        if (!isCallerTrusted()) return
         if (rawText.isNullOrBlank() || callbackId.isNullOrBlank()) return
         scope.launch(Dispatchers.IO) {
             val translated = GoogleGamingTranslator.translate(rawText, "vi", isBilingual)
@@ -604,6 +622,7 @@ class XboxBridge(
 
     @JavascriptInterface
     fun requestBatchTranslate(jsonTexts: String?, batchId: String?, isBilingual: Boolean) {
+        if (!isCallerTrusted()) return
         if (jsonTexts.isNullOrBlank() || batchId.isNullOrBlank()) return
         scope.launch(Dispatchers.IO) {
             try {
@@ -631,6 +650,7 @@ class XboxBridge(
 
     @JavascriptInterface
     fun log(msg: String?) {
+        if (!isCallerTrusted()) return
         Log.d("XboxBridgeJS", msg ?: "")
     }
 }

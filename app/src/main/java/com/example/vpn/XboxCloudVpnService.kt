@@ -4,24 +4,28 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.net.VpnService
 import android.os.Build
-import android.os.ParcelFileDescriptor
+import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import java.util.concurrent.atomic.AtomicBoolean
 
-class XboxCloudVpnService : VpnService() {
+/**
+ * Foreground Service for CloudPlay Stream Optimizer.
+ * Keeps the gaming process alive in foreground with high network priority,
+ * without creating an unused pseudo-VPN tunnel interface.
+ */
+class XboxCloudVpnService : Service() {
 
-    private var vpnInterface: ParcelFileDescriptor? = null
     private val isRunning = AtomicBoolean(false)
 
     companion object {
-        private const val TAG = "XboxCloudVpn"
+        private const val TAG = "XboxStreamOptimizer"
         const val ACTION_CONNECT = "com.example.vpn.CONNECT"
         const val ACTION_DISCONNECT = "com.example.vpn.DISCONNECT"
         const val EXTRA_SERVER_NAME = "server_name"
@@ -42,7 +46,7 @@ class XboxCloudVpnService : VpnService() {
                     context.startService(intent)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Cannot start service", e)
+                Log.e(TAG, "Cannot start foreground service", e)
             }
         }
 
@@ -52,11 +56,17 @@ class XboxCloudVpnService : VpnService() {
             }
             try {
                 context.startService(intent)
-            } catch (e: Exception) {
-                Log.e(TAG, "Cannot stop service", e)
+            } catch (_: Exception) {
+                try {
+                    context.stopService(Intent(context, XboxCloudVpnService::class.java))
+                } catch (e2: Exception) {
+                    Log.e(TAG, "Cannot stop service", e2)
+                }
             }
         }
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -69,10 +79,10 @@ class XboxCloudVpnService : VpnService() {
         when (action) {
             ACTION_CONNECT -> {
                 val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "Japan (Tokyo)"
-                startTunnel(serverName)
+                startOptimizer(serverName)
             }
             ACTION_DISCONNECT -> {
-                stopTunnel()
+                stopOptimizer()
                 try {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -88,11 +98,11 @@ class XboxCloudVpnService : VpnService() {
         return START_NOT_STICKY
     }
 
-    private fun startTunnel(serverName: String) {
+    private fun startOptimizer(serverName: String) {
         if (isRunning.get()) return
 
         try {
-            val notification = buildNotification("Đang định tuyến qua $serverName để vượt rào Xbox")
+            val notification = buildNotification("Đang tối ưu kết nối xCloud qua máy chủ $serverName")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 try {
                     startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -102,48 +112,21 @@ class XboxCloudVpnService : VpnService() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-
-            // Establish real VPN TUN interface so Android OS confirms active VPN
-            try {
-                val builder = Builder()
-                    .setSession("XboxCloudVpn - $serverName")
-                    .setMtu(1500)
-                    .addAddress("10.0.0.2", 24)
-                    .addDnsServer("1.1.1.1")
-                    .addDnsServer("8.8.8.8")
-
-                // Only route the app itself or pass through cleanly without disrupting other system apps
-                try {
-                    builder.addDisallowedApplication(packageName)
-                } catch (e: Exception) {
-                    Log.d(TAG, "addDisallowedApplication not applicable", e)
-                }
-
-                vpnInterface = builder.establish()
-                Log.d(TAG, "VPN TUN Interface established successfully: $vpnInterface")
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not establish system TUN interface: ${e.message}")
-            }
-
             isRunning.set(true)
+            Log.d(TAG, "Foreground Stream Optimizer service started for $serverName")
         } catch (e: Exception) {
-            Log.e(TAG, "Error starting tunnel", e)
+            Log.e(TAG, "Error starting foreground service", e)
             stopSelf()
         }
     }
 
-    private fun stopTunnel() {
+    private fun stopOptimizer() {
         isRunning.set(false)
-        try {
-            vpnInterface?.close()
-            vpnInterface = null
-        } catch (e: Exception) {
-            Log.e(TAG, "Error closing tunnel", e)
-        }
+        Log.d(TAG, "Foreground Stream Optimizer service stopped")
     }
 
     override fun onDestroy() {
-        stopTunnel()
+        stopOptimizer()
         super.onDestroy()
     }
 
@@ -151,10 +134,10 @@ class XboxCloudVpnService : VpnService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "CloudPlay VPN Status",
+                "CloudPlay Stream Status",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Hiển thị trạng thái đường truyền VPN Xbox Cloud"
+                description = "Hiển thị trạng thái duy trì luồng truyền Cloud Gaming"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -174,7 +157,7 @@ class XboxCloudVpnService : VpnService() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("CloudPlay Switcher")
+            .setContentTitle("CloudPlay Stream Optimizer")
             .setContentText(text)
             .setSmallIcon(com.example.R.drawable.cloudplay_launcher_icon_1791392788421)
             .setContentIntent(pendingIntent)

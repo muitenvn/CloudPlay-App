@@ -180,22 +180,8 @@ object GeoIpDetector {
             }
         }
 
-        // If completely offline or DNS block, default to device locale country so user is never stuck
-        val finalResult = result ?: run {
-            val localCountry = java.util.Locale.getDefault().country.ifBlank { "VN" }.uppercase()
-            val isSupported = SUPPORTED_COUNTRIES.contains(localCountry)
-            GeoIpResult(
-                ip = "127.0.0.1 (Mạng nội bộ)",
-                countryCode = localCountry,
-                countryName = getCountryDisplayName(localCountry),
-                city = "Thiết bị",
-                flagEmoji = getFlagEmoji(localCountry),
-                isXboxSupported = isSupported
-            )
-        }
-
         _isChecking.value = false
-        _currentGeoIp.value = finalResult
-        finalResult
+        _currentGeoIp.value = result
+        result
     }
 }

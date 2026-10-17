@@ -174,19 +174,22 @@ fun InGameLoadingOverlay(
         }
 
         // Realistic Ping & Quality status
-        val measuredPing = realLatencyMs ?: 29
+        val hasValidPing = realLatencyMs != null && realLatencyMs > 0
         val pingColor = when {
-            measuredPing < 50 -> DirectCyan
-            measuredPing < 90 -> XboxNeonGreen
-            measuredPing < 130 -> Color(0xFFFFB300)
+            !hasValidPing -> Color.Gray
+            realLatencyMs < 50 -> DirectCyan
+            realLatencyMs < 90 -> XboxNeonGreen
+            realLatencyMs < 130 -> Color(0xFFFFB300)
             else -> JapanRed
         }
         val pingRating = when {
-            measuredPing < 50 -> "Cực mượt"
-            measuredPing < 90 -> "Rất tốt"
-            measuredPing < 130 -> "Ổn định"
+            !hasValidPing -> "Đang đo..."
+            realLatencyMs < 50 -> "Cực mượt"
+            realLatencyMs < 90 -> "Rất tốt"
+            realLatencyMs < 130 -> "Ổn định"
             else -> "Cao"
         }
+        val pingText = if (hasValidPing) "⚡ ${realLatencyMs}ms" else "⚡ -- ms"
 
         // Dynamic flight phase synced to loading progress
         val effectiveProgress = progress.coerceIn(0.08f, 1f)
@@ -324,7 +327,7 @@ fun InGameLoadingOverlay(
                                     .background(pingColor)
                             )
                             Text(
-                                text = "⚡ ${measuredPing}ms",
+                                text = pingText,
                                 color = TextPrimary,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold

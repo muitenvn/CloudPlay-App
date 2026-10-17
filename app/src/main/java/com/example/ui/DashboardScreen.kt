@@ -198,9 +198,11 @@ fun DashboardScreen(
                                         tint = DirectCyan,
                                         modifier = Modifier.size(13.dp)
                                     )
+                                    val directPing = vpnState.directLatencyMs
+                                    val hasPing = directPing != null && directPing > 0
                                     Text(
-                                        text = "${vpnState.directLatencyMs ?: 28}ms",
-                                        color = DirectCyan,
+                                        text = if (hasPing) "${directPing}ms" else "-- ms",
+                                        color = if (hasPing) DirectCyan else Color.Gray,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )

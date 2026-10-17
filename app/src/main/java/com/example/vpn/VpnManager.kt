@@ -29,10 +29,80 @@ object VpnManager {
     private var pingJob: Job? = null
     private var ipCheckJob: Job? = null
     private val proxyExecutor = Executors.newSingleThreadExecutor()
+    private var appContext: Context? = null
 
     init {
         // Initial location check at launch
         checkCurrentIp()
+    }
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+        loadPersistedServers(context.applicationContext)
+    }
+
+    private fun loadPersistedServers(context: Context) {
+        try {
+            val sp = context.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("custom_servers_json", null) ?: return
+            val array = org.json.JSONArray(jsonStr)
+            val list = mutableListOf<ServerLocation>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    ServerLocation(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        flag = obj.optString("flag", "🌐"),
+                        ip = obj.getString("ip"),
+                        port = obj.getInt("port"),
+                        protocol = obj.optString("protocol", "http"),
+                        countryCode = obj.optString("countryCode", "JP"),
+                        lastPingMs = null,
+                        isCustom = true
+                    )
+                )
+            }
+            if (list.isNotEmpty()) {
+                _state.value = _state.value.copy(customServers = list)
+            }
+            val lastServerId = sp.getString("selected_server_id", null)
+            if (lastServerId != null) {
+                val all = list + DEFAULT_SERVERS
+                val found = all.find { it.id == lastServerId }
+                if (found != null) {
+                    _state.value = _state.value.copy(currentServer = found)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not load persisted servers", e)
+        }
+    }
+
+    private fun persistCustomServers(context: Context?, servers: List<ServerLocation>, selectedServer: ServerLocation?) {
+        val ctx = context ?: appContext ?: return
+        try {
+            val sp = ctx.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            val array = org.json.JSONArray()
+            for (s in servers) {
+                val obj = org.json.JSONObject().apply {
+                    put("id", s.id)
+                    put("name", s.name)
+                    put("flag", s.flag)
+                    put("ip", s.ip)
+                    put("port", s.port)
+                    put("protocol", s.protocol)
+                    put("countryCode", s.countryCode)
+                }
+                array.put(obj)
+            }
+            sp.edit()
+                .putString("custom_servers_json", array.toString())
+                .putString("selected_server_id", selectedServer?.id)
+                .apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not persist servers", e)
+        }
     }
 
     fun setEngine(engine: VpnEngine, context: Context? = null) {
@@ -47,20 +117,41 @@ object VpnManager {
         ipCheckJob?.cancel()
         ipCheckJob = scope.launch(Dispatchers.IO) {
             val result = GeoIpDetector.checkCurrentIp()
-            updateSmartDecision(result)
+            if (result != null) {
+                updateSmartDecision(result)
+            } else {
+                val offlineDecision = SmartVpnDecision(
+                    checked = true,
+                    needsVpn = false,
+                    userCountryCode = "--",
+                    userCountryName = "Không xác định / Ngoại tuyến",
+                    isSupportedRegion = false,
+                    message = "🌐 Không xác định được địa chỉ IP mạng (Mất kết nối hoặc chặn DNS). Bạn có thể bật Bypass hoặc chọn Server thủ công.",
+                    actionSummary = "Thủ công: Chọn máy chủ theo ý muốn"
+                )
+                _state.value = _state.value.copy(
+                    detectedGeoIp = null,
+                    smartDecision = offlineDecision,
+                    smartVpnPhase = SmartVpnPhase.IDLE,
+                    statusMessage = "Chưa kết nối mạng / Không rõ IP"
+                )
+            }
         }
     }
 
     fun updateSmartDecision(geo: GeoIpResult?) {
         val currentGeo = geo ?: _state.value.detectedGeoIp
         if (currentGeo == null) {
-            val pendingDecision = SmartVpnDecision(
-                checked = false,
-                needsVpn = true,
-                message = "Đang kiểm tra IP người chơi...",
-                actionSummary = "Tự động phân tích IP..."
+            val offlineDecision = SmartVpnDecision(
+                checked = true,
+                needsVpn = false,
+                userCountryCode = "--",
+                userCountryName = "Không xác định / Ngoại tuyến",
+                isSupportedRegion = false,
+                message = "🌐 Chưa xác định được IP mạng. Bạn có thể bật Bypass hoặc chọn Server thủ công.",
+                actionSummary = "Thủ công: Chọn máy chủ theo ý muốn"
             )
-            _state.value = _state.value.copy(smartDecision = pendingDecision)
+            _state.value = _state.value.copy(smartDecision = offlineDecision)
             return
         }
 
@@ -397,6 +488,7 @@ object VpnManager {
     fun selectServer(server: ServerLocation, context: Context? = null) {
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
         _state.value = _state.value.copy(currentServer = server)
+        persistCustomServers(context, _state.value.customServers, server)
         if (wasConnected && context != null) {
             connect(context, server)
         }
@@ -405,6 +497,7 @@ object VpnManager {
     fun addCustomServer(server: ServerLocation) {
         val updated = _state.value.customServers + server
         _state.value = _state.value.copy(customServers = updated, currentServer = server)
+        persistCustomServers(appContext, updated, server)
     }
 
     fun getAllServers(): List<ServerLocation> {

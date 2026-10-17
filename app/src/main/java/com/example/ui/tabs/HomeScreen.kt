@@ -457,9 +457,10 @@ private fun QuickNetworkCockpitCard(
                             tint = if (isConnected) XboxNeonGreen else Color.Gray,
                             modifier = Modifier.size(13.dp)
                         )
+                        val hasPing = isConnected && vpnState.directLatencyMs != null && vpnState.directLatencyMs > 0
                         Text(
-                            text = if (isConnected) "${vpnState.directLatencyMs ?: 28} ms" else "-- ms",
-                            color = if (isConnected) XboxNeonGreen else Color.Gray,
+                            text = if (hasPing) "${vpnState.directLatencyMs} ms" else "-- ms",
+                            color = if (hasPing) XboxNeonGreen else Color.Gray,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )

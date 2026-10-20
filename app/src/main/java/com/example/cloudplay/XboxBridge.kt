@@ -165,25 +165,59 @@ class XboxBridge(
                         console.log("[xCloud Optimizer] Network Profile Active:", window.__networkProfile);
                     };
 
-                    window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs) {
-                        const mbps = parseFloat(targetMbps) || 10.0;
-                        const bufMs = parseInt(bufferHintMs) || 18;
+                    window.__currentBufferSec = 0.018;
+                    window.__targetBufferSec = 0.018;
+                    window.__bufferGlideTimer = null;
+
+                    window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
+                        const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
+                        const bufMs = Math.max(14.0, Math.min(26.0, parseFloat(bufferHintMs) || 18.0));
+                        const targetSec = bufMs / 1000.0;
+
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
                         }
-                        console.log("[AdaptiveQuality] Applying adaptive bitrate:", mbps, "Mbps, buffer hint:", bufMs, "ms");
-                        if (window.__activePeerConnection) {
+
+                        window.__targetBufferSec = targetSec;
+                        if (typeof window.__currentBufferSec !== 'number') {
+                            window.__currentBufferSec = targetSec;
+                        }
+
+                        function applyBufferToReceivers(secVal) {
+                            if (!window.__activePeerConnection) return;
                             try {
                                 const receivers = window.__activePeerConnection.getReceivers ? window.__activePeerConnection.getReceivers() : [];
-                                receivers.forEach(r => {
+                                for (let i = 0; i < receivers.length; i++) {
+                                    const r = receivers[i];
                                     if (r && r.track && r.track.kind === 'video') {
-                                        if ('playoutDelayHint' in r) r.playoutDelayHint = bufMs / 1000.0;
-                                        if ('jitterBufferTarget' in r) r.jitterBufferTarget = bufMs / 1000.0;
+                                        if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
+                                        if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal;
                                     }
-                                });
-                            } catch(e) {
-                                console.warn("[AdaptiveQuality] Could not adjust receiver playout delay", e);
-                            }
+                                }
+                            } catch(e) {}
+                        }
+
+                        // Smooth micro-interpolation (0.35ms per 90ms tick) so WebRTC hardware decoder never stutters when changing quality
+                        if (smoothGlide === false) {
+                            window.__currentBufferSec = targetSec;
+                            applyBufferToReceivers(targetSec);
+                            return;
+                        }
+
+                        if (!window.__bufferGlideTimer) {
+                            window.__bufferGlideTimer = setInterval(function() {
+                                const diff = window.__targetBufferSec - window.__currentBufferSec;
+                                if (Math.abs(diff) <= 0.0004) {
+                                    window.__currentBufferSec = window.__targetBufferSec;
+                                    applyBufferToReceivers(window.__currentBufferSec);
+                                    clearInterval(window.__bufferGlideTimer);
+                                    window.__bufferGlideTimer = null;
+                                } else {
+                                    const step = diff > 0 ? Math.min(diff, 0.00035) : Math.max(diff, -0.00035);
+                                    window.__currentBufferSec = parseFloat((window.__currentBufferSec + step).toFixed(5));
+                                    applyBufferToReceivers(window.__currentBufferSec);
+                                }
+                            }, 90);
                         }
                     };
 

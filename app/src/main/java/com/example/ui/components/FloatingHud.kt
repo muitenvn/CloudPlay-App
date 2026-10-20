@@ -627,7 +627,7 @@ fun FloatingHud(
                                         Text(text = "Giải mã: ${if (telemetry.decodeTimeMs > 0) String.format("%.1f", telemetry.decodeTimeMs) + "ms" else "--"}", color = if (telemetry.decodeTimeMs in 0.1..8.5) XboxNeonGreen else if (telemetry.decodeTimeMs > 12.0) JapanRed else DirectCyan, fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold)
                                     }
 
-                                    // Thang Chất Lượng Tự Động Thích Ứng (Adaptive Quality Bitrate Ladder)
+                                    // Tự Động Biến Thiên Tự Do (1..20 Mbps) vs Cố Định
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -637,7 +637,7 @@ fun FloatingHud(
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(7.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            verticalArrangement = Arrangement.spacedBy(5.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -655,7 +655,11 @@ fun FloatingHud(
                                                         modifier = Modifier.size(12.dp)
                                                     )
                                                     Text(
-                                                        text = "TỰ ĐỘNG THÍCH ỨNG THEO MẠNG & MÁY",
+                                                        text = if (adaptiveQualityState.isAutoAdapting) {
+                                                            "TỰ ĐỘNG BIẾN THIÊN (1 ➔ 20 Mbps)"
+                                                        } else {
+                                                            "CHẾ ĐỘ CỐ ĐỊNH (KHÔNG TỰ ĐỔI)"
+                                                        },
                                                         color = DirectCyan,
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold
@@ -667,7 +671,7 @@ fun FloatingHud(
                                                     modifier = Modifier.clickable { onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting) }
                                                 ) {
                                                     Text(
-                                                        text = if (adaptiveQualityState.isAutoAdapting) "TỰ ĐỘNG: BẬT" else "CỐ ĐỊNH",
+                                                        text = if (adaptiveQualityState.isAutoAdapting) "TỰ ĐỘNG: BẬT" else "ĐANG CỐ ĐỊNH",
                                                         color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen else TextSecondary,
                                                         fontSize = 7.5.sp,
                                                         fontWeight = FontWeight.Bold,
@@ -690,30 +694,48 @@ fun FloatingHud(
                                                 lineHeight = 11.sp
                                             )
 
-                                            // Ladder Step Indicators (clickable)
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                adaptiveQualityState.ladderSteps.forEachIndexed { idx, step ->
-                                                    val isSelected = idx == adaptiveQualityState.currentStepIndex
-                                                    Surface(
+                                            // Continuous 1..20 Mbps progress spectrum (No fixed 4-bar jump!)
+                                            val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
+                                            val fillFraction = ((liveMbps - 1.0) / 19.0).toFloat().coerceIn(0.05f, 1f)
+                                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(7.dp)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFF14241B))
+                                                ) {
+                                                    Box(
                                                         modifier = Modifier
-                                                            .weight(1f)
+                                                            .fillMaxWidth(fillFraction)
+                                                            .height(7.dp)
                                                             .clip(RoundedCornerShape(4.dp))
-                                                            .clickable { onSelectLadderStep(idx) },
-                                                        color = if (isSelected) XboxNeonGreen.copy(alpha = 0.35f) else Color(0xFF14241B),
-                                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen) else null
-                                                    ) {
-                                                        Text(
-                                                            text = "${step.targetBitrateMbps.toInt()}M",
-                                                            color = if (isSelected) XboxNeonGreen else TextSecondary,
-                                                            fontSize = 8.sp,
-                                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
-                                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                                            modifier = Modifier.padding(vertical = 3.dp)
-                                                        )
-                                                    }
+                                                            .background(
+                                                                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                                    colors = listOf(XboxNeonGreen, DirectCyan)
+                                                                )
+                                                            )
+                                                    )
+                                                }
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = if (adaptiveQualityState.isAutoAdapting) {
+                                                            "1M • 2 • 3 • 4 • 5 ... 10 ... 15 ... 20M (Tự do từng nấc)"
+                                                        } else {
+                                                            "Đang khóa cố định tại ${liveMbps.toInt()} Mbps"
+                                                        },
+                                                        color = TextSecondary,
+                                                        fontSize = 7.2.sp
+                                                    )
+                                                    Text(
+                                                        text = "${liveMbps} Mbps",
+                                                        color = XboxNeonGreen,
+                                                        fontSize = 7.5.sp,
+                                                        fontWeight = FontWeight.ExtraBold
+                                                    )
                                                 }
                                             }
                                         }

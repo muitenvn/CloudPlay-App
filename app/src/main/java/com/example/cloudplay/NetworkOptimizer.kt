@@ -204,62 +204,45 @@ object NetworkOptimizer {
 
         when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
-                when {
-                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> {
-                        profileName = "Đồ Họa: Tự Động • Wi-Fi 6GHz (Rất Cao 18M)"
-                        bitrate = 18
-                        summary = "Mạng Wi-Fi 6GHz siêu tốc: Tự chọn mức Rất Cao (18M) hỗ trợ 1080p 60–120FPS độ trễ cực thấp."
-                        badge = "⚡ Tự Động (18M)"
+                val liveAutoMbps = AdaptiveQualityManager.state.value.smoothBitrateMbps
+                    .takeIf { it in 1.0..20.0 }
+                    ?: when {
+                        isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 16.0
+                        isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 13.0
+                        isWifi -> 10.0
+                        isCellular -> 8.0
+                        else -> 10.0
                     }
-                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> {
-                        profileName = "Đồ Họa: Tự Động • Wi-Fi 5GHz (Cao 14M)"
-                        bitrate = 14
-                        summary = "Mạng Wi-Fi 5GHz mạnh: Tự chọn mức Cao (14M) sắc nét và tự hạ tải GPU nếu máy nóng."
-                        badge = "⚡ Tự Động (14M)"
-                    }
-                    isWifi -> {
-                        profileName = "Đồ Họa: Tự Động • Wi-Fi (Trung Bình 9M)"
-                        bitrate = 9
-                        summary = "Mạng Wi-Fi chuẩn: Tự cân bằng mức Trung Bình (9M) giữ 60 FPS êm ái, chống giật lag."
-                        badge = "⚡ Tự Động (9M)"
-                    }
-                    isCellular -> {
-                        profileName = "Đồ Họa: Tự Động • Mạng Di Động (Tiết Kiệm 6M)"
-                        bitrate = 6
-                        summary = "Mạng 4G/5G di động: Tự ưu tiên tiết kiệm dung lượng & giảm tải giải mã GPU chống nóng máy."
-                        badge = "⚡ Tự Động (6M)"
-                    }
-                    else -> {
-                        profileName = "Đồ Họa: Tự Động (Cân Bằng 10M)"
-                        bitrate = 10
-                        summary = "Tự động điều chỉnh chất lượng đồ họa và giảm tải phần cứng theo điều kiện mạng thực tế."
-                        badge = "⚡ Tự Động (10M)"
-                    }
-                }
+                val displayMbps = kotlin.math.round(liveAutoMbps * 10.0) / 10.0
+                val mbpsLabel = if (displayMbps % 1.0 == 0.0) "${displayMbps.toInt()}M" else "${displayMbps}M"
+                profileName = "Đồ Họa: Tự Động Linh Hoạt • $mbpsLabel (Tự do 1–20M)"
+                bitrate = displayMbps.toInt().coerceIn(1, 20)
+                summary = "Tự động biến thiên mượt từng nấc (1, 2, 3... 20 Mbps) theo mạng & tải máy thực tế, chuyển mượt không khựng."
+                badge = "⚡ Tự Động ($mbpsLabel)"
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
-                profileName = "Đồ Họa: Thấp (Tiết Kiệm Dung Lượng • 5M)"
+                profileName = "Đồ Họa: Thấp (Cố Định • 5M)"
                 bitrate = 5
-                summary = "Giảm tải tối đa cho CPU/GPU điện thoại (<4ms giải mã), tiết kiệm 60% dung lượng (~2.2GB/h), siêu mát máy."
-                badge = "❄️ Tiết Kiệm (5M)"
+                summary = "Khóa cố định mức 5 Mbps (<4ms giải mã), luôn giữ nguyên không tự đổi, siêu tiết kiệm data & mát máy."
+                badge = "❄️ Cố Định (5M)"
             }
             CellularOptimizationMode.MEDIUM -> {
-                profileName = "Đồ Họa: Trung Bình (Cân Bằng • 9M)"
+                profileName = "Đồ Họa: Trung Bình (Cố Định • 9M)"
                 bitrate = 9
-                summary = "Cân bằng độ nét và nhiệt độ điện thoại (~3.8GB/h). Giữ 60 FPS mượt mà, ít hao pin khi chơi lâu."
-                badge = "🌿 Trung Bình (9M)"
+                summary = "Khóa cố định mức 9 Mbps (~3.8GB/h), luôn giữ nguyên không tự đổi, cân bằng độ nét và nhiệt độ."
+                badge = "🌿 Cố Định (9M)"
             }
             CellularOptimizationMode.HIGH -> {
-                profileName = "Đồ Họa: Cao (Sắc Nét 1080p • 14M)"
+                profileName = "Đồ Họa: Cao (Cố Định • 14M)"
                 bitrate = 14
-                summary = "Hình ảnh Full HD 1080p60 sắc nét (~5.5GB/h), chi tiết cao cho mạng ổn định và máy tầm trung trở lên."
-                badge = "✨ Cao (14M)"
+                summary = "Khóa cố định mức 14 Mbps Full HD 1080p60 sắc nét, luôn giữ nguyên không tự đổi."
+                badge = "✨ Cố Định (14M)"
             }
             CellularOptimizationMode.MAX_SPEED_UNCAPPED -> {
-                profileName = "Đồ Họa: Rất Cao (Tối Đa • 20M)"
+                profileName = "Đồ Họa: Rất Cao (Cố Định • 20M)"
                 bitrate = 20
-                summary = "Bung tối đa 20 Mbps chất lượng đồ họa xCloud (~7.5GB/h), hỗ trợ 120 FPS & phản hồi tay cầm tức thì."
-                badge = "🔥 Rất Cao (20M)"
+                summary = "Khóa cố định tối đa 20 Mbps chất lượng đồ họa xCloud (hỗ trợ 120 FPS), luôn giữ nguyên không tự đổi."
+                badge = "🔥 Cố Định (20M)"
             }
         }
 
@@ -325,6 +308,19 @@ object NetworkOptimizer {
             )
             _telemetry.value = newTelemetry
             AdaptiveQualityManager.evaluateTelemetry(newTelemetry)
+
+            // If in AUTO mode, sync live stepless bitrate (1..20M) back to NetworkOptimizer status
+            val config = SettingsRepository.config.value
+            if (config.cellularMode == CellularOptimizationMode.AUTO) {
+                val autoState = AdaptiveQualityManager.state.value
+                val liveMbps = autoState.smoothBitrateMbps
+                val mbpsLabel = if (liveMbps % 1.0 == 0.0) "${liveMbps.toInt()}M" else "${liveMbps}M"
+                _status.value = _status.value.copy(
+                    effectiveBitrateMbps = liveMbps.toInt().coerceIn(1, 20),
+                    activeProfileName = "Đồ Họa: Tự Động Linh Hoạt • $mbpsLabel (Tự do 1–20M)",
+                    profileBadge = "⚡ Tự Động ($mbpsLabel)"
+                )
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing telemetry: $telemetryJson", e)
         }

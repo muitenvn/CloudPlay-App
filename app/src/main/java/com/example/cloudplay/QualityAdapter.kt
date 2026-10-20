@@ -3,29 +3,59 @@ package com.example.cloudplay
 import android.util.Log
 import android.webkit.WebView
 import java.lang.ref.WeakReference
+import kotlin.math.abs
 
 /**
  * QualityAdapter: Bridge between AdaptiveQualityManager and the Xbox WebRTC stream.
- * Dynamically adjusts receiver playout delay, jitter buffer target, and bitrate constraints.
+ * Smoothly interpolates receiver playout delay, jitter buffer target, and bitrate constraints
+ * without causing decoder stutters or frame drops during transitions.
  */
 object QualityAdapter {
     private const val TAG = "QualityAdapter"
     private var webViewRef: WeakReference<WebView>? = null
+    private var lastAppliedBitrateMbps: Double = -1.0
+    private var lastAppliedBufferMs: Double = -1.0
 
     fun setWebView(webView: WebView?) {
         webViewRef = if (webView != null) WeakReference(webView) else null
+        if (webView == null) {
+            lastAppliedBitrateMbps = -1.0
+            lastAppliedBufferMs = -1.0
+        }
     }
 
     /**
-     * Applies target bitrate and buffer tuning hint into the active WebRTC stream in WebView.
+     * Compatibility overload accepting integer bufferHintMs.
      */
     fun applyAdaptiveBitrate(targetBitrateMbps: Double, bufferHintMs: Int) {
+        applyAdaptiveBitrate(targetBitrateMbps, bufferHintMs.toDouble(), smoothGlide = true)
+    }
+
+    /**
+     * Applies continuous target bitrate and float buffer tuning hint into the active WebRTC stream
+     * using zero-hitch micro-interpolation in JavaScript.
+     */
+    fun applyAdaptiveBitrate(
+        targetBitrateMbps: Double,
+        bufferHintMs: Double,
+        smoothGlide: Boolean = true
+    ) {
         val webView = webViewRef?.get() ?: return
-        val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $bufferHintMs);"
+        // Avoid redundant JS evaluations if change is negligible
+        if (lastAppliedBitrateMbps > 0 &&
+            abs(targetBitrateMbps - lastAppliedBitrateMbps) < 0.08 &&
+            abs(bufferHintMs - lastAppliedBufferMs) < 0.15
+        ) {
+            return
+        }
+        lastAppliedBitrateMbps = targetBitrateMbps
+        lastAppliedBufferMs = bufferHintMs
+
+        val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $bufferHintMs, $smoothGlide);"
         webView.post {
             try {
                 webView.evaluateJavascript(js) { res ->
-                    Log.d(TAG, "Applied adaptive bitrate: ${targetBitrateMbps}Mbps, buffer: ${bufferHintMs}ms (res=$res)")
+                    Log.d(TAG, "Glided adaptive bitrate: ${targetBitrateMbps}Mbps, buffer: ${bufferHintMs}ms (smooth=$smoothGlide, res=$res)")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to evaluate adaptive bitrate javascript", e)

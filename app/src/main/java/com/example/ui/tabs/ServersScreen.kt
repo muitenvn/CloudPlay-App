@@ -3,27 +3,26 @@ package com.example.ui.tabs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -31,11 +30,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,16 +56,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
+import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarningAmber
@@ -78,6 +77,7 @@ import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
+import com.example.ui.theme.XboxSurfaceElevated
 import com.example.ui.theme.XboxSurfaceVariant
 import com.example.vpn.DEFAULT_SERVERS
 import com.example.vpn.LiveProxyFetcher
@@ -164,70 +164,163 @@ fun ServersScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            // Header Card with Live IP status and backup count
+            // Global Routing Radar Header Deck
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, XboxCardBorder, RoundedCornerShape(18.dp)),
-                colors = CardDefaults.cardColors(containerColor = XboxSurface)
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(
+                        1.2.dp,
+                        Brush.horizontalGradient(
+                            listOf(XboxNeonGreen.copy(alpha = 0.55f), XboxCardBorder, DirectCyan.copy(alpha = 0.55f))
+                        ),
+                        RoundedCornerShape(22.dp)
+                    ),
+                colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.servers_title),
-                                color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${allServers.size} " + stringResource(R.string.servers_subtitle),
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(XboxNeonGreen.copy(alpha = 0.22f), DirectCyan.copy(alpha = 0.14f))
+                                        )
+                                    )
+                                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Public,
+                                    contentDescription = null,
+                                    tint = XboxNeonGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = stringResource(R.string.servers_title).uppercase(),
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.8.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${allServers.size} " + stringResource(R.string.servers_subtitle),
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = XboxGreen.copy(alpha = 0.2f)
+                            shape = RoundedCornerShape(10.dp),
+                            color = XboxGreen.copy(alpha = 0.22f),
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f))
                         ) {
-                            Text(
-                                text = "${currentServer.flag} ${currentServer.name.take(10)}",
-                                color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = currentServer.flag, fontSize = 12.sp)
+                                Text(
+                                    text = currentServer.name.take(11),
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+
+                    // Active Node Telemetry Strip
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF08100C),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    text = "MÁY CHỦ ĐANG CHỌN: ${currentServer.flag} ${currentServer.name}",
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Endpoint: ${currentServer.azureEndpoint} • ${currentServer.protocol.uppercase()}",
+                                    color = TextSecondary,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = DirectCyan.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = "${currentServer.speedMbps} Mbps",
+                                    color = DirectCyan,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
 
                     // Action buttons row: Ping All + Refresh Live + Add Custom
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         Button(
                             onClick = { testAllServers() },
                             enabled = !isTestingAll,
                             modifier = Modifier
                                 .weight(1.1f)
-                                .defaultMinSize(minHeight = 38.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                                .defaultMinSize(minHeight = 40.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(11.dp)
                         ) {
                             if (isTestingAll) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
@@ -236,8 +329,9 @@ fun ServersScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     stringResource(R.string.btn_ping_all),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -249,10 +343,10 @@ fun ServersScreen(
                             enabled = !isFetchingLive,
                             modifier = Modifier
                                 .weight(1.1f)
-                                .defaultMinSize(minHeight = 38.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
-                            shape = RoundedCornerShape(10.dp)
+                                .defaultMinSize(minHeight = 40.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
+                            shape = RoundedCornerShape(11.dp)
                         ) {
                             if (isFetchingLive) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), color = DirectCyan, strokeWidth = 2.dp)
@@ -262,8 +356,9 @@ fun ServersScreen(
                                 Text(
                                     stringResource(R.string.btn_fetch_live),
                                     color = TextPrimary,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -273,20 +368,22 @@ fun ServersScreen(
                         Button(
                             onClick = { showCustomDialog = true },
                             modifier = Modifier
-                                .weight(0.7f)
-                                .defaultMinSize(minHeight = 38.dp),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
-                            shape = RoundedCornerShape(10.dp)
+                                .weight(0.75f)
+                                .defaultMinSize(minHeight = 40.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
+                            shape = RoundedCornerShape(11.dp)
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
-                            Spacer(modifier = Modifier.width(2.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
                             Text(
                                 stringResource(R.string.btn_add_custom_server),
                                 color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -313,17 +410,22 @@ fun ServersScreen(
                     val isSelected = selectedCategory == code
                     Surface(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable { selectedCategory = code },
-                        color = if (isSelected) XboxNeonGreen else XboxSurfaceVariant,
-                        shape = RoundedCornerShape(20.dp)
+                        color = if (isSelected) XboxNeonGreen else XboxSurfaceVariant.copy(alpha = 0.88f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isSelected) XboxNeonGreen else XboxCardBorder
+                        ),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
                         Text(
                             text = title,
                             color = if (isSelected) Color.Black else TextSecondary,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                            fontSize = 11.5.sp,
+                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp)
                         )
                     }
                 }
@@ -382,20 +484,33 @@ private fun ServerCard(
         else -> JapanRed
     }
 
+    val activeBars = when {
+        pingMs <= 0 -> 2
+        pingMs < 60 -> 4
+        pingMs < 110 -> 3
+        pingMs < 170 -> 2
+        else -> 1
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) XboxNeonGreen else XboxCardBorder,
-                shape = RoundedCornerShape(16.dp)
+                width = if (isSelected) 1.6.dp else 1.dp,
+                brush = if (isSelected) {
+                    Brush.horizontalGradient(listOf(XboxNeonGreen, DirectCyan))
+                } else {
+                    Brush.horizontalGradient(listOf(XboxCardBorder, XboxCardBorder))
+                },
+                shape = RoundedCornerShape(18.dp)
             )
             .clickable { onClick() }
             .testTag("server_card_${server.id}"),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) XboxSurfaceVariant else XboxSurface
-        )
+            containerColor = if (isSelected) XboxSurfaceVariant.copy(alpha = 0.96f) else XboxSurface.copy(alpha = 0.94f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 3.dp)
     ) {
         Row(
             modifier = Modifier
@@ -409,13 +524,19 @@ private fun ServerCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                // Flag badge
+                // Flag badge with neon ring when active
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(XboxSurfaceVariant)
-                        .border(1.dp, XboxCardBorder, CircleShape),
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            if (isSelected) XboxNeonGreen.copy(alpha = 0.16f) else XboxSurfaceVariant
+                        )
+                        .border(
+                            1.dp,
+                            if (isSelected) XboxNeonGreen else XboxCardBorder,
+                            RoundedCornerShape(13.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = server.flag, fontSize = 22.sp)
@@ -429,54 +550,76 @@ private fun ServerCard(
                         Text(
                             text = server.name,
                             color = if (isSelected) XboxNeonGreen else TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = XboxGreen.copy(alpha = 0.2f)
+                            shape = RoundedCornerShape(5.dp),
+                            color = XboxGreen.copy(alpha = 0.22f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.45f))
                         ) {
                             Text(
                                 text = server.protocol.uppercase(),
                                 color = XboxNeonGreen,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
                             )
                         }
                     }
 
                     Text(
-                        text = "${server.description} • IP: ${server.ip}",
+                        text = "${server.description} • ${server.ip}",
                         color = TextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Ping & Selection state
+                // Signal Bars + Ping & Selection state
                 Column(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(pingColor)
-                        )
+                        // 4-Bar Signal Quality Meter
+                        Row(
+                            verticalAlignment = Alignment.Bottom,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.height(13.dp)
+                        ) {
+                            for (bar in 1..4) {
+                                val barHeight = (4 + bar * 2).dp
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(barHeight)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(
+                                            if (bar <= activeBars) pingColor else XboxCardBorder
+                                        )
+                                )
+                            }
+                        }
+
                         Text(
-                            text = if (pingMs > 0) "${pingMs}ms" else "-- ms",
+                            text = if (pingMs > 0) "${pingMs}ms" else "--ms",
                             color = pingColor,
-                            fontWeight = FontWeight.Bold,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.ExtraBold,
                             fontSize = 12.sp
                         )
                     }
@@ -484,26 +627,28 @@ private fun ServerCard(
                     if (isSelected) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Đang dùng",
+                                text = "ĐANG DÙNG",
                                 color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black
                             )
                         }
                     } else {
                         Text(
                             text = "${server.speedMbps} Mbps",
                             color = TextSecondary,
-                            fontSize = 11.sp
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.sp
                         )
                     }
                 }
@@ -548,7 +693,12 @@ private fun CustomProxyDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("Thêm Proxy Tùy Chỉnh", color = TextPrimary, fontWeight = FontWeight.Bold)
+            Text(
+                "Thêm Proxy Tùy Chỉnh",
+                color = TextPrimary,
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold
+            )
         },
         text = {
             val scrollState = rememberScrollState()
@@ -556,17 +706,43 @@ private fun CustomProxyDialog(
                 modifier = Modifier.verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                    Text(
-                        text = "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
+                Text(
+                    text = "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
 
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Tên gợi nhớ") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = XboxNeonGreen
+                    )
+                )
+
+                OutlinedTextField(
+                    value = host,
+                    onValueChange = { host = it },
+                    label = { Text("Địa chỉ IP hoặc Hostname") },
+                    placeholder = { Text("vd: 127.0.0.1 hoặc 138.199.21.239") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = XboxNeonGreen
+                    )
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Tên gợi nhớ") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = port,
+                        onValueChange = { port = it },
+                        label = { Text("Cổng (Port)") },
+                        modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -575,120 +751,94 @@ private fun CustomProxyDialog(
                     )
 
                     OutlinedTextField(
-                        value = host,
-                        onValueChange = { host = it },
-                        label = { Text("Địa chỉ IP hoặc Hostname") },
-                        placeholder = { Text("vd: 127.0.0.1 hoặc 138.199.21.239") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = protocol,
+                        onValueChange = { protocol = it.lowercase() },
+                        label = { Text("Giao thức (http/socks5)") },
+                        modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             focusedBorderColor = XboxNeonGreen
                         )
                     )
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = port,
-                            onValueChange = { port = it },
-                            label = { Text("Cổng (Port)") },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                focusedBorderColor = XboxNeonGreen
-                            )
-                        )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Ghi chú mô tả") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = XboxNeonGreen
+                    )
+                )
 
-                        OutlinedTextField(
-                            value = protocol,
-                            onValueChange = { protocol = it.lowercase() },
-                            label = { Text("Giao thức (http/socks5)") },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                focusedBorderColor = XboxNeonGreen
-                            )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = speedMbps,
+                        onValueChange = { speedMbps = it },
+                        label = { Text("Tốc độ (Mbps)") },
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedBorderColor = XboxNeonGreen
                         )
-                    }
+                    )
 
                     OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        label = { Text("Ghi chú mô tả") },
-                        modifier = Modifier.fillMaxWidth(),
+                        value = countryCode,
+                        onValueChange = { countryCode = it.uppercase() },
+                        label = { Text("Quốc gia (JP/KR/US)") },
+                        modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             focusedBorderColor = XboxNeonGreen
                         )
                     )
+                }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = speedMbps,
-                            onValueChange = { speedMbps = it },
-                            label = { Text("Tốc độ (Mbps)") },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                focusedBorderColor = XboxNeonGreen
-                            )
-                        )
-
-                        OutlinedTextField(
-                            value = countryCode,
-                            onValueChange = { countryCode = it.uppercase() },
-                            label = { Text("Quốc gia (JP/KR/US)") },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary,
-                                focusedBorderColor = XboxNeonGreen
-                            )
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = azureEndpoint,
-                        onValueChange = { azureEndpoint = it },
-                        label = { Text("Azure Endpoint để đo ping") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = XboxNeonGreen
-                        )
+                OutlinedTextField(
+                    value = azureEndpoint,
+                    onValueChange = { azureEndpoint = it },
+                    label = { Text("Azure Endpoint để đo ping") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = XboxNeonGreen
                     )
+                )
 
-                    // Test connection button
-                    Button(
-                        onClick = {
-                            isTesting = true
-                            testResult = null
-                            scope.launch(Dispatchers.IO) {
-                                val p = port.toIntOrNull() ?: 8080
-                                val ok = PingTester.isHostReachable(host.trim(), p, 1500)
-                                testResult = if (ok) "✅ Kết nối thành công!" else "❌ Không thể kết nối tới IP/Port này"
-                                isTesting = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
-                    ) {
-                        if (isTesting) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
-                        } else {
-                            Text("Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
+                // Test connection button
+                Button(
+                    onClick = {
+                        isTesting = true
+                        testResult = null
+                        scope.launch(Dispatchers.IO) {
+                            val p = port.toIntOrNull() ?: 8080
+                            val ok = PingTester.isHostReachable(host.trim(), p, 1500)
+                            testResult = if (ok) "✅ Kết nối thành công!" else "❌ Không thể kết nối tới IP/Port này"
+                            isTesting = false
                         }
-                    }
-
-                    testResult?.let { msg ->
-                        Text(text = msg, color = if (msg.startsWith("✅")) XboxNeonGreen else JapanRed, fontSize = 12.sp)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
+                    } else {
+                        Text("Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
                     }
                 }
+
+                testResult?.let { msg ->
+                    Text(text = msg, color = if (msg.startsWith("✅")) XboxNeonGreen else JapanRed, fontSize = 12.sp)
+                }
+            }
         },
         confirmButton = {
             Button(

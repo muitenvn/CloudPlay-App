@@ -226,5 +226,12 @@ object GameLibraryRepository {
         _games.value = updated
         saveCustomGames(updated)
     }
+
+    fun removeCustomGame(gameId: String) {
+        val updated = _games.value.filterNot { it.id == gameId }
+        _games.value = updated
+        saveCustomGames(updated)
+    }
 }
+
 

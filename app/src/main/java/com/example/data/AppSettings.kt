@@ -218,8 +218,8 @@ data class AppConfig(
     val githubDictionaryEnabled: Boolean = true,
     // Ẩn lớp phủ bảng thông số kỹ thuật đè màn hình (Decode Profile / Stream Stats HUD)
     val hideStreamStatsOverlay: Boolean = true,
-    // Tối Ưu Mạng 4G (Tiết kiệm vs Có nhiêu sài hết) & Wifi Tốc Độ Hàng Đầu
-    val cellularMode: CellularOptimizationMode = CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
+    // Chế độ Đồ Họa & Hiệu Năng Máy (Mặc định: Tự Động theo điều kiện mạng & máy)
+    val cellularMode: CellularOptimizationMode = CellularOptimizationMode.AUTO,
     val networkTuningMode: NetworkTuningMode = NetworkTuningMode.AUTO,
     val wifiSpeedFirstPriority: Boolean = true,
     // Điều khoản người dùng & Tuyên bố bản quyền nguồn mở GitHub (Better-xCloud MIT)
@@ -276,8 +276,11 @@ object SettingsRepository {
             githubDictionaryEnabled = sp.getBoolean("github_dict", true),
             hideStreamStatsOverlay = sp.getBoolean("hide_stream_stats", true),
             cellularMode = try {
-                CellularOptimizationMode.valueOf(sp.getString("cellular_mode", CellularOptimizationMode.DATA_SAVER_HIGH_SPEED.name) ?: CellularOptimizationMode.DATA_SAVER_HIGH_SPEED.name)
-            } catch (_: Exception) { CellularOptimizationMode.DATA_SAVER_HIGH_SPEED },
+                CellularOptimizationMode.valueOf(
+                    sp.getString("graphics_quality_mode_v2", CellularOptimizationMode.AUTO.name)
+                        ?: CellularOptimizationMode.AUTO.name
+                )
+            } catch (_: Exception) { CellularOptimizationMode.AUTO },
             networkTuningMode = try {
                 NetworkTuningMode.valueOf(sp.getString("network_tuning_mode", NetworkTuningMode.AUTO.name) ?: NetworkTuningMode.AUTO.name)
             } catch (_: Exception) { NetworkTuningMode.AUTO },
@@ -314,6 +317,7 @@ object SettingsRepository {
             putBoolean("github_dict", c.githubDictionaryEnabled)
             putBoolean("hide_stream_stats", c.hideStreamStatsOverlay)
             putString("cellular_mode", c.cellularMode.name)
+            putString("graphics_quality_mode_v2", c.cellularMode.name)
             putString("network_tuning_mode", c.networkTuningMode.name)
             putBoolean("wifi_speed_first", c.wifiSpeedFirstPriority)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)

@@ -66,6 +66,8 @@ import com.example.data.AppLanguage
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
@@ -76,6 +78,7 @@ import com.example.ui.theme.XboxSurfaceVariant
 import com.example.vpn.VpnConnectionState
 import com.example.vpn.VpnEngine
 import com.example.vpn.VpnManager
+import androidx.compose.ui.graphics.Brush
 import java.util.Locale
 
 @Composable
@@ -102,7 +105,105 @@ fun SettingsScreen(
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Console System Profile Overview Banner
+        item {
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = XboxSurface.copy(alpha = 0.96f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.2.dp,
+                    Brush.horizontalGradient(
+                        listOf(XboxNeonGreen.copy(alpha = 0.55f), XboxCardBorder, DirectCyan.copy(alpha = 0.55f))
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "TRUNG TÂM CẤU HÌNH HỆ THỐNG PRO",
+                                color = TextPrimary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.6.sp
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = XboxNeonGreen.copy(alpha = 0.18f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "60-120Hz READY",
+                                color = XboxNeonGreen,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            Triple("ĐỒ HỌA", config.cellularMode.shortLabel, XboxNeonGreen),
+                            Triple("VÙNG WEB", config.getEffectiveLocale(), DirectCyan),
+                            Triple("CLARITY", if (config.clarityBoostEnabled) "Đang Bật" else "Tắt", XboxNeonGreen)
+                        ).forEach { (label, value, color) ->
+                            Surface(
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFF08100C),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, color.copy(alpha = 0.35f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = TextSecondary,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = value,
+                                        color = color,
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Section 0: App Language (Multilingual UI Support)
         item {
@@ -1065,9 +1166,16 @@ private fun SettingsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(18.dp)),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.95f))
+            .clip(RoundedCornerShape(20.dp))
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    listOf(XboxNeonGreen.copy(alpha = 0.35f), XboxCardBorder, DirectCyan.copy(alpha = 0.25f))
+                ),
+                RoundedCornerShape(20.dp)
+            ),
+        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1079,15 +1187,18 @@ private fun SettingsCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(4.dp, 14.dp)
+                        .size(4.dp, 16.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(XboxNeonGreen)
+                        .background(
+                            Brush.verticalGradient(listOf(XboxNeonGreen, DirectCyan))
+                        )
                 )
                 Text(
                     text = title,
                     color = XboxNeonGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Black,
                     letterSpacing = 0.8.sp
                 )
             }
@@ -1095,3 +1206,4 @@ private fun SettingsCard(
         }
     }
 }
+

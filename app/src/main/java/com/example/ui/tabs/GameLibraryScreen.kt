@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -59,14 +60,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.GameBookmark
 import com.example.data.GameFilterTab
 import com.example.data.GameLibraryRepository
-import com.example.ui.theme.CyberCyan
 import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.GoldStar
+import com.example.ui.theme.JapanRed
+import com.example.ui.theme.JetBrainsMonoFontFamily
+import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarningAmber
@@ -97,20 +102,89 @@ fun GameLibraryScreen(
             }
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 game.title.contains(searchQuery, ignoreCase = true) ||
-                        game.category.contains(searchQuery, ignoreCase = true)
+                    game.category.contains(searchQuery, ignoreCase = true)
             }
             matchesTab && matchesSearch
         }
     }
 
+    val freeCount = remember(games) { games.count { it.freeToPlay } }
+    val touchCount = remember(games) { games.count { it.supportsTouch } }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // High-Tech Search Bar
+            // 1. Vault Telemetry Header Strip
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = XboxSurface.copy(alpha = 0.95f),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Brush.horizontalGradient(
+                        listOf(XboxNeonGreen.copy(alpha = 0.45f), XboxCardBorder, DirectCyan.copy(alpha = 0.45f))
+                    )
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "KHO GAME XBOX CLOUD VAULT",
+                            color = XboxNeonGreen,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.8.sp
+                        )
+                        Text(
+                            text = "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = XboxNeonGreen.copy(alpha = 0.16f),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showAddDialog = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.btn_add_game),
+                                color = XboxNeonGreen,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2. High-Tech Console Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -118,7 +192,13 @@ fun GameLibraryScreen(
                     .fillMaxWidth()
                     .height(52.dp)
                     .testTag("library_search_input"),
-                placeholder = { Text(stringResource(R.string.search_games_placeholder), fontSize = 13.sp, color = TextSecondary) },
+                placeholder = {
+                    Text(
+                        stringResource(R.string.search_games_placeholder),
+                        fontSize = 13.sp,
+                        color = TextSecondary
+                    )
+                },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Search,
@@ -142,39 +222,40 @@ fun GameLibraryScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = XboxNeonGreen,
                     unfocusedBorderColor = XboxCardBorder,
-                    focusedContainerColor = XboxSurfaceVariant.copy(alpha = 0.9f),
-                    unfocusedContainerColor = XboxSurface.copy(alpha = 0.8f)
+                    focusedContainerColor = XboxSurfaceVariant.copy(alpha = 0.92f),
+                    unfocusedContainerColor = XboxSurface.copy(alpha = 0.88f)
                 ),
                 shape = RoundedCornerShape(14.dp),
                 singleLine = true
             )
 
-            // Category Tabs Carousel
+            // 3. Category Tabs Carousel
             val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
-                GameFilterTab.ALL to "${stringResource(R.string.filter_all)} (${games.size})",
-                GameFilterTab.FREE_TO_PLAY to stringResource(R.string.filter_free),
-                GameFilterTab.TOUCH_FRIENDLY to stringResource(R.string.filter_touch),
-                GameFilterTab.GAME_PASS to stringResource(R.string.filter_gamepass)
+                GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
+                GameFilterTab.FREE_TO_PLAY to "⚡ ${stringResource(R.string.filter_free)} ($freeCount)",
+                GameFilterTab.TOUCH_FRIENDLY to "👆 ${stringResource(R.string.filter_touch)} ($touchCount)",
+                GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
             )
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filterOptions) { (tab, label) ->
                     val isSelected = selectedTab == tab
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isSelected) XboxGreen else XboxSurfaceVariant.copy(alpha = 0.8f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) XboxGreen else XboxSurfaceVariant.copy(alpha = 0.85f),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
-                            if (isSelected) XboxNeonGreen.copy(alpha = 0.6f) else XboxCardBorder
+                            if (isSelected) XboxNeonGreen else XboxCardBorder
                         ),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { selectedTab = tab }
                     ) {
                         Text(
                             text = label,
                             color = if (isSelected) Color.White else TextSecondary,
+                            fontFamily = SpaceGroteskFontFamily,
                             fontSize = 11.sp,
                             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
@@ -183,7 +264,7 @@ fun GameLibraryScreen(
                 }
             }
 
-            // Grid of Games
+            // 4. Adaptive Grid of Games (2 columns in Portrait, 3-4 in Landscape)
             if (filteredGames.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -204,23 +285,27 @@ fun GameLibraryScreen(
                         Text(
                             text = "Không tìm thấy tựa game nào phù hợp",
                             color = TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(bottom = 20.dp),
+                    columns = GridCells.Adaptive(minSize = 152.dp),
+                    contentPadding = PaddingValues(bottom = 84.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    items(filteredGames) { game ->
+                    items(filteredGames, key = { it.id }) { game ->
                         LibraryGameCard(
                             game = game,
-                            onPlay = { onLaunchGame(game.playUrl) }
+                            onPlay = { onLaunchGame(game.playUrl) },
+                            onDeleteCustom = if (game.id.startsWith("custom_")) {
+                                { GameLibraryRepository.removeCustomGame(game.id) }
+                            } else null
                         )
                     }
                 }
@@ -256,16 +341,24 @@ fun GameLibraryScreen(
 @Composable
 private fun LibraryGameCard(
     game: GameBookmark,
-    onPlay: () -> Unit
+    onPlay: () -> Unit,
+    onDeleteCustom: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(18.dp))
+            .height(210.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .border(
+                1.dp,
+                Brush.verticalGradient(
+                    listOf(XboxCardBorder, Color(game.accentColorHex).copy(alpha = 0.65f))
+                ),
+                RoundedCornerShape(20.dp)
+            )
             .clickable { onPlay() },
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.95f))
+        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             if (game.drawableResId != null) {
@@ -295,55 +388,96 @@ private fun LibraryGameCard(
                 }
             }
 
-            // High-Contrast Gradient Scrim
+            // High-Contrast Console Vignette Scrim
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f)),
-                            startY = 60f
+                            colorStops = arrayOf(
+                                0.0f to Color(0x4D000000),
+                                0.45f to Color.Transparent,
+                                0.78f to Color(0xD9060A08),
+                                1.0f to Color(0xF7060A08)
+                            )
                         )
                     )
             )
 
-            // Top Badges
+            // Top Badges Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
+                    .padding(9.dp)
                     .align(Alignment.TopStart),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color.Black.copy(alpha = 0.65f),
-                    border = androidx.compose.foundation.BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f))
+                    shape = RoundedCornerShape(7.dp),
+                    color = Color(0xCC060B08),
+                    border = androidx.compose.foundation.BorderStroke(0.6.dp, GoldStar.copy(alpha = 0.45f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(11.dp))
-                        Text(text = game.rating, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = GoldStar,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Text(
+                            text = game.rating,
+                            color = Color.White,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
-                if (game.supportsTouch) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.65f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.TouchApp,
-                            contentDescription = "Touch",
-                            tint = DirectCyan,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    if (game.supportsTouch) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xCC060B08),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, DirectCyan.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TouchApp,
+                                contentDescription = "Touch",
+                                tint = DirectCyan,
+                                modifier = Modifier
+                                    .padding(5.dp)
+                                    .size(13.dp)
+                            )
+                        }
+                    }
+
+                    if (onDeleteCustom != null) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xCC1E090D),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, JapanRed.copy(alpha = 0.6f)),
                             modifier = Modifier
-                                .padding(5.dp)
-                                .size(13.dp)
-                        )
+                                .clip(CircleShape)
+                                .clickable { onDeleteCustom() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = stringResource(R.string.btn_delete),
+                                tint = JapanRed,
+                                modifier = Modifier
+                                    .padding(5.dp)
+                                    .size(13.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -352,16 +486,30 @@ private fun LibraryGameCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(10.dp)
+                    .padding(11.dp)
                     .align(Alignment.BottomStart),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (game.badge != null) {
+                    Text(
+                        text = game.badge,
+                        color = XboxNeonGreen,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Text(
                     text = game.title,
                     color = Color.White,
+                    fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 13.sp,
-                    maxLines = 1
+                    fontSize = 13.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
@@ -374,21 +522,34 @@ private fun LibraryGameCard(
                         color = TextSecondary,
                         fontSize = 10.sp,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
 
                     Surface(
-                        shape = CircleShape,
-                        color = XboxGreen
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxGreen,
+                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.55f))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Play",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(5.dp)
-                                .size(14.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "PLAY",
+                                color = Color.White,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
                 }
             }
@@ -408,60 +569,62 @@ private fun AddGameDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                stringResource(R.string.dialog_add_game_title),
+                text = "Thêm Game Vào Thư Viện",
                 color = TextPrimary,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 17.sp
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    stringResource(R.string.dialog_add_game_title),
+                    text = "Dán link trò chơi trên Xbox Cloud Gaming để tạo phím tắt vào thẳng game 1 chạm (được lưu bền vững trên máy).",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.input_game_title)) },
+                    label = { Text("Tên Game (VD: Persona 3 Reload)") },
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
                         unfocusedBorderColor = XboxCardBorder,
-                        focusedContainerColor = XboxSurfaceVariant,
-                        unfocusedContainerColor = XboxSurface
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
                 )
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text(stringResource(R.string.input_game_url)) },
+                    label = { Text("Đường dẫn Xbox Cloud URL") },
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
                         unfocusedBorderColor = XboxCardBorder,
-                        focusedContainerColor = XboxSurfaceVariant,
-                        unfocusedContainerColor = XboxSurface
-                    ),
-                    modifier = Modifier.fillMaxWidth()
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    )
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onAdd(title, url) },
-                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                enabled = title.isNotBlank() && url.isNotBlank()
+                onClick = {
+                    if (title.isNotBlank() && url.isNotBlank()) {
+                        onAdd(title.trim(), url.trim())
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
             ) {
-                Text(stringResource(R.string.btn_save), fontWeight = FontWeight.Bold)
+                Text("Thêm Game", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.btn_cancel), color = TextSecondary)
+                Text("Hủy", color = TextSecondary)
             }
         },
-        containerColor = XboxSurface,
-        shape = RoundedCornerShape(18.dp)
+        containerColor = XboxSurface
     )
 }

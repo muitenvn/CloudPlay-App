@@ -17,7 +17,8 @@ android {
     minSdk = 24
     targetSdk = 36
     val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 2
-    versionCode = runNumber
+    // Monotonically increasing versionCode (epoch / 10s) so updating APK across new repos or ZIP exports never conflicts
+    versionCode = ((System.currentTimeMillis() / 10000L).toInt()).coerceAtLeast(runNumber)
     versionName = "1.0.${runNumber}"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

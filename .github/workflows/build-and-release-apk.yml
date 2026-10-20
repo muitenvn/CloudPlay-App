@@ -85,25 +85,17 @@ jobs:
             fi
           fi
 
-          # 2. Khôi phục hoặc tạo debug.keystore an toàn (tránh lỗi file 0 byte)
+          # 2. Khôi phục debug.keystore cố định đồng nhất 100% giữa mọi bản build (tránh lỗi "Gói xung đột với một gói hiện có" khi cập nhật đè)
           if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
-            if [ -f "debug.keystore.base64" ]; then
+            if [ -f "debug.keystore.base64" ] && [ -s "debug.keystore.base64" ]; then
               python3 -c "import base64; open('debug.keystore', 'wb').write(base64.b64decode(open('debug.keystore.base64').read().strip()))" 2>/dev/null || true
             fi
           fi
 
           if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
-            echo "Generating clean debug.keystore for CI build..."
-            rm -f debug.keystore
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+            echo "Restoring fixed project debug.keystore for seamless APK updates..."
+            FIXED_KEYSTORE_B64="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"
+            python3 -c "import base64; open('debug.keystore', 'wb').write(base64.b64decode('$FIXED_KEYSTORE_B64'))"
           fi
 
           chmod 644 debug.keystore || true

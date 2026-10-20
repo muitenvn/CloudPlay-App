@@ -315,8 +315,8 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Wifi,
                                     iconColor = XboxNeonGreen,
-                                    title = "Tối ưu mạng 4G & Wifi (Tốc độ #1, Đồ họa #2)",
-                                    content = "• 4G Tiết Kiệm Data (Tốc độ cao): Tiết kiệm 50% data di động (~3.2GB/giờ), giữ 60 FPS, độ trễ đệm 0ms, H.264 Baseline chống nóng máy cho mọi dòng máy.\n• 4G Có Nhiêu Sài Hết: Bung tối đa 20 Mbps cho gói cước không giới hạn, độ nét cao nhất và phản hồi tức thì.\n• Wifi Tự Động Tinh Chỉnh: Đặt TỐC ĐỘ LÊN HÀNG ĐẦU, ĐỒ HỌA THỨ 2. Khi sóng Wifi dao động, lập tức triệt tiêu đệm hình để phím bấm không bao giờ bị delay."
+                                    title = "Chất lượng Đồ họa & Hiệu năng máy",
+                                    content = "• Tự Động (Khuyên dùng): Tự điều chỉnh đồ họa theo điều kiện mạng (Wi-Fi / 4G) và giảm tải GPU khi máy nóng để giữ 60 FPS mượt mà.\n• Thấp (Tiết Kiệm Dung Lượng - 5M): Tiết kiệm 60% dung lượng (~2.2GB/giờ), giải mã H.264 Baseline <4ms siêu mát máy và đỡ hao pin.\n• Trung Bình (9M) / Cao (14M) / Rất Cao (20M): Tùy chọn 4 mức độ từ cân bằng mát máy đến bung tối đa đồ họa 1080p60 sắc nét."
                                 )
                             }
                             item {

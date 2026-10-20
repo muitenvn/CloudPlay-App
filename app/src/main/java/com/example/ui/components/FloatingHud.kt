@@ -563,7 +563,7 @@ fun FloatingHud(
                                                 modifier = Modifier.size(15.dp)
                                             )
                                             Text(
-                                                text = "TỐI ƯU MẠNG 4G & WIFI (TỐC ĐỘ #1)",
+                                                text = "CHẤT LƯỢNG ĐỒ HỌA & HIỆU NĂNG MÁY",
                                                 color = XboxNeonGreen,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -575,7 +575,7 @@ fun FloatingHud(
                                             color = DirectCyan.copy(alpha = 0.2f)
                                         ) {
                                             Text(
-                                                text = "${networkStatus.effectiveBitrateMbps} Mbps Max",
+                                                text = "${networkStatus.effectiveBitrateMbps} Mbps",
                                                 color = DirectCyan,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.Bold,
@@ -604,7 +604,7 @@ fun FloatingHud(
                                         Text(text = "FPS: ${if (telemetry.fps > 0) telemetry.fps else "--"}", color = XboxNeonGreen, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                                         Text(text = "Ping: ${if (telemetry.rttMs > 0) "${telemetry.rttMs}ms" else "--"}", color = if (telemetry.rttMs in 1..49) DirectCyan else if (telemetry.rttMs >= 100) JapanRed else TextPrimary, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                                         Text(text = "Bitrate: ${if (telemetry.bitrateMbps > 0) String.format("%.1f", telemetry.bitrateMbps) + "M" else "--"}", color = TextPrimary, fontSize = 8.5.sp)
-                                        Text(text = "Giải mã: ${if (telemetry.decodeTimeMs > 0) String.format("%.1f", telemetry.decodeTimeMs) + "ms" else "--"}", color = if (telemetry.decodeTimeMs in 0.1..8.5) XboxNeonGreen else if (telemetry.decodeTimeMs > 15.0) JapanRed else DirectCyan, fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(text = "Giải mã: ${if (telemetry.decodeTimeMs > 0) String.format("%.1f", telemetry.decodeTimeMs) + "ms" else "--"}", color = if (telemetry.decodeTimeMs in 0.1..8.5) XboxNeonGreen else if (telemetry.decodeTimeMs > 12.0) JapanRed else DirectCyan, fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold)
                                     }
 
                                     // Thang Chất Lượng Tự Động Thích Ứng (Adaptive Quality Bitrate Ladder)
@@ -635,7 +635,7 @@ fun FloatingHud(
                                                         modifier = Modifier.size(12.dp)
                                                     )
                                                     Text(
-                                                        text = "THÍCH ỨNG BITRATE TỰ ĐỘNG",
+                                                        text = "TỰ ĐỘNG THÍCH ỨNG THEO MẠNG & MÁY",
                                                         color = DirectCyan,
                                                         fontSize = 8.5.sp,
                                                         fontWeight = FontWeight.Bold
@@ -701,72 +701,80 @@ fun FloatingHud(
 
                                     if (telemetry.estimatedDataSavedMb > 1.0) {
                                         Text(
-                                            text = "🌱 Đã tiết kiệm ước tính: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB data 4G",
+                                            text = "🌱 Đã tiết kiệm ước tính: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB dung lượng data",
                                             color = XboxNeonGreen,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                     }
 
-                                    // 4G Profile Quick Selectors (Tiết kiệm vs Có nhiêu sài hết)
+                                    // Graphics & Data Mode Quick Selectors (2 hàng gọn gàng, không bị ép chữ)
                                     Text(
-                                        text = "CHẾ ĐỘ MẠNG 4G DI ĐỘNG:",
+                                        text = "CHẾ ĐỘ ĐỒ HỌA & DUNG LƯỢNG:",
                                         color = TextSecondary,
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        val isSaver = networkStatus.effectiveBitrateMbps <= 8
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable { onSelectCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
-                                            color = if (isSaver) XboxNeonGreen.copy(alpha = 0.25f) else Color(0xFF14241B)
-                                        ) {
+                                    val hudRows = listOf(
+                                        listOf(
+                                            Triple(com.example.data.CellularOptimizationMode.AUTO, "⚡ Tự Động", "Theo mạng & máy"),
+                                            Triple(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED, "❄️ Thấp (5M)", "Tiết kiệm data")
+                                        ),
+                                        listOf(
+                                            Triple(com.example.data.CellularOptimizationMode.MEDIUM, "Trung Bình", "9M • Êm máy"),
+                                            Triple(com.example.data.CellularOptimizationMode.HIGH, "Cao", "14M • 1080p"),
+                                            Triple(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED, "Rất Cao", "20M • Tối đa")
+                                        )
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        hudRows.forEach { rowItems ->
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                                             ) {
-                                                if (isSaver) {
-                                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(11.dp))
-                                                }
-                                                Column {
-                                                    Text(text = "4G Tiết Kiệm (8M)", color = if (isSaver) XboxNeonGreen else TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                    Text(text = "Tiết kiệm 50% data, 60fps", color = TextSecondary, fontSize = 7.5.sp)
-                                                }
-                                            }
-                                        }
-
-                                        val isMax = networkStatus.effectiveBitrateMbps >= 18
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .clickable { onSelectCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
-                                            color = if (isMax) DirectCyan.copy(alpha = 0.25f) else Color(0xFF14241B)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                if (isMax) {
-                                                    Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(11.dp))
-                                                }
-                                                Column {
-                                                    Text(text = "Có Nhiêu Sài Hết (20M)", color = if (isMax) DirectCyan else TextPrimary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                    Text(text = "Bung trọn vẹn tốc độ 4G", color = TextSecondary, fontSize = 7.5.sp)
+                                                rowItems.forEach { (mode, label, sub) ->
+                                                    val isSelected = networkStatus.activeProfileName.contains(
+                                                        when (mode) {
+                                                            com.example.data.CellularOptimizationMode.AUTO -> "Tự Động"
+                                                            com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "Thấp"
+                                                            com.example.data.CellularOptimizationMode.MEDIUM -> "Trung Bình"
+                                                            com.example.data.CellularOptimizationMode.HIGH -> "Cao ("
+                                                            com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "Rất Cao"
+                                                        }
+                                                    )
+                                                    Surface(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .clip(RoundedCornerShape(6.dp))
+                                                            .clickable { onSelectCellularMode(mode) },
+                                                        color = if (isSelected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF14241B),
+                                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(0.9.dp, XboxNeonGreen) else null
+                                                    ) {
+                                                        Column(
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                                                            horizontalAlignment = Alignment.CenterHorizontally
+                                                        ) {
+                                                            Text(
+                                                                text = label,
+                                                                color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                                                fontSize = 8.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                maxLines = 1
+                                                            )
+                                                            Text(
+                                                                text = sub,
+                                                                color = TextSecondary,
+                                                                fontSize = 7.sp,
+                                                                maxLines = 1
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                     }
 
-                                    // Wifi Auto-Tuning Row
+                                    // Low-Latency & Thermal Protection Row
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -781,13 +789,13 @@ fun FloatingHud(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "Wifi Tự Động: Tốc độ #1, Đồ họa #2",
+                                                    text = "Ưu Tiên Độ Trễ Thấp & Giảm Tải Khi Mạng Yếu",
                                                     color = if (networkStatus.speedFirstPriority) DirectCyan else TextPrimary,
                                                     fontSize = 9.5.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
-                                                    text = "Tự động chống lag khi ping tăng, không bao giờ trễ hình",
+                                                    text = "Tự động giảm trễ đệm và hạ tải GPU khi sóng yếu hoặc máy nóng",
                                                     color = TextSecondary,
                                                     fontSize = 8.sp
                                                 )

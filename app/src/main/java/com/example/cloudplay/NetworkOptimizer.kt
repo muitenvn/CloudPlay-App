@@ -35,12 +35,12 @@ data class NetworkOptimizerStatus(
     val isWifi: Boolean = false,
     val isCellular: Boolean = false,
     val isMetered: Boolean = false,
-    val activeProfileName: String = "4G Tiết Kiệm Data (Tốc Độ Cao)",
-    val effectiveBitrateMbps: Int = 8,
+    val activeProfileName: String = "Tự Động (Theo Điều Kiện Mạng & Máy)",
+    val effectiveBitrateMbps: Int = 9,
     val speedFirstPriority: Boolean = true,
     val wifiFrequencyMhz: Int = 0,
-    val summaryText: String = "Đang tối ưu hóa kết nối...",
-    val profileBadge: String = "⚡ Tốc độ #1"
+    val summaryText: String = "Đang tối ưu hóa đồ họa và hiệu năng thiết bị...",
+    val profileBadge: String = "⚡ Tự Động"
 )
 
 data class StreamTelemetry(
@@ -52,7 +52,7 @@ data class StreamTelemetry(
     val packetsLostPercent: Double = 0.0,
     val framesDropped: Int = 0,
     val speedPriorityActive: Boolean = true,
-    val appliedProfile: String = "4G Tiết Kiệm",
+    val appliedProfile: String = "Tự Động",
     val estimatedDataSavedMb: Double = 0.0
 )
 
@@ -182,7 +182,6 @@ object NetworkOptimizer {
         val isWifi = current.isWifi
         val isCellular = current.isCellular || (!isWifi && current.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
 
-        val tuningMode = config.networkTuningMode
         val cellularMode = config.cellularMode
         val speedFirst = config.wifiSpeedFirstPriority
 
@@ -191,30 +190,58 @@ object NetworkOptimizer {
         val summary: String
         val badge: String
 
-        when {
-            // Explicit Wi-Fi mode OR Auto on Wi-Fi
-            tuningMode == NetworkTuningMode.WIFI_SPEED_FIRST || (tuningMode == NetworkTuningMode.AUTO && isWifi) -> {
-                val freqLabel = if (current.physicalType == PhysicalNetworkType.WIFI_5GHZ) "5GHz" else if (current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ) "2.4GHz" else "Wifi"
-                profileName = "Wifi Tự Động Tinh Chỉnh ($freqLabel)"
-                bitrate = if (current.physicalType == PhysicalNetworkType.WIFI_5GHZ) 16 else 12
-                summary = "Ưu tiên Tốc độ & Độ nhạy #1 (Đồ hoạ #2). Tự động giảm trễ đệm khi ping tăng."
-                badge = "🛜 Wifi Speed #1"
+        when (cellularMode) {
+            CellularOptimizationMode.AUTO -> {
+                when {
+                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> {
+                        profileName = "Đồ Họa: Tự Động • Wi-Fi 5GHz (Cao 14M)"
+                        bitrate = 14
+                        summary = "Mạng Wi-Fi 5GHz mạnh: Tự chọn mức Cao (14M) sắc nét và tự hạ tải GPU nếu máy nóng."
+                        badge = "⚡ Tự Động (14M)"
+                    }
+                    isWifi -> {
+                        profileName = "Đồ Họa: Tự Động • Wi-Fi (Trung Bình 9M)"
+                        bitrate = 9
+                        summary = "Mạng Wi-Fi chuẩn: Tự cân bằng mức Trung Bình (9M) giữ 60 FPS êm ái, chống giật lag."
+                        badge = "⚡ Tự Động (9M)"
+                    }
+                    isCellular -> {
+                        profileName = "Đồ Họa: Tự Động • Mạng Di Động (Tiết Kiệm 6M)"
+                        bitrate = 6
+                        summary = "Mạng 4G/5G di động: Tự ưu tiên tiết kiệm dung lượng & giảm tải giải mã GPU chống nóng máy."
+                        badge = "⚡ Tự Động (6M)"
+                    }
+                    else -> {
+                        profileName = "Đồ Họa: Tự Động (Cân Bằng 10M)"
+                        bitrate = 10
+                        summary = "Tự động điều chỉnh chất lượng đồ họa và giảm tải phần cứng theo điều kiện mạng thực tế."
+                        badge = "⚡ Tự Động (10M)"
+                    }
+                }
             }
-            // Explicit 4G Data Saver OR Auto on Cellular with Data Saver
-            tuningMode == NetworkTuningMode.CELLULAR_DATA_SAVER ||
-            (tuningMode == NetworkTuningMode.AUTO && isCellular && cellularMode == CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) ||
-            (!isWifi && cellularMode == CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) -> {
-                profileName = "4G Tiết Kiệm Data (Tốc Độ Cao)"
-                bitrate = 8
-                summary = "Tiết kiệm 50% data di động (~3.2GB/h). Giữ nguyên 60 FPS, độ trễ đệm 0ms, chống nóng chip."
-                badge = "📶 4G Tiết Kiệm (8M)"
+            CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
+                profileName = "Đồ Họa: Thấp (Tiết Kiệm Dung Lượng • 5M)"
+                bitrate = 5
+                summary = "Giảm tải tối đa cho CPU/GPU điện thoại (<4ms giải mã), tiết kiệm 60% dung lượng (~2.2GB/h), siêu mát máy."
+                badge = "❄️ Tiết Kiệm (5M)"
             }
-            // 4G Max Speed ("Có nhiêu sài hết")
-            else -> {
-                profileName = "4G Có Nhiêu Sài Hết (Max Speed)"
+            CellularOptimizationMode.MEDIUM -> {
+                profileName = "Đồ Họa: Trung Bình (Cân Bằng • 9M)"
+                bitrate = 9
+                summary = "Cân bằng độ nét và nhiệt độ điện thoại (~3.8GB/h). Giữ 60 FPS mượt mà, ít hao pin khi chơi lâu."
+                badge = "🌿 Trung Bình (9M)"
+            }
+            CellularOptimizationMode.HIGH -> {
+                profileName = "Đồ Họa: Cao (Sắc Nét 1080p • 14M)"
+                bitrate = 14
+                summary = "Hình ảnh Full HD 1080p60 sắc nét (~5.5GB/h), chi tiết cao cho mạng ổn định và máy tầm trung trở lên."
+                badge = "✨ Cao (14M)"
+            }
+            CellularOptimizationMode.MAX_SPEED_UNCAPPED -> {
+                profileName = "Đồ Họa: Rất Cao (Tối Đa • 20M)"
                 bitrate = 20
-                summary = "Bung trọn vẹn 20 Mbps băng thông 4G/5G. Khung hình mượt mà tuyệt đối, 0ms input lag."
-                badge = "🚀 4G Max (20M)"
+                summary = "Bung tối đa 20 Mbps chất lượng đồ họa xCloud (~7.5GB/h), phản hồi tay cầm tức thì cho máy mạnh."
+                badge = "🔥 Rất Cao (20M)"
             }
         }
 
@@ -244,12 +271,12 @@ object NetworkOptimizer {
             val framesDropped = json.optInt("framesDropped", 0)
 
             val currentStatus = _status.value
-            val isDataSaver = currentStatus.effectiveBitrateMbps <= 8
+            val isSavingData = currentStatus.effectiveBitrateMbps <= 10
 
-            // Calculate estimated saved MB (standard Xbox stream consumes 15-20Mbps, Data Saver uses ~8Mbps -> saves ~1.2MB every second)
+            // Calculate estimated saved MB compared to uncapped 16-20Mbps stream
             streamSecondsTracked += 2
-            if (isDataSaver && bitrate in 0.1..14.0) {
-                totalDataSavedMegabytes += (14.0 - bitrate).coerceAtLeast(0.0) * (2.0 / 8.0) // (Mbps saved) * seconds / 8 bits
+            if (isSavingData && bitrate in 0.1..14.0) {
+                totalDataSavedMegabytes += (15.0 - bitrate).coerceAtLeast(0.0) * (2.0 / 8.0)
             }
 
             val newTelemetry = StreamTelemetry(

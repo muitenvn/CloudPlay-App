@@ -349,21 +349,31 @@ class XboxBridge(
                                     if (desc && desc.sdp) {
                                         try {
                                             let sdp = desc.sdp;
-                                            const isSaver = $effectiveBitrateMbps <= 8;
-                                            // Max 15 Mbps for mobile GPU decoders to ensure decode time stays under 8ms (Better-xCloud standard)
-                                            const targetKbps = isSaver ? 8000 : Math.min($effectiveBitrateMbps * 1000, 15000);
+                                            const activeMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
+                                            const isLowSaver = activeMbps <= 6;
+                                            const isMedium = activeMbps > 6 && activeMbps <= 10;
+                                            const isHigh = activeMbps > 10 && activeMbps <= 15;
+                                            const targetKbps = Math.min(Math.max(activeMbps * 1000, 3500), 20000);
 
                                             // Video bandwidth limit
                                             sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
 
-                                            if (isSaver) {
-                                                // 4G DATA SAVER: H.264 Baseline Level 3.1 (instant decode, 0 heat, 50% data saved)
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;x-google-max-bitrate=8000;x-google-min-bitrate=3500;x-google-start-bitrate=6000\r\n');
+                                            if (isLowSaver) {
+                                                // MỨC THẤP (TIẾT KIỆM DUNG LƯỢNG): H.264 Baseline Level 3.1 (giải mã <4ms, siêu mát máy, tiết kiệm 60% data & pin)
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;x-google-max-bitrate=5000;x-google-min-bitrate=2500;x-google-start-bitrate=4000\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=48000\r\n');
-                                            } else {
-                                                // High-performance hardware decode: 1080p60 smooth, prevents decoder queue bloat
+                                            } else if (isMedium) {
+                                                // MỨC TRUNG BÌNH (CÂN BẰNG): H.264 Constrained/Main nhẹ nhàng cho GPU tầm trung, chống nóng máy khi chơi lâu
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;x-google-max-bitrate=9000;x-google-min-bitrate=4000;x-google-start-bitrate=7000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=64000\r\n');
+                                            } else if (isHigh) {
+                                                // MỨC CAO (SẮC NÉT 1080P): 14 Mbps chuẩn Full HD 60fps
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=14000;x-google-min-bitrate=5000;x-google-start-bitrate=10000\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=96000\r\n');
+                                            } else {
+                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA): 20 Mbps max visual quality
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=20000;x-google-min-bitrate=8000;x-google-start-bitrate=14000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n');
                                             }
                                             desc = new RTCSessionDescription({ type: desc.type, sdp: sdp });
                                         } catch(sdpErr) {}

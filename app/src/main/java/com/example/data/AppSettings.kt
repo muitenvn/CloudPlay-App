@@ -101,23 +101,56 @@ enum class StreamGraphicsQuality(
 enum class CellularOptimizationMode(
     val id: String,
     val title: String,
+    val shortLabel: String,
     val subtitle: String,
     val bitrateMbps: Int,
+    val deviceLoadBadge: String,
     val description: String
 ) {
+    AUTO(
+        id = "auto",
+        title = "Tự Động",
+        shortLabel = "Tự Động",
+        subtitle = "Tự tối ưu theo điều kiện mạng & máy",
+        bitrateMbps = 10,
+        deviceLoadBadge = "⚡ Tự Động Tối Ưu",
+        description = "Tự động nhận diện chất lượng Wi-Fi / 4G / 5G và theo dõi tải giải mã GPU của điện thoại để điều chỉnh đồ họa, giữ 60 FPS mượt mà và chống nóng máy."
+    ),
     DATA_SAVER_HIGH_SPEED(
         id = "saver",
-        title = "Tiết Kiệm Dung Lượng (Thấp)",
-        subtitle = "Tiết kiệm data, siêu mát máy, tốn ít pin",
+        title = "Thấp",
+        shortLabel = "Tiết Kiệm (5M)",
+        subtitle = "Tiết kiệm dung lượng • 5 Mbps",
         bitrateMbps = 5,
-        description = "Giảm tải tối đa cho GPU và CPU điện thoại, giải mã nhanh dưới 4ms, tiết kiệm 60% data và kéo dài thời lượng pin."
+        deviceLoadBadge = "❄️ Siêu Nhẹ • Mát Máy",
+        description = "Giảm tải tối đa cho CPU/GPU điện thoại (giải mã phần cứng dưới 4ms), tiết kiệm đến 60% dung lượng data (~2.2GB/giờ) và đỡ hao pin."
+    ),
+    MEDIUM(
+        id = "medium",
+        title = "Trung Bình",
+        shortLabel = "Trung Bình (9M)",
+        subtitle = "Cân bằng & mát máy • 9 Mbps",
+        bitrateMbps = 9,
+        deviceLoadBadge = "🌿 Êm Ái • Chống Nóng",
+        description = "Mức cân bằng lý tưởng cho điện thoại tầm trung. Đảm bảo khung hình 60 FPS ổn định, tiết kiệm ~40% dung lượng và giữ máy mát khi chơi lâu."
+    ),
+    HIGH(
+        id = "high",
+        title = "Cao",
+        shortLabel = "Cao (14M)",
+        subtitle = "Sắc nét 1080p • 14 Mbps",
+        bitrateMbps = 14,
+        deviceLoadBadge = "✨ Chuẩn 1080p60",
+        description = "Tái tạo hình ảnh Full HD 1080p60 sắc nét với chi tiết bề mặt rõ ràng, phù hợp khi mạng ổn định và điện thoại có chip xử lý khá trở lên."
     ),
     MAX_SPEED_UNCAPPED(
         id = "max",
-        title = "Rất Cao (Tối Đa 20M)",
-        subtitle = "Bung trọn vẹn 20 Mbps, đồ họa tối đa",
+        title = "Rất Cao",
+        shortLabel = "Rất Cao (20M)",
+        subtitle = "Đồ họa tối đa • 20 Mbps",
         bitrateMbps = 20,
-        description = "Bung trọn vẹn băng thông 4G/5G và Wifi tốc độ cao, hình ảnh sắc nét và giảm thiểu đệm WebRTC để phản hồi tay cầm tức thì."
+        deviceLoadBadge = "🔥 Đồ Họa Tối Đa",
+        description = "Bung trọn vẹn 20 Mbps băng thông cho chất lượng đồ họa cao nhất, phản hồi tay cầm tức thì cho máy cấu hình mạnh và mạng tốc độ cao."
     )
 }
 
@@ -128,23 +161,23 @@ enum class NetworkTuningMode(
 ) {
     AUTO(
         id = "auto",
-        title = "Tự Động Thông Minh (Khuyên dùng)",
-        subtitle = "Tự nhận diện Wifi & 4G để tinh chỉnh tốc độ tối ưu nhất"
+        title = "Tự Động Theo Điều Kiện Mạng (Khuyên dùng)",
+        subtitle = "Tự động điều chỉnh đồ họa & hiệu năng theo Wi-Fi / 4G"
     ),
     WIFI_SPEED_FIRST(
         id = "wifi_speed",
-        title = "Wifi Tự Động (Tốc độ #1, Đồ họa #2)",
-        subtitle = "Ưu tiên độ trễ cực thấp, đồ họa tự co giãn theo chất lượng sóng"
+        title = "Ưu Tiên Độ Trễ Thấp & Mượt 60 FPS",
+        subtitle = "Triệt tiêu trễ đệm khi mạng yếu, giảm tải GPU tức thì"
     ),
     CELLULAR_DATA_SAVER(
         id = "cell_saver",
-        title = "Cố định 4G Tiết Kiệm (Tốc độ cao)",
-        subtitle = "Tiết kiệm 50% data, giữ 60 FPS mượt mà"
+        title = "Thấp (Tiết Kiệm Dung Lượng)",
+        subtitle = "Tiết kiệm 60% dung lượng, siêu mát máy & nhẹ GPU"
     ),
     CELLULAR_MAX_SPEED(
         id = "cell_max",
-        title = "Cố định 4G Có Nhiêu Sài Hết",
-        subtitle = "Bung tối đa 20 Mbps không giới hạn"
+        title = "Rất Cao (Đồ Họa Tối Đa)",
+        subtitle = "Bung tối đa 20 Mbps cho hình ảnh sắc nét nhất"
     )
 }
 

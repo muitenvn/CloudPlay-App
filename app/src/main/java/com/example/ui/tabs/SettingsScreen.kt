@@ -603,144 +603,213 @@ fun SettingsScreen(
             }
         }
 
-        // Section: 4G & Wi-Fi Network Optimization
+        // Section: Graphics Quality & Device Performance Optimization
         item {
-            SettingsCard(title = "TỐI ƯU MẠNG 4G & WIFI (TỐC ĐỘ HÀNG ĐẦU)") {
+            SettingsCard(title = "ĐỒ HỌA & HIỆU NĂNG MÁY") {
                 Text(
-                    text = "Tối ưu hóa đường truyền cho tất cả các loại mạng 4G/LTE/5G di động (Viettel, Vina, Mobi...) và tự động tinh chỉnh mạng Wifi ưu tiên 'Tốc độ #1, Đồ họa #2'.",
+                    text = "Tùy chỉnh mức đồ họa, dung lượng tiêu thụ và giảm tải CPU/GPU cho điện thoại (chống nóng máy, tiết kiệm pin và giữ 60 FPS mượt mà).",
                     color = TextSecondary,
                     fontSize = 11.sp
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                val selectedMode = config.cellularMode
+                val isAutoSelected = selectedMode == com.example.data.CellularOptimizationMode.AUTO
 
-                // 4G Options Title
-                Text(
-                    text = "CHẾ ĐỘ MẠNG DI ĐỘNG 4G/5G:",
-                    color = TextPrimary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // 4G Option 1: Data Saver High Speed
-                val isDataSaver = config.cellularMode == com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED
+                // 1. Nút Chế độ Tự Động (Nổi bật trên cùng)
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .border(
-                            1.dp,
-                            if (isDataSaver) XboxNeonGreen else XboxCardBorder,
-                            RoundedCornerShape(10.dp)
+                            1.2.dp,
+                            if (isAutoSelected) XboxNeonGreen else XboxCardBorder,
+                            RoundedCornerShape(12.dp)
                         )
-                        .clickable { SettingsRepository.updateCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
-                    color = if (isDataSaver) Color(0xFF132219) else Color(0xFF0F1813)
+                        .clickable { SettingsRepository.updateCellularMode(com.example.data.CellularOptimizationMode.AUTO) }
+                        .testTag("settings_graphics_mode_auto"),
+                    color = if (isAutoSelected) Color(0xFF13241A) else Color(0xFF0F1813)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isAutoSelected) XboxNeonGreen.copy(alpha = 0.2f) else Color(0xFF18261E),
+                                modifier = Modifier.size(34.dp)
                             ) {
-                                Text(
-                                    text = "4G Tiết Kiệm Data (Tốc Độ Cao)",
-                                    color = if (isDataSaver) XboxNeonGreen else TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = XboxNeonGreen.copy(alpha = 0.2f)
-                                ) {
-                                    Text(
-                                        text = "KHUYÊN DÙNG",
-                                        color = XboxNeonGreen,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = if (isAutoSelected) XboxNeonGreen else TextSecondary,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Tiết kiệm 50% data di động (~3.2GB/giờ thay vì 7GB). Khóa 60 FPS mượt mà, độ trễ đệm 0ms, bộ giải mã H.264 Baseline chống nóng máy cho mọi chip 4G.",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
+                            Column {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Tự Động (Theo Mạng & Máy)",
+                                        color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = XboxNeonGreen.copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = "KHUYÊN DÙNG",
+                                            color = XboxNeonGreen,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "Tự động tối ưu theo Wi-Fi / 4G & giảm tải khi máy nóng",
+                                    color = TextSecondary,
+                                    fontSize = 10.5.sp
+                                )
+                            }
                         }
-                        if (isDataSaver) {
+                        if (isAutoSelected) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // 2. Lưới 2x2 cho 4 mức độ (Thấp, Trung Bình, Cao, Rất Cao)
+                val manualModes = listOf(
+                    com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
+                    com.example.data.CellularOptimizationMode.MEDIUM,
+                    com.example.data.CellularOptimizationMode.HIGH,
+                    com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED
+                )
 
-                // 4G Option 2: Max Speed Uncapped ("Có nhiêu sài hết")
-                val isMaxSpeed = config.cellularMode == com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(
-                            1.dp,
-                            if (isMaxSpeed) DirectCyan else XboxCardBorder,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .clickable { SettingsRepository.updateCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
-                    color = if (isMaxSpeed) Color(0xFF0F2327) else Color(0xFF0F1813)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "4G Có Nhiêu Sài Hết (Max Speed 20M)",
-                                    color = if (isMaxSpeed) DirectCyan else TextPrimary,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    manualModes.chunked(2).forEach { rowModes ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            rowModes.forEach { mode ->
+                                val isSelected = selectedMode == mode
+                                val isLowOrMed = mode == com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED ||
+                                    mode == com.example.data.CellularOptimizationMode.MEDIUM
+                                val accent = if (isLowOrMed) XboxNeonGreen else DirectCyan
+
                                 Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = DirectCyan.copy(alpha = 0.2f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) accent else XboxCardBorder,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { SettingsRepository.updateCellularMode(mode) }
+                                        .testTag("settings_graphics_mode_${mode.id}"),
+                                    color = if (isSelected) {
+                                        if (isLowOrMed) Color(0xFF132219) else Color(0xFF0F2327)
+                                    } else {
+                                        Color(0xFF0F1813)
+                                    }
                                 ) {
-                                    Text(
-                                        text = "MAX BĂNG THÔNG",
-                                        color = DirectCyan,
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                    )
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = mode.title,
+                                                color = if (isSelected) accent else TextPrimary,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = accent,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = "${mode.bitrateMbps}M",
+                                                    color = TextSecondary,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = mode.subtitle,
+                                            color = TextSecondary,
+                                            fontSize = 10.sp,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Bung trọn vẹn 20 Mbps băng thông 4G/5G tốc độ cao. Ưu tiên hình ảnh sắc nét tối đa, hàng đợi đệm WebRTC 0ms phản hồi tay cầm tức thì.",
-                                color = TextSecondary,
-                                fontSize = 11.sp
-                            )
-                        }
-                        if (isMaxSpeed) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // 3. Khung tóm tắt chi tiết chế độ đang chọn
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF0B140E),
+                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Đang chọn: ${selectedMode.title}",
+                                color = XboxNeonGreen,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = selectedMode.deviceLoadBadge,
+                                color = DirectCyan,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Text(
+                            text = selectedMode.description,
+                            color = TextSecondary,
+                            fontSize = 10.5.sp,
+                            lineHeight = 14.5.sp
+                        )
+                    }
+                }
 
-                // Wifi Auto-Tuning Policy Toggle
+                // 4. Công tắc Ưu tiên độ trễ thấp & giảm tải khi mạng yếu
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -755,19 +824,19 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(Icons.Default.Wifi, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Speed, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                             Text(
-                                text = "Wifi: Tự Động Tinh Chỉnh (Tốc độ #1, Đồ họa #2)",
+                                text = "Ưu Tiên Độ Trễ Thấp & Chống Nóng Máy",
                                 color = if (config.wifiSpeedFirstPriority) DirectCyan else TextPrimary,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Tự động phân tích chất lượng sóng Wifi (2.4GHz / 5GHz) & độ trễ RTT. Luôn đặt TỐC ĐỘ LÊN HÀNG ĐẦU, khi có dao động sóng sẽ lập tức triệt tiêu độ trễ đệm để không bao giờ bị delay thao tác, đồ họa tự thích ứng theo sau.",
+                            text = "Khi sóng yếu hoặc GPU giải mã chậm, tự động triệt tiêu đệm trễ và hạ tải đồ họa để thao tác luôn mượt tức thì.",
                             color = TextSecondary,
-                            fontSize = 11.sp
+                            fontSize = 10.5.sp
                         )
                     }
                     Switch(

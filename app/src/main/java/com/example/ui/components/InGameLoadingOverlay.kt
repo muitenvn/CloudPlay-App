@@ -2,14 +2,15 @@ package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,16 +18,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,12 +40,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,21 +60,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.GameOptimizationProfile
 import com.example.data.GameOptimizationRepository
 import com.example.ui.theme.DirectCyan
@@ -81,7 +81,6 @@ import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxDark
 import com.example.ui.theme.XboxNeonGreen
 import kotlinx.coroutines.delay
-import kotlin.random.Random
 
 @Composable
 fun InGameLoadingOverlay(
@@ -97,507 +96,725 @@ fun InGameLoadingOverlay(
 ) {
     AnimatedVisibility(
         visible = isLoading,
-        enter = fadeIn(tween(300)),
-        exit = fadeOut(tween(400)),
+        enter = fadeIn(tween(260)),
+        exit = fadeOut(tween(320)),
         modifier = modifier
     ) {
         val primaryAccent = Color(gameProfile.primaryAccentHex)
         val secondaryAccent = Color(gameProfile.secondaryAccentHex)
 
-        // Infinite transitions for dynamic aerospace physics and particle effects
-        val infiniteTransition = rememberInfiniteTransition(label = "flight_dynamics")
-
-        // Altitude hover oscillation (cruising physics)
-        val altitudeHoverY by infiniteTransition.animateFloat(
-            initialValue = -6f,
-            targetValue = 6f,
+        val infiniteTransition = rememberInfiniteTransition(label = "ambient_loading")
+        val ambientGlowAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.14f,
+            targetValue = 0.28f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2200, easing = FastOutSlowInEasing),
+                animation = tween(2000, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
-            label = "altitude"
+            label = "ambient_glow"
         )
 
-        // Bank tilt angle (-1.8 deg to +1.8 deg)
-        val bankTiltAngle by infiniteTransition.animateFloat(
-            initialValue = -1.5f,
-            targetValue = 1.5f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(3400, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "bank_tilt"
-        )
-
-        // Supersonic plasma engine pulse
-        val engineFlareScale by infiniteTransition.animateFloat(
-            initialValue = 0.88f,
-            targetValue = 1.25f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(650, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "engine_flare"
-        )
-
-        // Sonic boom shockwave expansion progress
-        val shockwaveProgress by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1800, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "shockwave"
-        )
-
-        // Speed warp streaks animation
-        val warpOffset by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1000f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "warp_streaks"
-        )
-
-        // Rotate through tips smoothly
         var tipIndex by remember { mutableIntStateOf(0) }
         LaunchedEffect(gameProfile.tips) {
             while (true) {
-                delay(3500)
+                delay(4000)
                 if (gameProfile.tips.isNotEmpty()) {
                     tipIndex = (tipIndex + 1) % gameProfile.tips.size
                 }
             }
         }
 
-        // Realistic Ping & Quality status
         val hasValidPing = realLatencyMs != null && realLatencyMs > 0
         val pingColor = when {
-            !hasValidPing -> Color.Gray
+            !hasValidPing -> TextSecondary
             realLatencyMs < 50 -> DirectCyan
             realLatencyMs < 90 -> XboxNeonGreen
             realLatencyMs < 130 -> Color(0xFFFFB300)
             else -> JapanRed
         }
         val pingRating = when {
-            !hasValidPing -> "Đang đo..."
+            !hasValidPing -> "Đang đo"
             realLatencyMs < 50 -> "Cực mượt"
             realLatencyMs < 90 -> "Rất tốt"
             realLatencyMs < 130 -> "Ổn định"
-            else -> "Cao"
+            else -> "Ping cao"
         }
-        val pingText = if (hasValidPing) "⚡ ${realLatencyMs}ms" else "⚡ -- ms"
+        val pingText = if (hasValidPing) "${realLatencyMs}ms" else "-- ms"
 
-        // Dynamic flight phase synced to loading progress
-        val effectiveProgress = progress.coerceIn(0.08f, 1f)
-        val flightPhaseTitle = when {
-            effectiveProgress < 0.25f -> "Khởi động buồng lái Cloud Stream..."
-            effectiveProgress < 0.50f -> "Bứt tốc xuyên tầng mây • Đang kết nối máy chủ Tokyo..."
-            effectiveProgress < 0.75f -> "Đồng bộ hóa luồng WebRTC H.264 / 60 FPS..."
-            effectiveProgress < 0.92f -> "Hiệu chỉnh độ trễ siêu thấp (Zero-Lag) & Sẵn sàng..."
-            else -> "Đã vào không phận game! Đang hạ cánh..."
+        val rawProgress = progress.coerceIn(0.06f, 1f)
+        val animatedProgress by animateFloatAsState(
+            targetValue = rawProgress,
+            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            label = "smooth_progress"
+        )
+
+        val phaseStatusText = when {
+            animatedProgress < 0.25f -> "Đang khởi tạo phiên kết nối đám mây..."
+            animatedProgress < 0.55f -> "Đang định tuyến qua máy chủ $targetServerName..."
+            animatedProgress < 0.80f -> "Đang đồng bộ luồng hình ảnh 60 FPS & âm thanh..."
+            animatedProgress < 0.92f -> "Đang tối ưu độ trễ đầu vào & bộ điều khiển..."
+            else -> "Đã sẵn sàng! Đang mở giao diện trò chơi..."
         }
 
-        Box(
+        val currentStep = when {
+            animatedProgress < 0.25f -> 1
+            animatedProgress < 0.55f -> 2
+            animatedProgress < 0.85f -> 3
+            else -> 4
+        }
+
+        val currentTip = if (gameProfile.tips.isNotEmpty()) {
+            gameProfile.tips.getOrNull(tipIndex) ?: gameProfile.tips.first()
+        } else {
+            "Bạn có thể mở thanh công cụ nổi bất cứ lúc nào để chỉnh đồ họa và kiểm tra mạng."
+        }
+
+        val controllerStatus = if (hasGamepad) {
+            "Tay cầm vật lý đã kết nối"
+        } else if (gameProfile.nativeTouchSupport) {
+            "Cảm ứng trực tiếp + Phím ảo"
+        } else {
+            "Tay cầm ảo sẵn sàng"
+        }
+
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(XboxDark)
-                .testTag("ingame_loading_overlay"),
-            contentAlignment = Alignment.Center
+                .testTag("ingame_loading_overlay")
         ) {
-            // LAYER 1: Futuristic Atmospheric Backdrop (Darkened cosmic nebula)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            listOf(
-                                Color(0xFF0F2420),
-                                Color(0xFF071110),
-                                Color(0xFF030708)
-                            )
-                        )
-                    )
-            )
+            val isLandscape = maxWidth > maxHeight || maxWidth >= 600.dp
 
-            // LAYER 2: Warp Speed Streaks Canvas (Aerospace Cloud Flight)
+            // Subtle ambient background glow
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
 
-                // Draw high-speed light streaks rushing past the aircraft
-                val streakCount = 35
-                for (i in 0 until streakCount) {
-                    val seed = (i * 137).toDouble()
-                    val y = (seed * 97 % h).toFloat()
-                    val speed = 1.2f + (i % 5) * 0.4f
-                    val currentX = ((warpOffset * speed + (i * 73)) % (w + 400)) - 200
-                    val streakLength = 80f + (i % 4) * 60f
-                    val alpha = (0.15f + (i % 3) * 0.12f).coerceIn(0.1f, 0.45f)
-
-                    val streakColor = if (i % 3 == 0) DirectCyan else XboxNeonGreen
-
-                    drawLine(
-                        color = streakColor.copy(alpha = alpha),
-                        start = Offset(currentX, y),
-                        end = Offset(currentX + streakLength, y + (altitudeHoverY * 0.4f)),
-                        strokeWidth = (1.5f + (i % 2)).dp.toPx(),
-                        cap = StrokeCap.Round
-                    )
-                }
-
-                // Sonic Boom Shockwave Ring expanding from center
-                val shockwaveRadius = shockwaveProgress * (w * 0.55f)
-                val shockwaveAlpha = (1f - shockwaveProgress).coerceIn(0f, 0.65f)
                 drawCircle(
-                    color = DirectCyan.copy(alpha = shockwaveAlpha * 0.35f),
-                    radius = shockwaveRadius,
-                    center = Offset(w * 0.5f, h * 0.34f),
-                    style = Stroke(width = 2.5.dp.toPx())
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            primaryAccent.copy(alpha = ambientGlowAlpha),
+                            XboxNeonGreen.copy(alpha = ambientGlowAlpha * 0.45f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.25f, h * 0.25f),
+                        radius = w.coerceAtLeast(h) * 0.55f
+                    ),
+                    center = Offset(w * 0.25f, h * 0.25f),
+                    radius = w.coerceAtLeast(h) * 0.55f
+                )
+
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            DirectCyan.copy(alpha = ambientGlowAlpha * 0.65f),
+                            secondaryAccent.copy(alpha = ambientGlowAlpha * 0.3f),
+                            Color.Transparent
+                        ),
+                        center = Offset(w * 0.8f, h * 0.78f),
+                        radius = w.coerceAtLeast(h) * 0.5f
+                    ),
+                    center = Offset(w * 0.8f, h * 0.78f),
+                    radius = w.coerceAtLeast(h) * 0.5f
                 )
             }
 
-            // LAYER 3: Main Scrollable Content Layout
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // TOP BAR: Home Escape Button & Real Latency Indicator
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Home Button (Direct escape to dashboard)
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = DirectCyan.copy(alpha = 0.16f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.45f)),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { onNavigateHome() }
-                            .testTag("loading_home_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = "Trang chủ",
-                                tint = DirectCyan,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Text(
-                                text = "Trang Chủ",
-                                color = Color.White,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Real Latency Telemetry Badge
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = pingColor.copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, pingColor.copy(alpha = 0.5f)),
-                        modifier = Modifier.testTag("loading_ping_badge")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(pingColor)
-                            )
-                            Text(
-                                text = pingText,
-                                color = TextPrimary,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "• $pingRating",
-                                color = pingColor,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // CENTERPIECE: The Futuristic Supersonic Cloud Gaming Jet Artwork with Physics Animation
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(210.dp)
-                        .offset(y = altitudeHoverY.dp)
-                        .rotate(bankTiltAngle),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Ambient Engine Glow Aura behind the craft
-                    Box(
-                        modifier = Modifier
-                            .size(240.dp, 140.dp)
-                            .scale(engineFlareScale)
-                            .background(
-                                Brush.radialGradient(
-                                    listOf(
-                                        DirectCyan.copy(alpha = 0.35f),
-                                        XboxNeonGreen.copy(alpha = 0.15f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
-
-                    // Hero Aircraft Visual: Supersonic Cloud Jet
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .height(185.dp)
-                            .clip(RoundedCornerShape(22.dp))
-                            .border(
-                                1.2.dp,
-                                Brush.horizontalGradient(listOf(DirectCyan.copy(alpha = 0.7f), XboxNeonGreen.copy(alpha = 0.7f))),
-                                RoundedCornerShape(22.dp)
-                            ),
-                        color = Color(0xFF081216),
-                        shadowElevation = 18.dp
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            Image(
-                                painter = painterResource(id = R.drawable.cloud_jet_loading),
-                                contentDescription = "Supersonic Cloud Gaming Jet",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-
-                            // Sleek dark vignette edge gradient
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.3f),
-                                                Color(0xCC050A0E)
-                                            )
-                                        )
-                                    )
-                            )
-
-                            // In-flight Speed Protocol Badge (Bottom-Right of cockpit banner)
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color.Black.copy(alpha = 0.65f),
-                                border = androidx.compose.foundation.BorderStroke(0.6.dp, DirectCyan.copy(alpha = 0.5f)),
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.FlightTakeoff,
-                                        contentDescription = null,
-                                        tint = XboxNeonGreen,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "X-STREAM CRUISE // 60 FPS",
-                                        color = TextPrimary,
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.6.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Game Title & Optimization Profile
-                Text(
-                    text = gameProfile.title.uppercase(),
-                    color = TextPrimary,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.2.sp,
-                    textAlign = TextAlign.Center
+            if (isLandscape) {
+                LandscapeLoadingContent(
+                    gameProfile = gameProfile,
+                    animatedProgress = animatedProgress,
+                    phaseStatusText = phaseStatusText,
+                    currentStep = currentStep,
+                    targetServerName = targetServerName,
+                    controllerStatus = controllerStatus,
+                    hasGamepad = hasGamepad,
+                    pingText = pingText,
+                    pingRating = pingRating,
+                    pingColor = pingColor,
+                    currentTip = currentTip,
+                    onNavigateHome = onNavigateHome,
+                    onSkip = onSkip
                 )
-
-                // Flight Status Text (Dynamically changes with progress)
-                Text(
-                    text = flightPhaseTitle,
-                    color = DirectCyan,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 16.sp,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp, start = 8.dp, end = 8.dp)
+            } else {
+                PortraitLoadingContent(
+                    gameProfile = gameProfile,
+                    animatedProgress = animatedProgress,
+                    phaseStatusText = phaseStatusText,
+                    currentStep = currentStep,
+                    targetServerName = targetServerName,
+                    controllerStatus = controllerStatus,
+                    hasGamepad = hasGamepad,
+                    pingText = pingText,
+                    pingRating = pingRating,
+                    pingColor = pingColor,
+                    currentTip = currentTip,
+                    onNavigateHome = onNavigateHome,
+                    onSkip = onSkip
                 )
-
-                // Modern Sleek Progress Bar with Percentage
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Tiến độ tải dữ liệu luồng",
-                        color = TextSecondary,
-                        fontSize = 10.5.sp
-                    )
-                    Text(
-                        text = "${(effectiveProgress * 100).toInt()}%",
-                        color = XboxNeonGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
-
-                LinearProgressIndicator(
-                    progress = { effectiveProgress },
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .height(6.5.dp)
-                        .clip(RoundedCornerShape(3.5.dp)),
-                    color = XboxNeonGreen,
-                    trackColor = Color(0xFF101B24)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Flight Optimization & Hardware Telemetry Card
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp)),
-                    color = Color(0xFF091218).copy(alpha = 0.94f)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp)
-                    ) {
-                        // Server Route
-                        GameOptimizationRow(
-                            icon = Icons.Default.Public,
-                            title = "Đường truyền & Máy chủ",
-                            status = targetServerName,
-                            accentColor = DirectCyan
-                        )
-
-                        // Controller
-                        GameOptimizationRow(
-                            icon = Icons.Default.Gamepad,
-                            title = "Hệ thống điều khiển",
-                            status = if (hasGamepad) "Tay cầm vật lý kết nối" else (if (gameProfile.nativeTouchSupport) "Cảm ứng Native Epic + Ảo" else "Phím ảo sẵn sàng"),
-                            accentColor = if (hasGamepad) XboxNeonGreen else DirectCyan
-                        )
-
-                        // Zero-lag protocol
-                        GameOptimizationRow(
-                            icon = Icons.Default.Bolt,
-                            title = "Giao thức Zero-Lag",
-                            status = "Tự động kích hoạt khi vào luồng",
-                            accentColor = XboxNeonGreen
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Rotating Pro Tip
-                if (gameProfile.tips.isNotEmpty()) {
-                    val currentTip = gameProfile.tips.getOrNull(tipIndex) ?: gameProfile.tips[0]
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(0.8.dp, DirectCyan.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                        color = Color(0xFF0B171F).copy(alpha = 0.85f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lightbulb,
-                                contentDescription = null,
-                                tint = XboxNeonGreen,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Text(
-                                text = currentTip,
-                                color = TextSecondary,
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action Buttons Row: Skip / Enter Now
-                Button(
-                    onClick = onSkip,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = DirectCyan.copy(alpha = 0.22f),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f)),
-                    modifier = Modifier
-                        .fillMaxWidth(0.65f)
-                        .testTag("skip_loading_button")
-                ) {
-                    Text(
-                        text = "Vào Trận Ngay ➜",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
             }
         }
     }
 }
 
 @Composable
+private fun PortraitLoadingContent(
+    gameProfile: GameOptimizationProfile,
+    animatedProgress: Float,
+    phaseStatusText: String,
+    currentStep: Int,
+    targetServerName: String,
+    controllerStatus: String,
+    hasGamepad: Boolean,
+    pingText: String,
+    pingRating: String,
+    pingColor: Color,
+    currentTip: String,
+    onNavigateHome: () -> Unit,
+    onSkip: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        LoadingTopBar(
+            pingText = pingText,
+            pingRating = pingRating,
+            pingColor = pingColor,
+            onNavigateHome = onNavigateHome
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            GameHeroBannerCard(
+                gameProfile = gameProfile,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(195.dp)
+            )
+
+            LoadingProgressPanel(
+                animatedProgress = animatedProgress,
+                phaseStatusText = phaseStatusText,
+                currentStep = currentStep
+            )
+
+            SystemTelemetryCard(
+                targetServerName = targetServerName,
+                controllerStatus = controllerStatus,
+                hasGamepad = hasGamepad
+            )
+
+            LoadingTipCard(tip = currentTip)
+        }
+
+        SkipLoadingButton(
+            onSkip = onSkip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 480.dp)
+                .padding(top = 8.dp, bottom = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun LandscapeLoadingContent(
+    gameProfile: GameOptimizationProfile,
+    animatedProgress: Float,
+    phaseStatusText: String,
+    currentStep: Int,
+    targetServerName: String,
+    controllerStatus: String,
+    hasGamepad: Boolean,
+    pingText: String,
+    pingRating: String,
+    pingColor: Color,
+    currentTip: String,
+    onNavigateHome: () -> Unit,
+    onSkip: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        LoadingTopBar(
+            pingText = pingText,
+            pingRating = pingRating,
+            pingColor = pingColor,
+            onNavigateHome = onNavigateHome
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left Column: Hero Poster Card
+            GameHeroBannerCard(
+                gameProfile = gameProfile,
+                modifier = Modifier
+                    .weight(0.45f)
+                    .fillMaxHeight()
+            )
+
+            // Right Column: Progress, Telemetry, Tip & Action Button
+            Column(
+                modifier = Modifier
+                    .weight(0.55f)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                LoadingProgressPanel(
+                    animatedProgress = animatedProgress,
+                    phaseStatusText = phaseStatusText,
+                    currentStep = currentStep
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SystemTelemetryCard(
+                    targetServerName = targetServerName,
+                    controllerStatus = controllerStatus,
+                    hasGamepad = hasGamepad
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        LoadingTipCard(tip = currentTip, compact = true)
+                    }
+
+                    SkipLoadingButton(
+                        onSkip = onSkip,
+                        modifier = Modifier.width(155.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingTopBar(
+    pingText: String,
+    pingRating: String,
+    pingColor: Color,
+    onNavigateHome: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF101B24).copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, XboxCardBorder),
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onNavigateHome() }
+                .testTag("loading_home_button")
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = "Trang chủ",
+                    tint = DirectCyan,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "Trang Chủ",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF101B24).copy(alpha = 0.9f),
+            border = BorderStroke(1.dp, pingColor.copy(alpha = 0.45f)),
+            modifier = Modifier.testTag("loading_ping_badge")
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(pingColor)
+                )
+                Text(
+                    text = pingText,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "• $pingRating",
+                    color = pingColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameHeroBannerCard(
+    gameProfile: GameOptimizationProfile,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .border(
+                1.dp,
+                Brush.horizontalGradient(
+                    listOf(
+                        DirectCyan.copy(alpha = 0.5f),
+                        XboxNeonGreen.copy(alpha = 0.45f)
+                    )
+                ),
+                RoundedCornerShape(20.dp)
+            ),
+        color = Color(0xFF0A141C),
+        shadowElevation = 12.dp
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = gameProfile.bannerResId),
+                contentDescription = gameProfile.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x40050A0E),
+                                Color(0x88050A0E),
+                                Color(0xEE060D13)
+                            )
+                        )
+                    )
+            )
+
+            // Top Badges
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xCC071118),
+                    border = BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = gameProfile.badge,
+                        color = DirectCyan,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xCC071118),
+                    border = BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Speed,
+                            contentDescription = null,
+                            tint = XboxNeonGreen,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Text(
+                            text = gameProfile.recommendedFps,
+                            color = XboxNeonGreen,
+                            fontSize = 9.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Bottom Title & Subtitle
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = gameProfile.title,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = gameProfile.subtitle,
+                    color = TextSecondary,
+                    fontSize = 11.5.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 15.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingProgressPanel(
+    animatedProgress: Float,
+    phaseStatusText: String,
+    currentStep: Int
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp)),
+        color = Color(0xFF0A141D).copy(alpha = 0.92f)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = phaseStatusText,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${(animatedProgress * 100).toInt()}%",
+                    color = XboxNeonGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = XboxNeonGreen,
+                trackColor = Color(0xFF152431)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                StepBadge(label = "Kết nối", isDone = currentStep >= 1, isActive = currentStep == 1)
+                StepBadge(label = "Định tuyến", isDone = currentStep >= 2, isActive = currentStep == 2)
+                StepBadge(label = "Luồng 60FPS", isDone = currentStep >= 3, isActive = currentStep == 3)
+                StepBadge(label = "Sẵn sàng", isDone = currentStep >= 4, isActive = currentStep == 4)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepBadge(
+    label: String,
+    isDone: Boolean,
+    isActive: Boolean
+) {
+    val color = when {
+        isActive -> DirectCyan
+        isDone -> XboxNeonGreen
+        else -> TextSecondary.copy(alpha = 0.45f)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(11.dp)
+        )
+        Text(
+            text = label,
+            color = color,
+            fontSize = 10.sp,
+            fontWeight = if (isActive || isDone) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun SystemTelemetryCard(
+    targetServerName: String,
+    controllerStatus: String,
+    hasGamepad: Boolean
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp)),
+        color = Color(0xFF0A141D).copy(alpha = 0.92f)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            GameOptimizationRow(
+                icon = Icons.Default.Public,
+                title = "Máy chủ kết nối",
+                status = targetServerName,
+                accentColor = DirectCyan
+            )
+
+            GameOptimizationRow(
+                icon = Icons.Default.Gamepad,
+                title = "Bộ điều khiển",
+                status = controllerStatus,
+                accentColor = if (hasGamepad) XboxNeonGreen else DirectCyan
+            )
+
+            GameOptimizationRow(
+                icon = Icons.Default.Bolt,
+                title = "Tối ưu đường truyền",
+                status = "Tự động xả trễ khi vào game",
+                accentColor = XboxNeonGreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoadingTipCard(
+    tip: String,
+    compact: Boolean = false
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .border(0.8.dp, DirectCyan.copy(alpha = 0.25f), RoundedCornerShape(14.dp)),
+        color = Color(0xFF0B1722).copy(alpha = 0.88f)
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = if (compact) 8.dp else 10.dp
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lightbulb,
+                contentDescription = null,
+                tint = XboxNeonGreen,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = tip,
+                color = TextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 14.5.sp,
+                maxLines = if (compact) 2 else 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkipLoadingButton(
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onSkip,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = DirectCyan.copy(alpha = 0.18f),
+            contentColor = Color.White
+        ),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f)),
+        modifier = modifier
+            .height(42.dp)
+            .testTag("skip_loading_button")
+    ) {
+        Text(
+            text = "Vào Trận Ngay ➜",
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
 private fun GameOptimizationRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     status: String,
     accentColor: Color
@@ -616,20 +833,25 @@ private fun GameOptimizationRow(
                 imageVector = icon,
                 contentDescription = null,
                 tint = accentColor,
-                modifier = Modifier.size(15.dp)
+                modifier = Modifier.size(14.dp)
             )
             Text(
                 text = title,
                 color = TextSecondary,
-                fontSize = 11.sp
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = status,
             color = accentColor,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
+

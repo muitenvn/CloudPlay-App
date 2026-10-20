@@ -1,0 +1,8 @@
+{
+  "name": "Remix  Cloud VPN Switcher",
+  "description": "Automatically enables Japan VPN for Xbox Cloud Gaming, then reverts to your local network for smoother gameplay.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

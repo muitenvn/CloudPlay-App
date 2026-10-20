@@ -1,0 +1,251 @@
+package com.example
+
+import android.app.Activity
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.example.cloudplay.StreamController
+import com.example.data.SettingsRepository
+import com.example.ui.CloudBrowserScreen
+import com.example.ui.DashboardScreen
+import com.example.ui.theme.MyApplicationTheme
+import com.example.vpn.VpnManager
+
+
+sealed class AppScreen {
+    data object Dashboard : AppScreen()
+    data class Browser(val url: String) : AppScreen()
+}
+
+class MainActivity : ComponentActivity() {
+
+    private lateinit var streamController: StreamController
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        // Keep screen awake while streaming Xbox games
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        )
+
+        VpnManager.init(applicationContext)
+        SettingsRepository.init(applicationContext)
+        com.example.cloudplay.NetworkOptimizer.init(applicationContext)
+        streamController = StreamController(applicationContext)
+
+        setContent {
+            val config by SettingsRepository.config.collectAsState()
+            val targetLocale: java.util.Locale = remember(config.appLanguage) {
+                when (config.appLanguage) {
+                    com.example.data.AppLanguage.SYSTEM -> {
+                        val sys = java.util.Locale.getDefault()
+                        if (sys.language.lowercase().startsWith("vi")) java.util.Locale("vi") else java.util.Locale.ENGLISH
+                    }
+                    com.example.data.AppLanguage.VIETNAMESE -> java.util.Locale("vi")
+                    com.example.data.AppLanguage.ENGLISH -> java.util.Locale.ENGLISH
+                }
+            }
+
+            val baseContext = androidx.compose.ui.platform.LocalContext.current
+            val localizedConfiguration = remember(targetLocale) {
+                val conf = android.content.res.Configuration()
+                conf.setLocale(targetLocale)
+                conf.setLayoutDirection(targetLocale)
+                conf
+            }
+            val localizedWrapper = remember(targetLocale, baseContext) {
+                val conf = android.content.res.Configuration(baseContext.resources.configuration)
+                conf.setLocale(targetLocale)
+                conf.setLayoutDirection(targetLocale)
+                val localizedCtx = baseContext.createConfigurationContext(conf)
+                object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
+                    override fun getResources(): android.content.res.Resources = localizedCtx.resources
+                    override fun getAssets(): android.content.res.AssetManager = localizedCtx.assets
+                    override fun getTheme(): android.content.res.Resources.Theme = localizedCtx.theme
+                    override val activityResultRegistry: androidx.activity.result.ActivityResultRegistry
+                        get() = this@MainActivity.activityResultRegistry
+                }
+            }
+
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalConfiguration provides localizedConfiguration,
+                androidx.compose.ui.platform.LocalContext provides localizedWrapper,
+                androidx.activity.compose.LocalActivityResultRegistryOwner provides this@MainActivity
+            ) {
+                MyApplicationTheme {
+                    MainContent(
+                        activity = this@MainActivity,
+                        streamController = streamController,
+                        onConnectVpnRequested = { handleVpnConnect() }
+                    )
+                }
+            }
+        }
+    }
+
+    private var isBrowserScreenActive = false
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && isBrowserScreenActive) {
+            applyImmersiveFullscreen(true)
+        }
+    }
+
+    fun applyImmersiveFullscreen(enable: Boolean) {
+        isBrowserScreenActive = enable
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (enable) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                window.attributes = window.attributes.apply {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+            insetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+            resetOrientation()
+        }
+    }
+
+    fun toggleOrientation() {
+        requestedOrientation = if (resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
+
+    fun resetOrientation() {
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
+    private fun handleVpnConnect() {
+        VpnManager.connect(this)
+    }
+}
+
+@Composable
+fun MainContent(
+    activity: MainActivity,
+    streamController: StreamController,
+    onConnectVpnRequested: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Dashboard) }
+
+    // Runtime POST_NOTIFICATIONS permission request for Android 13+ (TIRAMISU / API 33+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        android.util.Log.d("MainActivity", "POST_NOTIFICATIONS permission granted: $isGranted")
+    }
+
+    val config by SettingsRepository.config.collectAsState()
+
+    // Mandatory Terms of Service & Open Source Disclaimer (Better-xCloud MIT)
+    if (!config.userAcceptedTerms) {
+        com.example.ui.components.UserTermsAgreementDialog(
+            onAccept = {
+                SettingsRepository.updateUserAcceptedTerms(true)
+            },
+            onDecline = {
+                activity.finish()
+            },
+            isDismissible = false
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    // Fullscreen Immersive Mode controller for Cloud Gaming
+    LaunchedEffect(currentScreen) {
+        val isBrowser = currentScreen is AppScreen.Browser
+        activity.applyImmersiveFullscreen(isBrowser)
+        if (!isBrowser) {
+            activity.resetOrientation()
+        }
+    }
+
+    AnimatedContent(
+        targetState = currentScreen,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "screen_navigation"
+    ) { screen ->
+        when (screen) {
+            is AppScreen.Dashboard -> {
+                DashboardScreen(
+                    onLaunchUrl = { url ->
+                        val config = SettingsRepository.config.value
+                        if (config.smartVpnEnabled) {
+                            if (VpnManager.needsVpnToPlay()) {
+                                VpnManager.autoTurnOnForLaunch(context)
+                            } else {
+                                VpnManager.ensureDirectNetwork()
+                            }
+                        } else {
+                            if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
+                                VpnManager.connect(context)
+                            }
+                        }
+                        val currentLocale = config.getEffectiveLocale()
+                        val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
+                        currentScreen = AppScreen.Browser(finalUrl)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            is AppScreen.Browser -> {
+                CloudBrowserScreen(
+                    initialUrl = screen.url,
+                    streamController = streamController,
+                    onNavigateBackToDashboard = {
+                        currentScreen = AppScreen.Dashboard
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}

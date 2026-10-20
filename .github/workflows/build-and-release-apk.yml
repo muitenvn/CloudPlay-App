@@ -1,0 +1,202 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Tạo GitHub Release để tải trực tiếp (true/false)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+          cache-disabled: false
+
+      - name: Setup Android SDK & Accept All Licenses
+        run: |
+          # Detect Android SDK root
+          if [ -z "$ANDROID_HOME" ]; then
+            export ANDROID_HOME="/usr/local/lib/android/sdk"
+          fi
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+
+          # Add SDK tools to PATH
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+          # Pre-accept all standard Android SDK licenses
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\n24333f8a63061b1290586ac4e1419e6750add54b\n84831b9409646a918e30573bab4c9c91346d8abd\nd56f5187479451eabf01fb78af6dfcb131a6481e\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "84831b9409646a918e30573bab4c9c91346d8abd\n89337d0207f9f1e1684c7987150e609e5b9330f1\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          printf "859f317696f67ef3d7f30a50a5560e7834b43903\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-arm-dbt-license"
+          printf "601085b94cd77f0b54ff86406957099ebe79c4d6\n601085b94cd77f0b54ff86406957099fed7926e4\n" > "$ANDROID_HOME/licenses/android-googletv-license"
+          printf "ceff83576aac4f7f37cb98fe189e9fb3c49d3b81\n" > "$ANDROID_HOME/licenses/android-googlexr-license"
+          printf "e9acab5b5fbb560a72cfaecce8946896ff6aab9d\n" > "$ANDROID_HOME/licenses/mips-android-sysimage-license"
+          printf "33b6a2b64607f11b759f320ef9dff4ae5c47d97a\n" > "$ANDROID_HOME/licenses/google-gdk-license"
+
+          # Run sdkmanager to accept licenses and install SDK 36 and 36.1 components
+          SDK_MGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDK_MGR" ]; then
+            SDK_MGR=$(which sdkmanager || true)
+          fi
+          if [ -n "$SDK_MGR" ]; then
+            yes | "$SDK_MGR" --licenses || true
+            "$SDK_MGR" --install "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" "platform-tools" || true
+          fi
+
+      - name: Prepare Keystore and Environment
+        run: |
+          # 1. Đảm bảo file .env tồn tại cho Secrets Gradle Plugin
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+              echo "Created .env from .env.example"
+            else
+              touch .env
+              echo "Created empty .env"
+            fi
+          fi
+
+          # 2. Khôi phục hoặc tạo debug.keystore an toàn (tránh lỗi file 0 byte)
+          if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
+            if [ -f "debug.keystore.base64" ]; then
+              python3 -c "import base64; open('debug.keystore', 'wb').write(base64.b64decode(open('debug.keystore.base64').read().strip()))" 2>/dev/null || true
+            fi
+          fi
+
+          if [ ! -f "debug.keystore" ] || [ ! -s "debug.keystore" ]; then
+            echo "Generating clean debug.keystore for CI build..."
+            rm -f debug.keystore
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          chmod 644 debug.keystore || true
+          echo "Keystore verified successfully:"
+          ls -l debug.keystore
+
+          # 3. Đảm bảo default_web_client_id luôn có mặt để tránh lỗi Unresolved reference trên CI
+          mkdir -p app/src/main/res/values
+          if [ ! -f "app/src/main/res/values/default_web_client.xml" ]; then
+            printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="default_web_client_id" translatable="false">placeholder_web_client_id.apps.googleusercontent.com</string>\n</resources>\n' > app/src/main/res/values/default_web_client.xml
+            echo "Created fallback default_web_client.xml"
+          fi
+
+      - name: Make Gradlew Executable
+        run: |
+          if [ -f "./gradlew" ]; then
+            sed -i 's/\r$//' ./gradlew || true
+            chmod +x ./gradlew || true
+          fi
+
+      - name: Build APK with Gradle
+        run: |
+          if [ -f "./gradlew" ]; then
+            ./gradlew assembleDebug --no-daemon --no-configuration-cache --stacktrace
+          else
+            gradle assembleDebug --no-daemon --no-configuration-cache --stacktrace
+          fi
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p release-output
+          APK_FILE=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
+          if [ -f "$APK_FILE" ]; then
+            cp "$APK_FILE" release-output/CloudPlay-Xbox-v1.0.apk
+            cp "$APK_FILE" release-output/app-debug.apk
+            echo "Copied $APK_FILE to release-output/"
+            ls -lh release-output/
+          else
+            echo "Error: APK file not found!"
+            find app/build/ -name "*.apk" || true
+            exit 1
+          fi
+
+      - name: Upload APK to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudPlay-Xbox-APK
+          path: release-output/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Determine Release Tag and Name
+        id: release_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+            TITLE="CloudPlay Xbox APK ${{ github.ref_name }}"
+          else
+            TAG="v1.0.${{ github.run_number }}"
+            TITLE="CloudPlay Xbox APK Build #${{ github.run_number }}"
+          fi
+          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+          echo "release_name=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success() && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+        continue-on-error: true
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag_name }}
+          name: ${{ steps.release_info.outputs.release_name }}
+          body: |
+            ### 🚀 Tải ứng dụng CloudPlay Xbox Cloud Gaming (APK)
+
+            Phiên bản APK được tự động biên dịch và phát hành từ GitHub Actions.
+
+            #### 📥 Tải file cài đặt:
+            - **`CloudPlay-Xbox-v1.0.apk`** (Tải ở mục **Assets** ngay bên dưới 👇)
+
+            #### 🌟 Tính năng nổi bật:
+            - **Bypass Region Lock:** Tự động định tuyến header qua máy chủ xCloud Nhật Bản / Hàn Quốc / Mỹ mà không cần cài app VPN bên thứ 3.
+            - **Direct Handshake:** Tự động ngắt Proxy chuyển về mạng gốc Việt Nam sau khi bắt đầu stream game để độ trễ thấp nhất (~25 - 35ms).
+            - **Floating Controller & HUD:** Nút Home trang chủ nổi, đo ping thực tế, FPS, chống tụt frame khi chơi game.
+            - **Giao diện Loading:** Phong cách phi thuyền Cloud Cruiser tốc độ cao.
+
+            #### 📱 Hướng dẫn cài đặt:
+            1. Tải file **`CloudPlay-Xbox-v1.0.apk`** bên dưới về điện thoại.
+            2. Cho phép cài đặt ứng dụng từ nguồn này nếu điện thoại yêu cầu.
+            3. Mở ứng dụng, đăng nhập tài khoản Xbox Game Pass Ultimate và thưởng thức!
+          draft: false
+          prerelease: false
+          make_latest: true
+          fail_on_unmatched_files: false
+          files: release-output/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

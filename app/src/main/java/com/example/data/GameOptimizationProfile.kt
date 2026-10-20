@@ -29,26 +29,26 @@ object GameOptimizationRepository {
     val FORTNITE_PROFILE = GameOptimizationProfile(
         gameId = "fortnite",
         title = "FORTNITE BATTLE ROYALE",
-        subtitle = "Tối ưu độc quyền: Free 100% • Epic Touch Cảm Ứng • Zero-Delay Shotgun",
+        subtitle = "Tối ưu độc quyền: Hỗ trợ 60–120 FPS • Free 100% • Epic Touch Cảm Ứng • Zero-Delay",
         bannerResId = R.drawable.fortnite_cloud_poster_1791719536404,
         primaryAccentHex = 0xFF0074E4, // Fortnite Electric Blue
         secondaryAccentHex = 0xFF9C27B0, // Epic Purple
-        badge = "TỐI ƯU ĐỘC QUYỀN FORTNITE",
+        badge = "TỐI ƯU ĐỘC QUYỀN FORTNITE • 120 FPS",
         isFreeToPlay = true,
-        recommendedFps = "60 FPS Dynamic",
+        recommendedFps = "60–120 FPS",
         nativeTouchSupport = true,
         loadingQuote = "Nhảy dù Battle Bus • Loot súng huyền thoại • Giành Victory Royale! 👑",
         tips = listOf(
+            "Fortnite trên Xbox Cloud hỗ trợ chế độ 120 FPS (trên phần cứng máy chủ Xbox Series X)! Bạn có thể bật 120 FPS Mode trong phần Cài đặt Video của Fortnite.",
             "Fortnite là game MIỄN PHÍ 100% trên Xbox Cloud, không cần mua gói Game Pass Ultimate!",
             "Game hỗ trợ phím cảm ứng riêng của Epic Games. Bạn có thể bấm biểu tượng 🎮 trên Game Bar để ẩn tay cầm ảo nếu dùng cảm ứng của game.",
-            "Chế độ Direct Network Bypass giữ ping dưới 30ms, giúp bắn shotgun và xây nhà không bị delay phản xạ.",
-            "Tự động đồng bộ toàn bộ Skin, V-Bucks và Battle Pass từ tài khoản Epic Games của bạn."
+            "Chế độ Direct Network Bypass giữ ping dưới 30ms, giúp bắn shotgun và xây nhà không bị delay phản xạ."
         ),
         checklist = listOf(
             OptimizationCheckItem("Máy chủ thi đấu", "Định tuyến xCloud Tokyo/Singapore (<30ms)"),
-            OptimizationCheckItem("Bản quyền game", "Miễn phí 100% (Không cần Game Pass)"),
+            OptimizationCheckItem("Tần số khung hình", "Đồng bộ màn hình 60–120Hz (Hỗ trợ 120 FPS Mode)"),
             OptimizationCheckItem("Chế độ điều khiển", "Hỗ trợ kép: Touch Epic Controls + Gamepad"),
-            OptimizationCheckItem("Tối ưu phản xạ", "Kích hoạt Low-Latency Shooter Preset 60FPS")
+            OptimizationCheckItem("Tối ưu phản xạ", "Kích hoạt Low-Latency Shooter Preset 60–120FPS")
         )
     )
 

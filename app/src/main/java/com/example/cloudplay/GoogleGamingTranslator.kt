@@ -1,13 +1,18 @@
 package com.example.cloudplay
 
 import android.util.Log
+import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import java.net.URLEncoder
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -24,14 +29,25 @@ import java.util.regex.Pattern
 object GoogleGamingTranslator {
 
     private const val TAG = "GoogleGamingTranslator"
+    private const val MAX_CACHE_ENTRIES = 500
+    private const val MAX_PARALLEL_TRANSLATIONS = 4
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
-    // In-memory persistent LRU-like translation cache
-    private val translationCache = ConcurrentHashMap<String, String>()
+    // Bounded thread-safe LRU translation cache (prevents unbounded RAM growth)
+    private val translationCache = object : LruCache<String, String>(MAX_CACHE_ENTRIES) {}
+    private val batchSemaphore = Semaphore(MAX_PARALLEL_TRANSLATIONS)
+
+    private fun getCachedTranslation(key: String): String? = synchronized(translationCache) {
+        translationCache.get(key)
+    }
+
+    private fun putCachedTranslation(key: String, value: String) = synchronized(translationCache) {
+        translationCache.put(key, value)
+    }
 
     data class SmartTranslationResult(
         val originalText: String,
@@ -183,10 +199,8 @@ object GoogleGamingTranslator {
     fun restoreProtectedContent(translated: String, placeholderMap: Map<String, String>): String {
         var result = translated
         for ((placeholder, originalTerm) in placeholderMap) {
-            // First attempt exact replacement
             result = result.replace(placeholder, originalTerm)
 
-            // Also handle any spacing variations that Google Translate might introduce
             val nameOnly = placeholder.trim('_')
             val parts = nameOnly.split("_")
             if (parts.size == 2) {
@@ -209,9 +223,9 @@ object GoogleGamingTranslator {
         val trimmed = rawText.trim()
         if (trimmed.length < 2) return@withContext rawText
 
-        // Check cache first
+        // Check bounded LRU cache first
         val cacheKey = "$targetLang:$trimmed"
-        val cached = translationCache[cacheKey]
+        val cached = getCachedTranslation(cacheKey)
         if (cached != null) {
             return@withContext if (bilingual && cached != trimmed) "$cached ($trimmed)" else cached
         }
@@ -220,7 +234,7 @@ object GoogleGamingTranslator {
         val dictMatch = XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed]
             ?: XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed.lowercase()]
         if (dictMatch != null) {
-            translationCache[cacheKey] = dictMatch
+            putCachedTranslation(cacheKey, dictMatch)
             return@withContext if (bilingual) "$dictMatch ($trimmed)" else dictMatch
         }
 
@@ -261,8 +275,8 @@ object GoogleGamingTranslator {
             // Restore protected gaming terms
             val finalizedText = restoreProtectedContent(rawTranslated, placeholderMap).trim()
 
-            // Save to memory cache
-            translationCache[cacheKey] = finalizedText
+            // Save to bounded LRU cache
+            putCachedTranslation(cacheKey, finalizedText)
 
             if (bilingual && finalizedText != trimmed) {
                 "$finalizedText ($trimmed)"
@@ -287,7 +301,7 @@ object GoogleGamingTranslator {
         val startTime = System.currentTimeMillis()
         val trimmed = rawText.trim()
         val cacheKey = "$targetLang:$trimmed"
-        val cached = translationCache[cacheKey]
+        val cached = getCachedTranslation(cacheKey)
 
         val (_, placeholderMap) = tokenizeProtectedContent(trimmed)
         val protectedList = placeholderMap.values.toList()
@@ -298,7 +312,7 @@ object GoogleGamingTranslator {
                 originalText = rawText,
                 translatedText = finalized,
                 protectedTerms = protectedList,
-                translatedTerms = listOf("Đã tải tức thì từ bộ nhớ đệm (0ms)"),
+                translatedTerms = listOf("Đã tải tức thì từ bộ nhớ đệm LRU (0ms)"),
                 executionTimeMs = System.currentTimeMillis() - startTime,
                 isFromCache = true
             )
@@ -318,21 +332,31 @@ object GoogleGamingTranslator {
     }
 
     /**
-     * Batch translation for fast initial page translation
+     * Controlled parallel batch translation using Semaphore(4) + async/awaitAll.
      */
     suspend fun translateBatch(
         texts: List<String>,
-        targetLang: String = "vi"
+        targetLang: String = "vi",
+        bilingual: Boolean = false
     ): Map<String, String> = withContext(Dispatchers.IO) {
-        val results = mutableMapOf<String, String>()
-        for (text in texts) {
-            val translated = translate(text, targetLang)
-            results[text] = translated
+        val distinctTexts = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (distinctTexts.isEmpty()) return@withContext emptyMap()
+
+        coroutineScope {
+            val deferredList = distinctTexts.map { text ->
+                async {
+                    batchSemaphore.withPermit {
+                        text to translate(text, targetLang, bilingual)
+                    }
+                }
+            }
+            deferredList.awaitAll().toMap()
         }
-        results
     }
 
     fun clearCache() {
-        translationCache.clear()
+        synchronized(translationCache) {
+            translationCache.evictAll()
+        }
     }
 }

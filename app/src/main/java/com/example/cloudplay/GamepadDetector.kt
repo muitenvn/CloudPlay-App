@@ -3,20 +3,24 @@ package com.example.cloudplay
 import android.content.Context
 import android.hardware.input.InputManager
 import android.view.InputDevice
+import com.example.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class GamepadStatus(
     val hasPhysicalController: Boolean = false,
-    val controllerName: String = "Không có",
+    val controllerName: String = "",
     val deviceCount: Int = 0
 )
 
 class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
 
-    private val inputManager = context.getSystemService(Context.INPUT_SERVICE) as? InputManager
-    private val _status = MutableStateFlow(GamepadStatus())
+    private val appContext = context.applicationContext ?: context
+    private val inputManager = appContext.getSystemService(Context.INPUT_SERVICE) as? InputManager
+    private val _status = MutableStateFlow(
+        GamepadStatus(controllerName = appContext.getString(R.string.gamepad_none))
+    )
     val status: StateFlow<GamepadStatus> = _status.asStateFlow()
 
     init {
@@ -30,7 +34,7 @@ class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
     fun checkControllers() {
         val deviceIds = InputDevice.getDeviceIds()
         var foundGamepad = false
-        var name = "Không có"
+        var name = appContext.getString(R.string.gamepad_none)
         var count = 0
 
         for (id in deviceIds) {
@@ -41,7 +45,7 @@ class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
 
             if (isGamepad && !device.isVirtual) {
                 foundGamepad = true
-                name = device.name ?: "Tay cầm Gamepad"
+                name = device.name ?: appContext.getString(R.string.gamepad_default_name)
                 count++
             }
         }
@@ -72,3 +76,4 @@ class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
         }
     }
 }
+

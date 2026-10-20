@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -19,12 +20,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.cloudplay.StreamController
+import com.example.data.GameLibraryRepository
 import com.example.data.SettingsRepository
 import com.example.ui.CloudBrowserScreen
 import com.example.ui.DashboardScreen
@@ -35,6 +39,25 @@ import com.example.vpn.VpnManager
 sealed class AppScreen {
     data object Dashboard : AppScreen()
     data class Browser(val url: String) : AppScreen()
+
+    companion object {
+        val Saver: Saver<AppScreen, String> = Saver(
+            save = { screen ->
+                when (screen) {
+                    is Dashboard -> "DASHBOARD"
+                    is Browser -> "BROWSER|${screen.url}"
+                }
+            },
+            restore = { saved ->
+                if (saved.startsWith("BROWSER|")) {
+                    val url = saved.removePrefix("BROWSER|").ifBlank { "https://www.xbox.com/en-US/play" }
+                    Browser(url)
+                } else {
+                    Dashboard
+                }
+            }
+        )
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -54,6 +77,7 @@ class MainActivity : ComponentActivity() {
 
         VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
+        GameLibraryRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
 
@@ -107,6 +131,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::streamController.isInitialized) {
+            streamController.release()
+        }
+    }
+
     private var isBrowserScreenActive = false
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -120,21 +151,62 @@ class MainActivity : ComponentActivity() {
         isBrowserScreenActive = enable
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         if (enable) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 window.attributes = window.attributes.apply {
                     layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
             }
+            enableHighRefreshRateDisplay(true)
             WindowCompat.setDecorFitsSystemWindows(window, false)
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else {
+            enableHighRefreshRateDisplay(false)
             WindowCompat.setDecorFitsSystemWindows(window, true)
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
             insetsController.show(WindowInsetsCompat.Type.systemBars())
             resetOrientation()
+        }
+    }
+
+    /**
+     * Enables high refresh rate (up to 120Hz) on supported displays during Xbox Cloud Gaming sessions.
+     */
+    private fun enableHighRefreshRateDisplay(enable: Boolean) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    this.display
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay
+                }
+                val supportedModes = display?.supportedModes ?: return
+                val lp = window.attributes
+                if (enable) {
+                    val currentMode = display.mode
+                    val bestMode = supportedModes
+                        .filter { it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight }
+                        .maxByOrNull { it.refreshRate }
+                        ?: supportedModes.maxByOrNull { it.refreshRate }
+                    if (bestMode != null && bestMode.refreshRate >= 60f) {
+                        lp.preferredDisplayModeId = bestMode.modeId
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            lp.preferredRefreshRate = bestMode.refreshRate
+                        }
+                        window.attributes = lp
+                    }
+                } else {
+                    lp.preferredDisplayModeId = 0
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        lp.preferredRefreshRate = 0f
+                    }
+                    window.attributes = lp
+                }
+            }
+        } catch (_: Exception) {
         }
     }
 
@@ -163,7 +235,9 @@ fun MainContent(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Dashboard) }
+    var currentScreen by rememberSaveable(stateSaver = AppScreen.Saver) {
+        mutableStateOf<AppScreen>(AppScreen.Dashboard)
+    }
 
     // Runtime POST_NOTIFICATIONS permission request for Android 13+ (TIRAMISU / API 33+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -249,3 +323,4 @@ fun MainContent(
         }
     }
 }
+

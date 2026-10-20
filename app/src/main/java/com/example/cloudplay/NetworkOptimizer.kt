@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import com.example.data.AppConfig
 import com.example.data.CellularOptimizationMode
@@ -20,8 +21,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import kotlin.math.roundToLong
 
 enum class PhysicalNetworkType(val label: String, val icon: String) {
+    WIFI_6GHZ("Wifi 6GHz (Siêu tốc Wi-Fi 6E/7)", "🛜"),
     WIFI_5GHZ("Wifi 5GHz (Tốc độ cao)", "🛜"),
     WIFI_2_4GHZ("Wifi 2.4GHz (Chống nhiễu)", "🛜"),
     WIFI_STANDARD("Wifi (Chuẩn)", "🛜"),
@@ -70,9 +73,10 @@ object NetworkOptimizer {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var isInitialized = false
 
-    // Telemetry tracking for estimated data savings
-    private var streamSecondsTracked = 0L
+    // Telemetry tracking for estimated data savings using actual elapsed time
+    private var streamSecondsTracked = 0.0
     private var totalDataSavedMegabytes = 0.0
+    private var lastTelemetryTimestampMs = 0L
 
     fun init(context: Context) {
         if (isInitialized) return
@@ -134,11 +138,7 @@ object NetworkOptimizer {
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                 isWifi = true
                 wifiFreq = detectWifiFrequency(context, caps)
-                type = when {
-                    wifiFreq >= 4900 -> PhysicalNetworkType.WIFI_5GHZ
-                    wifiFreq in 2400..2500 -> PhysicalNetworkType.WIFI_2_4GHZ
-                    else -> PhysicalNetworkType.WIFI_STANDARD
-                }
+                type = classifyWifiBand(wifiFreq)
             } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                 isCellular = true
                 type = PhysicalNetworkType.CELLULAR_4G_5G
@@ -157,6 +157,18 @@ object NetworkOptimizer {
         )
 
         recomputeEffectiveProfile(config)
+    }
+
+    /**
+     * Classifies Wi-Fi frequency band including 6GHz (5925–7125 MHz), 5GHz, and 2.4GHz.
+     */
+    fun classifyWifiBand(wifiFreqMhz: Int): PhysicalNetworkType {
+        return when {
+            wifiFreqMhz in 5925..7125 -> PhysicalNetworkType.WIFI_6GHZ
+            wifiFreqMhz >= 4900 -> PhysicalNetworkType.WIFI_5GHZ
+            wifiFreqMhz in 2400..2500 -> PhysicalNetworkType.WIFI_2_4GHZ
+            else -> PhysicalNetworkType.WIFI_STANDARD
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -193,6 +205,12 @@ object NetworkOptimizer {
         when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
                 when {
+                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> {
+                        profileName = "Đồ Họa: Tự Động • Wi-Fi 6GHz (Rất Cao 18M)"
+                        bitrate = 18
+                        summary = "Mạng Wi-Fi 6GHz siêu tốc: Tự chọn mức Rất Cao (18M) hỗ trợ 1080p 60–120FPS độ trễ cực thấp."
+                        badge = "⚡ Tự Động (18M)"
+                    }
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> {
                         profileName = "Đồ Họa: Tự Động • Wi-Fi 5GHz (Cao 14M)"
                         bitrate = 14
@@ -240,7 +258,7 @@ object NetworkOptimizer {
             CellularOptimizationMode.MAX_SPEED_UNCAPPED -> {
                 profileName = "Đồ Họa: Rất Cao (Tối Đa • 20M)"
                 bitrate = 20
-                summary = "Bung tối đa 20 Mbps chất lượng đồ họa xCloud (~7.5GB/h), phản hồi tay cầm tức thì cho máy mạnh."
+                summary = "Bung tối đa 20 Mbps chất lượng đồ họa xCloud (~7.5GB/h), hỗ trợ 120 FPS & phản hồi tay cầm tức thì."
                 badge = "🔥 Rất Cao (20M)"
             }
         }
@@ -257,6 +275,7 @@ object NetworkOptimizer {
 
     /**
      * Parses real-time WebRTC telemetry sent from the injected stream monitor.
+     * Calculates actual elapsed time between telemetry packets (~1500ms) instead of fixed 2.0s.
      */
     fun onTelemetryReceived(telemetryJson: String?) {
         if (telemetryJson.isNullOrBlank()) return
@@ -270,13 +289,26 @@ object NetworkOptimizer {
             val loss = json.optDouble("packetsLostPercent", 0.0)
             val framesDropped = json.optInt("framesDropped", 0)
 
+            val nowMs = try {
+                val rt = SystemClock.elapsedRealtime()
+                if (rt > 0L) rt else System.currentTimeMillis()
+            } catch (_: Throwable) {
+                System.currentTimeMillis()
+            }
+            val elapsedSeconds = if (lastTelemetryTimestampMs > 0L && nowMs > lastTelemetryTimestampMs) {
+                ((nowMs - lastTelemetryTimestampMs) / 1000.0).coerceIn(0.2, 5.0)
+            } else {
+                1.5 // Matches XboxBridge 1500ms interval on first sample
+            }
+            lastTelemetryTimestampMs = nowMs
+
             val currentStatus = _status.value
             val isSavingData = currentStatus.effectiveBitrateMbps <= 10
 
-            // Calculate estimated saved MB compared to uncapped 16-20Mbps stream
-            streamSecondsTracked += 2
+            // Calculate estimated saved MB using actual elapsedSeconds compared to uncapped 15Mbps stream
+            streamSecondsTracked += elapsedSeconds
             if (isSavingData && bitrate in 0.1..14.0) {
-                totalDataSavedMegabytes += (15.0 - bitrate).coerceAtLeast(0.0) * (2.0 / 8.0)
+                totalDataSavedMegabytes += (15.0 - bitrate).coerceAtLeast(0.0) * (elapsedSeconds / 8.0)
             }
 
             val newTelemetry = StreamTelemetry(
@@ -298,3 +330,4 @@ object NetworkOptimizer {
         }
     }
 }
+

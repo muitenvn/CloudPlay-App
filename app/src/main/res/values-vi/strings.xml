@@ -51,6 +51,8 @@
     <string name="controller_connected">Đã kết nối</string>
     <string name="controller_disconnected">Chưa kết nối</string>
     <string name="controller_touch">Cảm ứng màn hình</string>
+    <string name="gamepad_none">Không có</string>
+    <string name="gamepad_default_name">Tay cầm Xbox</string>
     <string name="guide_button">Hướng Dẫn</string>
 
     <!-- Featured Games -->

@@ -1,9 +1,6 @@
 package com.example.ui
 
 import android.app.Activity
-import android.net.VpnService
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,6 +47,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,21 +106,10 @@ fun DashboardScreen(
         onDispose { gamepadDetector.release() }
     }
 
-    var currentTab by remember { mutableStateOf(DashboardTab.HOME) }
+    var currentTab by rememberSaveable { mutableStateOf(DashboardTab.HOME) }
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.QUICK_START) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
-
-    val vpnLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            VpnManager.connect(context)
-        } else {
-            VpnManager.setEngine(VpnEngine.SMART_BYPASS)
-            VpnManager.connect(context)
-        }
-    }
 
     fun handleConnect() {
         VpnManager.connect(context)

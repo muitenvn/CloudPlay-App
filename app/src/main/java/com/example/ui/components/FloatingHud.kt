@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -131,9 +132,9 @@ fun FloatingHud(
     onToggleOrientation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var hudMode by remember { mutableStateOf(HudMode.MINIMIZED) }
-    var offsetX by remember { mutableFloatStateOf(16f) }
-    var offsetY by remember { mutableFloatStateOf(48f) }
+    var hudMode by rememberSaveable { mutableStateOf(HudMode.MINIMIZED) }
+    var offsetX by rememberSaveable { mutableFloatStateOf(16f) }
+    var offsetY by rememberSaveable { mutableFloatStateOf(48f) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var showDonateDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -158,6 +159,15 @@ fun FloatingHud(
         val density = androidx.compose.ui.platform.LocalDensity.current
         val maxWidthPx = with(density) { maxWidth.toPx() }
         val maxHeightPx = with(density) { maxHeight.toPx() }
+
+        LaunchedEffect(maxWidthPx, maxHeightPx) {
+            if (maxWidthPx > 0f && maxHeightPx > 0f) {
+                val boundX = (maxWidthPx - 90f).coerceAtLeast(8f)
+                val boundY = (maxHeightPx - 50f).coerceAtLeast(8f)
+                offsetX = offsetX.coerceIn(8f, boundX)
+                offsetY = offsetY.coerceIn(8f, boundY)
+            }
+        }
 
         Surface(
             modifier = Modifier
@@ -506,14 +516,24 @@ fun FloatingHud(
                                 shape = RoundedCornerShape(10.dp),
                                 color = Color(0xFF14221A)
                             ) {
+                                val effectivePing = when {
+                                    telemetry.rttMs > 0 -> telemetry.rttMs
+                                    compactHasValidPing -> compactRawPing
+                                    else -> null
+                                }
+                                val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+                                    if (effectivePing != null) "Direct (${effectivePing}ms)" else "Direct (-- ms)"
+                                } else {
+                                    if (effectivePing != null) "VPN ${vpnState.currentServer.flag} (${effectivePing}ms)" else "VPN ${vpnState.currentServer.flag} (-- ms)"
+                                }
                                 Column(modifier = Modifier.padding(10.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "ĐỘ TRỄ STREAM", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = stringResource(R.string.hud_stream_latency), color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                         Text(
-                                            text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "Direct (~28ms)" else "VPN JP (~135ms)",
+                                            text = latencyDisplayText,
                                             color = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold
@@ -524,9 +544,9 @@ fun FloatingHud(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = "TAY CẦM", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = stringResource(R.string.hud_controller), color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                         Text(
-                                            text = if (physicalControllerConnected) controllerName else if (virtualControllerEnabled) "Tay Cầm Ảo Màn Hình" else "Chưa kết nối",
+                                            text = if (physicalControllerConnected) controllerName else if (virtualControllerEnabled) stringResource(R.string.hud_virtual_gamepad) else stringResource(R.string.controller_disconnected),
                                             color = TextPrimary,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold

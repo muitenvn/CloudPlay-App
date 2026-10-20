@@ -52,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,7 +79,7 @@ import com.example.ui.theme.XboxSurface
 import com.example.vpn.NetworkMode
 import com.example.vpn.VpnManager
 
-private const val EDGE_DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
+private const val EDGE_DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -105,28 +106,36 @@ fun CloudBrowserScreen(
         ctx as? android.app.Activity
     }
 
-    DisposableEffect(activity) {
-        (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
-        onDispose {
-            gamepadDetector.release()
-            com.example.cloudplay.QualityAdapter.setWebView(null)
-            (activity as? com.example.MainActivity)?.let { mainAct ->
-                mainAct.applyImmersiveFullscreen(false)
-                mainAct.resetOrientation()
-            }
-        }
-    }
-
     var webViewInstance by remember { mutableStateOf<WebView?>(null) }
+    var bridgeInstance by remember { mutableStateOf<XboxBridge?>(null) }
     var pageLoadingProgress by remember { mutableFloatStateOf(0f) }
     var isPageLoading by remember { mutableStateOf(true) }
-    var showSettingsDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.ZERO_LAG) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
     var lastXboxUrl by remember { mutableStateOf(initialUrl) }
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
+
+    DisposableEffect(activity) {
+        (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
+        onDispose {
+            gamepadDetector.release()
+            bridgeInstance?.release()
+            bridgeInstance = null
+            streamController.release()
+            com.example.cloudplay.QualityAdapter.setWebView(null)
+            webViewInstance?.apply {
+                stopLoading()
+                destroy()
+            }
+            webViewInstance = null
+            (activity as? com.example.MainActivity)?.let { mainAct ->
+                mainAct.applyImmersiveFullscreen(false)
+                mainAct.resetOrientation()
+            }
+        }
+    }
 
     val returnToGame: () -> Unit = {
         val webView = webViewInstance
@@ -190,6 +199,54 @@ fun CloudBrowserScreen(
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
     val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
     val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
+
+    val effectiveLocale = config.getEffectiveLocale()
+
+    // Dynamically recompute injectionScript whenever server, locale, or graphics/translation settings change
+    val injectionScript = remember(
+        config.clarityBoostEnabled,
+        config.clarityPreset,
+        vpnState.currentServer,
+        effectiveLocale,
+        config.xcloudTranslateEnabled,
+        config.preserveGameTitles,
+        config.bilingualMode,
+        config.hideStreamStatsOverlay,
+        config.cellularMode,
+        config.networkTuningMode,
+        config.wifiSpeedFirstPriority,
+        networkStatus.effectiveBitrateMbps
+    ) {
+        XboxBridge.getInjectionScript(
+            clarityBoost = config.clarityBoostEnabled,
+            clarityPreset = config.clarityPreset.name,
+            targetCountry = vpnState.currentServer.countryCode,
+            targetIp = vpnState.currentServer.ip,
+            userLocale = effectiveLocale,
+            xcloudTranslate = config.xcloudTranslateEnabled,
+            preserveTitles = config.preserveGameTitles,
+            bilingualMode = config.bilingualMode,
+            hideStreamStats = config.hideStreamStatsOverlay,
+            cellularMode = config.cellularMode.id,
+            networkTuningMode = config.networkTuningMode.id,
+            speedFirstPriority = config.wifiSpeedFirstPriority,
+            effectiveBitrateMbps = networkStatus.effectiveBitrateMbps
+        )
+    }
+
+    val currentInjectionScript by rememberUpdatedState(injectionScript)
+
+    // Dynamically update active WebView when user changes server or locale
+    LaunchedEffect(vpnState.currentServer, effectiveLocale) {
+        CookieManager.getInstance().setCookie(
+            "https://www.xbox.com",
+            "MSPC-LOCALE=$effectiveLocale; domain=.xbox.com; path=/"
+        )
+        webViewInstance?.evaluateJavascript(
+            "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: '${vpnState.currentServer.countryCode}', ip: '${vpnState.currentServer.ip}', locale: '$effectiveLocale' });",
+            null
+        )
+    }
 
     LaunchedEffect(config.xcloudTranslateEnabled) {
         webViewInstance?.evaluateJavascript(
@@ -263,8 +320,6 @@ fun CloudBrowserScreen(
                         }
                     }
 
-                    val effectiveLocale = config.getEffectiveLocale()
-
                     CookieManager.getInstance().let { cookieManager ->
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
@@ -274,32 +329,17 @@ fun CloudBrowserScreen(
                     // Add JavaScript bridge for stream / launch detection & smart translation
                     val bridge = XboxBridge(streamController)
                     bridge.setWebView(this)
+                    bridgeInstance = bridge
                     com.example.cloudplay.QualityAdapter.setWebView(this)
                     bridge.updateCurrentUrl(initialUrl)
                     addJavascriptInterface(bridge, "CloudPlayBridge")
-
-                    val injectionScript = XboxBridge.getInjectionScript(
-                        clarityBoost = config.clarityBoostEnabled,
-                        clarityPreset = config.clarityPreset.name,
-                        targetCountry = vpnState.currentServer.countryCode,
-                        targetIp = vpnState.currentServer.ip,
-                        userLocale = effectiveLocale,
-                        xcloudTranslate = config.xcloudTranslateEnabled,
-                        preserveTitles = config.preserveGameTitles,
-                        bilingualMode = config.bilingualMode,
-                        hideStreamStats = config.hideStreamStatsOverlay,
-                        cellularMode = config.cellularMode.id,
-                        networkTuningMode = config.networkTuningMode.id,
-                        speedFirstPriority = config.wifiSpeedFirstPriority,
-                        effectiveBitrateMbps = networkStatus.effectiveBitrateMbps
-                    )
 
                     // Inject document start script exclusively on authorized Xbox & Microsoft domains
                     if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
                         try {
                             androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
                                 this,
-                                injectionScript,
+                                currentInjectionScript,
                                 setOf("https://www.xbox.com", "https://xbox.com", "https://login.live.com", "https://login.microsoftonline.com")
                             )
                         } catch (e: Exception) {
@@ -315,15 +355,15 @@ fun CloudBrowserScreen(
                                 streamController.onUrlChanged(it)
                                 handleMainFrameNavigation(it)
                             }
-                            // Early injection to intercept Xbox login and region check
+                            // Early injection to intercept Xbox login and region check using latest dynamic script
                             if (XboxBridge.isTrustedHost(url)) {
-                                view?.evaluateJavascript(injectionScript, null)
+                                view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
 
                         override fun onPageCommitVisible(view: WebView?, url: String?) {
                             if (XboxBridge.isTrustedHost(url)) {
-                                view?.evaluateJavascript(injectionScript, null)
+                                view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
 
@@ -335,7 +375,7 @@ fun CloudBrowserScreen(
                             }
                             if (XboxBridge.isTrustedHost(url)) {
                                 // Re-apply hooks for dynamic single-page-app transitions
-                                view?.evaluateJavascript(injectionScript, null)
+                                view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
 
@@ -366,8 +406,8 @@ fun CloudBrowserScreen(
                     webChromeClient = object : WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
                             pageLoadingProgress = newProgress / 100f
-                            if (newProgress in 25..80) {
-                                view?.evaluateJavascript(injectionScript, null)
+                            if (newProgress in 25..80 && XboxBridge.isTrustedHost(view?.url)) {
+                                view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
 
@@ -409,7 +449,7 @@ fun CloudBrowserScreen(
             com.example.data.GameOptimizationRepository.getProfileForUrl(initialUrl)
         }
 
-        // Dedicated Game Loading Screen (Optimized for Fortnite & Xbox Cloud with Jet Cruise Animation)
+        // Dedicated Game Loading Screen (Optimized for Portrait & Landscape)
         com.example.ui.components.InGameLoadingOverlay(
             isLoading = isPageLoading && pageLoadingProgress < 0.92f,
             progress = pageLoadingProgress,
@@ -557,7 +597,10 @@ fun CloudBrowserScreen(
             onToggleVirtualController = {
                 SettingsRepository.updateShowVirtualController(!config.showVirtualController)
             },
-            onOpenSettings = { showSettingsDialog = true },
+            onOpenSettings = {
+                guideInitialSection = com.example.ui.components.GuideSection.ZERO_LAG
+                showGuideDialog = true
+            },
             onNavigateHome = onNavigateBackToDashboard,
             onReloadPage = { webViewInstance?.reload() },
             onToggleClarityBoost = { enabled ->
@@ -606,19 +649,6 @@ fun CloudBrowserScreen(
             }
         )
 
-        // Settings Dialog
-        if (showSettingsDialog) {
-            SettingsDialog(
-                onDismiss = { showSettingsDialog = false },
-                onClearCookies = {
-                    CookieManager.getInstance().removeAllCookies(null)
-                    webViewInstance?.clearCache(true)
-                    webViewInstance?.reload()
-                    showSettingsDialog = false
-                }
-            )
-        }
-
         // How To Use Guide Dialog
         if (showGuideDialog) {
             com.example.ui.components.HowToUseGuideDialog(
@@ -638,3 +668,4 @@ fun CloudBrowserScreen(
         }
     }
 }
+

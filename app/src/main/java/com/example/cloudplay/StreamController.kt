@@ -11,6 +11,8 @@ import com.example.vpn.VpnManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,11 +40,25 @@ enum class BannerType {
 
 class StreamController(private val context: Context) {
 
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private var scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val _uiState = MutableStateFlow(StreamUiState())
     val uiState: StateFlow<StreamUiState> = _uiState.asStateFlow()
 
     private var countdownJob: Job? = null
+
+    /**
+     * Cancels active coroutines when WebView or Activity is destroyed to prevent memory leaks.
+     */
+    fun release() {
+        countdownJob?.cancel()
+        countdownJob = null
+        scope.cancel()
+        scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    }
+
+    fun cancel() {
+        release()
+    }
 
     fun onGameLaunchInitiated(title: String) {
         _uiState.value = _uiState.value.copy(
@@ -189,3 +205,4 @@ class StreamController(private val context: Context) {
         }
     }
 }
+

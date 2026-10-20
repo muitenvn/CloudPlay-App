@@ -51,6 +51,8 @@
     <string name="controller_connected">Connected</string>
     <string name="controller_disconnected">Disconnected</string>
     <string name="controller_touch">Screen Touch</string>
+    <string name="gamepad_none">None</string>
+    <string name="gamepad_default_name">Xbox Wireless Controller</string>
     <string name="guide_button">User Guide</string>
 
     <!-- Featured Games -->

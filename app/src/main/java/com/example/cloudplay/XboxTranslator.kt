@@ -583,24 +583,17 @@ object XboxTranslator {
                     return modified ? s : null;
                 }
 
-                // Dynamic cache and pending callbacks for Google Translate
+                // Dynamic cache and pending callbacks for Google Translate (Single & Batch)
                 const DYNAMIC_CACHE = Object.create(null);
                 const pendingCallbacks = Object.create(null);
+                const pendingBatchCallbacks = Object.create(null);
+                let queuedBatchMap = Object.create(null);
                 let callbackSeq = 0;
+                let batchSeq = 0;
 
-                window.__onSmartTranslateResult = function(callbackId, translatedText) {
-                    if (!translatedText) return;
-                    const entry = pendingCallbacks[callbackId];
-                    if (!entry) return;
-                    delete pendingCallbacks[callbackId];
-
-                    const node = entry.node;
-                    const orig = entry.orig;
-                    if (!node || !node.parentElement) return;
-
+                function applyTranslationToNode(node, orig, translatedText) {
+                    if (!node || !node.parentElement || !translatedText) return;
                     const clean = orig.trim();
-                    DYNAMIC_CACHE[clean] = translatedText;
-
                     if (node._xcloudOrig === undefined) {
                         node._xcloudOrig = orig;
                     }
@@ -611,8 +604,67 @@ object XboxTranslator {
                     }
                     delete node._cpPending;
                     translatedCount++;
+                }
+
+                window.__onSmartTranslateResult = function(callbackId, translatedText) {
+                    if (!translatedText) return;
+                    const entry = pendingCallbacks[callbackId];
+                    if (!entry) return;
+                    delete pendingCallbacks[callbackId];
+
+                    const clean = entry.orig.trim();
+                    DYNAMIC_CACHE[clean] = translatedText;
+                    applyTranslationToNode(entry.node, entry.orig, translatedText);
                     reportStatus();
                 };
+
+                window.__onBatchTranslateResult = function(batchId, resultMap) {
+                    const batchEntries = pendingBatchCallbacks[batchId];
+                    if (!batchEntries) return;
+                    delete pendingBatchCallbacks[batchId];
+                    if (!resultMap || typeof resultMap !== 'object') return;
+
+                    for (const trimmed in batchEntries) {
+                        const translatedText = resultMap[trimmed];
+                        const entries = batchEntries[trimmed];
+                        if (translatedText && entries && entries.length) {
+                            DYNAMIC_CACHE[trimmed] = translatedText;
+                            for (let i = 0; i < entries.length; i++) {
+                                applyTranslationToNode(entries[i].node, entries[i].orig, translatedText);
+                            }
+                        } else if (entries && entries.length) {
+                            for (let i = 0; i < entries.length; i++) {
+                                delete entries[i].node._cpPending;
+                            }
+                        }
+                    }
+                    reportStatus();
+                };
+
+                function flushTranslationBatch() {
+                    const texts = Object.keys(queuedBatchMap);
+                    if (texts.length === 0) return;
+
+                    const currentMap = queuedBatchMap;
+                    queuedBatchMap = Object.create(null);
+
+                    const batchId = 'batch_' + (++batchSeq);
+                    pendingBatchCallbacks[batchId] = currentMap;
+
+                    if (window.CloudPlayBridge && window.CloudPlayBridge.requestBatchTranslate) {
+                        window.CloudPlayBridge.requestBatchTranslate(JSON.stringify(texts), batchId, isBilingual);
+                    } else if (window.CloudPlayBridge && window.CloudPlayBridge.requestSmartTranslate) {
+                        for (let i = 0; i < texts.length; i++) {
+                            const t = texts[i];
+                            const entries = currentMap[t];
+                            if (entries && entries.length > 0) {
+                                const callId = 'cb_' + (++callbackSeq);
+                                pendingCallbacks[callId] = entries[0];
+                                window.CloudPlayBridge.requestSmartTranslate(t, callId, isBilingual);
+                            }
+                        }
+                    }
+                }
 
                 function processTextNode(node) {
                     if (!isTranslationEnabled) return;
@@ -655,24 +707,21 @@ object XboxTranslator {
                         return;
                     }
 
-                    // 3. Smart Google Translate: Translates descriptions, guides, reviews, synopsis
-                    // Intelligently avoids numbers, single punctuation, codes, URLs
+                    // 3. Queue into batch for CloudPlayBridge.requestBatchTranslate
                     if (trimmed.length >= 4 && !node._cpPending) {
                         if (/^[\d\s\.,:\-_/\\#\$%&*()+=\[\]{}|<>?!@~`^;'"0-9]+$/.test(trimmed)) return;
                         if (/^(https?:\/\/|www\.)/i.test(trimmed)) return;
 
                         node._cpPending = true;
-                        const callId = 'cb_' + (++callbackSeq);
-                        pendingCallbacks[callId] = { node: node, orig: original };
-
-                        if (window.CloudPlayBridge && window.CloudPlayBridge.requestSmartTranslate) {
-                            window.CloudPlayBridge.requestSmartTranslate(trimmed, callId, isBilingual);
+                        if (!queuedBatchMap[trimmed]) {
+                            queuedBatchMap[trimmed] = [];
                         }
+                        queuedBatchMap[trimmed].push({ node: node, orig: original });
                     }
                 }
 
                 // Fast Native TreeWalker Pass
-                function runTreeWalkerPass(root) {
+                function runTreeWalkerPass(root, deferFlush) {
                     if (!root || !isTranslationEnabled) return;
                     try {
                         const walker = document.createTreeWalker(
@@ -696,6 +745,9 @@ object XboxTranslator {
                             currentNode = walker.nextNode();
                         }
                     } catch(e) {}
+                    if (!deferFlush) {
+                        flushTranslationBatch();
+                    }
                     reportStatus();
                 }
 
@@ -733,7 +785,7 @@ object XboxTranslator {
                     isTranslationEnabled = !!enabled;
                     if (isTranslationEnabled) {
                         translatedCount = 0;
-                        runTreeWalkerPass(document.body);
+                        runTreeWalkerPass(document.body, false);
                     } else {
                         revertAllTextNodes(document.body);
                         translatedCount = 0;
@@ -743,7 +795,7 @@ object XboxTranslator {
 
                 window.__forceTranslateEntirePage = function() {
                     isTranslationEnabled = true;
-                    runTreeWalkerPass(document.body);
+                    runTreeWalkerPass(document.body, false);
                     reportStatus();
                 };
 
@@ -756,7 +808,7 @@ object XboxTranslator {
                         updateStatsScrubber(hideStreamStats);
                     }
                     if (isTranslationEnabled) {
-                        runTreeWalkerPass(document.body);
+                        runTreeWalkerPass(document.body, false);
                     }
                 };
 
@@ -765,7 +817,7 @@ object XboxTranslator {
                     updateStatsScrubber(hideStreamStats);
                 };
 
-                // Batched MutationObserver via requestAnimationFrame
+                // Batched MutationObserver via requestAnimationFrame -> single requestBatchTranslate call
                 let pendingNodes = new Set();
                 let rafId = null;
 
@@ -779,10 +831,12 @@ object XboxTranslator {
                         if (node.nodeType === 3) {
                             processTextNode(node);
                         } else if (node.nodeType === 1) {
-                            runTreeWalkerPass(node);
+                            runTreeWalkerPass(node, true);
                         }
                     });
                     pendingNodes.clear();
+                    flushTranslationBatch();
+                    reportStatus();
                 }
 
                 const observer = new MutationObserver(function(mutations) {
@@ -813,7 +867,7 @@ object XboxTranslator {
                             subtree: true,
                             characterData: true
                         });
-                        runTreeWalkerPass(target);
+                        runTreeWalkerPass(target, false);
                     } else {
                         document.addEventListener('DOMContentLoaded', function() {
                             observer.observe(document.body, {
@@ -821,14 +875,14 @@ object XboxTranslator {
                                 subtree: true,
                                 characterData: true
                             });
-                            runTreeWalkerPass(document.body);
+                            runTreeWalkerPass(document.body, false);
                         });
                     }
                 }
 
                 start();
-                setTimeout(() => runTreeWalkerPass(document.body), 800);
-                setTimeout(() => runTreeWalkerPass(document.body), 2500);
+                setTimeout(() => runTreeWalkerPass(document.body, false), 800);
+                setTimeout(() => runTreeWalkerPass(document.body, false), 2500);
             })();
         """.trimIndent()
     }

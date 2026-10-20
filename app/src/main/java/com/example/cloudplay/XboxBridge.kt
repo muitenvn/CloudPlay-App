@@ -5,7 +5,8 @@ import android.webkit.JavascriptInterface
 import com.example.vpn.VpnManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +24,7 @@ class XboxBridge(
     private val controller: StreamController,
     private var webViewRef: WeakReference<android.webkit.WebView>? = null
 ) {
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     @Volatile
     private var currentNavigatedUrl: String? = null
@@ -36,6 +37,19 @@ class XboxBridge(
         if (!url.isNullOrBlank()) {
             currentNavigatedUrl = url
         }
+    }
+
+    /**
+     * Cancels the CoroutineScope and clears WebView reference when WebView or Activity is destroyed.
+     */
+    fun release() {
+        webViewRef?.clear()
+        webViewRef = null
+        scope.cancel()
+    }
+
+    fun cancel() {
+        release()
     }
 
     companion object {
@@ -127,6 +141,7 @@ class XboxBridge(
             return """
                 (function() {
                     if (window.__cloudPlayInjected) {
+                        if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale" });
                         if (window.__toggleClarityBoost) window.__toggleClarityBoost($clarityBoost);
                         if (window.__setClarityPreset) window.__setClarityPreset("$clarityPreset");
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
@@ -182,9 +197,21 @@ class XboxBridge(
                         }
                     }
 
-                    const targetCountry = "$targetCountry";
-                    const bypassIp = "$targetIp";
-                    const preferredLocale = "$userLocale";
+                    let targetCountry = "$targetCountry";
+                    let bypassIp = "$targetIp";
+                    let preferredLocale = "$userLocale";
+
+                    window.__updateRegionAndLocale = function(conf) {
+                        if (!conf) return;
+                        if (conf.country) targetCountry = conf.country;
+                        if (conf.ip) bypassIp = conf.ip;
+                        if (conf.locale) {
+                            preferredLocale = conf.locale;
+                            try {
+                                document.cookie = "MSPC-LOCALE=" + preferredLocale + ";domain=.xbox.com;path=/;max-age=31536000";
+                            } catch(e) {}
+                        }
+                    };
 
                     // Set locale cookie to enforce user's selected language
                     try {
@@ -341,6 +368,10 @@ class XboxBridge(
                         if (OrigPeerConnection) {
                             window.RTCPeerConnection = function(...args) {
                                 const pc = new OrigPeerConnection(...args);
+                                if (window.__activeStatsIntervalId) {
+                                    clearInterval(window.__activeStatsIntervalId);
+                                    window.__activeStatsIntervalId = null;
+                                }
                                 window.__activePeerConnection = pc;
 
                                 // SDP Munging optimized for Android Hardware MediaCodec Decoder (Better-xCloud method)
@@ -367,11 +398,11 @@ class XboxBridge(
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;x-google-max-bitrate=9000;x-google-min-bitrate=4000;x-google-start-bitrate=7000\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=64000\r\n');
                                             } else if (isHigh) {
-                                                // MỨC CAO (SẮC NÉT 1080P): 14 Mbps chuẩn Full HD 60fps
+                                                // MỨC CAO (SẮC NÉT 1080P): 14 Mbps chuẩn Full HD 60/120fps
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=14000;x-google-min-bitrate=5000;x-google-start-bitrate=10000\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=96000\r\n');
                                             } else {
-                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA): 20 Mbps max visual quality
+                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA): 20 Mbps max visual quality (hỗ trợ 120 FPS)
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=20000;x-google-min-bitrate=8000;x-google-start-bitrate=14000\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n');
                                             }
@@ -381,8 +412,7 @@ class XboxBridge(
                                     return origSetRemote(desc);
                                 };
 
-                                // Hardware Decoder Stabilization: Adaptive ~18ms jitter buffer (1 frame at 60fps)
-                                // Allows Android MediaCodec to decode frames smoothly without dropped packets or decode delay warnings
+                                // Hardware Decoder Stabilization: Adaptive ~18ms jitter buffer
                                 pc.addEventListener('track', function(evt) {
                                     try {
                                         if (evt.receiver) {
@@ -396,28 +426,58 @@ class XboxBridge(
                                     } catch(trackErr) {}
                                 });
 
+                                let statsIntervalId = null;
+                                function stopStatsPolling() {
+                                    if (statsIntervalId !== null) {
+                                        clearInterval(statsIntervalId);
+                                        if (window.__activeStatsIntervalId === statsIntervalId) {
+                                            window.__activeStatsIntervalId = null;
+                                        }
+                                        statsIntervalId = null;
+                                    }
+                                }
+
                                 pc.addEventListener('iceconnectionstatechange', function() {
-                                    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                                    const state = pc.iceConnectionState;
+                                    if (state === 'connected' || state === 'completed') {
                                         notify('onStreamConnected', 'ice_connected');
-                                    } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') {
+                                    } else if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+                                        stopStatsPolling();
                                         notify('onStreamDisconnected', 'ice_closed');
                                     }
                                 });
                                 pc.addEventListener('connectionstatechange', function() {
-                                    if (pc.connectionState === 'connected') {
+                                    const state = pc.connectionState;
+                                    if (state === 'connected') {
                                         notify('onStreamConnected', 'pc_connected');
+                                    } else if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+                                        stopStatsPolling();
+                                        notify('onStreamDisconnected', 'pc_closed');
                                     }
                                 });
 
-                                // WebRTC getStats() Real-Time Telemetry Extractor (Real decodeTimeMs, No fake fallback 14.2)
+                                const origClose = pc.close ? pc.close.bind(pc) : null;
+                                if (origClose) {
+                                    pc.close = function() {
+                                        stopStatsPolling();
+                                        return origClose();
+                                    };
+                                }
+
+                                // WebRTC getStats() Real-Time Telemetry Extractor (Real decodeTimeMs, supports up to 120 FPS)
                                 let lastBytes = 0;
                                 let lastTimestamp = Date.now();
                                 let lastFrames = 0;
                                 let lastTotalDecodeTime = 0;
                                 let lastFramesDecodedForDecode = 0;
 
-                                setInterval(async function() {
-                                    if (pc.connectionState !== 'connected' && pc.iceConnectionState !== 'connected') return;
+                                statsIntervalId = setInterval(async function() {
+                                    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
+                                        pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed') {
+                                        stopStatsPolling();
+                                        return;
+                                    }
+                                    if (pc.connectionState !== 'connected' && pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') return;
                                     try {
                                         const stats = await pc.getStats();
                                         let currentBytes = 0;
@@ -428,6 +488,7 @@ class XboxBridge(
                                         let framesDecoded = 0;
                                         let framesDropped = 0;
                                         let currentTotalDecodeTime = 0;
+                                        let nativeFps = 0;
 
                                         stats.forEach(report => {
                                             if (report.type === 'inbound-rtp' && report.kind === 'video') {
@@ -439,6 +500,9 @@ class XboxBridge(
                                                 }
                                                 framesDecoded = report.framesDecoded || framesDecoded;
                                                 framesDropped = report.framesDropped || framesDropped;
+                                                if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
+                                                    nativeFps = Math.round(report.framesPerSecond);
+                                                }
                                                 if (report.totalDecodeTime !== undefined) {
                                                     currentTotalDecodeTime = report.totalDecodeTime;
                                                 }
@@ -458,13 +522,14 @@ class XboxBridge(
                                         const now = Date.now();
                                         const timeDiff = (now - lastTimestamp) / 1000;
                                         let bitrateMbps = 0.0;
-                                        let fps = 0;
+                                        let fps = nativeFps;
                                         if (timeDiff > 0 && lastBytes > 0 && currentBytes >= lastBytes) {
                                             bitrateMbps = parseFloat((((currentBytes - lastBytes) * 8) / (timeDiff * 1000000)).toFixed(2));
-                                            if (lastFrames > 0 && framesDecoded >= lastFrames) {
+                                            if (fps <= 0 && lastFrames > 0 && framesDecoded >= lastFrames) {
                                                 fps = Math.round((framesDecoded - lastFrames) / timeDiff);
-                                                if (fps > 120) fps = 60;
                                             }
+                                            // Clamp up to 120 FPS (Fortnite & Xbox Series X 120FPS cloud streams)
+                                            if (fps > 120) fps = 120;
                                         }
                                         lastBytes = currentBytes;
                                         lastTimestamp = now;
@@ -497,6 +562,7 @@ class XboxBridge(
                                         }));
                                     } catch(err) {}
                                 }, 1500);
+                                window.__activeStatsIntervalId = statsIntervalId;
 
                                 return pc;
                             };
@@ -507,11 +573,12 @@ class XboxBridge(
                     }
 
                     // ==========================================
-                    // 5. Monitor DOM & URL for Launch State & Stream Active
+                    // 5. Event-Driven SPA Navigation & Video Media Stream Detection
                     // ==========================================
                     let lastUrl = location.href;
                     let notifiedStreamConnection = false;
-                    setInterval(function() {
+
+                    function handleNavigationChange() {
                         if (location.href !== lastUrl) {
                             lastUrl = location.href;
                             notify('onUrlChanged', location.href);
@@ -521,8 +588,53 @@ class XboxBridge(
                                 notifiedStreamConnection = false;
                             }
                         }
+                    }
 
-                        // Also monitor active video stream element as secondary trigger
+                    // Hook History API (pushState / replaceState) + popstate / hashchange for zero-overhead SPA tracking
+                    try {
+                        const origPushState = history.pushState;
+                        const origReplaceState = history.replaceState;
+                        if (origPushState) {
+                            history.pushState = function() {
+                                const ret = origPushState.apply(this, arguments);
+                                handleNavigationChange();
+                                return ret;
+                            };
+                        }
+                        if (origReplaceState) {
+                            history.replaceState = function() {
+                                const ret = origReplaceState.apply(this, arguments);
+                                handleNavigationChange();
+                                return ret;
+                            };
+                        }
+                        window.addEventListener('popstate', handleNavigationChange);
+                        window.addEventListener('hashchange', handleNavigationChange);
+                    } catch(e) {}
+
+                    // Listen for video media events (playing / loadeddata) in capture phase
+                    function handleVideoMediaEvent(e) {
+                        const target = e ? e.target : null;
+                        if (target && target.tagName === 'VIDEO' && location.href.indexOf('/play/launch/') !== -1 && !notifiedStreamConnection) {
+                            if ((target.currentTime > 0 || target.readyState >= 3) && !target.paused) {
+                                notifiedStreamConnection = true;
+                                notify('onStreamConnected', 'video_active');
+                            }
+                        }
+                    }
+                    document.addEventListener('playing', handleVideoMediaEvent, true);
+                    document.addEventListener('loadeddata', handleVideoMediaEvent, true);
+                    document.addEventListener('ended', function(e) {
+                        const target = e ? e.target : null;
+                        if (target && target.tagName === 'VIDEO' && notifiedStreamConnection) {
+                            notifiedStreamConnection = false;
+                            notify('onStreamDisconnected', 'video_ended');
+                        }
+                    }, true);
+
+                    // Lightweight fallback check (2500ms) for edge cases where video mounts silently
+                    setInterval(function() {
+                        handleNavigationChange();
                         if (location.href.indexOf('/play/launch/') !== -1 && !notifiedStreamConnection) {
                             const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
                             if (video && (video.currentTime > 0 || video.readyState >= 3) && !video.paused) {
@@ -530,7 +642,7 @@ class XboxBridge(
                                 notify('onStreamConnected', 'video_active');
                             }
                         }
-                    }, 800);
+                    }, 2500);
 
                     document.addEventListener('click', function(e) {
                         const target = e.target;
@@ -752,10 +864,11 @@ class XboxBridge(
                 for (i in 0 until array.length()) {
                     list.add(array.getString(i))
                 }
+                // Use controlled parallel batch translation instead of sequential loop
+                val translatedMap = GoogleGamingTranslator.translateBatch(list, "vi", isBilingual)
                 val resultMap = org.json.JSONObject()
-                for (item in list) {
-                    val translated = GoogleGamingTranslator.translate(item, "vi", isBilingual)
-                    resultMap.put(item, translated)
+                for ((orig, translated) in translatedMap) {
+                    resultMap.put(orig, translated)
                 }
                 withContext(Dispatchers.Main) {
                     webViewRef?.get()?.evaluateJavascript(
@@ -775,4 +888,5 @@ class XboxBridge(
         Log.d("XboxBridgeJS", msg ?: "")
     }
 }
+
 

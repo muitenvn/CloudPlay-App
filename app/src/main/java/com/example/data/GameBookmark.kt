@@ -1,9 +1,13 @@
 package com.example.data
 
+import android.content.Context
+import android.content.SharedPreferences
 import com.example.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 
 enum class GameFilterTab {
     ALL,
@@ -53,12 +57,12 @@ val INITIAL_XBOX_GAMES = listOf(
     GameBookmark(
         id = "fortnite",
         title = "Fortnite",
-        category = "Sinh tồn / Battle Royale",
+        category = "Sinh tồn / Battle Royale (Hỗ trợ 120FPS)",
         playUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2",
         freeToPlay = true,
         supportsTouch = true,
         accentColorHex = 0xFF0074E4,
-        badge = "Tối Ưu Riêng • Free 100%",
+        badge = "Hỗ Trợ 120FPS • Free 100%",
         drawableResId = R.drawable.fortnite_cloud_poster_1791719536404,
         rating = "4.9"
     ),
@@ -132,8 +136,78 @@ val INITIAL_XBOX_GAMES = listOf(
 )
 
 object GameLibraryRepository {
+    private const val PREFS_NAME = "cloudplay_custom_games_prefs"
+    private const val KEY_CUSTOM_GAMES_JSON = "custom_games_json"
+
+    private var prefs: SharedPreferences? = null
+
     private val _games = MutableStateFlow(INITIAL_XBOX_GAMES)
     val games: StateFlow<List<GameBookmark>> = _games.asStateFlow()
+
+    /**
+     * Initializes persistent storage for custom user-added games via SharedPreferences.
+     */
+    fun init(context: Context) {
+        if (prefs != null) return
+        val sharedPrefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs = sharedPrefs
+        loadCustomGames(sharedPrefs)
+    }
+
+    private fun loadCustomGames(sharedPrefs: SharedPreferences) {
+        try {
+            val rawJson = sharedPrefs.getString(KEY_CUSTOM_GAMES_JSON, null) ?: return
+            val arr = JSONArray(rawJson)
+            val customList = mutableListOf<GameBookmark>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val title = obj.optString("title", "").trim()
+                val playUrl = obj.optString("playUrl", "").trim()
+                if (title.isBlank() || playUrl.isBlank()) continue
+                customList.add(
+                    GameBookmark(
+                        id = obj.optString("id", "custom_$i"),
+                        title = title,
+                        category = obj.optString("category", "Game tùy chỉnh"),
+                        playUrl = playUrl,
+                        freeToPlay = obj.optBoolean("freeToPlay", false),
+                        supportsTouch = obj.optBoolean("supportsTouch", true),
+                        accentColorHex = obj.optLong("accentColorHex", 0xFF00E676),
+                        badge = obj.optString("badge", "Tự thêm"),
+                        rating = obj.optString("rating", "5.0")
+                    )
+                )
+            }
+            if (customList.isNotEmpty()) {
+                _games.value = customList + INITIAL_XBOX_GAMES
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun saveCustomGames(allGames: List<GameBookmark>) {
+        val sharedPrefs = prefs ?: return
+        try {
+            val customGames = allGames.filter { it.id.startsWith("custom_") }
+            val arr = JSONArray()
+            for (game in customGames) {
+                val obj = JSONObject().apply {
+                    put("id", game.id)
+                    put("title", game.title)
+                    put("category", game.category)
+                    put("playUrl", game.playUrl)
+                    put("freeToPlay", game.freeToPlay)
+                    put("supportsTouch", game.supportsTouch)
+                    put("accentColorHex", game.accentColorHex)
+                    put("badge", game.badge ?: "Tự thêm")
+                    put("rating", game.rating)
+                }
+                arr.put(obj)
+            }
+            sharedPrefs.edit().putString(KEY_CUSTOM_GAMES_JSON, arr.toString()).apply()
+        } catch (_: Exception) {
+        }
+    }
 
     fun addCustomGame(title: String, url: String) {
         if (title.isBlank() || url.isBlank()) return
@@ -148,6 +222,9 @@ object GameLibraryRepository {
             badge = "Tự thêm",
             rating = "5.0"
         )
-        _games.value = listOf(newGame) + _games.value
+        val updated = listOf(newGame) + _games.value
+        _games.value = updated
+        saveCustomGames(updated)
     }
 }
+

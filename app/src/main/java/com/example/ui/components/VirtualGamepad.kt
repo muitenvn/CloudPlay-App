@@ -69,31 +69,19 @@ fun VirtualGamepadOverlay(
 
     fun sendButtonEvent(buttonIndex: Int, pressed: Boolean) {
         if (pressed) vibrate()
-        val script = """
-            (function() {
-                if (window.dispatchEvent) {
-                    const event = new CustomEvent('virtual_gamepad_button', {
-                        detail: { index: $buttonIndex, pressed: $pressed }
-                    });
-                    window.dispatchEvent(event);
-                }
-            })();
-        """.trimIndent()
-        webView?.evaluateJavascript(script, null)
+        webView?.evaluateJavascript(
+            "window.dispatchEvent&&window.dispatchEvent(new CustomEvent('virtual_gamepad_button',{detail:{index:$buttonIndex,pressed:$pressed}}));",
+            null
+        )
     }
 
-    fun sendAxisEvent(axisIndex: Int, value: Float) {
-        val script = """
-            (function() {
-                if (window.dispatchEvent) {
-                    const event = new CustomEvent('virtual_gamepad_axis', {
-                        detail: { axis: $axisIndex, value: $value }
-                    });
-                    window.dispatchEvent(event);
-                }
-            })();
-        """.trimIndent()
-        webView?.evaluateJavascript(script, null)
+    fun sendStickAxesPair(xAxisIndex: Int, xVal: Float, yAxisIndex: Int, yVal: Float) {
+        val rx = (xVal * 100f).roundToInt() / 100f
+        val ry = (yVal * 100f).roundToInt() / 100f
+        webView?.evaluateJavascript(
+            "window.dispatchEvent&&window.dispatchEvent(new CustomEvent('virtual_gamepad_axes_pair',{detail:{xAxis:$xAxisIndex,xVal:$rx,yAxis:$yAxisIndex,yVal:$ry}}));",
+            null
+        )
     }
 
     Box(
@@ -144,8 +132,7 @@ fun VirtualGamepadOverlay(
                 opacity = opacity,
                 label = "L",
                 onMove = { x, y ->
-                    sendAxisEvent(0, x)
-                    sendAxisEvent(1, y)
+                    sendStickAxesPair(0, x, 1, y)
                 }
             )
 
@@ -167,8 +154,7 @@ fun VirtualGamepadOverlay(
                 opacity = opacity * 0.9f,
                 label = "R",
                 onMove = { x, y ->
-                    sendAxisEvent(2, x)
-                    sendAxisEvent(3, y)
+                    sendStickAxesPair(2, x, 3, y)
                 }
             )
 
@@ -187,6 +173,8 @@ private fun VirtualAnalogStick(
 ) {
     var stickX by remember { mutableFloatStateOf(0f) }
     var stickY by remember { mutableFloatStateOf(0f) }
+    var lastSentX by remember { mutableFloatStateOf(0f) }
+    var lastSentY by remember { mutableFloatStateOf(0f) }
     val maxRadius = 55f
 
     Box(
@@ -200,11 +188,15 @@ private fun VirtualAnalogStick(
                     onDragEnd = {
                         stickX = 0f
                         stickY = 0f
+                        lastSentX = 0f
+                        lastSentY = 0f
                         onMove(0f, 0f)
                     },
                     onDragCancel = {
                         stickX = 0f
                         stickY = 0f
+                        lastSentX = 0f
+                        lastSentY = 0f
                         onMove(0f, 0f)
                     },
                     onDrag = { change, dragAmount ->
@@ -219,7 +211,13 @@ private fun VirtualAnalogStick(
                             stickX = (newX / dist) * maxRadius
                             stickY = (newY / dist) * maxRadius
                         }
-                        onMove(stickX / maxRadius, stickY / maxRadius)
+                        val normX = stickX / maxRadius
+                        val normY = stickY / maxRadius
+                        if (kotlin.math.abs(normX - lastSentX) >= 0.015f || kotlin.math.abs(normY - lastSentY) >= 0.015f) {
+                            lastSentX = normX
+                            lastSentY = normY
+                            onMove(normX, normY)
+                        }
                     }
                 )
             },

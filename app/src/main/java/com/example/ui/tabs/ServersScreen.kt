@@ -696,7 +696,7 @@ private fun ServerCard(
                     }
 
                     Text(
-                        text = "${server.description} • ${server.ip}",
+                        text = "${server.localizedDescription(isEn)} • ${server.ip}",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,
@@ -785,7 +785,7 @@ private fun ServerCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Xóa proxy tùy chỉnh",
+                            contentDescription = if (isEn) "Delete custom proxy" else "Xóa proxy tùy chỉnh",
                             tint = JapanRed,
                             modifier = Modifier.size(20.dp)
                         )
@@ -801,12 +801,14 @@ private fun CustomProxyDialog(
     onDismiss: () -> Unit,
     onAddServer: (ServerLocation) -> Unit
 ) {
-    var name by remember { mutableStateOf("Proxy Cá Nhân") }
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    var name by remember { mutableStateOf(if (isEn) "Personal Proxy" else "Proxy Cá Nhân") }
     var host by remember { mutableStateOf("") }
     var port by remember { mutableStateOf("8080") }
     var protocol by remember { mutableStateOf("http") }
     var countryCode by remember { mutableStateOf("JP") }
-    var description by remember { mutableStateOf("Proxy cá nhân") }
+    var description by remember { mutableStateOf(if (isEn) "Custom proxy" else "Proxy cá nhân") }
     var speedMbps by remember { mutableStateOf("250") }
     var azureEndpoint by remember { mutableStateOf("japaneast.cloudapp.azure.com") }
     var testResult by remember { mutableStateOf<String?>(null) }
@@ -817,7 +819,7 @@ private fun CustomProxyDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "Thêm Proxy Tùy Chỉnh",
+                if (isEn) "Add Custom Proxy" else "Thêm Proxy Tùy Chỉnh",
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold
@@ -830,7 +832,11 @@ private fun CustomProxyDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)",
+                    text = if (isEn) {
+                        "Enter your custom SOCKS5 or HTTP proxy details (Cloudflare WARP, private VPS, v2ray...)"
+                    } else {
+                        "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)"
+                    },
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
@@ -838,7 +844,7 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Tên gợi nhớ") },
+                    label = { Text(if (isEn) "Display Name" else "Tên gợi nhớ") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -850,8 +856,8 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = host,
                     onValueChange = { host = it },
-                    label = { Text("Địa chỉ IP hoặc Hostname") },
-                    placeholder = { Text("vd: 127.0.0.1 hoặc 138.199.21.239") },
+                    label = { Text(if (isEn) "IP Address or Hostname" else "Địa chỉ IP hoặc Hostname") },
+                    placeholder = { Text(if (isEn) "e.g., 127.0.0.1 or 138.199.21.239" else "vd: 127.0.0.1 hoặc 138.199.21.239") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -864,7 +870,7 @@ private fun CustomProxyDialog(
                     OutlinedTextField(
                         value = port,
                         onValueChange = { port = it },
-                        label = { Text("Cổng (Port)") },
+                        label = { Text(if (isEn) "Port" else "Cổng (Port)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -876,7 +882,7 @@ private fun CustomProxyDialog(
                     OutlinedTextField(
                         value = protocol,
                         onValueChange = { protocol = it.lowercase() },
-                        label = { Text("Giao thức (http/socks5)") },
+                        label = { Text(if (isEn) "Protocol (http/socks5)" else "Giao thức (http/socks5)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -889,7 +895,7 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Ghi chú mô tả") },
+                    label = { Text(if (isEn) "Description / Notes" else "Ghi chú mô tả") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -902,7 +908,7 @@ private fun CustomProxyDialog(
                     OutlinedTextField(
                         value = speedMbps,
                         onValueChange = { speedMbps = it },
-                        label = { Text("Tốc độ (Mbps)") },
+                        label = { Text(if (isEn) "Speed (Mbps)" else "Tốc độ (Mbps)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -914,7 +920,7 @@ private fun CustomProxyDialog(
                     OutlinedTextField(
                         value = countryCode,
                         onValueChange = { countryCode = it.uppercase() },
-                        label = { Text("Quốc gia (JP/KR/US)") },
+                        label = { Text(if (isEn) "Country (JP/KR/US)" else "Quốc gia (JP/KR/US)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -927,7 +933,7 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = azureEndpoint,
                     onValueChange = { azureEndpoint = it },
-                    label = { Text("Azure Endpoint để đo ping") },
+                    label = { Text(if (isEn) "Azure Endpoint for Ping" else "Azure Endpoint để đo ping") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -944,7 +950,11 @@ private fun CustomProxyDialog(
                         scope.launch(Dispatchers.IO) {
                             val p = port.toIntOrNull() ?: 8080
                             val ok = PingTester.isHostReachable(host.trim(), p, 1500)
-                            testResult = if (ok) "✅ Kết nối thành công!" else "❌ Không thể kết nối tới IP/Port này"
+                            testResult = if (ok) {
+                                if (isEn) "✅ Connection successful!" else "✅ Kết nối thành công!"
+                            } else {
+                                if (isEn) "❌ Could not reach this IP/Port" else "❌ Không thể kết nối tới IP/Port này"
+                            }
                             isTesting = false
                         }
                     },
@@ -954,7 +964,7 @@ private fun CustomProxyDialog(
                     if (isTesting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
                     } else {
-                        Text("Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
+                        Text(if (isEn) "Test Connection" else "Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
                     }
                 }
 
@@ -976,7 +986,7 @@ private fun CustomProxyDialog(
                         port = p,
                         protocol = protocol.trim().lowercase(),
                         azureEndpoint = azureEndpoint.ifBlank { "japaneast.cloudapp.azure.com" },
-                        description = description.ifBlank { "Proxy cá nhân" },
+                        description = description.ifBlank { if (isEn) "Custom proxy" else "Proxy cá nhân" },
                         speedMbps = speed,
                         countryCode = countryCode.uppercase(),
                         isCustom = true,
@@ -987,14 +997,15 @@ private fun CustomProxyDialog(
                 enabled = host.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
             ) {
-                Text("Lưu & Sử Dụng")
+                Text(if (isEn) "Save & Use" else "Lưu & Sử Dụng")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Hủy", color = TextSecondary)
+                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary)
             }
         },
         containerColor = XboxSurface
     )
 }
+

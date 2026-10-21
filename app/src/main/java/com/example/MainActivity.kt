@@ -87,9 +87,9 @@ class MainActivity : ComponentActivity() {
                 when (config.appLanguage) {
                     com.example.data.AppLanguage.SYSTEM -> {
                         val sys = java.util.Locale.getDefault()
-                        if (sys.language.lowercase().startsWith("vi")) java.util.Locale("vi") else java.util.Locale.ENGLISH
+                        if (sys.language.lowercase().startsWith("vi")) java.util.Locale.forLanguageTag("vi") else java.util.Locale.ENGLISH
                     }
-                    com.example.data.AppLanguage.VIETNAMESE -> java.util.Locale("vi")
+                    com.example.data.AppLanguage.VIETNAMESE -> java.util.Locale.forLanguageTag("vi")
                     com.example.data.AppLanguage.ENGLISH -> java.util.Locale.ENGLISH
                 }
             }

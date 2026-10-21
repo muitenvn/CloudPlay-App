@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,11 +49,13 @@ fun PingVisualizerCard(
     mode: NetworkMode,
     modifier: Modifier = Modifier
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     val quality = when {
-        currentPing in 1..35 -> "S • Xuất sắc" to XboxNeonGreen
-        currentPing in 36..65 -> "A • Tốt" to DirectCyan
-        currentPing in 66..110 -> "B • Trung bình" to WarningAmber
-        else -> "C • Có độ trễ" to JapanRed
+        currentPing in 1..35 -> (if (isEn) "S • Excellent" else "S • Xuất sắc") to XboxNeonGreen
+        currentPing in 36..65 -> (if (isEn) "A • Good" else "A • Tốt") to DirectCyan
+        currentPing in 66..110 -> (if (isEn) "B • Moderate" else "B • Trung bình") to WarningAmber
+        else -> (if (isEn) "C • High Ping" else "C • Có độ trễ") to JapanRed
     }
 
     Surface(
@@ -74,7 +77,7 @@ fun PingVisualizerCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "ĐỘ TRỄ MẠNG THEO THỜI GIAN",
+                        text = if (isEn) "LIVE NETWORK LATENCY" else "ĐỘ TRỄ MẠNG THEO THỜI GIAN",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -120,7 +123,11 @@ fun PingVisualizerCard(
                 }
 
                 Text(
-                    text = if (mode == NetworkMode.DIRECT_NETWORK) "⚡ Trực tiếp Azure Tokyo" else "🇯🇵 Qua Relay Japan",
+                    text = if (mode == NetworkMode.DIRECT_NETWORK) {
+                        if (isEn) "⚡ Direct Azure Tokyo" else "⚡ Trực tiếp Azure Tokyo"
+                    } else {
+                        if (isEn) "🇯🇵 Via Japan Relay" else "🇯🇵 Qua Relay Japan"
+                    },
                     color = TextSecondary,
                     fontSize = 11.sp,
                     modifier = Modifier.padding(bottom = 4.dp)

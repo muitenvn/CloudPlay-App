@@ -12,11 +12,13 @@ enum class VpnEngine {
     EXTERNAL_VPN     // External VPN Assistant: Use with Warp, Proton, Kiwi, etc. with auto-detect and zero-reload handoff
 }
 
-enum class RegionUnlockStatus(val labelVi: String) {
-    UNLOCKED("Đã mở khóa"),
-    FAILED("Không mở khóa"),
-    UNTESTED("Chưa thử"),
-    WRONG_REGION("Sai vùng")
+enum class RegionUnlockStatus(val labelVi: String, val labelEn: String) {
+    UNLOCKED("Đã mở khóa", "Unlocked"),
+    FAILED("Không mở khóa", "Unlock Failed"),
+    UNTESTED("Chưa thử", "Untested"),
+    WRONG_REGION("Sai vùng", "Wrong Region");
+
+    fun localizedLabel(isEn: Boolean): String = if (isEn) labelEn else labelVi
 }
 
 data class ServerUnlockRecord(
@@ -59,6 +61,27 @@ data class ServerLocation(
 ) {
     val addressPortKey: String
         get() = ServerUnlockRecord.keyFor(ip, port)
+
+    fun localizedDescription(isEn: Boolean): String {
+        if (!isEn) return description
+        return description
+            .replace("Đã xác minh IP Tokyo", "Verified Tokyo IP")
+            .replace("Đã xác minh IP Nhật Bản", "Verified Japan IP")
+            .replace("Đã xác minh IP Osaka", "Verified Osaka IP")
+            .replace("Khuyên dùng", "Recommended")
+            .replace("Dự phòng", "Backup")
+            .replace("Đại học Tsukuba Academic", "Tsukuba Academic Node")
+            .replace("Trục cáp quang", "Fiber Backbone")
+            .replace("Cụm máy chủ", "Server Cluster")
+            .replace("Độ trễ thấp cho VN", "Low Latency for SEA/VN")
+            .replace("Kết nối khu vực Đông Nam Á", "Southeast Asia Regional Hub")
+            .replace("Đầu mối quốc tế tốc độ cao", "High-Speed International Node")
+            .replace("Mạng lưới toàn cầu", "Global Edge Network")
+            .replace("Cổng kết nối ổn định", "Stable Gateway")
+            .replace("Máy chủ SOCKS5 do người dùng tự thêm", "User-added custom SOCKS5 proxy")
+            .replace("Máy chủ HTTP do người dùng tự thêm", "User-added custom HTTP proxy")
+            .replace("do người dùng tự thêm", "User-added custom proxy")
+    }
 }
 
 // Curated pool of 26+ High Quality Backup Servers with verified IP geolocations

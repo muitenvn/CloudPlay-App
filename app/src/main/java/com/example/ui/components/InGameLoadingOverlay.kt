@@ -53,6 +53,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -121,13 +122,17 @@ fun InGameLoadingOverlay(
             animatedAlpha
         }
 
+        val config by com.example.data.SettingsRepository.config.collectAsState()
+        val isEn = config.isEnglishUI()
+        val activeTips = gameProfile.localizedTips(isEn)
+
         var tipIndex by remember { mutableIntStateOf(0) }
-        LaunchedEffect(gameProfile.tips, lowEndDeviceMode) {
+        LaunchedEffect(activeTips, lowEndDeviceMode) {
             if (!lowEndDeviceMode) {
                 while (true) {
                     delay(4000)
-                    if (gameProfile.tips.isNotEmpty()) {
-                        tipIndex = (tipIndex + 1) % gameProfile.tips.size
+                    if (activeTips.isNotEmpty()) {
+                        tipIndex = (tipIndex + 1) % activeTips.size
                     }
                 }
             }
@@ -142,11 +147,11 @@ fun InGameLoadingOverlay(
             else -> JapanRed
         }
         val pingRating = when {
-            !hasValidPing -> "Đang đo"
-            realLatencyMs < 50 -> "Cực mượt"
-            realLatencyMs < 90 -> "Rất tốt"
-            realLatencyMs < 130 -> "Ổn định"
-            else -> "Ping cao"
+            !hasValidPing -> if (isEn) "Measuring" else "Đang đo"
+            realLatencyMs < 50 -> if (isEn) "Ultra Smooth" else "Cực mượt"
+            realLatencyMs < 90 -> if (isEn) "Great" else "Rất tốt"
+            realLatencyMs < 130 -> if (isEn) "Stable" else "Ổn định"
+            else -> if (isEn) "High Ping" else "Ping cao"
         }
         val pingText = if (hasValidPing) "${realLatencyMs}ms" else "-- ms"
 
@@ -158,11 +163,11 @@ fun InGameLoadingOverlay(
         )
 
         val phaseStatusText = when {
-            animatedProgress < 0.25f -> "Đang khởi tạo phiên kết nối đám mây..."
-            animatedProgress < 0.55f -> "Đang định tuyến qua máy chủ $targetServerName..."
-            animatedProgress < 0.80f -> "Đang đồng bộ luồng hình ảnh 60 FPS & âm thanh..."
-            animatedProgress < 0.92f -> "Đang tối ưu độ trễ đầu vào & bộ điều khiển..."
-            else -> "Đã sẵn sàng! Đang mở giao diện trò chơi..."
+            animatedProgress < 0.25f -> if (isEn) "Initializing cloud gaming session..." else "Đang khởi tạo phiên kết nối đám mây..."
+            animatedProgress < 0.55f -> if (isEn) "Routing via server $targetServerName..." else "Đang định tuyến qua máy chủ $targetServerName..."
+            animatedProgress < 0.80f -> if (isEn) "Synchronizing 60 FPS video & audio stream..." else "Đang đồng bộ luồng hình ảnh 60 FPS & âm thanh..."
+            animatedProgress < 0.92f -> if (isEn) "Optimizing input latency & controller..." else "Đang tối ưu độ trễ đầu vào & bộ điều khiển..."
+            else -> if (isEn) "Ready! Launching game interface..." else "Đã sẵn sàng! Đang mở giao diện trò chơi..."
         }
 
         val currentStep = when {
@@ -172,18 +177,22 @@ fun InGameLoadingOverlay(
             else -> 4
         }
 
-        val currentTip = if (gameProfile.tips.isNotEmpty()) {
-            gameProfile.tips.getOrNull(tipIndex) ?: gameProfile.tips.first()
+        val currentTip = if (activeTips.isNotEmpty()) {
+            activeTips.getOrNull(tipIndex) ?: activeTips.first()
         } else {
-            "Bạn có thể mở thanh công cụ nổi bất cứ lúc nào để chỉnh đồ họa và kiểm tra mạng."
+            if (isEn) {
+                "You can open the Floating HUD anytime to adjust graphics quality and check network latency."
+            } else {
+                "Bạn có thể mở thanh công cụ nổi bất cứ lúc nào để chỉnh đồ họa và kiểm tra mạng."
+            }
         }
 
         val controllerStatus = if (hasGamepad) {
-            "Tay cầm vật lý đã kết nối"
+            if (isEn) "Physical controller connected" else "Tay cầm vật lý đã kết nối"
         } else if (gameProfile.nativeTouchSupport) {
-            "Cảm ứng trực tiếp + Phím ảo"
+            if (isEn) "Native Touch + Virtual Gamepad" else "Cảm ứng trực tiếp + Phím ảo"
         } else {
-            "Tay cầm ảo sẵn sàng"
+            if (isEn) "Virtual Gamepad ready" else "Tay cầm ảo sẵn sàng"
         }
 
         BoxWithConstraints(
@@ -433,6 +442,8 @@ private fun LoadingTopBar(
     pingColor: Color,
     onNavigateHome: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -454,12 +465,12 @@ private fun LoadingTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Home,
-                    contentDescription = "Trang chủ",
+                    contentDescription = if (isEn) "Home" else "Trang chủ",
                     tint = DirectCyan,
                     modifier = Modifier.size(15.dp)
                 )
                 Text(
-                    text = "Trang Chủ",
+                    text = if (isEn) "Home" else "Trang Chủ",
                     color = TextPrimary,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
@@ -506,6 +517,8 @@ private fun GameHeroBannerCard(
     gameProfile: GameOptimizationProfile,
     modifier: Modifier = Modifier
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -559,7 +572,7 @@ private fun GameHeroBannerCard(
                     border = BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f))
                 ) {
                     Text(
-                        text = gameProfile.badge,
+                        text = gameProfile.localizedBadge(isEn),
                         color = DirectCyan,
                         fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -611,7 +624,7 @@ private fun GameHeroBannerCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = gameProfile.subtitle,
+                    text = gameProfile.localizedSubtitle(isEn),
                     color = TextSecondary,
                     fontSize = 11.5.sp,
                     maxLines = 2,
@@ -673,14 +686,16 @@ private fun LoadingProgressPanel(
                 trackColor = Color(0xFF152431)
             )
 
+            val config by com.example.data.SettingsRepository.config.collectAsState()
+            val isEn = config.isEnglishUI()
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                StepBadge(label = "Kết nối", isDone = currentStep >= 1, isActive = currentStep == 1)
-                StepBadge(label = "Định tuyến", isDone = currentStep >= 2, isActive = currentStep == 2)
-                StepBadge(label = "Luồng 60FPS", isDone = currentStep >= 3, isActive = currentStep == 3)
-                StepBadge(label = "Sẵn sàng", isDone = currentStep >= 4, isActive = currentStep == 4)
+                StepBadge(label = if (isEn) "Connect" else "Kết nối", isDone = currentStep >= 1, isActive = currentStep == 1)
+                StepBadge(label = if (isEn) "Route" else "Định tuyến", isDone = currentStep >= 2, isActive = currentStep == 2)
+                StepBadge(label = if (isEn) "60FPS Stream" else "Luồng 60FPS", isDone = currentStep >= 3, isActive = currentStep == 3)
+                StepBadge(label = if (isEn) "Ready" else "Sẵn sàng", isDone = currentStep >= 4, isActive = currentStep == 4)
             }
         }
     }
@@ -722,6 +737,8 @@ private fun SystemTelemetryCard(
     controllerStatus: String,
     hasGamepad: Boolean
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -735,22 +752,22 @@ private fun SystemTelemetryCard(
         ) {
             GameOptimizationRow(
                 icon = Icons.Default.Public,
-                title = "Máy chủ kết nối",
+                title = if (isEn) "Connected Server" else "Máy chủ kết nối",
                 status = targetServerName,
                 accentColor = DirectCyan
             )
 
             GameOptimizationRow(
                 icon = Icons.Default.Gamepad,
-                title = "Bộ điều khiển",
+                title = if (isEn) "Controller" else "Bộ điều khiển",
                 status = controllerStatus,
                 accentColor = if (hasGamepad) XboxNeonGreen else DirectCyan
             )
 
             GameOptimizationRow(
                 icon = Icons.Default.Bolt,
-                title = "Tối ưu đường truyền",
-                status = "Tự động xả trễ khi vào game",
+                title = if (isEn) "Route Optimization" else "Tối ưu đường truyền",
+                status = if (isEn) "Auto zero-lag switch in-game" else "Tự động xả trễ khi vào game",
                 accentColor = XboxNeonGreen
             )
         }
@@ -801,6 +818,8 @@ private fun SkipLoadingButton(
     onSkip: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Button(
         onClick = onSkip,
         colors = ButtonDefaults.buttonColors(
@@ -814,7 +833,7 @@ private fun SkipLoadingButton(
             .testTag("skip_loading_button")
     ) {
         Text(
-            text = "Vào Trận Ngay ➜",
+            text = if (isEn) "Enter Game Now ➜" else "Vào Trận Ngay ➜",
             fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold
         )

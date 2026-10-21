@@ -34,7 +34,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Speed
@@ -130,16 +130,21 @@ fun DashboardScreen(
         VpnManager.connect(context)
     }
 
-    val pulseTransition = rememberInfiniteTransition(label = "header_pulse")
-    val dotPulse by pulseTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "dot_pulse"
-    )
+    val dotPulse = if (config.lowEndDeviceMode) {
+        0.9f
+    } else {
+        val pulseTransition = rememberInfiniteTransition(label = "header_pulse")
+        val animatedDot by pulseTransition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1100, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "dot_pulse"
+        )
+        animatedDot
+    }
 
     Scaffold(
         modifier = modifier.testTag("dashboard_screen"),
@@ -366,7 +371,7 @@ fun DashboardScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.HelpOutline,
+                                        imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                                         contentDescription = stringResource(R.string.guide_button),
                                         tint = DirectCyan,
                                         modifier = Modifier.size(15.dp)

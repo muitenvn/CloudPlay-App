@@ -171,13 +171,14 @@ class XboxBridge(
                         console.log("[xCloud Optimizer] Network Profile Active:", window.__networkProfile);
                     };
 
-                    window.__currentBufferSec = 0.018;
-                    window.__targetBufferSec = 0.018;
+                    const initialBufSec = ($speedFirstPriority || $lowEndDeviceMode) ? 0.012 : 0.016;
+                    window.__currentBufferSec = initialBufSec;
+                    window.__targetBufferSec = initialBufSec;
                     window.__bufferGlideTimer = null;
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(14.0, Math.min(26.0, parseFloat(bufferHintMs) || 18.0));
+                        const bufMs = Math.max(8.0, Math.min(24.0, parseFloat(bufferHintMs) || 12.0));
                         const targetSec = bufMs / 1000.0;
 
                         if (window.__networkProfile) {
@@ -195,9 +196,14 @@ class XboxBridge(
                                 const receivers = window.__activePeerConnection.getReceivers ? window.__activePeerConnection.getReceivers() : [];
                                 for (let i = 0; i < receivers.length; i++) {
                                     const r = receivers[i];
-                                    if (r && r.track && r.track.kind === 'video') {
-                                        if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
-                                        if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal;
+                                    if (r && r.track) {
+                                        if (r.track.kind === 'video') {
+                                            if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
+                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal;
+                                        } else if (r.track.kind === 'audio') {
+                                            const audioSec = Math.max(0.008, secVal - 0.002);
+                                            if ('playoutDelayHint' in r) r.playoutDelayHint = audioSec;
+                                        }
                                     }
                                 }
                             } catch(e) {}
@@ -335,11 +341,20 @@ class XboxBridge(
                                             }));
                                         }
 
-                                        response.json = () => Promise.resolve(data);
-                                        response.text = () => Promise.resolve(JSON.stringify(data));
+                                        const modifiedBody = JSON.stringify(data);
+                                        try {
+                                            return new Response(modifiedBody, {
+                                                status: response.status,
+                                                statusText: response.statusText,
+                                                headers: response.headers
+                                            });
+                                        } catch (respErr) {
+                                            Object.defineProperty(response, 'json', { value: () => Promise.resolve(data) });
+                                            Object.defineProperty(response, 'text', { value: () => Promise.resolve(modifiedBody) });
+                                        }
                                     }
                                 } catch(e) {
-                                    console.warn("Could not patch login response", e);
+                                    // Ignore non-JSON login responses cleanly
                                 }
                             }
 
@@ -396,6 +411,9 @@ class XboxBridge(
                     // 3. In-WebView Live IP & Region probe
                     // ==========================================
                     setTimeout(async function() {
+                        if (location.hostname && (location.hostname.indexOf('xbox.com') !== -1 || location.hostname.indexOf('live.com') !== -1 || location.hostname.indexOf('microsoft') !== -1)) {
+                            return;
+                        }
                         try {
                             const res = await window.fetch('https://api.country.is/');
                             if (res.ok) {
@@ -404,7 +422,7 @@ class XboxBridge(
                             }
                         } catch(e) {
                             try {
-                                const res2 = await window.fetch('http://ipwho.is/');
+                                const res2 = await window.fetch('https://ipwho.is/');
                                 if (res2.ok) {
                                     const geo2 = await res2.json();
                                     notify('onWebViewIpDetected', JSON.stringify(geo2));
@@ -471,15 +489,17 @@ class XboxBridge(
                                     return origSetRemote(desc);
                                 };
 
-                                // Hardware Decoder Stabilization: Adaptive ~18ms jitter buffer
+                                // Hardware Decoder Stabilization: Ultra-low latency jitter buffer (10-12ms)
                                 pc.addEventListener('track', function(evt) {
                                     try {
                                         if (evt.receiver) {
+                                            const isFast = !!(window.__networkProfile && (window.__networkProfile.speedFirst || window.__networkProfile.lowEndDeviceMode));
+                                            const delaySec = isFast ? 0.012 : 0.016;
                                             if ('playoutDelayHint' in evt.receiver) {
-                                                evt.receiver.playoutDelayHint = 0.018;
+                                                evt.receiver.playoutDelayHint = delaySec;
                                             }
                                             if ('jitterBufferTarget' in evt.receiver) {
-                                                evt.receiver.jitterBufferTarget = 0.018;
+                                                evt.receiver.jitterBufferTarget = delaySec;
                                             }
                                         }
                                     } catch(trackErr) {}
@@ -641,6 +661,7 @@ class XboxBridge(
                     // ==========================================
                     let lastUrl = location.href;
                     let notifiedStreamConnection = false;
+                    let regionCheckCountForUrl = 0;
 
                     if (location.href.indexOf('/play/launch/') !== -1) {
                         notify('onGameLaunchInitiated', document.title || 'Xbox Game');
@@ -652,6 +673,7 @@ class XboxBridge(
                             const nowInLaunch = location.href.indexOf('/play/launch/') !== -1;
                             lastUrl = location.href;
                             notifiedStreamConnection = false;
+                            regionCheckCountForUrl = 0;
                             notify('onUrlChanged', location.href);
                             if (nowInLaunch) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
@@ -725,12 +747,15 @@ class XboxBridge(
                         const bar = document.createElement('div');
                         bar.id = '__cloudplay_unlock_fail_banner';
                         bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2147483647;background:rgba(12,20,15,0.96);border:1.5px solid #ef4444;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-family:sans-serif;max-width:92vw;color:#fff;';
+                        const isViUi = !!window.__xcloudTranslateEnabled || (preferredLocale || '').toLowerCase().startsWith('vi');
                         const msg = document.createElement('span');
                         msg.style.cssText = 'font-size:12.5px;font-weight:700;line-height:1.35;';
-                        msg.textContent = 'Máy chủ này không mở khóa được, đổi sang máy chủ khác?';
+                        msg.textContent = isViUi
+                            ? 'Máy chủ này không mở khóa được, đổi sang máy chủ khác?'
+                            : 'This server cannot unlock the region, switch to another server?';
                         const btnOk = document.createElement('button');
                         btnOk.style.cssText = 'background:#107C10;color:#fff;border:1px solid #22c55e;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;';
-                        btnOk.textContent = 'Xác nhận';
+                        btnOk.textContent = isViUi ? 'Xác nhận' : 'Switch';
                         btnOk.onclick = function() {
                             bar.remove();
                             if (window.CloudPlayBridge && window.CloudPlayBridge.confirmSwitchBestServer) {
@@ -753,8 +778,10 @@ class XboxBridge(
                     }
 
                     function checkRegionLockDomState() {
-                        if (notifiedStreamConnection || !document.body) return;
-                        const bodyText = (document.body.innerText || '').toLowerCase();
+                        // Never read document.body.innerText during active stream, on /launch/ page, or more than 4 times per URL (avoids layout reflow)
+                        if (notifiedStreamConnection || !document.body || location.href.indexOf('/launch/') !== -1 || regionCheckCountForUrl >= 4) return;
+                        regionCheckCountForUrl++;
+                        const bodyText = (document.body.textContent || '').toLowerCase();
                         const hasRegionUnsupportedText =
                             bodyText.includes('unavailable in your region') ||
                             bodyText.includes('not available in your region') ||
@@ -770,19 +797,34 @@ class XboxBridge(
                         }
                     }
 
-                    // Lightweight fallback check (2000ms) for edge cases where video mounts silently & region lock check
+                    function optimizeVideoElementLowLatency(video) {
+                        if (!video || video.__cpLowLatencyTuned) return;
+                        video.__cpLowLatencyTuned = true;
+                        try {
+                            video.playsInline = true;
+                            if ('disablePictureInPicture' in video) video.disablePictureInPicture = true;
+                            if ('disableRemotePlayback' in video) video.disableRemotePlayback = true;
+                        } catch(e) {}
+                    }
+
+                    // Lightweight fallback check (2500ms) for edge cases where video mounts silently & region lock check
                     setInterval(function() {
                         handleNavigationChange();
-                        checkRegionLockDomState();
+                        if (!notifiedStreamConnection && regionCheckCountForUrl < 4) {
+                            checkRegionLockDomState();
+                        }
                         const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
                         if (isLaunchPage && !notifiedStreamConnection) {
                             const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
-                            if (video && (video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
-                                notifiedStreamConnection = true;
-                                notify('onStreamConnected', 'video_active');
+                            if (video) {
+                                optimizeVideoElementLowLatency(video);
+                                if ((video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
+                                    notifiedStreamConnection = true;
+                                    notify('onStreamConnected', 'video_active');
+                                }
                             }
                         }
-                    }, 2000);
+                    }, 2500);
 
                     document.addEventListener('click', function(e) {
                         const target = e.target;
@@ -832,6 +874,15 @@ class XboxBridge(
                         }
                     });
 
+                    window.addEventListener('virtual_gamepad_axes_pair', function(e) {
+                        const d = e.detail;
+                        if (d) {
+                            if (d.xAxis >= 0 && d.xAxis < 4) virtualGamepadState.axes[d.xAxis] = d.xVal;
+                            if (d.yAxis >= 0 && d.yAxis < 4) virtualGamepadState.axes[d.yAxis] = d.yVal;
+                            virtualGamepadState.timestamp = Date.now();
+                        }
+                    });
+
                     // Anti-AFK Keep-Alive trigger
                     if ($antiAfk) {
                         setInterval(function() {
@@ -861,20 +912,20 @@ class XboxBridge(
                     } catch(e) {}
 
                     // ==========================================
-                    // 7. Dynamic Clarity Boost Ultra Controller
+                    // 7. Dynamic Clarity Boost Ultra Controller (Zero-Lag GPU Color Matrix, No Drop-Shadow Blur Pass)
                     // ==========================================
                     let clarityStyleEl = null;
                     function getPresetCss(preset) {
                         switch(preset) {
                             case 'ULTRA_SHARP':
-                                return 'filter: contrast(1.12) saturate(1.15) brightness(1.02) drop-shadow(0 0 1.5px rgba(0,0,0,0.5)) !important; image-rendering: -webkit-optimize-contrast !important;';
+                                return 'filter: contrast(1.12) saturate(1.14) brightness(1.02) !important; image-rendering: -webkit-optimize-contrast !important; transform: translateZ(0); backface-visibility: hidden;';
                             case 'OLED_PUNCH':
-                                return 'filter: contrast(1.18) saturate(1.22) drop-shadow(0 0 2px rgba(0,0,0,0.6)) !important;';
+                                return 'filter: contrast(1.16) saturate(1.20) !important; transform: translateZ(0); backface-visibility: hidden;';
                             case 'OFF':
-                                return 'filter: none !important;';
+                                return 'filter: none !important; transform: translateZ(0); backface-visibility: hidden;';
                             case 'BALANCED':
                             default:
-                                return 'filter: contrast(1.06) saturate(1.08) drop-shadow(0 0 1px rgba(0,0,0,0.3)) !important; image-rendering: -webkit-optimize-contrast !important;';
+                                return 'filter: contrast(1.06) saturate(1.08) !important; image-rendering: -webkit-optimize-contrast !important; transform: translateZ(0); backface-visibility: hidden;';
                         }
                     }
 
@@ -915,13 +966,14 @@ class XboxBridge(
     }
 
     private fun isCallerTrusted(): Boolean {
-        return isTrustedHost(currentNavigatedUrl)
+        val url = currentNavigatedUrl
+        if (url.isNullOrBlank()) return true
+        return isTrustedHost(url) || isXboxHost(url)
     }
 
     @JavascriptInterface
     fun onTranslationStatus(enabled: Boolean, count: Int) {
         if (!isCallerTrusted()) return
-        Log.d(TAG, "xCloud Native Translation: enabled=$enabled, count=$count")
         _translationInfo.value = TranslationInfo(isEnabled = enabled, translatedCount = count)
     }
 
@@ -951,8 +1003,8 @@ class XboxBridge(
         Log.d(TAG, "Stream ended: $detail — resuming DOM translator if allowed")
         controller.onStreamDisconnected()
         scope.launch(Dispatchers.Main) {
-            val isLowEnd = com.example.data.SettingsRepository.config.value.lowEndDeviceMode
-            if (!isLowEnd) {
+            val cfg = com.example.data.SettingsRepository.config.value
+            if (!cfg.lowEndDeviceMode && cfg.isEffectiveTranslateEnabled()) {
                 webViewRef?.get()?.evaluateJavascript(
                     "if (window.__resumeTranslator) window.__resumeTranslator();",
                     null
@@ -965,11 +1017,12 @@ class XboxBridge(
     fun onUrlChanged(url: String?) {
         if (!isCallerTrusted()) return
         url?.let { targetUrl ->
+            currentNavigatedUrl = targetUrl
             controller.onUrlChanged(targetUrl)
             if (!targetUrl.contains("/launch/") && isXboxHost(targetUrl)) {
                 scope.launch(Dispatchers.Main) {
-                    val isLowEnd = com.example.data.SettingsRepository.config.value.lowEndDeviceMode
-                    if (!isLowEnd) {
+                    val cfg = com.example.data.SettingsRepository.config.value
+                    if (!cfg.lowEndDeviceMode && cfg.isEffectiveTranslateEnabled()) {
                         webViewRef?.get()?.evaluateJavascript(
                             "if (window.__resumeTranslator) window.__resumeTranslator();",
                             null
@@ -1025,21 +1078,19 @@ class XboxBridge(
             val json = JSONObject(jsonStr)
             val ip = json.optString("ip", "")
             val countryCode = json.optString("country", json.optString("country_code", "JP")).uppercase()
-            val countryName = json.optString("country_name", json.optString("country", "Nhật Bản"))
+            val countryName = json.optString("country_name", json.optString("country", "Japan"))
             val city = json.optString("city", "")
             if (ip.isNotBlank()) {
                 VpnManager.onWebViewIpDetected(ip, countryCode, countryName, city)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Could not parse onWebViewIpDetected JSON", e)
+            Log.w(TAG, "Could not parse onWebViewIpDetected JSON: ${e.message}")
         }
     }
 
     @JavascriptInterface
     fun onStreamTelemetry(telemetryJson: String?) {
         if (!isCallerTrusted()) return
-        // Real-time WebRTC telemetry received from stream
-        Log.d(TAG, "Stream telemetry: $telemetryJson")
         NetworkOptimizer.onTelemetryReceived(telemetryJson)
     }
 

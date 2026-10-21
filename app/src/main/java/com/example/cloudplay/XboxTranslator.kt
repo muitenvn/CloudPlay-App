@@ -357,6 +357,10 @@ object XboxTranslator {
 
     suspend fun syncDictionaryFromGithub(rawUrl: String = "https://raw.githubusercontent.com/redphx/better-xcloud/main/src/locales/vi-VN.json"): Boolean {
         return withContext(Dispatchers.IO) {
+            val config = com.example.data.SettingsRepository.config.value
+            if (!config.isEffectiveTranslateEnabled() || dynamicGithubDictionary.isNotEmpty()) {
+                return@withContext dynamicGithubDictionary.isNotEmpty()
+            }
             try {
                 val url = URL(rawUrl)
                 val conn = url.openConnection() as HttpURLConnection
@@ -377,13 +381,13 @@ object XboxTranslator {
                             count++
                         }
                     }
-                    Log.i(TAG, "Synced $count translation terms from GitHub successfully")
+                    Log.d(TAG, "Synced $count translation terms from GitHub successfully")
                     true
                 } else {
                     false
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Could not sync GitHub dictionary: ${e.message}")
+                Log.d(TAG, "Using built-in dictionary (remote sync skipped: ${e.message})")
                 false
             }
         }

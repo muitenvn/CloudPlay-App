@@ -23,8 +23,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PlayArrow
@@ -40,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,8 +83,8 @@ fun HowToUseGuideDialog(
     onDismiss: () -> Unit
 ) {
     var selectedSection by remember { mutableStateOf(initialSection) }
-
-    val isVi = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]?.language?.lowercase()?.startsWith("vi") == true
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isVi = !config.isEnglishUI()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -127,7 +128,7 @@ fun HowToUseGuideDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.HelpOutline,
+                                imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                                 contentDescription = null,
                                 tint = DirectCyan,
                                 modifier = Modifier.size(20.dp)
@@ -180,7 +181,7 @@ fun HowToUseGuideDialog(
                         val tabTitle = when (section) {
                             GuideSection.QUICK_START -> if (isVi) "Bắt Đầu" else "Start"
                             GuideSection.REVOLUTION -> if (isVi) "5 Tầng" else "5 Layers"
-                            GuideSection.ZERO_LAG -> if (isVi) "0ms Ping" else "0ms Ping"
+                            GuideSection.ZERO_LAG -> "0ms Ping"
                             GuideSection.CONTROLLER -> if (isVi) "Tay Cầm" else "Gamepad"
                             GuideSection.FAQS -> if (isVi) "Sửa Lỗi" else "FAQs"
                         }
@@ -263,41 +264,61 @@ fun HowToUseGuideDialog(
                             item {
                                 GuideStepCard(
                                     stepNum = "1",
-                                    badge = "Tầng 1 • Vượt Rào",
+                                    badge = if (isVi) "Tầng 1 • Vượt Rào" else "Layer 1 • Bypass",
                                     title = "Stealth Header Spoofing",
-                                    desc = "Ứng dụng ngụy trang toàn bộ Header mạng HTTP như thể đang kết nối trực tiếp từ Tokyo. Microsoft tự động nhận diện bạn thuộc vùng hỗ trợ Xbox Cloud Gaming mà không cần VPN nặng nề."
+                                    desc = if (isVi) {
+                                        "Ứng dụng ngụy trang toàn bộ Header mạng HTTP như thể đang kết nối trực tiếp từ Tokyo. Microsoft tự động nhận diện bạn thuộc vùng hỗ trợ Xbox Cloud Gaming mà không cần VPN nặng nề."
+                                    } else {
+                                        "Disguises HTTP network headers as if connecting directly from supported regions (e.g., Tokyo), passing Microsoft region checks without heavy VPN overhead."
+                                    }
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "2",
-                                    badge = "Tầng 2 • Tự Lành",
+                                    badge = if (isVi) "Tầng 2 • Tự Lành" else "Layer 2 • Self-Healing",
                                     title = "Mesh Proxy Auto-Healing",
-                                    desc = "Mạng lưới proxy phân tán tự động đo ping mỗi giây. Nếu proxy hiện tại bị nghẽn (>150ms) hoặc rớt mạng, hệ thống chuyển sang node dự phòng trong vòng 300ms mà không làm đứt kết nối."
+                                    desc = if (isVi) {
+                                        "Mạng lưới proxy phân tán tự động đo ping mỗi giây. Nếu proxy hiện tại bị nghẽn (>150ms) hoặc rớt mạng, hệ thống chuyển sang node dự phòng trong vòng 300ms mà không làm đứt kết nối."
+                                    } else {
+                                        "Distributed proxy mesh continuously measures latency and region unlock status, automatically failing over to the fastest verified node if a server goes offline."
+                                    }
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "3",
-                                    badge = "Tầng 3 • 1080p 60FPS",
+                                    badge = if (isVi) "Tầng 3 • 1080p 60FPS" else "Layer 3 • 1080p 60FPS",
                                     title = "WebRTC SDP Bitrate Booster",
-                                    desc = "Can thiệp trực tiếp vào giao thức bắt tay WebRTC SDP của trình duyệt, ép mở trần băng thông video lên 15Mbps Full HD 60FPS mượt mà cùng âm thanh vòm Stereo 128kbps."
+                                    desc = if (isVi) {
+                                        "Can thiệp trực tiếp vào giao thức bắt tay WebRTC SDP của trình duyệt, ép mở trần băng thông video lên 15Mbps Full HD 60FPS mượt mà cùng âm thanh vòm Stereo 128kbps."
+                                    } else {
+                                        "Optimizes the browser WebRTC SDP handshake to unlock high-bitrate 1080p 60FPS streaming (or lightweight H.264 5Mbps in Low-End Device Mode) with crisp stereo audio."
+                                    }
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "4",
-                                    badge = "Tầng 4 • 0ms VPN Lag",
+                                    badge = if (isVi) "Tầng 4 • 0ms VPN Lag" else "Layer 4 • 0ms VPN Lag",
                                     title = "Zero-Reload Direct Handshake",
-                                    desc = "Kỹ thuật đột phá ngắt VPN và chuyển luồng WebRTC sang đường truyền Internet trực tiếp của nhà mạng Việt Nam (Viettel, VNPT, FPT) mà không cần tải lại trang. Ping về 25-35ms chuẩn esports."
+                                    desc = if (isVi) {
+                                        "Kỹ thuật đột phá ngắt VPN và chuyển luồng WebRTC sang đường truyền Internet trực tiếp của nhà mạng Việt Nam (Viettel, VNPT, FPT) mà không cần tải lại trang. Ping về 25-35ms chuẩn esports."
+                                    } else {
+                                        "Disconnects the VPN tunnel as soon as the WebRTC stream connects, switching media packets to your direct ISP connection without reloading the page."
+                                    }
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "5",
-                                    badge = "Tầng 5 • Ngôn Ngữ",
+                                    badge = if (isVi) "Tầng 5 • Ngôn Ngữ" else "Layer 5 • Locale",
                                     title = "Anti-Japanese Enforcer",
-                                    desc = "Chặn đứng tình trạng Xbox tự động ép ngôn ngữ tiếng Nhật khi dùng server Tokyo. Toàn bộ giao diện trò chơi và phụ đề được ép theo ngôn ngữ bạn chọn (Tiếng Anh en-US hoặc tiếng máy)."
+                                    desc = if (isVi) {
+                                        "Chặn đứng tình trạng Xbox tự động ép ngôn ngữ tiếng Nhật khi dùng server Tokyo. Toàn bộ giao diện trò chơi và phụ đề được ép theo ngôn ngữ bạn chọn (Tiếng Anh en-US hoặc tiếng máy)."
+                                    } else {
+                                        "Prevents Xbox from forcing Japanese menus when routing via Tokyo servers. Game UI and subtitles stay locked to your chosen locale (e.g., English en-US)."
+                                    }
                                 )
                             }
                         }
@@ -307,24 +328,36 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = "Cơ chế Zero-Reload Direct Network",
-                                    content = "Bình thường nếu chơi qua VPN, toàn bộ dữ liệu game nặng phải chạy vòng qua máy chủ Tokyo khiến ping cao (~140ms) và giật lag. Ứng dụng này chỉ dùng VPN lúc bấm nút Play để vượt qua bước duyệt IP của Microsoft, sau đó ngắt kết nối VPN để luồng video truyền trực tiếp về điện thoại bạn."
+                                    title = if (isVi) "Cơ chế Zero-Reload Direct Network" else "Zero-Reload Direct Network Mechanism",
+                                    content = if (isVi) {
+                                        "Bình thường nếu chơi qua VPN, toàn bộ dữ liệu game nặng phải chạy vòng qua máy chủ Tokyo khiến ping cao (~140ms) và giật lag. Ứng dụng này chỉ dùng VPN lúc bấm nút Play để vượt qua bước duyệt IP của Microsoft, sau đó ngắt kết nối VPN để luồng video truyền trực tiếp về điện thoại bạn."
+                                    } else {
+                                        "Normally, playing over a VPN forces all heavy video traffic through a remote relay, causing high ping (~140ms). CloudPlay only uses the proxy/VPN when clicking Play to pass Microsoft's region check, then switches to your direct ISP connection for ultra-low latency."
+                                    }
                                 )
                             }
                             item {
                                 GuideDetailCard(
                                     icon = Icons.Default.Wifi,
                                     iconColor = XboxNeonGreen,
-                                    title = "Chất lượng Đồ họa & Hiệu năng máy",
-                                    content = "• Tự Động (Khuyên dùng): Tự điều chỉnh đồ họa theo điều kiện mạng (Wi-Fi / 4G) và giảm tải GPU khi máy nóng để giữ 60 FPS mượt mà.\n• Thấp (Tiết Kiệm Dung Lượng - 5M): Tiết kiệm 60% dung lượng (~2.2GB/giờ), giải mã H.264 Baseline <4ms siêu mát máy và đỡ hao pin.\n• Trung Bình (9M) / Cao (14M) / Rất Cao (20M): Tùy chọn 4 mức độ từ cân bằng mát máy đến bung tối đa đồ họa 1080p60 sắc nét."
+                                    title = if (isVi) "Chất lượng Đồ họa & Hiệu năng máy" else "Graphics Quality & Device Performance",
+                                    content = if (isVi) {
+                                        "• Tự Động (Khuyên dùng): Tự điều chỉnh đồ họa theo điều kiện mạng (Wi-Fi / 4G) và giảm tải GPU khi máy nóng để giữ 60 FPS mượt mà.\n• Thấp (Tiết Kiệm Dung Lượng - 5M): Tiết kiệm 60% dung lượng (~2.2GB/giờ), giải mã H.264 Baseline <4ms siêu mát máy và đỡ hao pin.\n• Trung Bình (9M) / Cao (14M) / Rất Cao (20M): Tùy chọn 4 mức độ từ cân bằng mát máy đến bung tối đa đồ họa 1080p60 sắc nét."
+                                    } else {
+                                        "• Auto (Recommended): Dynamically tunes bitrate for Wi-Fi / 4G and throttles GPU load if the device warms up.\n• Low (Data Saver - 5M) & Low-End Mode: Saves 60% data (~2.2GB/hr) with <4ms H.264 Baseline hardware decode.\n• Medium (9M) / High (14M) / Ultra (20M): Choose between cool balanced play and maximum 1080p60 clarity."
+                                    }
                                 )
                             }
                             item {
                                 GuideDetailCard(
                                     icon = Icons.Default.Speed,
                                     iconColor = WarningAmber,
-                                    title = "Bật bộ lọc Clarity Boost (Làm Nét)",
-                                    content = "Vào tab Cài Đặt hoặc mở thanh HUD trong game -> Bật 'Clarity Boost'. Bộ lọc thông minh sẽ tăng độ tương phản và độ sắc nét giúp hình ảnh 1080p sắc sảo như đang chơi trên máy console thật."
+                                    title = if (isVi) "Bật bộ lọc Clarity Boost (Làm Nét)" else "Enable Clarity Boost Filter",
+                                    content = if (isVi) {
+                                        "Vào tab Cài Đặt hoặc mở thanh HUD trong game -> Bật 'Clarity Boost'. Bộ lọc thông minh sẽ tăng độ tương phản và độ sắc nét giúp hình ảnh 1080p sắc sảo như đang chơi trên máy console thật."
+                                    } else {
+                                        "Open Settings or the in-game Floating HUD -> Turn on 'Clarity Boost' to sharpen edges and enhance contrast for a crisp console-like image."
+                                    }
                                 )
                             }
                         }
@@ -334,16 +367,24 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Gamepad,
                                     iconColor = XboxNeonGreen,
-                                    title = "Kết nối tay cầm Bluetooth / Type-C",
-                                    content = "• Hỗ trợ 100%: Tay cầm Xbox One/Series, PS4 DualShock 4, PS5 DualSense, Gamesir, Flydigi, EasySMX...\n• Bật Bluetooth trên điện thoại -> Ghép đôi tay cầm -> Đèn báo tay cầm trên ứng dụng sẽ chuyển màu Xanh lá cây báo hiệu sẵn sàng."
+                                    title = if (isVi) "Kết nối tay cầm Bluetooth / Type-C" else "Connect Bluetooth / USB-C Controller",
+                                    content = if (isVi) {
+                                        "• Hỗ trợ 100%: Tay cầm Xbox One/Series, PS4 DualShock 4, PS5 DualSense, Gamesir, Flydigi, EasySMX...\n• Bật Bluetooth trên điện thoại -> Ghép đôi tay cầm -> Đèn báo tay cầm trên ứng dụng sẽ chuyển màu Xanh lá cây báo hiệu sẵn sàng."
+                                    } else {
+                                        "• 100% compatible with Xbox One/Series, PS4 DualShock 4, PS5 DualSense, Gamesir, Flydigi, Backbone, and USB-C gamepads.\n• Pair via Bluetooth or plug in -> The controller status indicator turns Neon Green when ready."
+                                    }
                                 )
                             }
                             item {
                                 GuideDetailCard(
                                     icon = Icons.Default.CheckCircle,
                                     iconColor = DirectCyan,
-                                    title = "Chơi bằng Tay Cầm Ảo trên màn hình",
-                                    content = "• Nếu không có tay cầm vật lý, vào Cài Đặt -> Bật công tắc 'Tay cầm ảo trên màn hình'.\n• Hệ thống sẽ hiển thị cần xoay Analog 360°, cụm nút ABXY, D-Pad và các nút cò LT/RT/LB/RB với độ phản hồi rung haptic chân thực."
+                                    title = if (isVi) "Chơi bằng Tay Cầm Ảo trên màn hình" else "Play with On-Screen Virtual Touch Gamepad",
+                                    content = if (isVi) {
+                                        "• Nếu không có tay cầm vật lý, vào Cài Đặt -> Bật công tắc 'Tay cầm ảo trên màn hình'.\n• Hệ thống sẽ hiển thị cần xoay Analog 360°, cụm nút ABXY, D-Pad và các nút cò LT/RT/LB/RB với độ phản hồi rung haptic chân thực."
+                                    } else {
+                                        "• No physical controller? Toggle the gamepad icon on the Floating HUD or enable 'On-Screen Virtual Touch Controller' in Settings.\n• Provides 360° dual thumbsticks, ABXY, D-Pad, and LT/RT/LB/RB triggers with haptic feedback."
+                                    }
                                 )
                             }
                         }
@@ -353,24 +394,36 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Language,
                                     iconColor = JapanRed,
-                                    title = "Bị ép hiển thị tiếng Nhật thì làm sao?",
-                                    content = "Mở tab 'Cài Đặt' -> Tại mục Ngôn Ngữ, chọn 'Tiếng Anh (en-US)' hoặc ngôn ngữ máy -> Bấm 'Áp dụng'. Sau đó kéo xuống dưới cùng bấm 'Xóa Cookie & Đăng Nhập Lại'. Giao diện sẽ vĩnh viễn chuyển sang tiếng Anh dễ đọc!"
+                                    title = if (isVi) "Bị ép hiển thị tiếng Nhật thì làm sao?" else "What if Xbox displays in Japanese?",
+                                    content = if (isVi) {
+                                        "Mở tab 'Cài Đặt' -> Tại mục Ngôn Ngữ, chọn 'Tiếng Anh (en-US)' hoặc ngôn ngữ máy -> Bấm 'Áp dụng'. Sau đó kéo xuống dưới cùng bấm 'Xóa Cookie & Đăng Nhập Lại'. Giao diện sẽ vĩnh viễn chuyển sang tiếng Anh dễ đọc!"
+                                    } else {
+                                        "Open 'Settings' -> Select 'English (en-US)' under Xbox Web Language -> Tap 'Apply Code', or scroll down and tap 'Clear Cookies & Re-login to Xbox'."
+                                    }
                                 )
                             }
                             item {
                                 GuideDetailCard(
                                     icon = Icons.Default.Speed,
                                     iconColor = WarningAmber,
-                                    title = "Máy chủ phản hồi chậm hoặc báo lỗi vùng?",
-                                    content = "Chuyển sang tab 'Máy Chủ' -> Bấm nút 'Kiểm Tra Ping' hoặc 'Tải Proxy Sống' để cập nhật danh sách máy chủ mới nhất. Bạn cũng có thể bấm 'Đổi Server Dự Phòng' ngay trên Trang Chủ."
+                                    title = if (isVi) "Máy chủ phản hồi chậm hoặc báo lỗi vùng?" else "Slow server or 'Unavailable in your region'?",
+                                    content = if (isVi) {
+                                        "Chuyển sang tab 'Máy Chủ' -> Bấm nút 'Kiểm Tra Ping' hoặc 'Tải Proxy Sống' để cập nhật danh sách máy chủ mới nhất. Bạn cũng có thể bấm 'Đổi Server Dự Phòng' ngay trên Trang Chủ."
+                                    } else {
+                                        "Go to the 'Servers' tab -> Select a server with the green 'Unlocked' badge, or tap 'Test All Ping' / 'Fetch Live' to refresh live proxies."
+                                    }
                                 )
                             }
                             item {
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = "Game bị đứng hình hoặc màn hình đen?",
-                                    content = "Chạm vào thanh HUD nổi trên màn hình -> Nhấn biểu tượng 🔄 'Tải Lại Trang'. Hệ thống sẽ tự động bắt tay lại với máy chủ Xbox mà không cần thoát ứng dụng."
+                                    title = if (isVi) "Game bị đứng hình hoặc màn hình đen?" else "Frozen frame or black screen?",
+                                    content = if (isVi) {
+                                        "Chạm vào thanh HUD nổi trên màn hình -> Nhấn biểu tượng 🔄 'Tải Lại Trang'. Hệ thống sẽ tự động bắt tay lại với máy chủ Xbox mà không cần thoát ứng dụng."
+                                    } else {
+                                        "Expand the Floating HUD -> Tap 'Reload'. The browser will re-establish the Xbox stream session without losing your progress."
+                                    }
                                 )
                             }
                         }

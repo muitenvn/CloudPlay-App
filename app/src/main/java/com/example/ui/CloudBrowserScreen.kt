@@ -210,7 +210,7 @@ fun CloudBrowserScreen(
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
 
-    // Dynamically recompute injectionScript whenever server, locale, or graphics/translation settings change
+    // Dynamically recompute injectionScript only when structural settings change (bitrate updates go through __updateNetworkProfile)
     val injectionScript = remember(
         config.clarityBoostEnabled,
         config.clarityPreset,
@@ -223,7 +223,6 @@ fun CloudBrowserScreen(
         config.cellularMode,
         config.networkTuningMode,
         config.wifiSpeedFirstPriority,
-        networkStatus.effectiveBitrateMbps,
         config.lowEndDeviceMode
     ) {
         XboxBridge.getInjectionScript(
@@ -325,7 +324,6 @@ fun CloudBrowserScreen(
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
-                        databaseEnabled = true
                         cacheMode = WebSettings.LOAD_DEFAULT
                         mediaPlaybackRequiresUserGesture = false
                         mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -356,6 +354,7 @@ fun CloudBrowserScreen(
                     bridge.updateCurrentUrl(initialUrl)
                     addJavascriptInterface(bridge, "CloudPlayBridge")
 
+                    var hasDocumentStartScript = false
                     // Inject document start script exclusively on authorized Xbox & Microsoft domains
                     if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
                         try {
@@ -364,27 +363,33 @@ fun CloudBrowserScreen(
                                 currentInjectionScript,
                                 setOf("https://www.xbox.com", "https://xbox.com", "https://login.live.com", "https://login.microsoftonline.com")
                             )
+                            hasDocumentStartScript = true
                         } catch (e: Exception) {
                             android.util.Log.w("CloudBrowser", "Document start script not supported", e)
                         }
                     }
 
+                    var injectedForCurrentPage = false
+
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             isPageLoading = true
+                            injectedForCurrentPage = false
                             bridge.updateCurrentUrl(url)
                             url?.let {
                                 streamController.onUrlChanged(it)
                                 handleMainFrameNavigation(it)
                             }
                             // Early injection to intercept Xbox login and region check using latest dynamic script
-                            if (XboxBridge.isTrustedHost(url)) {
+                            if (!hasDocumentStartScript && XboxBridge.isTrustedHost(url)) {
+                                injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
 
                         override fun onPageCommitVisible(view: WebView?, url: String?) {
-                            if (XboxBridge.isTrustedHost(url)) {
+                            if (!injectedForCurrentPage && XboxBridge.isTrustedHost(url)) {
+                                injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
@@ -396,7 +401,8 @@ fun CloudBrowserScreen(
                                 handleMainFrameNavigation(it)
                             }
                             if (XboxBridge.isTrustedHost(url)) {
-                                // Re-apply hooks for dynamic single-page-app transitions
+                                // Ensure hooks are active on finished page
+                                injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
@@ -437,7 +443,8 @@ fun CloudBrowserScreen(
                     webChromeClient = object : WebChromeClient() {
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
                             pageLoadingProgress = newProgress / 100f
-                            if (newProgress in 25..80 && XboxBridge.isTrustedHost(view?.url)) {
+                            if (!injectedForCurrentPage && newProgress >= 30 && XboxBridge.isTrustedHost(view?.url)) {
+                                injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
                         }
@@ -557,7 +564,11 @@ fun CloudBrowserScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
                             modifier = Modifier.testTag("cancel_bypass_button")
                         ) {
-                            Text("Hủy", fontSize = 11.sp, color = Color.White)
+                            Text(
+                                text = if (config.isEnglishUI()) "Cancel" else "Hủy",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -573,6 +584,7 @@ fun CloudBrowserScreen(
                 .align(Alignment.TopEnd)
                 .padding(top = 16.dp, end = 16.dp)
         ) {
+            val returnLabel = if (config.isEnglishUI()) "Return to Game" else "Quay trở lại trò chơi"
             Surface(
                 onClick = { returnToGame() },
                 shape = RoundedCornerShape(20.dp),
@@ -590,12 +602,12 @@ fun CloudBrowserScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Quay trở lại trò chơi",
+                        contentDescription = returnLabel,
                         tint = XboxNeonGreen,
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "Quay trở lại trò chơi",
+                        text = returnLabel,
                         color = TextPrimary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -612,11 +624,18 @@ fun CloudBrowserScreen(
             )
         }
 
-        // Measure actual <video> top position in WebView so Portrait HUD sits in the top black bar above the game image
+        // Measure actual <video> top position in WebView ONLY in Portrait mode (0 JS polling overhead in Landscape)
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isPortraitMode = configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
         var videoTopRatio by remember { mutableFloatStateOf(0f) }
-        LaunchedEffect(webViewInstance, streamUiState.isGameActive) {
+        LaunchedEffect(webViewInstance, streamUiState.isGameActive, isPortraitMode) {
             val wv = webViewInstance ?: return@LaunchedEffect
-            while (true) {
+            if (!isPortraitMode) {
+                videoTopRatio = 0f
+                return@LaunchedEffect
+            }
+            var sampleCount = 0
+            while (sampleCount < 6) {
                 try {
                     wv.evaluateJavascript(
                         "(function(){var v=document.querySelector('video#stream-video,video[data-testid=\"stream-video\"],#segmented-video video,video');var vh=window.innerHeight||1;var vw=window.innerWidth||1;if(!v){return (vh>vw)?(Math.max(0,(vh-(vw*9/16))/2)/vh).toFixed(4):'0';}var r=v.getBoundingClientRect();var aspect=(v.videoWidth>0&&v.videoHeight>0)?(v.videoWidth/v.videoHeight):(16/9);var rh=r.width/aspect;var topPx=r.top;if(r.height>rh+4){topPx=r.top+(r.height-rh)/2;}return Math.max(0,Math.min(0.48,topPx/vh)).toFixed(4);})()"
@@ -627,7 +646,8 @@ fun CloudBrowserScreen(
                         }
                     }
                 } catch (_: Exception) {}
-                kotlinx.coroutines.delay(1500)
+                sampleCount++
+                kotlinx.coroutines.delay(if (videoTopRatio > 0.04f) 5000L else 2000L)
             }
         }
 
@@ -659,9 +679,12 @@ fun CloudBrowserScreen(
                 webViewInstance?.evaluateJavascript("if (window.__toggleClarityBoost) window.__toggleClarityBoost($enabled);", null)
             },
             clarityBoostActive = config.clarityBoostEnabled,
-            translationActive = config.xcloudTranslateEnabled,
+            translationActive = effectiveTranslate,
             translatedCount = translationInfo.translatedCount,
             onToggleTranslation = { enabled ->
+                if (config.isEnglishUI() && enabled) {
+                    SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
+                }
                 SettingsRepository.updateXcloudTranslate(enabled)
                 webViewInstance?.evaluateJavascript(
                     "if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($enabled);",

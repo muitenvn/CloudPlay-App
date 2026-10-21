@@ -98,6 +98,7 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     val systemLocale = remember { Locale.getDefault() }
     val resolvedSystemLocale = remember { SettingsRepository.resolveSystemXboxLocale() }
+    val isEn = config.isEnglishUI()
 
     LazyColumn(
         modifier = modifier
@@ -139,7 +140,7 @@ fun SettingsScreen(
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
-                                text = "TRUNG TÂM CẤU HÌNH HỆ THỐNG PRO",
+                                text = if (isEn) "PRO SYSTEM CONFIGURATION CENTER" else "TRUNG TÂM CẤU HÌNH HỆ THỐNG PRO",
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 12.5.sp,
@@ -168,9 +169,9 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         listOf(
-                            Triple("ĐỒ HỌA", config.cellularMode.shortLabel, XboxNeonGreen),
-                            Triple("VÙNG WEB", config.getEffectiveLocale(), DirectCyan),
-                            Triple("CLARITY", if (config.clarityBoostEnabled) "Đang Bật" else "Tắt", XboxNeonGreen)
+                            Triple(if (isEn) "GRAPHICS" else "ĐỒ HỌA", config.cellularMode.localizedShortLabel(isEn), XboxNeonGreen),
+                            Triple(if (isEn) "WEB REGION" else "VÙNG WEB", config.getEffectiveLocale(), DirectCyan),
+                            Triple("CLARITY", if (config.clarityBoostEnabled) (if (isEn) "ON" else "Đang Bật") else (if (isEn) "OFF" else "Tắt"), XboxNeonGreen)
                         ).forEach { (label, value, color) ->
                             Surface(
                                 modifier = Modifier.weight(1f),
@@ -251,7 +252,7 @@ fun SettingsScreen(
                                     val sys = Locale.getDefault()
                                     val detectedStr = if (sys.language.lowercase().startsWith("vi")) "Tiếng Việt (${sys.displayName})" else "English (${sys.displayName})"
                                     Text(
-                                        text = "Hệ thống: $detectedStr",
+                                        text = if (isEn) "System: $detectedStr" else "Hệ thống: $detectedStr",
                                         color = DirectCyan,
                                         fontSize = 10.sp
                                     )
@@ -296,7 +297,7 @@ fun SettingsScreen(
                                         fontSize = 12.sp
                                     )
                                     Text(
-                                        text = "Giao diện tiếng Việt chuẩn, tự nhiên",
+                                        text = if (isEn) "Natural Vietnamese interface & auto-translator" else "Giao diện tiếng Việt chuẩn, tự nhiên",
                                         color = TextSecondary,
                                         fontSize = 10.sp
                                     )
@@ -341,7 +342,7 @@ fun SettingsScreen(
                                         fontSize = 12.sp
                                     )
                                     Text(
-                                        text = "Clean, native English UI",
+                                        text = "Clean, native English UI (disables Vietnamese web auto-translation)",
                                         color = TextSecondary,
                                         fontSize = 10.sp
                                     )
@@ -397,7 +398,7 @@ fun SettingsScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = "Theo ngôn ngữ hệ thống (Tự động fallback en-US)",
+                                        text = if (isEn) "Follow System Language (Auto fallback to en-US)" else "Theo ngôn ngữ hệ thống (Tự động fallback en-US)",
                                         color = TextPrimary,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 12.sp
@@ -405,13 +406,21 @@ fun SettingsScreen(
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Thiết bị: ${systemLocale.displayName} (${systemLocale.toLanguageTag()}) ➔ Áp dụng Xbox: $resolvedSystemLocale",
+                                    text = if (isEn) {
+                                        "Device: ${systemLocale.displayName} (${systemLocale.toLanguageTag()}) ➔ Xbox Locale: $resolvedSystemLocale"
+                                    } else {
+                                        "Thiết bị: ${systemLocale.displayName} (${systemLocale.toLanguageTag()}) ➔ Áp dụng Xbox: $resolvedSystemLocale"
+                                    },
                                     color = DirectCyan,
                                     fontSize = 10.sp
                                 )
                                 if (systemLocale.language.lowercase() == "vi") {
                                     Text(
-                                        text = "*(Tiếng Việt chưa có trên xCloud ➔ tự động chuyển tiếng Anh en-US để dễ đọc)",
+                                        text = if (isEn) {
+                                            "*(Vietnamese is not natively on xCloud ➔ auto-defaults to English en-US)"
+                                        } else {
+                                            "*(Tiếng Việt chưa có trên xCloud ➔ tự động chuyển tiếng Anh en-US để dễ đọc)"
+                                        },
                                         color = TextSecondary,
                                         fontSize = 9.sp
                                     )
@@ -430,7 +439,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "HOẶC CHỌN NGÔN NGỮ CỤ THỂ",
+                        text = if (isEn) "OR SELECT A SPECIFIC XBOX LOCALE" else "HOẶC CHỌN NGÔN NGỮ CỤ THỂ",
                         color = TextSecondary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -466,14 +475,14 @@ fun SettingsScreen(
                                         Column {
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
-                                                    text = lang.displayName,
+                                                    text = lang.localizedName(isEn),
                                                     color = TextPrimary,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     fontSize = 12.sp
                                                 )
                                                 if (lang.code == "en-US") {
                                                     Text(
-                                                        text = "KHUYÊN DÙNG",
+                                                        text = if (isEn) "RECOMMENDED" else "KHUYÊN DÙNG",
                                                         color = Color.Black,
                                                         fontSize = 8.sp,
                                                         fontWeight = FontWeight.ExtraBold,
@@ -484,7 +493,7 @@ fun SettingsScreen(
                                                 }
                                             }
                                             Text(
-                                                text = "${lang.nativeName} • Mã: ${lang.code}",
+                                                text = if (isEn) "${lang.nativeName} • Code: ${lang.code}" else "${lang.nativeName} • Mã: ${lang.code}",
                                                 color = TextSecondary,
                                                 fontSize = 10.sp
                                             )
@@ -507,7 +516,7 @@ fun SettingsScreen(
 
                     // Option C: Manual Language input / Paste link (e.g. "xbox.com/en-US")
                     Text(
-                        text = "NHẬP TÙY CHỌN MÃ NGÔN NGỮ HOẶC LINK XBOX",
+                        text = if (isEn) "ENTER CUSTOM LOCALE CODE OR XBOX URL" else "NHẬP TÙY CHỌN MÃ NGÔN NGỮ HOẶC LINK XBOX",
                         color = TextSecondary,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -516,7 +525,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = customInputText,
                         onValueChange = { customInputText = it },
-                        label = { Text("Ví dụ: xbox.com/en-US hoặc en-US") },
+                        label = { Text(if (isEn) "Example: xbox.com/en-US or en-US" else "Ví dụ: xbox.com/en-US hoặc en-US") },
                         placeholder = { Text("xbox.com/en-US") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -543,7 +552,7 @@ fun SettingsScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Áp dụng mã này", fontSize = 11.sp)
+                            Text(if (isEn) "Apply Code" else "Áp dụng mã này", fontSize = 11.sp)
                         }
 
                         OutlinedButton(
@@ -553,7 +562,7 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Đặt en-US 🇺🇸", color = DirectCyan, fontSize = 11.sp)
+                            Text(if (isEn) "Set en-US 🇺🇸" else "Đặt en-US 🇺🇸", color = DirectCyan, fontSize = 11.sp)
                         }
                     }
 
@@ -571,7 +580,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Info, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(14.dp))
                             Text(
-                                text = "Link Xbox Cloud hiện tại: ${config.targetRegionUrl}",
+                                text = if (isEn) "Current Xbox Cloud URL: ${config.targetRegionUrl}" else "Link Xbox Cloud hiện tại: ${config.targetRegionUrl}",
                                 color = TextSecondary,
                                 fontSize = 10.sp
                             )
@@ -583,7 +592,13 @@ fun SettingsScreen(
 
         // Section 1.5: BỘ DỊCH TIẾNG VIỆT XBOX CLOUD (TỐI ƯU ĐỘC QUYỀN)
         item {
-            SettingsCard(title = "BỘ DỊCH TIẾNG VIỆT XBOX CLOUD (TỐI ƯU ĐỘC QUYỀN)") {
+            SettingsCard(
+                title = if (isEn) {
+                    "XBOX CLOUD TRANSLATOR & OVERLAY FILTER"
+                } else {
+                    "BỘ DỊCH TIẾNG VIỆT XBOX CLOUD (TỐI ƯU ĐỘC QUYỀN)"
+                }
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Surface(
                         modifier = Modifier
@@ -598,7 +613,11 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Default.Language, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "Google Dịch Thông Minh Cho Xbox Cloud (Smart Gaming Translator)",
+                                    text = if (isEn) {
+                                        "Smart Gaming Web Translator (Auto-paused in English UI & In-Game)"
+                                    } else {
+                                        "Google Dịch Thông Minh Cho Xbox Cloud (Smart Gaming Translator)"
+                                    },
                                     color = TextPrimary,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -606,7 +625,11 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "✓ Dịch y chang Google Dịch tự nhiên 100% mọi mô tả cốt truyện, hướng dẫn, đánh giá và menu game.\n✓ Biết hết chỗ nào để né: Không đụng thẻ video stream WebRTC, không làm giật lag hay mất 60 FPS.\n✓ Tự động bảo vệ tên game (Fortnite, Forza, Halo, Starfield...) và phím tay cầm (RT, LT, D-pad).\n✓ Kết hợp từ điển 0ms tức thì cho giao diện và Google Translate mượt mà cho đoạn văn dài.",
+                                text = if (isEn) {
+                                    "✓ When App Language is set to English, web auto-translation to Vietnamese is automatically disabled so Xbox Cloud stays 100% in English.\n✓ Automatically pauses DOM translation during WebRTC gameplay for 0ms latency overhead.\n✓ Protects original game titles (Fortnite, Forza, Halo...) and controller prompts."
+                                } else {
+                                    "✓ Dịch y chang Google Dịch tự nhiên 100% mọi mô tả cốt truyện, hướng dẫn, đánh giá và menu game.\n✓ Biết hết chỗ nào để né: Không đụng thẻ video stream WebRTC, không làm giật lag hay mất 60 FPS.\n✓ Tự động bảo vệ tên game (Fortnite, Forza, Halo, Starfield...) và phím tay cầm (RT, LT, D-pad).\n✓ Kết hợp từ điển 0ms tức thì cho giao diện và Google Translate mượt mà cho đoạn văn dài."
+                                },
                                 color = TextSecondary,
                                 fontSize = 11.sp,
                                 lineHeight = 16.sp
@@ -621,8 +644,21 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Tự động dịch sang Tiếng Việt", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Dịch toàn bộ menu, danh mục game, nút bấm và thông báo", color = TextSecondary, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Auto-translate Xbox web catalog to Vietnamese" else "Tự động dịch sang Tiếng Việt",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isEn) {
+                                    "Currently inactive while English UI is selected (switch App Language to Vietnamese to enable)"
+                                } else {
+                                    "Dịch toàn bộ menu, danh mục game, nút bấm và thông báo"
+                                },
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         Switch(
                             checked = config.xcloudTranslateEnabled,
@@ -639,8 +675,17 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Bảo vệ tên tựa game gốc", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Giữ nguyên tên gốc các game (Fortnite, Forza Horizon, Halo Infinite...)", color = TextSecondary, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Preserve Original Game Titles" else "Bảo vệ tên tựa game gốc",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isEn) "Keep original game names (Fortnite, Forza Horizon, Halo Infinite...)" else "Giữ nguyên tên gốc các game (Fortnite, Forza Horizon, Halo Infinite...)",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         Switch(
                             checked = config.preserveGameTitles,
@@ -656,8 +701,17 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Chế độ song ngữ (Việt - Anh)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Kèm từ gốc Tiếng Anh trong ngoặc bên cạnh bản dịch tiếng Việt", color = TextSecondary, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Bilingual Mode (Vietnamese - English)" else "Chế độ song ngữ (Việt - Anh)",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isEn) "Display original English term in parentheses next to Vietnamese text" else "Kèm từ gốc Tiếng Anh trong ngoặc bên cạnh bản dịch tiếng Việt",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         Switch(
                             checked = config.bilingualMode,
@@ -673,8 +727,17 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Ẩn bảng Decode Profile / Stream Stats đè màn hình", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Tự động ẩn bảng thông số kỹ thuật (Decode profile, FPS, Bitrate) che tầm nhìn khi chơi", color = TextSecondary, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Hide Web Decode Profile / Stream Stats Overlay" else "Ẩn bảng Decode Profile / Stream Stats đè màn hình",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isEn) "Automatically hide intrusive web technical overlays blocking gameplay" else "Tự động ẩn bảng thông số kỹ thuật (Decode profile, FPS, Bitrate) che tầm nhìn khi chơi",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         Switch(
                             checked = config.hideStreamStatsOverlay,
@@ -691,8 +754,17 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Từ điển Gaming đầy đủ từ GitHub (550+ mục)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Text(text = "Trọn bộ từ điển Better-xCloud GitHub với thuật toán tra cứu O(1) tức thì", color = TextSecondary, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Full Better-xCloud Gaming Dictionary (550+ entries)" else "Từ điển Gaming đầy đủ từ GitHub (550+ mục)",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isEn) "O(1) instant lookup gaming terminology dictionary" else "Trọn bộ từ điển Better-xCloud GitHub với thuật toán tra cứu O(1) tức thì",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
                         }
                         Switch(
                             checked = config.githubDictionaryEnabled,
@@ -706,9 +778,13 @@ fun SettingsScreen(
 
         // Section: Graphics Quality & Device Performance Optimization
         item {
-            SettingsCard(title = "ĐỒ HỌA & HIỆU NĂNG MÁY") {
+            SettingsCard(title = if (isEn) "GRAPHICS & DEVICE PERFORMANCE" else "ĐỒ HỌA & HIỆU NĂNG MÁY") {
                 Text(
-                    text = "Tùy chỉnh mức đồ họa, dung lượng tiêu thụ và giảm tải CPU/GPU cho điện thoại (chống nóng máy, tiết kiệm pin và giữ 60 FPS mượt mà).",
+                    text = if (isEn) {
+                        "Customize stream bitrate, mobile data usage, and CPU/GPU decode workload (prevents overheating, saves battery, and locks smooth 60 FPS)."
+                    } else {
+                        "Tùy chỉnh mức đồ họa, dung lượng tiêu thụ và giảm tải CPU/GPU cho điện thoại (chống nóng máy, tiết kiệm pin và giữ 60 FPS mượt mà)."
+                    },
                     color = TextSecondary,
                     fontSize = 11.sp
                 )
@@ -760,7 +836,7 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "Tự Động (Theo Mạng & Máy)",
+                                        text = if (isEn) "Auto (Network & Device Adaptive)" else "Tự Động (Theo Mạng & Máy)",
                                         color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
@@ -770,7 +846,7 @@ fun SettingsScreen(
                                         color = XboxNeonGreen.copy(alpha = 0.2f)
                                     ) {
                                         Text(
-                                            text = "KHUYÊN DÙNG",
+                                            text = if (isEn) "RECOMMENDED" else "KHUYÊN DÙNG",
                                             color = XboxNeonGreen,
                                             fontSize = 8.sp,
                                             fontWeight = FontWeight.Bold,
@@ -779,7 +855,7 @@ fun SettingsScreen(
                                     }
                                 }
                                 Text(
-                                    text = "Tự động tối ưu theo Wi-Fi / 4G & giảm tải khi máy nóng",
+                                    text = if (isEn) "Automatically optimizes for Wi-Fi / 4G & throttles load when device warms up" else "Tự động tối ưu theo Wi-Fi / 4G & giảm tải khi máy nóng",
                                     color = TextSecondary,
                                     fontSize = 10.5.sp
                                 )
@@ -838,7 +914,7 @@ fun SettingsScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = mode.title,
+                                                text = mode.localizedTitle(isEn),
                                                 color = if (isSelected) accent else TextPrimary,
                                                 fontSize = 12.5.sp,
                                                 fontWeight = FontWeight.Bold
@@ -860,7 +936,7 @@ fun SettingsScreen(
                                             }
                                         }
                                         Text(
-                                            text = mode.subtitle,
+                                            text = mode.localizedSubtitle(isEn),
                                             color = TextSecondary,
                                             fontSize = 10.sp,
                                             maxLines = 1
@@ -889,20 +965,20 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Đang chọn: ${selectedMode.title}",
+                                text = if (isEn) "Selected: ${selectedMode.localizedTitle(true)}" else "Đang chọn: ${selectedMode.localizedTitle(false)}",
                                 color = XboxNeonGreen,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = selectedMode.deviceLoadBadge,
+                                text = selectedMode.localizedBadge(isEn),
                                 color = DirectCyan,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                         Text(
-                            text = selectedMode.description,
+                            text = selectedMode.localizedDesc(isEn),
                             color = TextSecondary,
                             fontSize = 10.5.sp,
                             lineHeight = 14.5.sp
@@ -927,7 +1003,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Speed, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                             Text(
-                                text = "Ưu Tiên Độ Trễ Thấp & Chống Nóng Máy",
+                                text = if (isEn) "Prioritize Ultra-Low Latency & Anti-Overheat" else "Ưu Tiên Độ Trễ Thấp & Chống Nóng Máy",
                                 color = if (config.wifiSpeedFirstPriority) DirectCyan else TextPrimary,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -935,7 +1011,11 @@ fun SettingsScreen(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Khi sóng yếu hoặc GPU giải mã chậm, tự động triệt tiêu đệm trễ và hạ tải đồ họa để thao tác luôn mượt tức thì.",
+                            text = if (isEn) {
+                                "Eliminates WebRTC jitter buffer bloat and lowers decode overhead when signal drops or GPU decode slows down."
+                            } else {
+                                "Khi sóng yếu hoặc GPU giải mã chậm, tự động triệt tiêu đệm trễ và hạ tải đồ họa để thao tác luôn mượt tức thì."
+                            },
                             color = TextSecondary,
                             fontSize = 10.5.sp
                         )
@@ -982,7 +1062,7 @@ fun SettingsScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    text = "Chế độ máy yếu",
+                                    text = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
                                     color = if (config.lowEndDeviceMode) XboxNeonGreen else TextPrimary,
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.Bold
@@ -990,7 +1070,11 @@ fun SettingsScreen(
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Khóa bitrate thấp cố định (~5 Mbps), dùng H.264 nhẹ trong SDP lúc kết nối, ưu tiên 60 FPS, tắt hiệu ứng động (HUD & màn tải) và tự tạm dừng bộ dịch.",
+                                text = if (isEn) {
+                                    "Locks fixed low bitrate (~5 Mbps), forces lightweight H.264 Baseline in SDP handshake, prioritizes 60 FPS, disables HUD/loading infinite animations, and auto-pauses the web translator."
+                                } else {
+                                    "Khóa bitrate thấp cố định (~5 Mbps), dùng H.264 nhẹ trong SDP lúc kết nối, ưu tiên 60 FPS, tắt hiệu ứng động (HUD & màn tải) và tự tạm dừng bộ dịch."
+                                },
                                 color = TextSecondary,
                                 fontSize = 10.5.sp,
                                 lineHeight = 14.sp
@@ -1020,7 +1104,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "💡 Thoát game và vào lại để áp dụng",
+                            text = if (isEn) "💡 Exit and relaunch the game to apply" else "💡 Thoát game và vào lại để áp dụng",
                             color = if (config.lowEndDeviceMode) XboxNeonGreen else DirectCyan,
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -1033,7 +1117,7 @@ fun SettingsScreen(
 
         // Section 2: Smart VPN & Auto Bypass Logic
         item {
-            SettingsCard(title = "VPN THÔNG MINH (SMART VPN AUTO ON/OFF) & ZERO RELOAD") {
+            SettingsCard(title = if (isEn) "SMART VPN (AUTO ON/OFF) & ZERO RELOAD" else "VPN THÔNG MINH (SMART VPN AUTO ON/OFF) & ZERO RELOAD") {
                 // Smart VPN Toggle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1041,8 +1125,21 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Kích hoạt VPN Thông Minh (Auto On/Off)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Tự động phân tích IP người chơi: Tự bật VPN khi mở game nếu chưa hỗ trợ, tự tắt khi vào trận", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = if (isEn) "Enable Smart VPN (Auto On/Off)" else "Kích hoạt VPN Thông Minh (Auto On/Off)",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) {
+                                "Automatically detects your IP region: turns VPN on when launching Xbox if unsupported, and disconnects once in-game"
+                            } else {
+                                "Tự động phân tích IP người chơi: Tự bật VPN khi mở game nếu chưa hỗ trợ, tự tắt khi vào trận"
+                            },
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                     Switch(
                         checked = config.smartVpnEnabled,
@@ -1060,8 +1157,21 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Tự động ngắt VPN khi vào game", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Chuyển về mạng thường (Direct ISP) ngay khi luồng WebRTC kết nối, không reload trang", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = if (isEn) "Auto-disconnect VPN when entering game" else "Tự động ngắt VPN khi vào game",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) {
+                                "Switches to Direct ISP immediately after WebRTC stream connects without reloading the page"
+                            } else {
+                                "Chuyển về mạng thường (Direct ISP) ngay khi luồng WebRTC kết nối, không reload trang"
+                            },
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                     Switch(
                         checked = config.autoBypassEnabled,
@@ -1081,8 +1191,17 @@ fun SettingsScreen(
                             .padding(10.dp)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Thời gian đếm ngược trước khi ngắt VPN", color = TextSecondary, fontSize = 11.sp)
-                            Text(text = "${config.autoBypassDelaySeconds} giây", color = DirectCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            Text(
+                                text = if (isEn) "Countdown delay before disconnecting VPN" else "Thời gian đếm ngược trước khi ngắt VPN",
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                text = if (isEn) "${config.autoBypassDelaySeconds} sec" else "${config.autoBypassDelaySeconds} giây",
+                                color = DirectCyan,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
                         }
                         Slider(
                             value = config.autoBypassDelaySeconds.toFloat(),
@@ -1098,11 +1217,23 @@ fun SettingsScreen(
 
         // Section 3: Engine Selection
         item {
-            SettingsCard(title = "CHẾ ĐỘ VƯỢT RÀO (VPN ENGINE)") {
+            SettingsCard(title = if (isEn) "REGION BYPASS MODE (VPN ENGINE)" else "CHẾ ĐỘ VƯỢT RÀO (VPN ENGINE)") {
                 listOf(
-                    Triple(VpnEngine.SMART_BYPASS, "Smart Japan Bypass 🇯🇵 (Khuyên dùng)", "Vượt rào trực tiếp Better-xCloud, 0 độ trễ, không sợ chết proxy"),
-                    Triple(VpnEngine.PROXY_TUNNEL, "Proxy Route 🌐 (20+ Máy chủ)", "Định tuyến qua máy chủ Proxy Nhật Bản với tự động đổi máy chủ dự phòng"),
-                    Triple(VpnEngine.EXTERNAL_VPN, "VPN Ngoài (1.1.1.1 / WARP / Kiwi)", "Dành cho người chơi dùng app VPN riêng")
+                    Triple(
+                        VpnEngine.SMART_BYPASS,
+                        if (isEn) "Smart Japan Bypass 🇯🇵 (Recommended)" else "Smart Japan Bypass 🇯🇵 (Khuyên dùng)",
+                        if (isEn) "Direct Better-xCloud header bypass, 0ms extra latency, immune to proxy downtime" else "Vượt rào trực tiếp Better-xCloud, 0 độ trễ, không sợ chết proxy"
+                    ),
+                    Triple(
+                        VpnEngine.PROXY_TUNNEL,
+                        if (isEn) "Proxy Route 🌐 (20+ Servers)" else "Proxy Route 🌐 (20+ Máy chủ)",
+                        if (isEn) "Routes login traffic via regional proxies with automatic failover" else "Định tuyến qua máy chủ Proxy Nhật Bản với tự động đổi máy chủ dự phòng"
+                    ),
+                    Triple(
+                        VpnEngine.EXTERNAL_VPN,
+                        if (isEn) "External VPN (1.1.1.1 / WARP / Custom)" else "VPN Ngoài (1.1.1.1 / WARP / Kiwi)",
+                        if (isEn) "For players using a separate third-party VPN app" else "Dành cho người chơi dùng app VPN riêng"
+                    )
                 ).forEach { (engine, title, desc) ->
                     val isSelected = vpnState.engine == engine
                     Surface(
@@ -1133,12 +1264,21 @@ fun SettingsScreen(
 
         // Section 4: Stream Quality & Visuals
         item {
-            SettingsCard(title = "CHẤT LƯỢNG HÌNH ẢNH & ĐIỀU KHIỂN") {
+            SettingsCard(title = if (isEn) "STREAM VISUALS & CONTROLS" else "CHẤT LƯỢNG HÌNH ẢNH & ĐIỀU KHIỂN") {
                 // 1080p Edge UA
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Độ phân giải 1080p Full HD (Edge UA)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Giả lập Edge Desktop để Xbox stream ở 1080p thay vì 720p", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = if (isEn) "1080p Full HD Resolution (Edge Desktop UA)" else "Độ phân giải 1080p Full HD (Edge UA)",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) "Spoofs Desktop Edge so Xbox streams at 1080p instead of 720p" else "Giả lập Edge Desktop để Xbox stream ở 1080p thay vì 720p",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                     Switch(
                         checked = config.forceDesktopUserAgent,
@@ -1152,8 +1292,17 @@ fun SettingsScreen(
                 // Clarity Boost
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Bộ lọc Clarity Boost (Làm nét)", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Tăng độ sắc nét và tương phản video stream", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = if (isEn) "Clarity Boost Filter (Sharpening)" else "Bộ lọc Clarity Boost (Làm nét)",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) "Enhances video stream edge sharpness and contrast" else "Tăng độ sắc nét và tương phản video stream",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                     Switch(
                         checked = config.clarityBoostEnabled,
@@ -1167,8 +1316,17 @@ fun SettingsScreen(
                 // Virtual Touch Gamepad
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "Tay cầm ảo trên màn hình", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Text(text = "Hiện D-Pad, cần Analog và nút ABXY khi không có tay cầm Bluetooth", color = TextSecondary, fontSize = 11.sp)
+                        Text(
+                            text = if (isEn) "On-Screen Virtual Touch Controller" else "Tay cầm ảo trên màn hình",
+                            color = TextPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) "Show virtual D-Pad, thumbsticks, and ABXY buttons when no physical controller is connected" else "Hiện D-Pad, cần Analog và nút ABXY khi không có tay cầm Bluetooth",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
                     }
                     Switch(
                         checked = config.showVirtualController,
@@ -1181,7 +1339,7 @@ fun SettingsScreen(
 
         // Section 5: Storage & Reset
         item {
-            SettingsCard(title = "BỘ NHỚ ĐỆM & TÀI KHOẢN") {
+            SettingsCard(title = if (isEn) "CACHE & ACCOUNT SESSION" else "BỘ NHỚ ĐỆM & TÀI KHOẢN") {
                 Button(
                     onClick = onClearCookies,
                     modifier = Modifier.fillMaxWidth(),
@@ -1190,7 +1348,84 @@ fun SettingsScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Delete, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-                        Text(text = "Xóa Cookie & Đăng Nhập Lại Xbox", color = TextPrimary, fontSize = 12.sp)
+                        Text(
+                            text = if (isEn) "Clear Cookies & Re-login to Xbox" else "Xóa Cookie & Đăng Nhập Lại Xbox",
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // Section 5.5: Dynamic Update Changelog & APK Build Info
+        item {
+            SettingsCard(
+                title = if (isEn) {
+                    "UPDATE CHANGELOG & APK BUILD INFO (v${com.example.BuildConfig.VERSION_NAME})"
+                } else {
+                    "NHẬT KÝ BẢN CẬP NHẬT & XUẤT FILE APK (v${com.example.BuildConfig.VERSION_NAME})"
+                }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "Build v${com.example.BuildConfig.VERSION_NAME} (Code #${com.example.BuildConfig.VERSION_CODE})"
+                            } else {
+                                "Phiên bản v${com.example.BuildConfig.VERSION_NAME} (Mã build #${com.example.BuildConfig.VERSION_CODE})"
+                            },
+                            color = DirectCyan,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(5.dp),
+                            color = XboxNeonGreen.copy(alpha = 0.18f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = if (isEn) "SEAMLESS APK UPDATE" else "CẬP NHẬT ĐÈ TRỰC TIẾP",
+                                color = XboxNeonGreen,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF0A140E),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) "What's New in This Update:" else "Thay đổi thực tế trong bản cập nhật này:",
+                                color = TextPrimary,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isEn) {
+                                    "• Full 100% English & Vietnamese localization across all screens, dialogs, and HUD.\n• English UI mode automatically disables web auto-translation to Vietnamese & restores original English DOM.\n• Free-moving Floating HUD with edge-docking handle (drag flush to left/right edge to hide, swipe inward to restore) and thermal display only in Expanded HUD.\n• Region Unlock verification badges (Unlocked, Failed, Untested, Wrong Region) with smart sorting & auto-failover.\n• Reduced CPU/GPU & WebView overhead during gameplay (stopped unnecessary landscape JS polling, hardware layer rendering, Low-End Device Mode)."
+                                } else {
+                                    "• Hoàn thiện 100% ngôn ngữ Tiếng Anh & Tiếng Việt trên toàn bộ màn hình, hộp thoại và HUD.\n• Khi chọn Tiếng Anh: tự động tắt dịch web sang Tiếng Việt và khôi phục văn bản gốc tiếng Anh.\n• Nút nổi HUD di chuyển tự do không giới hạn, kéo sát rìa trái/phải tự ẩn thành thanh gờ (vuốt qua bật lại), ẩn nhiệt độ khi thu nhỏ.\n• Nhãn mở khóa vùng thực tế cho từng máy chủ (Đã mở khóa, Không mở khóa, Chưa thử, Sai vùng) kèm tự gợi ý đổi server.\n• Tối ưu giảm độ trễ & giảm tải CPU/GPU khi đang chơi (dừng quét JS thừa ở màn ngang, tăng tốc phần cứng WebRTC, Chế độ máy yếu)."
+                                },
+                                color = TextSecondary,
+                                fontSize = 10.5.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
                     }
                 }
             }
@@ -1198,10 +1433,14 @@ fun SettingsScreen(
 
         // Section 6: Legal & Open Source (Better-xCloud MIT License)
         item {
-            SettingsCard(title = "ĐIỀU KHOẢN & BẢN QUYỀN NGUỒN MỞ") {
+            SettingsCard(title = if (isEn) "TERMS OF USE & OPEN SOURCE LICENSE" else "ĐIỀU KHOẢN & BẢN QUYỀN NGUỒN MỞ") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "Ứng dụng phi lợi nhuận độc lập, tích hợp các giải pháp tối ưu hóa mã nguồn mở từ dự án Better-xCloud (MIT License). Hoàn toàn không liên kết với Microsoft hay Xbox.",
+                        text = if (isEn) {
+                            "Independent non-profit application integrating open-source optimizations from the Better-xCloud project (MIT License). Not affiliated with Microsoft or Xbox."
+                        } else {
+                            "Ứng dụng phi lợi nhuận độc lập, tích hợp các giải pháp tối ưu hóa mã nguồn mở từ dự án Better-xCloud (MIT License). Hoàn toàn không liên kết với Microsoft hay Xbox."
+                        },
                         color = TextSecondary,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
@@ -1215,7 +1454,12 @@ fun SettingsScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
-                            Text(text = "Xem Điều Khoản Sử Dụng & Giấy Phép MIT", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = if (isEn) "View Terms of Use & MIT License" else "Xem Điều Khoản Sử Dụng & Giấy Phép MIT",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

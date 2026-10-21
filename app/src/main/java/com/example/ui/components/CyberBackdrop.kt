@@ -22,6 +22,9 @@ import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.XboxDark
 import com.example.ui.theme.XboxNeonGreen
 
+import androidx.compose.runtime.collectAsState
+import com.example.data.SettingsRepository
+
 /**
  * Next-Gen Console Velocity Backdrop (CloudPlay UI 2.0).
  * Combines a breathing ambient aurora with a subtle tactical telemetry grid and top laser rim.
@@ -31,16 +34,22 @@ fun CyberBackdrop(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "cyber_backdrop_transition")
-    val pulseShift by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "aurora_pulse"
-    )
+    val config by SettingsRepository.config.collectAsState()
+    val pulseShift = if (config.lowEndDeviceMode) {
+        0.5f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "cyber_backdrop_transition")
+        val animated by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 6000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "aurora_pulse"
+        )
+        animated
+    }
 
     Box(
         modifier = modifier

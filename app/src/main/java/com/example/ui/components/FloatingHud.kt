@@ -79,6 +79,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -194,9 +195,10 @@ fun FloatingHud(
                 showThermalWarningBanner = isNowHot
                 if (isNowHot && !wasHot) {
                     try {
+                        val isEnNow = com.example.data.SettingsRepository.config.value.isEnglishUI()
                         Toast.makeText(
                             context,
-                            "Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
+                            if (isEnNow) "Device is hot, take a break or lower quality" else "Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
                             Toast.LENGTH_LONG
                         ).show()
                     } catch (_: Exception) {}
@@ -250,6 +252,9 @@ fun FloatingHud(
         }
     }
 
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+
     // Phân loại biểu tượng nhiệt trên HUD: mát / ấm / nóng
     val thermalIcon = when {
         !isThermalSupported -> ""
@@ -259,9 +264,9 @@ fun FloatingHud(
     }
     val thermalLabel = when {
         !isThermalSupported -> ""
-        thermalStatus >= 2 -> "Nóng"
-        thermalStatus == 1 -> "Ấm"
-        else -> "Mát"
+        thermalStatus >= 2 -> if (isEn) "Hot" else "Nóng"
+        thermalStatus == 1 -> if (isEn) "Warm" else "Ấm"
+        else -> if (isEn) "Cool" else "Mát"
     }
     val thermalColor = when {
         thermalStatus >= 2 -> JapanRed
@@ -648,7 +653,7 @@ fun FloatingHud(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Home,
-                                    contentDescription = "Trang chủ",
+                                    contentDescription = if (isEn) "Home" else "Trang chủ",
                                     tint = Color.White,
                                     modifier = Modifier.size(14.dp)
                                 )
@@ -722,7 +727,7 @@ fun FloatingHud(
                             Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.Gamepad,
-                                    contentDescription = "Tay cầm",
+                                    contentDescription = if (isEn) "Gamepad" else "Tay cầm",
                                     tint = if (physicalControllerConnected) XboxNeonGreen else if (virtualControllerEnabled) DirectCyan else TextSecondary,
                                     modifier = Modifier.size(12.dp)
                                 )
@@ -766,7 +771,7 @@ fun FloatingHud(
                             Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = "Làm nét",
+                                    contentDescription = if (isEn) "Clarity Boost" else "Làm nét",
                                     tint = if (clarityBoostActive) XboxNeonGreen else TextSecondary,
                                     modifier = Modifier.size(12.dp)
                                 )
@@ -789,7 +794,7 @@ fun FloatingHud(
                             Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
                                 Icon(
                                     imageVector = Icons.Default.Tune,
-                                    contentDescription = "Menu tùy chỉnh",
+                                    contentDescription = if (isEn) "Settings menu" else "Menu tùy chỉnh",
                                     tint = if (hudMode == HudMode.EXPANDED) XboxNeonGreen else TextSecondary,
                                     modifier = Modifier.size(12.dp)
                                 )
@@ -873,7 +878,7 @@ fun FloatingHud(
                                     border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.7f))
                                 ) {
                                     Text(
-                                        text = "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
+                                        text = if (isEn) "🔥 Device is hot, take a break or lower quality" else "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
                                         color = Color.White,
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.Bold,
@@ -1035,6 +1040,8 @@ private fun ExpandedHudCollapseHeader(
     onCollapseToCompact: () -> Unit,
     onCollapseToMinimized: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(9.dp),
@@ -1050,6 +1057,7 @@ private fun ExpandedHudCollapseHeader(
         ) {
             if (!isAnchoredRight) {
                 CollapseTouchButton48dp(
+                    isEn = isEn,
                     onCollapse = onCollapseToCompact,
                     onMinimize = onCollapseToMinimized
                 )
@@ -1061,7 +1069,7 @@ private fun ExpandedHudCollapseHeader(
                 horizontalAlignment = if (isAnchoredRight) Alignment.Start else Alignment.End
             ) {
                 Text(
-                    text = gameProfile?.title ?: "BẢNG ĐIỀU KHIỂN NHANH",
+                    text = gameProfile?.title ?: if (isEn) "QUICK CONTROL PANEL" else "BẢNG ĐIỀU KHIỂN NHANH",
                     color = TextPrimary,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -1069,9 +1077,9 @@ private fun ExpandedHudCollapseHeader(
                 )
                 Text(
                     text = if (gameProfile != null) {
-                        "${gameProfile.badge} • ${gameProfile.recommendedFps}"
+                        "${gameProfile.localizedBadge(isEn)} • ${gameProfile.recommendedFps}"
                     } else {
-                        "Chạm Thu gọn để đóng bảng"
+                        if (isEn) "Tap Collapse to close panel" else "Chạm Thu gọn để đóng bảng"
                     },
                     color = XboxNeonGreen,
                     fontSize = 8.sp,
@@ -1083,6 +1091,7 @@ private fun ExpandedHudCollapseHeader(
             if (isAnchoredRight) {
                 Spacer(modifier = Modifier.width(6.dp))
                 CollapseTouchButton48dp(
+                    isEn = isEn,
                     onCollapse = onCollapseToCompact,
                     onMinimize = onCollapseToMinimized
                 )
@@ -1096,6 +1105,7 @@ private fun ExpandedHudCollapseHeader(
  */
 @Composable
 private fun CollapseTouchButton48dp(
+    isEn: Boolean = false,
     onCollapse: () -> Unit,
     onMinimize: () -> Unit
 ) {
@@ -1123,13 +1133,13 @@ private fun CollapseTouchButton48dp(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Thu gọn bảng HUD",
+                    contentDescription = if (isEn) "Collapse HUD" else "Thu gọn bảng HUD",
                     tint = XboxNeonGreen,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(3.dp))
                 Text(
-                    text = "Thu gọn",
+                    text = if (isEn) "Collapse" else "Thu gọn",
                     color = Color.White,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Bold,
@@ -1224,11 +1234,18 @@ private fun DenseCoreTelemetrySection(
         else -> stringResource(R.string.controller_disconnected)
     }
 
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+
     val batteryStatusText = if (batteryPercent >= 0) {
-        val chargeStr = if (isBatteryCharging) "Đang sạc ⚡" else "Không sạc"
+        val chargeStr = if (isBatteryCharging) {
+            if (isEn) "Charging ⚡" else "Đang sạc ⚡"
+        } else {
+            if (isEn) "On Battery" else "Không sạc"
+        }
         "$batteryPercent% • $chargeStr"
     } else {
-        "--% • Không rõ"
+        if (isEn) "--% • Unknown" else "--% • Không rõ"
     }
     val batteryColor = when {
         isBatteryCharging -> XboxNeonGreen
@@ -1252,7 +1269,11 @@ private fun DenseCoreTelemetrySection(
                 label = stringResource(R.string.hud_stream_latency),
                 value = latencyDisplayText,
                 valueColor = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
-                badgeText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "Đổi VPN" else "Ngắt VPN",
+                badgeText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+                    if (isEn) "Use VPN" else "Đổi VPN"
+                } else {
+                    if (isEn) "Stop VPN" else "Ngắt VPN"
+                },
                 onRowClick = onToggleNetwork
             )
 
@@ -1265,7 +1286,7 @@ private fun DenseCoreTelemetrySection(
 
             // 3. Dòng Thời gian giải mã
             DenseMetricRowItem(
-                label = "Giải mã",
+                label = if (isEn) "Decode" else "Giải mã",
                 value = decodeTimeText,
                 valueColor = decodeColor
             )
@@ -1275,13 +1296,17 @@ private fun DenseCoreTelemetrySection(
                 label = stringResource(R.string.hud_controller),
                 value = controllerStatusText,
                 valueColor = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
-                badgeText = if (virtualControllerEnabled) "Ẩn ảo" else "Bật ảo",
+                badgeText = if (virtualControllerEnabled) {
+                    if (isEn) "Hide Touch" else "Ẩn ảo"
+                } else {
+                    if (isEn) "Show Touch" else "Bật ảo"
+                },
                 onRowClick = onToggleVirtualController
             )
 
             // 5. Dòng % Pin & trạng thái sạc (+ Nhiệt độ máy trên API 29+)
             DenseMetricRowItem(
-                label = "Pin & Sạc",
+                label = if (isEn) "Battery" else "Pin & Sạc",
                 value = batteryStatusText,
                 valueColor = batteryColor,
                 badgeText = if (isThermalSupported) "$thermalIcon $thermalLabel" else null
@@ -1363,6 +1388,8 @@ private fun DenseQualityModeSection(
     onToggleAutoAdapting: (Boolean) -> Unit,
     onToggleWifiSpeedFirst: (Boolean) -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1380,7 +1407,7 @@ private fun DenseQualityModeSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Chế độ chất lượng",
+                    text = if (isEn) "Quality Mode" else "Chế độ chất lượng",
                     color = XboxNeonGreen,
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold
@@ -1401,7 +1428,11 @@ private fun DenseQualityModeSection(
                         modifier = Modifier.clickable { onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting) }
                     ) {
                         Text(
-                            text = if (adaptiveQualityState.isAutoAdapting) "Tự động" else "Cố định",
+                            text = if (adaptiveQualityState.isAutoAdapting) {
+                                if (isEn) "Auto" else "Tự động"
+                            } else {
+                                if (isEn) "Fixed" else "Cố định"
+                            },
                             color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen else TextSecondary,
                             fontSize = 7.5.sp,
                             fontWeight = FontWeight.Bold,
@@ -1417,20 +1448,20 @@ private fun DenseQualityModeSection(
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 DenseQualityPresetChip(
-                    label = "Tự động",
-                    isSelected = networkStatus.activeProfileName.contains("Tự Động"),
+                    label = if (isEn) "Auto" else "Tự động",
+                    isSelected = networkStatus.activeProfileName.contains("Tự Động") || networkStatus.activeProfileName.contains("Auto", ignoreCase = true),
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.AUTO) },
                     modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
-                    label = "Thấp",
-                    isSelected = networkStatus.activeProfileName.contains("Thấp"),
+                    label = if (isEn) "Low" else "Thấp",
+                    isSelected = networkStatus.activeProfileName.contains("Thấp") || networkStatus.activeProfileName.contains("Low", ignoreCase = true),
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
                     modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
-                    label = "Vừa",
-                    isSelected = networkStatus.activeProfileName.contains("Trung Bình"),
+                    label = if (isEn) "Med" else "Vừa",
+                    isSelected = networkStatus.activeProfileName.contains("Trung Bình") || networkStatus.activeProfileName.contains("Medium", ignoreCase = true),
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MEDIUM) },
                     modifier = Modifier.weight(1f)
                 )
@@ -1442,19 +1473,23 @@ private fun DenseQualityModeSection(
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 DenseQualityPresetChip(
-                    label = "Cao",
-                    isSelected = networkStatus.activeProfileName.contains("Cao ("),
+                    label = if (isEn) "High" else "Cao",
+                    isSelected = networkStatus.activeProfileName.contains("Cao (") || networkStatus.activeProfileName.contains("High", ignoreCase = true),
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.HIGH) },
                     modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
-                    label = "Tối đa",
-                    isSelected = networkStatus.activeProfileName.contains("Rất Cao"),
+                    label = if (isEn) "Max" else "Tối đa",
+                    isSelected = networkStatus.activeProfileName.contains("Rất Cao") || networkStatus.activeProfileName.contains("Ultra", ignoreCase = true),
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
                     modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
-                    label = if (networkStatus.speedFirstPriority) "Giảm trễ: Bật" else "Giảm trễ: Tắt",
+                    label = if (networkStatus.speedFirstPriority) {
+                        if (isEn) "Low Lag: ON" else "Giảm trễ: Bật"
+                    } else {
+                        if (isEn) "Low Lag: OFF" else "Giảm trễ: Tắt"
+                    },
                     isSelected = networkStatus.speedFirstPriority,
                     accentColor = DirectCyan,
                     onClick = { onToggleWifiSpeedFirst(!networkStatus.speedFirstPriority) },
@@ -1464,7 +1499,7 @@ private fun DenseQualityModeSection(
 
             if (telemetry.estimatedDataSavedMb > 1.0) {
                 Text(
-                    text = "Tiết kiệm: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB",
+                    text = if (isEn) "Data saved: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB" else "Tiết kiệm: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB",
                     color = TextSecondary,
                     fontSize = 7.5.sp,
                     maxLines = 1
@@ -1519,19 +1554,29 @@ private fun DenseFeatureTogglesSection(
     onToggleTranslation: (Boolean) -> Unit,
     onOpenTranslator: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         DenseQuickTogglePill(
-            label = if (clarityBoostActive) "Làm nét: Bật" else "Làm nét: Tắt",
+            label = if (clarityBoostActive) {
+                if (isEn) "Clarity: ON" else "Làm nét: Bật"
+            } else {
+                if (isEn) "Clarity: OFF" else "Làm nét: Tắt"
+            },
             active = clarityBoostActive,
             activeColor = XboxNeonGreen,
             onClick = { onToggleClarityBoost(!clarityBoostActive) },
             modifier = Modifier.weight(1f)
         )
         DenseQuickTogglePill(
-            label = if (hideStreamStats) "Ẩn bảng: Bật" else "Ẩn bảng: Tắt",
+            label = if (hideStreamStats) {
+                if (isEn) "Hide Stats: ON" else "Ẩn bảng: Bật"
+            } else {
+                if (isEn) "Hide Stats: OFF" else "Ẩn bảng: Tắt"
+            },
             active = hideStreamStats,
             activeColor = DirectCyan,
             onClick = { onToggleHideStreamStats(!hideStreamStats) },
@@ -1545,9 +1590,13 @@ private fun DenseFeatureTogglesSection(
     ) {
         DenseQuickTogglePill(
             label = if (translationActive) {
-                if (translatedCount > 0) "Dịch VI ($translatedCount)" else "Dịch VI: Bật"
+                if (isEn) {
+                    if (translatedCount > 0) "VI Trans ($translatedCount)" else "VI Trans: ON"
+                } else {
+                    if (translatedCount > 0) "Dịch VI ($translatedCount)" else "Dịch VI: Bật"
+                }
             } else {
-                "Dịch VI: Tắt"
+                if (isEn) "VI Trans: OFF" else "Dịch VI: Tắt"
             },
             active = translationActive,
             activeColor = XboxNeonGreen,
@@ -1555,7 +1604,7 @@ private fun DenseFeatureTogglesSection(
             modifier = Modifier.weight(1f)
         )
         DenseQuickTogglePill(
-            label = "Bảng dịch",
+            label = if (isEn) "Translator" else "Bảng dịch",
             active = true,
             activeColor = DirectCyan,
             onClick = onOpenTranslator,
@@ -1608,13 +1657,15 @@ private fun DenseBottomActionsSection(
     onOpenSettings: () -> Unit,
     onRequestExitHome: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         DenseBottomActionChip(
             icon = Icons.Default.Refresh,
-            label = "Tải lại",
+            label = if (isEn) "Reload" else "Tải lại",
             tint = XboxNeonGreen,
             onClick = onReloadPage,
             modifier = Modifier.weight(1f),
@@ -1622,7 +1673,7 @@ private fun DenseBottomActionsSection(
         )
         DenseBottomActionChip(
             icon = Icons.Default.ScreenRotation,
-            label = "Xoay",
+            label = if (isEn) "Rotate" else "Xoay",
             tint = DirectCyan,
             onClick = onToggleOrientation,
             modifier = Modifier.weight(1f),
@@ -1630,7 +1681,7 @@ private fun DenseBottomActionsSection(
         )
         DenseBottomActionChip(
             icon = Icons.Default.Settings,
-            label = "Cài đặt",
+            label = if (isEn) "Settings" else "Cài đặt",
             tint = TextPrimary,
             onClick = onOpenSettings,
             modifier = Modifier.weight(1f),
@@ -1638,7 +1689,7 @@ private fun DenseBottomActionsSection(
         )
         DenseBottomActionChip(
             icon = Icons.Default.Home,
-            label = "Thoát",
+            label = if (isEn) "Exit" else "Thoát",
             tint = JapanRed,
             onClick = onRequestExitHome,
             modifier = Modifier.weight(1f),

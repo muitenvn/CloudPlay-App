@@ -46,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,8 @@ fun GameLibraryScreen(
     onLaunchGame: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(GameFilterTab.ALL) }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -139,7 +142,7 @@ fun GameLibraryScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = "KHO GAME XBOX CLOUD VAULT",
+                            text = if (isEn) "XBOX CLOUD GAMING VAULT" else "KHO GAME XBOX CLOUD VAULT",
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 12.sp,
@@ -147,7 +150,7 @@ fun GameLibraryScreen(
                             letterSpacing = 0.8.sp
                         )
                         Text(
-                            text = "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng",
+                            text = if (isEn) "${games.size} titles ready • $freeCount Free • $touchCount Touch" else "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng",
                             color = TextSecondary,
                             fontSize = 10.5.sp
                         )
@@ -283,7 +286,7 @@ fun GameLibraryScreen(
                             modifier = Modifier.size(48.dp)
                         )
                         Text(
-                            text = "Không tìm thấy tựa game nào phù hợp",
+                            text = if (isEn) "No matching games found" else "Không tìm thấy tựa game nào phù hợp",
                             color = TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 13.5.sp,
@@ -323,7 +326,7 @@ fun GameLibraryScreen(
                 .padding(20.dp)
                 .testTag("fab_add_game")
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Thêm Game")
+            Icon(Icons.Default.Add, contentDescription = if (isEn) "Add Game" else "Thêm Game")
         }
 
         if (showAddDialog) {
@@ -344,6 +347,10 @@ private fun LibraryGameCard(
     onPlay: () -> Unit,
     onDeleteCustom: (() -> Unit)? = null
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    val localizedBadge = game.localizedBadge(isEn)
+    val localizedCategory = game.localizedCategory(isEn)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -490,9 +497,9 @@ private fun LibraryGameCard(
                     .align(Alignment.BottomStart),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (game.badge != null) {
+                if (localizedBadge != null) {
                     Text(
-                        text = game.badge,
+                        text = localizedBadge,
                         color = XboxNeonGreen,
                         fontFamily = SpaceGroteskFontFamily,
                         fontSize = 9.sp,
@@ -518,7 +525,7 @@ private fun LibraryGameCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = game.category,
+                        text = localizedCategory,
                         color = TextSecondary,
                         fontSize = 10.sp,
                         maxLines = 1,
@@ -562,6 +569,8 @@ private fun AddGameDialog(
     onDismiss: () -> Unit,
     onAdd: (String, String) -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     var title by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("https://www.xbox.com/en-US/play/games/") }
 
@@ -569,7 +578,7 @@ private fun AddGameDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Thêm Game Vào Thư Viện",
+                text = if (isEn) "Add Game to Vault" else "Thêm Game Vào Thư Viện",
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold
@@ -578,14 +587,14 @@ private fun AddGameDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Dán link trò chơi trên Xbox Cloud Gaming để tạo phím tắt vào thẳng game 1 chạm (được lưu bền vững trên máy).",
+                    text = if (isEn) "Paste an Xbox Cloud Gaming URL to create a persistent 1-tap launch shortcut." else "Dán link trò chơi trên Xbox Cloud Gaming để tạo phím tắt vào thẳng game 1 chạm (được lưu bền vững trên máy).",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Tên Game (VD: Persona 3 Reload)") },
+                    label = { Text(if (isEn) "Game Title (e.g. Persona 3 Reload)" else "Tên Game (VD: Persona 3 Reload)") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
@@ -597,7 +606,7 @@ private fun AddGameDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Đường dẫn Xbox Cloud URL") },
+                    label = { Text(if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud URL") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
@@ -617,12 +626,12 @@ private fun AddGameDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
             ) {
-                Text("Thêm Game", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (isEn) "Add Game" else "Thêm Game", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Hủy", color = TextSecondary)
+                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary)
             }
         },
         containerColor = XboxSurface

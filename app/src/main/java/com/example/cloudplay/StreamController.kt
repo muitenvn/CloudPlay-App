@@ -79,14 +79,23 @@ class StreamController(private val context: Context) {
             )
 
             val config = SettingsRepository.config.value
+            val isEn = config.isEnglishUI()
             val vpnState = VpnManager.state.value
 
             if (config.smartVpnEnabled || config.autoBypassEnabled) {
                 if (vpnState.mode != NetworkMode.VPN_JAPAN) {
                     VpnManager.autoTurnOnForLaunch(context)
-                    showTemporaryBanner("🌐 Đã tự động bật VPN mở khóa vùng để vào game...", BannerType.INFO, 3500)
+                    showTemporaryBanner(
+                        if (isEn) "🌐 Auto-enabled region unlock VPN for game launch..." else "🌐 Đã tự động bật VPN mở khóa vùng để vào game...",
+                        BannerType.INFO,
+                        3500
+                    )
                 } else {
-                    showTemporaryBanner("🚀 Đang vào game: Sẽ tự động tắt VPN khi luồng game kết nối...", BannerType.INFO, 3500)
+                    showTemporaryBanner(
+                        if (isEn) "🚀 Launching game: VPN will auto-disconnect once stream connects..." else "🚀 Đang vào game: Sẽ tự động tắt VPN khi luồng game kết nối...",
+                        BannerType.INFO,
+                        3500
+                    )
                 }
             }
 
@@ -114,19 +123,24 @@ class StreamController(private val context: Context) {
             )
 
             val config = SettingsRepository.config.value
+            val isEn = config.isEnglishUI()
 
             if ((config.smartVpnEnabled || config.autoBypassEnabled) && !_uiState.value.autoBypassTriggered) {
                 val delaySec = config.autoBypassDelaySeconds.coerceIn(1, 15)
                 try {
                     android.widget.Toast.makeText(
                         context,
-                        "⚡ Đã vào game! Tự động tắt VPN sau ${delaySec}s...",
+                        if (isEn) "⚡ In-game! Auto-disconnecting VPN in ${delaySec}s..." else "⚡ Đã vào game! Tự động tắt VPN sau ${delaySec}s...",
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
                 } catch (_: Exception) {}
-                scheduleAutoBypass(delaySec, "Luồng game đã kết nối")
+                scheduleAutoBypass(delaySec, if (isEn) "Game stream connected" else "Luồng game đã kết nối")
             } else {
-                showTemporaryBanner("✅ Đã vào game! Đang dùng mạng trực tiếp.", BannerType.SUCCESS, 5000)
+                showTemporaryBanner(
+                    if (isEn) "✅ In-game! Using Direct ISP connection." else "✅ Đã vào game! Đang dùng mạng trực tiếp.",
+                    BannerType.SUCCESS,
+                    5000
+                )
             }
         }
     }
@@ -164,13 +178,18 @@ class StreamController(private val context: Context) {
                 )
 
                 val config = SettingsRepository.config.value
+                val isEn = config.isEnglishUI()
                 if ((config.smartVpnEnabled || config.autoReconnectOnMenu) && VpnManager.needsVpnToPlay()) {
-                    showTemporaryBanner("🎮 Đã thoát game: Tự động bật lại VPN mở khóa vùng...", BannerType.INFO, 4000)
+                    showTemporaryBanner(
+                        if (isEn) "🎮 Exited game: Re-enabling region unlock VPN..." else "🎮 Đã thoát game: Tự động bật lại VPN mở khóa vùng...",
+                        BannerType.INFO,
+                        4000
+                    )
                     VpnManager.autoTurnOnForLaunch(context)
                     try {
                         android.widget.Toast.makeText(
                             context,
-                            "🌐 Đã thoát game: Tự động bật lại VPN mở khóa vùng",
+                            if (isEn) "🌐 Exited game: Auto-reenabled region unlock VPN" else "🌐 Đã thoát game: Tự động bật lại VPN mở khóa vùng",
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                     } catch (_: Exception) {}
@@ -187,12 +206,18 @@ class StreamController(private val context: Context) {
             countdownRemainingSeconds = null,
             showBanner = false
         )
-        showTemporaryBanner("🛡️ Đã giữ nguyên kết nối VPN theo yêu cầu.", BannerType.INFO, 3000)
+        val isEn = SettingsRepository.config.value.isEnglishUI()
+        showTemporaryBanner(
+            if (isEn) "🛡️ Kept VPN connection active as requested." else "🛡️ Đã giữ nguyên kết nối VPN theo yêu cầu.",
+            BannerType.INFO,
+            3000
+        )
     }
 
     fun forceSwitchToDirectNetwork() {
         cancelAutoBypass()
-        executeBypass("Chuyển mạng thủ công")
+        val isEn = SettingsRepository.config.value.isEnglishUI()
+        executeBypass(if (isEn) "Manual network switch" else "Chuyển mạng thủ công")
     }
 
     private fun scheduleAutoBypass(delaySeconds: Int, triggerReason: String) {
@@ -200,10 +225,15 @@ class StreamController(private val context: Context) {
         bannerDismissJob?.cancel()
         countdownJob = scope.launch {
             for (sec in delaySeconds downTo 1) {
+                val isEn = SettingsRepository.config.value.isEnglishUI()
                 _uiState.value = _uiState.value.copy(
                     countdownRemainingSeconds = sec,
                     showBanner = true,
-                    bannerMessage = "⚡ Đã vào game: Tự động TẮT VPN sau ${sec}s... (Chạm Hủy nếu muốn giữ)",
+                    bannerMessage = if (isEn) {
+                        "⚡ In-game: Auto-disconnecting VPN in ${sec}s... (Tap Cancel to keep)"
+                    } else {
+                        "⚡ Đã vào game: Tự động TẮT VPN sau ${sec}s... (Chạm Hủy nếu muốn giữ)"
+                    },
                     bannerType = BannerType.COUNTDOWN
                 )
                 delay(1000)
@@ -215,11 +245,16 @@ class StreamController(private val context: Context) {
 
     private fun executeBypass(reason: String) {
         bannerDismissJob?.cancel()
+        val isEn = SettingsRepository.config.value.isEnglishUI()
         _uiState.value = _uiState.value.copy(
             countdownRemainingSeconds = null,
             autoBypassTriggered = true,
             showBanner = true,
-            bannerMessage = "✅ Đã TỰ ĐỘNG TẮT VPN khi vào game! Đang dùng mạng trực tiếp mượt nhất.",
+            bannerMessage = if (isEn) {
+                "✅ VPN auto-disconnected! Now streaming over ultra-low latency Direct ISP."
+            } else {
+                "✅ Đã TỰ ĐỘNG TẮT VPN khi vào game! Đang dùng mạng trực tiếp mượt nhất."
+            },
             bannerType = BannerType.SUCCESS
         )
 
@@ -229,7 +264,7 @@ class StreamController(private val context: Context) {
             try {
                 android.widget.Toast.makeText(
                     context,
-                    "✅ Đã TỰ ĐỘNG TẮT VPN — Chuyển sang mạng trực tiếp!",
+                    if (isEn) "✅ VPN Disconnected — Switched to Direct ISP!" else "✅ Đã TỰ ĐỘNG TẮT VPN — Chuyển sang mạng trực tiếp!",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
             } catch (_: Exception) {}

@@ -57,20 +57,25 @@ object GeoIpDetector {
     }
 
     fun getCountryDisplayName(countryCode: String): String {
+        val isEn = try {
+            com.example.data.SettingsRepository.config.value.isEnglishUI()
+        } catch (_: Exception) {
+            false
+        }
         return when (countryCode.uppercase()) {
-            "JP" -> "Nhật Bản (Japan)"
-            "KR" -> "Hàn Quốc (South Korea)"
-            "US" -> "Hoa Kỳ (United States)"
+            "JP" -> if (isEn) "Japan" else "Nhật Bản (Japan)"
+            "KR" -> if (isEn) "South Korea" else "Hàn Quốc (South Korea)"
+            "US" -> if (isEn) "United States" else "Hoa Kỳ (United States)"
             "SG" -> "Singapore"
-            "VN" -> "Việt Nam (Vietnam)"
-            "GB" -> "Vương Quốc Anh (United Kingdom)"
-            "DE" -> "Đức (Germany)"
-            "FR" -> "Pháp (France)"
-            "AU" -> "Úc (Australia)"
+            "VN" -> if (isEn) "Vietnam" else "Việt Nam (Vietnam)"
+            "GB" -> if (isEn) "United Kingdom" else "Vương Quốc Anh (United Kingdom)"
+            "DE" -> if (isEn) "Germany" else "Đức (Germany)"
+            "FR" -> if (isEn) "France" else "Pháp (France)"
+            "AU" -> if (isEn) "Australia" else "Úc (Australia)"
             "CA" -> "Canada"
             "BR" -> "Brazil"
             "MX" -> "Mexico"
-            "PL" -> "Ba Lan (Poland)"
+            "PL" -> if (isEn) "Poland" else "Ba Lan (Poland)"
             else -> countryCode
         }
     }
@@ -124,10 +129,10 @@ object GeoIpDetector {
                 )
             }
         } catch (_: Exception) {
-            // Fallback 1: ipwho.is
+            // Fallback 1: ipwho.is over HTTPS (prevents Cleartext/MixedContent errors)
             try {
                 val req = Request.Builder()
-                    .url("http://ipwho.is/")
+                    .url("https://ipwho.is/")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
                 val resp = httpClient.newCall(req).execute()

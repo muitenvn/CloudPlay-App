@@ -33,8 +33,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.RocketLaunch
@@ -161,16 +161,21 @@ private fun HeroConsolePlayDeck(
     onOpenGuide: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
-    val infiniteTransition = rememberInfiniteTransition(label = "hero_glow")
-    val borderGlowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.45f,
-        targetValue = 0.90f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "border_glow_alpha"
-    )
+    val borderGlowAlpha = if (config.lowEndDeviceMode) {
+        0.65f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "hero_glow")
+        val animatedAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 0.90f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "border_glow_alpha"
+        )
+        animatedAlpha
+    }
 
     Card(
         modifier = Modifier
@@ -304,7 +309,7 @@ private fun HeroConsolePlayDeck(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.HelpOutline,
+                                imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                                 contentDescription = stringResource(R.string.guide_button),
                                 tint = DirectCyan,
                                 modifier = Modifier.size(15.dp)
@@ -931,6 +936,10 @@ private fun FeaturedGameCard(
     game: GameBookmark,
     onLaunch: () -> Unit
 ) {
+    val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    val localizedBadge = game.localizedBadge(isEn)
+    val localizedCategory = game.localizedCategory(isEn)
     Card(
         modifier = Modifier
             .width(184.dp)
@@ -994,7 +1003,7 @@ private fun FeaturedGameCard(
                 )
 
                 // Top-left Badge Tag
-                if (game.badge != null) {
+                if (localizedBadge != null) {
                     Surface(
                         shape = RoundedCornerShape(bottomEnd = 10.dp),
                         color = Color(0xD9060B08),
@@ -1002,7 +1011,7 @@ private fun FeaturedGameCard(
                         modifier = Modifier.align(Alignment.TopStart)
                     ) {
                         Text(
-                            text = game.badge,
+                            text = localizedBadge,
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 8.5.sp,
@@ -1049,7 +1058,7 @@ private fun FeaturedGameCard(
                 )
 
                 Text(
-                    text = game.category,
+                    text = localizedCategory,
                     color = TextSecondary,
                     fontSize = 10.5.sp,
                     maxLines = 1,

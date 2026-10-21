@@ -94,6 +94,7 @@ fun SmartTranslatorDialog(
     modifier: Modifier = Modifier
 ) {
     val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val scope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
@@ -154,14 +155,14 @@ fun SmartTranslatorDialog(
                         }
                         Column {
                             Text(
-                                text = "BỘ DỊCH THÔNG MINH (GOOGLE TRANSLATE)",
+                                text = if (isEn) "SMART TRANSLATOR (GOOGLE TRANSLATE)" else "BỘ DỊCH THÔNG MINH (GOOGLE TRANSLATE)",
                                 color = TextPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.4.sp
                             )
                             Text(
-                                text = "Dịch mượt như Google Dịch • Tự động né tên game & stream",
+                                text = if (isEn) "Smooth Google Translate • Auto-preserves game titles & stream" else "Dịch mượt như Google Dịch • Tự động né tên game & stream",
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -175,7 +176,7 @@ fun SmartTranslatorDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Đóng",
+                            contentDescription = if (isEn) "Close" else "Đóng",
                             tint = TextSecondary
                         )
                     }
@@ -203,7 +204,7 @@ fun SmartTranslatorDialog(
                         onClick = { selectedTab = 0 },
                         text = {
                             Text(
-                                text = "Dịch Nhanh",
+                                text = if (isEn) "Quick Translate" else "Dịch Nhanh",
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
                             )
@@ -214,7 +215,7 @@ fun SmartTranslatorDialog(
                         onClick = { selectedTab = 1 },
                         text = {
                             Text(
-                                text = "Quy Tắc Né & Sửa",
+                                text = if (isEn) "Smart Rules" else "Quy Tắc Né & Sửa",
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
                             )
@@ -225,7 +226,7 @@ fun SmartTranslatorDialog(
                         onClick = { selectedTab = 2 },
                         text = {
                             Text(
-                                text = "Cài Đặt xCloud",
+                                text = if (isEn) "xCloud Options" else "Cài Đặt xCloud",
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal
                             )
@@ -239,6 +240,7 @@ fun SmartTranslatorDialog(
                 Box(modifier = Modifier.weight(1f)) {
                     when (selectedTab) {
                         0 -> LiveTranslateSection(
+                            isEn = isEn,
                             inputText = inputText,
                             onInputTextChange = { inputText = it },
                             translationResult = translationResult,
@@ -275,9 +277,10 @@ fun SmartTranslatorDialog(
                                 }
                             }
                         )
-                        1 -> SmartRulesSection()
+                        1 -> SmartRulesSection(isEn = isEn)
                         2 -> SettingsSection(
-                            translationActive = config.xcloudTranslateEnabled,
+                            isEn = isEn,
+                            translationActive = config.isEffectiveTranslateEnabled(),
                             preserveTitles = config.preserveGameTitles,
                             bilingualMode = config.bilingualMode,
                             hideStats = config.hideStreamStatsOverlay,
@@ -301,6 +304,7 @@ fun SmartTranslatorDialog(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LiveTranslateSection(
+    isEn: Boolean,
     inputText: String,
     onInputTextChange: (String) -> Unit,
     translationResult: GoogleGamingTranslator.SmartTranslationResult?,
@@ -321,7 +325,7 @@ private fun LiveTranslateSection(
     ) {
         // Sample chips
         Text(
-            text = "MẪU CÂU THỬ NGHIỆM ĐỂ KIỂM TRA NÉ & DỊCH:",
+            text = if (isEn) "SAMPLE PHRASES TO TEST SMART PROTECTION & TRANSLATION:" else "MẪU CÂU THỬ NGHIỆM ĐỂ KIỂM TRA NÉ & DỊCH:",
             color = TextSecondary,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold
@@ -363,8 +367,8 @@ private fun LiveTranslateSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 90.dp),
-            label = { Text("Nhập hoặc dán văn bản tiếng Anh (Game, Menu, Cốt truyện...)") },
-            placeholder = { Text("VD: Press RT to boost speed in Forza Horizon...") },
+            label = { Text(if (isEn) "Enter or paste English text (Game, Menu, Story...)" else "Nhập hoặc dán văn bản tiếng Anh (Game, Menu, Cốt truyện...)") },
+            placeholder = { Text(if (isEn) "e.g., Press RT to boost speed in Forza Horizon..." else "VD: Press RT to boost speed in Forza Horizon...") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = XboxNeonGreen,
                 unfocusedBorderColor = XboxGlassBorder,
@@ -399,11 +403,11 @@ private fun LiveTranslateSection(
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Đang dịch thông minh...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(if (isEn) "Smart translating..." else "Đang dịch thông minh...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             } else {
                 Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("DỊCH BẰNG GOOGLE TRANSLATE (CÓ BẢO VỆ)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(if (isEn) "TRANSLATE WITH GOOGLE TRANSLATE (PROTECTED)" else "DỊCH BẰNG GOOGLE TRANSLATE (CÓ BẢO VỆ)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
 
@@ -431,7 +435,7 @@ private fun LiveTranslateSection(
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
                             Text(
-                                text = "KẾT QUẢ DỊCH TIẾNG VIỆT",
+                                text = if (isEn) "VIETNAMESE TRANSLATION RESULT" else "KẾT QUẢ DỊCH TIẾNG VIỆT",
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -444,7 +448,7 @@ private fun LiveTranslateSection(
                         ) {
                             Icon(
                                 imageVector = if (copiedFeedback) Icons.Default.Check else Icons.Default.ContentCopy,
-                                contentDescription = "Sao chép",
+                                contentDescription = if (isEn) "Copy" else "Sao chép",
                                 tint = if (copiedFeedback) XboxNeonGreen else TextSecondary,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -471,7 +475,7 @@ private fun LiveTranslateSection(
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = "🛡️ ĐÃ NÉ THÀNH CÔNG (GIỮ NGUYÊN GỐC):",
+                                    text = if (isEn) "🛡️ PROTECTED TERMS (PRESERVED ORIGINAL):" else "🛡️ ĐÃ NÉ THÀNH CÔNG (GIỮ NGUYÊN GỐC):",
                                     color = DirectCyan,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -506,7 +510,11 @@ private fun LiveTranslateSection(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = if (translationResult.isFromCache) "⚡ Bộ nhớ đệm tức thì (0ms)" else "⏱️ Thời gian phản hồi: ${translationResult.executionTimeMs}ms",
+                            text = if (translationResult.isFromCache) {
+                                if (isEn) "⚡ Instant Cache (0ms)" else "⚡ Bộ nhớ đệm tức thì (0ms)"
+                            } else {
+                                if (isEn) "⏱️ Response time: ${translationResult.executionTimeMs}ms" else "⏱️ Thời gian phản hồi: ${translationResult.executionTimeMs}ms"
+                            },
                             color = TextSecondary,
                             fontSize = 9.sp
                         )
@@ -523,7 +531,7 @@ private fun LiveTranslateSection(
 }
 
 @Composable
-private fun SmartRulesSection() {
+private fun SmartRulesSection(isEn: Boolean) {
     val scrollState = rememberScrollState()
 
     Column(
@@ -533,7 +541,7 @@ private fun SmartRulesSection() {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "HỆ THỐNG PHÂN BIỆT THÔNG MINH (NÉ GÌ & DỊCH GÌ)",
+            text = if (isEn) "SMART PROTECTION ENGINE (WHAT TO SKIP & WHAT TO TRANSLATE)" else "HỆ THỐNG PHÂN BIỆT THÔNG MINH (NÉ GÌ & DỊCH GÌ)",
             color = XboxNeonGreen,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
@@ -557,7 +565,7 @@ private fun SmartRulesSection() {
                 ) {
                     Icon(Icons.Default.Security, contentDescription = null, tint = JapanRed, modifier = Modifier.size(16.dp))
                     Text(
-                        text = "1. CHỖ NÉ (TUYỆT ĐỐI KHÔNG DỊCH BỪA)",
+                        text = if (isEn) "1. PROTECTED ITEMS (NEVER TRANSLATE)" else "1. CHỖ NÉ (TUYỆT ĐỐI KHÔNG DỊCH BỪA)",
                         color = JapanRed,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -565,27 +573,27 @@ private fun SmartRulesSection() {
                 }
 
                 Text(
-                    text = "• Tên Game & Thương hiệu gốc: Halo, Forza Horizon, Starfield, Minecraft, Palworld, Call of Duty, Cyberpunk 2077, EA Play, Ubisoft, Bethesda Softworks...",
+                    text = if (isEn) "• Game Titles & Publishers: Halo, Forza Horizon, Starfield, Minecraft, Palworld, Call of Duty, Cyberpunk 2077, EA Play, Ubisoft, Bethesda Softworks..." else "• Tên Game & Thương hiệu gốc: Halo, Forza Horizon, Starfield, Minecraft, Palworld, Call of Duty, Cyberpunk 2077, EA Play, Ubisoft, Bethesda Softworks...",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Nút bấm tay cầm console: A, B, X, Y, LB, RB, LT, RT, D-Pad, Left Stick, Right Stick, Menu, View, Xbox Nexus Button.",
+                    text = if (isEn) "• Console Controller Buttons: A, B, X, Y, LB, RB, LT, RT, D-Pad, Left Stick, Right Stick, Menu, View, Xbox Nexus Button." else "• Nút bấm tay cầm console: A, B, X, Y, LB, RB, LT, RT, D-Pad, Left Stick, Right Stick, Menu, View, Xbox Nexus Button.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Luồng hình ảnh & âm thanh: Video stream WebRTC, thẻ <video>, <canvas>, audio (giữ nguyên để stream 60fps mượt mà).",
+                    text = if (isEn) "• Video & Audio Streams: WebRTC stream, <video>, <canvas>, audio tags (untouched for smooth 60fps streaming)." else "• Luồng hình ảnh & âm thanh: Video stream WebRTC, thẻ <video>, <canvas>, audio (giữ nguyên để stream 60fps mượt mà).",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Thông số kỹ thuật: FPS, Bitrate Mbps, Ping ms, 1080p, 60fps, 4K HDR, Clarity Boost, Codec H.264 / AV1.",
+                    text = if (isEn) "• Technical Specs: FPS, Bitrate Mbps, Ping ms, 1080p, 60fps, 4K HDR, Clarity Boost, H.264 / AV1 Codec." else "• Thông số kỹ thuật: FPS, Bitrate Mbps, Ping ms, 1080p, 60fps, 4K HDR, Clarity Boost, Codec H.264 / AV1.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Tài khoản người dùng: GamerTag, ID người chơi, URLs liên kết, Tokens.",
+                    text = if (isEn) "• User Account Data: GamerTag, Player IDs, URLs, Auth Tokens." else "• Tài khoản người dùng: GamerTag, ID người chơi, URLs liên kết, Tokens.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
@@ -610,7 +618,7 @@ private fun SmartRulesSection() {
                 ) {
                     Icon(Icons.Default.GTranslate, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                     Text(
-                        text = "2. CHỖ NÊN DỊCH (DỊCH Y HỆT GOOGLE DỊCH)",
+                        text = if (isEn) "2. TRANSLATED ITEMS (GOOGLE NEURAL TRANSLATE)" else "2. CHỖ NÊN DỊCH (DỊCH Y HỆT GOOGLE DỊCH)",
                         color = XboxNeonGreen,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -618,27 +626,27 @@ private fun SmartRulesSection() {
                 }
 
                 Text(
-                    text = "• Tóm tắt cốt truyện game (Game Synopsis, Overview, Description).",
+                    text = if (isEn) "• Game Synopsis, Story Overview & Descriptions." else "• Tóm tắt cốt truyện game (Game Synopsis, Overview, Description).",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Menu điều hướng giao diện xCloud: Tất cả trò chơi, Thư viện, Tham gia Game Pass, Đăng nhập, Cài đặt.",
+                    text = if (isEn) "• xCloud Navigation Menus: All Games, Library, Join Game Pass, Sign In, Settings." else "• Menu điều hướng giao diện xCloud: Tất cả trò chơi, Thư viện, Tham gia Game Pass, Đăng nhập, Cài đặt.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Thành tựu (Achievements), mục tiêu nhiệm vụ, mẹo chơi game.",
+                    text = if (isEn) "• Achievements, Quest Objectives & Gameplay Tips." else "• Thành tựu (Achievements), mục tiêu nhiệm vụ, mẹo chơi game.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Thông báo hàng chờ: Thời gian chờ còn lại, vị trí xếp hàng, lỗi mất kết nối máy chủ.",
+                    text = if (isEn) "• Queue Notifications: Remaining wait time, queue position, server disconnect alerts." else "• Thông báo hàng chờ: Thời gian chờ còn lại, vị trí xếp hàng, lỗi mất kết nối máy chủ.",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
                 Text(
-                    text = "• Đánh giá cộng đồng, bài nhận xét, ghi chú cập nhật bản vá (Patch notes).",
+                    text = if (isEn) "• Community Reviews, Ratings & Patch Notes." else "• Đánh giá cộng đồng, bài nhận xét, ghi chú cập nhật bản vá (Patch notes).",
                     color = TextPrimary,
                     fontSize = 10.sp
                 )
@@ -663,14 +671,18 @@ private fun SmartRulesSection() {
                 ) {
                     Icon(Icons.Default.Speed, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
                     Text(
-                        text = "CƠ CHẾ HOẠT ĐỘNG THÔNG MINH",
+                        text = if (isEn) "HOW THE SMART ENGINE WORKS" else "CƠ CHẾ HOẠT ĐỘNG THÔNG MINH",
                         color = DirectCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
-                    text = "1. Quét DOM bằng Native TreeWalker siêu nhẹ (<2ms).\n2. Đối chiếu từ điển UI 0ms của cộng đồng GitHub Better-xCloud.\n3. Nhận diện tokenized game titles và nút bấm để đóng gói bảo vệ.\n4. Gửi đoạn văn bản cần dịch tới Google Neural Translate qua mạng.\n5. Tự động giải mã placeholder đưa tên game nguyên bản về vị trí cũ.\n6. Lưu vào RAM Cache để lần truy cập sau hiển thị ngay lập tức không tốn data.",
+                    text = if (isEn) {
+                        "1. Scans DOM via lightweight Native TreeWalker (<2ms).\n2. Matches 0ms UI dictionary from Better-xCloud community.\n3. Tokenizes game titles & controller buttons into protected placeholders.\n4. Sends remaining text to Google Neural Translate.\n5. Restores original game titles & button tokens seamlessly.\n6. Caches in RAM for instant 0ms lookup on repeat visits."
+                    } else {
+                        "1. Quét DOM bằng Native TreeWalker siêu nhẹ (<2ms).\n2. Đối chiếu từ điển UI 0ms của cộng đồng GitHub Better-xCloud.\n3. Nhận diện tokenized game titles và nút bấm để đóng gói bảo vệ.\n4. Gửi đoạn văn bản cần dịch tới Google Neural Translate qua mạng.\n5. Tự động giải mã placeholder đưa tên game nguyên bản về vị trí cũ.\n6. Lưu vào RAM Cache để lần truy cập sau hiển thị ngay lập tức không tốn data."
+                    },
                     color = TextSecondary,
                     fontSize = 9.5.sp,
                     lineHeight = 15.sp
@@ -682,6 +694,7 @@ private fun SmartRulesSection() {
 
 @Composable
 private fun SettingsSection(
+    isEn: Boolean,
     translationActive: Boolean,
     preserveTitles: Boolean,
     bilingualMode: Boolean,
@@ -716,9 +729,15 @@ private fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Tự Động Dịch Trang Web xCloud", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) "Auto-Translate xCloud Web Page" else "Tự Động Dịch Trang Web xCloud", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        if (translationActive) "Đang bật: Đã dịch $translatedCount mục trên trang" else "Đang tắt: Hiển thị ngôn ngữ gốc",
+                        if (isEn) {
+                            "Disabled in English UI mode (Original English is kept)"
+                        } else if (translationActive) {
+                            "Đang bật: Đã dịch $translatedCount mục trên trang"
+                        } else {
+                            "Đang tắt: Hiển thị ngôn ngữ gốc"
+                        },
                         color = if (translationActive) XboxNeonGreen else TextSecondary,
                         fontSize = 10.sp
                     )
@@ -726,6 +745,7 @@ private fun SettingsSection(
                 Switch(
                     checked = translationActive,
                     onCheckedChange = onToggleTranslation,
+                    enabled = !isEn,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = XboxNeonGreen,
                         checkedTrackColor = XboxNeonGreen.copy(alpha = 0.3f)
@@ -748,9 +768,9 @@ private fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Giữ Nguyên Tên Game & Thương Hiệu", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) "Preserve Game Titles & Brands" else "Giữ Nguyên Tên Game & Thương Hiệu", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Không dịch 'Halo' thành 'Hào quang', 'Forza' thành 'Sức mạnh'",
+                        if (isEn) "Never translate 'Halo', 'Forza', 'Starfield', etc." else "Không dịch 'Halo' thành 'Hào quang', 'Forza' thành 'Sức mạnh'",
                         color = TextSecondary,
                         fontSize = 10.sp
                     )
@@ -780,9 +800,9 @@ private fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Chế Độ Hiển Thị Song Ngữ", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) "Bilingual Display Mode" else "Chế Độ Hiển Thị Song Ngữ", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Hiển thị Tiếng Việt kèm từ gốc tiếng Anh trong ngoặc đơn",
+                        if (isEn) "Show translated text with original English in parentheses" else "Hiển thị Tiếng Việt kèm từ gốc tiếng Anh trong ngoặc đơn",
                         color = TextSecondary,
                         fontSize = 10.sp
                     )
@@ -812,9 +832,9 @@ private fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Ẩn Bảng Decode Profile & Stream Stats", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(if (isEn) "Hide Decode Profile & Stream Stats" else "Ẩn Bảng Decode Profile & Stream Stats", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        "Tự động xóa bảng thông số web gây rối mắt khi chơi game",
+                        if (isEn) "Automatically remove distracting web overlay stats during gameplay" else "Tự động xóa bảng thông số web gây rối mắt khi chơi game",
                         color = TextSecondary,
                         fontSize = 10.sp
                     )
@@ -833,7 +853,7 @@ private fun SettingsSection(
         Spacer(modifier = Modifier.height(6.dp))
 
         // Force Translate Entire Page Action
-        if (onForceTranslatePage != null) {
+        if (onForceTranslatePage != null && !isEn) {
             Button(
                 onClick = onForceTranslatePage,
                 modifier = Modifier.fillMaxWidth(),
@@ -859,7 +879,7 @@ private fun SettingsSection(
             ),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Text("XÓA BỘ NHỚ ĐỆM BẢN DỊCH (LÀM MỚI)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(if (isEn) "CLEAR TRANSLATION CACHE (REFRESH)" else "XÓA BỘ NHỚ ĐỆM BẢN DỊCH (LÀM MỚI)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

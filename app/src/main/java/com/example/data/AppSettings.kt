@@ -12,28 +12,39 @@ data class XboxLanguage(
     val code: String,
     val displayName: String,
     val nativeName: String,
-    val flag: String
-)
+    val flag: String,
+    val displayNameEn: String = nativeName
+) {
+    fun localizedName(isEn: Boolean): String = if (isEn) displayNameEn else displayName
+}
 
 val POPULAR_XBOX_LANGUAGES = listOf(
-    XboxLanguage("en-US", "Tiếng Anh (Mỹ)", "English (United States)", "🇺🇸"),
-    XboxLanguage("en-GB", "Tiếng Anh (Anh)", "English (United Kingdom)", "🇬🇧"),
-    XboxLanguage("ja-JP", "Tiếng Nhật", "日本語", "🇯🇵"),
-    XboxLanguage("ko-KR", "Tiếng Hàn", "한국어", "🇰🇷"),
-    XboxLanguage("zh-TW", "Tiếng Trung (Phồn thể)", "繁體中文", "🇹🇼"),
-    XboxLanguage("fr-FR", "Tiếng Pháp", "Français", "🇫🇷"),
-    XboxLanguage("de-DE", "Tiếng Đức", "Deutsch", "🇩🇪"),
-    XboxLanguage("es-ES", "Tiếng Tây Ban Nha", "Español", "🇪🇸"),
-    XboxLanguage("pt-BR", "Tiếng Bồ Đào Nha", "Português (Brasil)", "🇧🇷"),
-    XboxLanguage("it-IT", "Tiếng Ý", "Italiano", "🇮🇹"),
-    XboxLanguage("pl-PL", "Tiếng Ba Lan", "Polski", "🇵🇱")
+    XboxLanguage("en-US", "Tiếng Anh (Mỹ)", "English (United States)", "🇺🇸", "English (United States)"),
+    XboxLanguage("en-GB", "Tiếng Anh (Anh)", "English (United Kingdom)", "🇬🇧", "English (United Kingdom)"),
+    XboxLanguage("ja-JP", "Tiếng Nhật", "日本語", "🇯🇵", "Japanese (日本語)"),
+    XboxLanguage("ko-KR", "Tiếng Hàn", "한국어", "🇰🇷", "Korean (한국어)"),
+    XboxLanguage("zh-TW", "Tiếng Trung (Phồn thể)", "繁體中文", "🇹🇼", "Traditional Chinese (繁體中文)"),
+    XboxLanguage("fr-FR", "Tiếng Pháp", "Français", "🇫🇷", "French (Français)"),
+    XboxLanguage("de-DE", "Tiếng Đức", "Deutsch", "🇩🇪", "German (Deutsch)"),
+    XboxLanguage("es-ES", "Tiếng Tây Ban Nha", "Español", "🇪🇸", "Spanish (Español)"),
+    XboxLanguage("pt-BR", "Tiếng Bồ Đào Nha", "Português (Brasil)", "🇧🇷", "Portuguese (Português)"),
+    XboxLanguage("it-IT", "Tiếng Ý", "Italiano", "🇮🇹", "Italian (Italiano)"),
+    XboxLanguage("pl-PL", "Tiếng Ba Lan", "Polski", "🇵🇱", "Polish (Polski)")
 )
 
-enum class ClarityPreset(val displayName: String, val description: String) {
-    OFF("Tắt", "Hình ảnh nguyên bản không can thiệp"),
-    BALANCED("Cân Bằng", "Tăng nét nhẹ + 8% tương phản (Khuyên dùng)"),
-    ULTRA_SHARP("Ultra Sharp", "Làm nét cạnh tối đa cho game 3D/FPS"),
-    OLED_PUNCH("OLED Punch", "Màu sắc rực rỡ & độ sâu màu cho màn AMOLED/OLED")
+enum class ClarityPreset(
+    val displayName: String,
+    val description: String,
+    val displayNameEn: String,
+    val descriptionEn: String
+) {
+    OFF("Tắt", "Hình ảnh nguyên bản không can thiệp", "Off", "Original unmodified video stream"),
+    BALANCED("Cân Bằng", "Tăng nét nhẹ + 8% tương phản (Khuyên dùng)", "Balanced", "Gentle sharpening + 8% contrast (Recommended)"),
+    ULTRA_SHARP("Ultra Sharp", "Làm nét cạnh tối đa cho game 3D/FPS", "Ultra Sharp", "Maximum edge clarity for 3D/FPS games"),
+    OLED_PUNCH("OLED Punch", "Màu sắc rực rỡ & độ sâu màu cho màn AMOLED/OLED", "OLED Punch", "Vivid colors & deep contrast for AMOLED/OLED");
+
+    fun localizedName(isEn: Boolean): String = if (isEn) displayNameEn else displayName
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descriptionEn else description
 }
 
 enum class StreamGraphicsQuality(
@@ -105,7 +116,12 @@ enum class CellularOptimizationMode(
     val subtitle: String,
     val bitrateMbps: Int,
     val deviceLoadBadge: String,
-    val description: String
+    val description: String,
+    val titleEn: String,
+    val shortLabelEn: String,
+    val subtitleEn: String,
+    val deviceLoadBadgeEn: String,
+    val descriptionEn: String
 ) {
     AUTO(
         id = "auto",
@@ -114,7 +130,12 @@ enum class CellularOptimizationMode(
         subtitle = "Tự tối ưu theo điều kiện mạng & máy",
         bitrateMbps = 10,
         deviceLoadBadge = "⚡ Tự Động Tối Ưu",
-        description = "Tự động nhận diện chất lượng Wi-Fi / 4G / 5G và theo dõi tải giải mã GPU của điện thoại để điều chỉnh đồ họa, giữ 60 FPS mượt mà và chống nóng máy."
+        description = "Tự động nhận diện chất lượng Wi-Fi / 4G / 5G và theo dõi tải giải mã GPU của điện thoại để điều chỉnh đồ họa, giữ 60 FPS mượt mà và chống nóng máy.",
+        titleEn = "Auto",
+        shortLabelEn = "Auto",
+        subtitleEn = "Auto-optimizes for network & device load",
+        deviceLoadBadgeEn = "⚡ Smart Auto-Tune",
+        descriptionEn = "Automatically detects Wi-Fi / 4G / 5G quality and GPU decode load to adjust bitrate smoothly, keeping 60 FPS and preventing overheating."
     ),
     DATA_SAVER_HIGH_SPEED(
         id = "saver",
@@ -123,7 +144,12 @@ enum class CellularOptimizationMode(
         subtitle = "Tiết kiệm dung lượng • 5 Mbps",
         bitrateMbps = 5,
         deviceLoadBadge = "❄️ Siêu Nhẹ • Mát Máy",
-        description = "Giảm tải tối đa cho CPU/GPU điện thoại (giải mã phần cứng dưới 4ms), tiết kiệm đến 60% dung lượng data (~2.2GB/giờ) và đỡ hao pin."
+        description = "Giảm tải tối đa cho CPU/GPU điện thoại (giải mã phần cứng dưới 4ms), tiết kiệm đến 60% dung lượng data (~2.2GB/giờ) và đỡ hao pin.",
+        titleEn = "Low",
+        shortLabelEn = "Saver (5M)",
+        subtitleEn = "Data Saver • 5 Mbps",
+        deviceLoadBadgeEn = "❄️ Ultra Light • Cool",
+        descriptionEn = "Minimizes phone CPU/GPU load (<4ms hardware decode), saves up to 60% mobile data (~2.2GB/hr), and extends battery life."
     ),
     MEDIUM(
         id = "medium",
@@ -132,7 +158,12 @@ enum class CellularOptimizationMode(
         subtitle = "Cân bằng & mát máy • 9 Mbps",
         bitrateMbps = 9,
         deviceLoadBadge = "🌿 Êm Ái • Chống Nóng",
-        description = "Mức cân bằng lý tưởng cho điện thoại tầm trung. Đảm bảo khung hình 60 FPS ổn định, tiết kiệm ~40% dung lượng và giữ máy mát khi chơi lâu."
+        description = "Mức cân bằng lý tưởng cho điện thoại tầm trung. Đảm bảo khung hình 60 FPS ổn định, tiết kiệm ~40% dung lượng và giữ máy mát khi chơi lâu.",
+        titleEn = "Medium",
+        shortLabelEn = "Medium (9M)",
+        subtitleEn = "Balanced & cool • 9 Mbps",
+        deviceLoadBadgeEn = "🌿 Smooth • Cool",
+        descriptionEn = "Ideal balance for mid-range phones. Delivers stable 60 FPS, saves ~40% data, and keeps your device cool during long sessions."
     ),
     HIGH(
         id = "high",
@@ -141,7 +172,12 @@ enum class CellularOptimizationMode(
         subtitle = "Sắc nét 1080p • 14 Mbps",
         bitrateMbps = 14,
         deviceLoadBadge = "✨ Chuẩn 1080p60",
-        description = "Tái tạo hình ảnh Full HD 1080p60 sắc nét với chi tiết bề mặt rõ ràng, phù hợp khi mạng ổn định và điện thoại có chip xử lý khá trở lên."
+        description = "Tái tạo hình ảnh Full HD 1080p60 sắc nét với chi tiết bề mặt rõ ràng, phù hợp khi mạng ổn định và điện thoại có chip xử lý khá trở lên.",
+        titleEn = "High",
+        shortLabelEn = "High (14M)",
+        subtitleEn = "Crisp 1080p • 14 Mbps",
+        deviceLoadBadgeEn = "✨ 1080p60 Standard",
+        descriptionEn = "Delivers sharp Full HD 1080p60 visuals with crisp textures, ideal for stable connections and capable mobile processors."
     ),
     MAX_SPEED_UNCAPPED(
         id = "max",
@@ -150,41 +186,67 @@ enum class CellularOptimizationMode(
         subtitle = "Đồ họa tối đa • 20 Mbps",
         bitrateMbps = 20,
         deviceLoadBadge = "🔥 Đồ Họa Tối Đa",
-        description = "Bung trọn vẹn 20 Mbps băng thông cho chất lượng đồ họa cao nhất, phản hồi tay cầm tức thì cho máy cấu hình mạnh và mạng tốc độ cao."
-    )
+        description = "Bung trọn vẹn 20 Mbps băng thông cho chất lượng đồ họa cao nhất, phản hồi tay cầm tức thì cho máy cấu hình mạnh và mạng tốc độ cao.",
+        titleEn = "Ultra",
+        shortLabelEn = "Ultra (20M)",
+        subtitleEn = "Max Graphics • 20 Mbps",
+        deviceLoadBadgeEn = "🔥 Max Graphics",
+        descriptionEn = "Unlocks the full 20 Mbps bandwidth for maximum visual fidelity and instant input response on high-speed networks."
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
+    fun localizedShortLabel(isEn: Boolean): String = if (isEn) shortLabelEn else shortLabel
+    fun localizedSubtitle(isEn: Boolean): String = if (isEn) subtitleEn else subtitle
+    fun localizedBadge(isEn: Boolean): String = if (isEn) deviceLoadBadgeEn else deviceLoadBadge
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descriptionEn else description
 }
 
 enum class NetworkTuningMode(
     val id: String,
     val title: String,
-    val subtitle: String
+    val subtitle: String,
+    val titleEn: String,
+    val subtitleEn: String
 ) {
     AUTO(
         id = "auto",
         title = "Tự Động Theo Điều Kiện Mạng (Khuyên dùng)",
-        subtitle = "Tự động điều chỉnh đồ họa & hiệu năng theo Wi-Fi / 4G"
+        subtitle = "Tự động điều chỉnh đồ họa & hiệu năng theo Wi-Fi / 4G",
+        titleEn = "Auto Network Adaptation (Recommended)",
+        subtitleEn = "Automatically tunes graphics & latency for Wi-Fi / 4G"
     ),
     WIFI_SPEED_FIRST(
         id = "wifi_speed",
         title = "Ưu Tiên Độ Trễ Thấp & Mượt 60 FPS",
-        subtitle = "Triệt tiêu trễ đệm khi mạng yếu, giảm tải GPU tức thì"
+        subtitle = "Triệt tiêu trễ đệm khi mạng yếu, giảm tải GPU tức thì",
+        titleEn = "Prioritize Low Latency & Smooth 60 FPS",
+        subtitleEn = "Eliminates buffer bloat on weak links, reduces GPU load"
     ),
     CELLULAR_DATA_SAVER(
         id = "cell_saver",
         title = "Thấp (Tiết Kiệm Dung Lượng)",
-        subtitle = "Tiết kiệm 60% dung lượng, siêu mát máy & nhẹ GPU"
+        subtitle = "Tiết kiệm 60% dung lượng, siêu mát máy & nhẹ GPU",
+        titleEn = "Low (Mobile Data Saver)",
+        subtitleEn = "Saves up to 60% data, ultra-cool & lightweight GPU decode"
     ),
     CELLULAR_MAX_SPEED(
         id = "cell_max",
         title = "Rất Cao (Đồ Họa Tối Đa)",
-        subtitle = "Bung tối đa 20 Mbps cho hình ảnh sắc nét nhất"
-    )
+        subtitle = "Bung tối đa 20 Mbps cho hình ảnh sắc nét nhất",
+        titleEn = "Ultra (Maximum Graphics)",
+        subtitleEn = "Unlocks full 20 Mbps for the sharpest visual quality"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
+    fun localizedSubtitle(isEn: Boolean): String = if (isEn) subtitleEn else subtitle
 }
 
-enum class AppLanguage(val code: String, val title: String) {
-    SYSTEM("system", "Theo hệ thống (Tự động)"),
-    VIETNAMESE("vi", "Tiếng Việt"),
-    ENGLISH("en", "English")
+enum class AppLanguage(val code: String, val title: String, val titleEn: String) {
+    SYSTEM("system", "Theo hệ thống (Tự động)", "System Default (Auto)"),
+    VIETNAMESE("vi", "Tiếng Việt", "Tiếng Việt (Vietnamese)"),
+    ENGLISH("en", "English", "English");
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
 }
 
 data class AppConfig(

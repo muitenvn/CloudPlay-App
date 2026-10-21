@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  models: read
 
 jobs:
   build:
@@ -126,189 +127,18 @@ jobs:
             gradle assembleDebug --no-daemon --no-configuration-cache --stacktrace
           fi
 
-      - name: Prepare APK and Extract Dynamic Changelog for Release
+      - name: Prepare APK and Generate Concise AI Release Description
         id: release_info
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_MODELS_TOKEN: ${{ secrets.GH_MODELS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          mkdir -p release-output
-          APK_FILE=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          if [ ! -f "$APK_FILE" ]; then
-            echo "Error: APK file not found!"
-            find app/build/ -name "*.apk" || true
-            exit 1
-          fi
-
-          # Extract versionName and versionCode from app/build.gradle.kts
-          APP_VER=$(grep -E 'versionName\s*=' app/build.gradle.kts | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.2.0")
-          APP_CODE=$(grep -E 'versionCode\s*=' app/build.gradle.kts | head -n 1 | sed -E 's/[^0-9]*([0-9]+).*/\1/' || echo "3")
-          [ -z "$APP_VER" ] && APP_VER="1.2.0"
-          [ -z "$APP_CODE" ] && APP_CODE="3"
-
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${{ github.ref_name }}"
-            TITLE="CloudPlay Xbox ${TAG} (Build #${APP_CODE})"
-          else
-            TAG="v${APP_VER}-b${{ github.run_number }}"
-            TITLE="CloudPlay Xbox v${APP_VER} (Build #${{ github.run_number }})"
-          fi
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-          echo "release_name=$TITLE" >> $GITHUB_OUTPUT
-
-          APK_TAGGED_NAME="CloudPlay-Xbox-${TAG}.apk"
-          APK_VER_NAME="CloudPlay-Xbox-v${APP_VER}.apk"
-          cp "$APK_FILE" "release-output/${APK_TAGGED_NAME}"
-          cp "$APK_FILE" "release-output/${APK_VER_NAME}"
-          cp "$APK_FILE" "release-output/app-debug.apk"
-          ls -lh release-output/
-
-          APK_SIZE=$(du -h "$APK_FILE" | cut -f1)
-          APK_SHA256=$(sha256sum "$APK_FILE" | awk '{print $1}')
-          BUILD_DATE=$(TZ='Asia/Ho_Chi_Minh' date '+%d/%m/%Y %H:%M:%S (GMT+7)')
-          LATEST_HASH=$(git rev-parse --short HEAD)
-
-          # 1. Extract the latest update section from CHANGELOG.md (between first "## [" and "---" or next "## [")
-          CHANGELOG_LATEST=""
-          if [ -f "CHANGELOG.md" ]; then
-            CHANGELOG_LATEST=$(awk '
-              /^## \[/ {
-                if (found) exit;
-                found=1;
-                print;
-                next;
-              }
-              found {
-                if (/^---$/) exit;
-                print;
-              }
-            ' CHANGELOG.md)
-          fi
-
-          # 2. Compare with previous tag or previous commit for code statistics and commit log
-          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -n 1 || true)
-          if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
-            COMMIT_RANGE="${PREV_TAG}..HEAD"
-            COMPARE_SUBTITLE="So sánh mã nguồn từ bản **${PREV_TAG}** ➔ **${TAG}**"
-            DIFF_STAT=$(git diff --stat "${PREV_TAG}" HEAD | tail -n 1 || true)
-            CHANGED_FILES=$(git diff --name-only "${PREV_TAG}" HEAD | head -n 25 | sed 's/^/- `/;s/$/`/' || true)
-          else
-            COMMIT_RANGE="-n 10 HEAD"
-            COMPARE_SUBTITLE="Thống kê commit & file cập nhật trong bản **${TAG}**"
-            DIFF_STAT=$(git show --stat --oneline HEAD | tail -n 1 || true)
-            CHANGED_FILES=$(git show --pretty="" --name-only HEAD | head -n 25 | sed 's/^/- `/;s/$/`/' || true)
-          fi
-
-          COMMIT_LIST=$(git log $COMMIT_RANGE --no-merges --pretty=format:"- \`%h\` %s *(%cr)*" | grep -v -E "Initial commit$" || true)
-
-          # 3. Call lightweight AI (Gemini Flash-Lite or GitHub Models free tier) with minimal token usage
-          export AI_CONTEXT_CHANGELOG="$CHANGELOG_LATEST"
-          export AI_CONTEXT_COMMITS="$COMMIT_LIST"
-          export AI_CONTEXT_FILES="$CHANGED_FILES"
-          export AI_CONTEXT_VERSION="$APP_VER"
-          AI_SUMMARY=$(python3 - << 'EOF' || true
-          import os, json, urllib.request
-
-          ver = os.environ.get("AI_CONTEXT_VERSION", "1.2.0")
-          # Truncate context to keep input tokens ultra-low (<200 tokens)
-          changelog = os.environ.get("AI_CONTEXT_CHANGELOG", "").strip()[:700]
-          commits = os.environ.get("AI_CONTEXT_COMMITS", "").strip()[:400]
-          files = os.environ.get("AI_CONTEXT_FILES", "").strip()[:300]
-
-          prompt = (
-              f"Tóm tắt ngắn gọn 3-4 gạch đầu dòng Tiếng Việt về bản cập nhật APK v{ver}:\n"
-              f"{changelog}\n{commits}\n{files}"
-          )
-
-          gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
-          gh_token = os.environ.get("GITHUB_TOKEN", "").strip()
-          result_text = ""
-
-          if gemini_key and gemini_key != "MY_GEMINI_API_KEY":
-              try:
-                  url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={gemini_key}"
-                  payload = {
-                      "contents": [{"parts": [{"text": prompt}]}],
-                      "generationConfig": {
-                          "temperature": 0.3,
-                          "maxOutputTokens": 200
-                      }
-                  }
-                  req = urllib.request.Request(
-                      url,
-                      data=json.dumps(payload).encode("utf-8"),
-                      headers={"Content-Type": "application/json"},
-                      method="POST"
-                  )
-                  with urllib.request.urlopen(req, timeout=20) as resp:
-                      data = json.loads(resp.read().decode("utf-8"))
-                      result_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-              except Exception:
-                  pass
-
-          if not result_text and gh_token:
-              try:
-                  url = "https://models.inference.ai.azure.com/chat/completions"
-                  payload = {
-                      "model": "gpt-4o-mini",
-                      "messages": [
-                          {"role": "user", "content": prompt}
-                      ],
-                      "temperature": 0.3,
-                      "max_tokens": 200
-                  }
-                  req = urllib.request.Request(
-                      url,
-                      data=json.dumps(payload).encode("utf-8"),
-                      headers={
-                          "Content-Type": "application/json",
-                          "Authorization": f"Bearer {gh_token}"
-                      },
-                      method="POST"
-                  )
-                  with urllib.request.urlopen(req, timeout=20) as resp:
-                      data = json.loads(resp.read().decode("utf-8"))
-                      result_text = data["choices"][0]["message"]["content"].strip()
-              except Exception:
-                  pass
-
-          if result_text:
-              print(result_text)
-          EOF
-          )
-
-          {
-            echo "## 🎮 Bản cập nhật CloudPlay Xbox **v${APP_VER}** (\`${TAG}\`)"
-            echo "> 📅 **Phát hành:** ${BUILD_DATE}  |  📦 **Kích thước APK:** \`${APK_SIZE}\`  |  🔢 **Version Code:** \`#${APP_CODE}\`  |  🔖 **Commit:** \`${LATEST_HASH}\`"
-            echo ""
-            if [ -n "$AI_SUMMARY" ]; then
-              echo "### ✨ Tóm tắt bản cập nhật (Mô tả bởi AI)"
-              printf "%s\n\n" "$AI_SUMMARY"
-              echo "---"
-            fi
-            if [ -n "$CHANGELOG_LATEST" ]; then
-              printf "%s\n\n" "$CHANGELOG_LATEST"
-            fi
-            if [ -n "$COMMIT_LIST" ]; then
-              echo "### 🕒 Lịch sử Commit trong đợt cập nhật này"
-              printf "%s\n\n" "$COMMIT_LIST"
-            fi
-            if [ -n "$DIFF_STAT" ] || [ -n "$CHANGED_FILES" ]; then
-              echo "<details><summary>📂 <b>Chi tiết các file mã nguồn đã thay đổi (${COMPARE_SUBTITLE})</b></summary>"
-              echo ""
-              [ -n "$DIFF_STAT" ] && echo "**Tổng quan:** \`${DIFF_STAT}\`" && echo ""
-              [ -n "$CHANGED_FILES" ] && printf "%s\n" "$CHANGED_FILES"
-              echo "</details>"
-              echo ""
-            fi
-            echo "---"
-            echo "### 📥 Tải về & Cài đặt đè trực tiếp"
-            echo "- **File APK bản cập nhật này:** Chọn **`${APK_TAGGED_NAME}`** (hoặc **`${APK_VER_NAME}`**) tại mục **Assets** bên dưới."
-            echo "- **Cài đặt đè không mất dữ liệu:** APK được ký bằng chữ ký đồng nhất — cài đặt đè trực tiếp lên bản cũ mà không cần gỡ ứng dụng."
-            echo "- **SHA-256:** \`${APK_SHA256}\`"
-          } > release-output/RELEASE_NOTES.md
-
-          cat release-output/RELEASE_NOTES.md
+          python3 scripts/generate_release_notes.py
 
       - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
@@ -333,7 +163,6 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: false
           files: |
-            release-output/CloudPlay-Xbox-${{ steps.release_info.outputs.tag_name }}.apk
             release-output/CloudPlay-Xbox-v*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -49,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,7 +94,6 @@ fun SettingsScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val systemLocale = remember { Locale.getDefault() }
     val resolvedSystemLocale = remember { SettingsRepository.resolveSystemXboxLocale() }
     val isEn = config.isEnglishUI()
@@ -1353,79 +1351,6 @@ fun SettingsScreen(
                             color = TextPrimary,
                             fontSize = 12.sp
                         )
-                    }
-                }
-            }
-        }
-
-        // Section 5.5: Dynamic Update Changelog & APK Build Info
-        item {
-            SettingsCard(
-                title = if (isEn) {
-                    "UPDATE CHANGELOG & APK BUILD INFO (v${com.example.BuildConfig.VERSION_NAME})"
-                } else {
-                    "NHẬT KÝ BẢN CẬP NHẬT & XUẤT FILE APK (v${com.example.BuildConfig.VERSION_NAME})"
-                }
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isEn) {
-                                "Build v${com.example.BuildConfig.VERSION_NAME} (Code #${com.example.BuildConfig.VERSION_CODE})"
-                            } else {
-                                "Phiên bản v${com.example.BuildConfig.VERSION_NAME} (Mã build #${com.example.BuildConfig.VERSION_CODE})"
-                            },
-                            color = DirectCyan,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(5.dp),
-                            color = XboxNeonGreen.copy(alpha = 0.18f),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.5f))
-                        ) {
-                            Text(
-                                text = if (isEn) "SEAMLESS APK UPDATE" else "CẬP NHẬT ĐÈ TRỰC TIẾP",
-                                color = XboxNeonGreen,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF0A140E),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "What's New in This Update:" else "Thay đổi thực tế trong bản cập nhật này:",
-                                color = TextPrimary,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isEn) {
-                                    "• Full 100% English & Vietnamese localization across all screens, dialogs, and HUD.\n• English UI mode automatically disables web auto-translation to Vietnamese & restores original English DOM.\n• Free-moving Floating HUD with edge-docking handle (drag flush to left/right edge to hide, swipe inward to restore) and thermal display only in Expanded HUD.\n• Region Unlock verification badges (Unlocked, Failed, Untested, Wrong Region) with smart sorting & auto-failover.\n• Reduced CPU/GPU & WebView overhead during gameplay (stopped unnecessary landscape JS polling, hardware layer rendering, Low-End Device Mode)."
-                                } else {
-                                    "• Hoàn thiện 100% ngôn ngữ Tiếng Anh & Tiếng Việt trên toàn bộ màn hình, hộp thoại và HUD.\n• Khi chọn Tiếng Anh: tự động tắt dịch web sang Tiếng Việt và khôi phục văn bản gốc tiếng Anh.\n• Nút nổi HUD di chuyển tự do không giới hạn, kéo sát rìa trái/phải tự ẩn thành thanh gờ (vuốt qua bật lại), ẩn nhiệt độ khi thu nhỏ.\n• Nhãn mở khóa vùng thực tế cho từng máy chủ (Đã mở khóa, Không mở khóa, Chưa thử, Sai vùng) kèm tự gợi ý đổi server.\n• Tối ưu giảm độ trễ & giảm tải CPU/GPU khi đang chơi (dừng quét JS thừa ở màn ngang, tăng tốc phần cứng WebRTC, Chế độ máy yếu)."
-                                },
-                                color = TextSecondary,
-                                fontSize = 10.5.sp,
-                                lineHeight = 15.sp
-                            )
-                        }
                     }
                 }
             }

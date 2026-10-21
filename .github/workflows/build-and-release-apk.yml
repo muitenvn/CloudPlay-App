@@ -201,7 +201,7 @@ jobs:
 
           COMMIT_LIST=$(git log $COMMIT_RANGE --no-merges --pretty=format:"- \`%h\` %s *(%cr)*" | grep -v -E "Initial commit$" || true)
 
-          # 3. Call AI (Gemini API gemini-3.5-flash or GitHub Models API) to write a natural description of this update
+          # 3. Call lightweight AI (Gemini Flash-Lite or GitHub Models free tier) with minimal token usage
           export AI_CONTEXT_CHANGELOG="$CHANGELOG_LATEST"
           export AI_CONTEXT_COMMITS="$COMMIT_LIST"
           export AI_CONTEXT_FILES="$CHANGED_FILES"
@@ -210,14 +210,14 @@ jobs:
           import os, json, urllib.request
 
           ver = os.environ.get("AI_CONTEXT_VERSION", "1.2.0")
-          changelog = os.environ.get("AI_CONTEXT_CHANGELOG", "").strip()
-          commits = os.environ.get("AI_CONTEXT_COMMITS", "").strip()
-          files = os.environ.get("AI_CONTEXT_FILES", "").strip()
+          # Truncate context to keep input tokens ultra-low (<200 tokens)
+          changelog = os.environ.get("AI_CONTEXT_CHANGELOG", "").strip()[:700]
+          commits = os.environ.get("AI_CONTEXT_COMMITS", "").strip()[:400]
+          files = os.environ.get("AI_CONTEXT_FILES", "").strip()[:300]
 
           prompt = (
-              f"Bạn là kỹ sư phát hành ứng dụng CloudPlay Xbox. Hãy viết một đoạn mô tả ngắn gọn (3-5 gạch đầu dòng bằng Tiếng Việt, tự nhiên, rõ ràng, không dùng văn mẫu sáo rỗng) "
-              f"tóm tắt những điểm mới trong bản cập nhật APK v{ver} dựa trên dữ liệu thay đổi thực tế dưới đây:\n\n"
-              f"Changelog:\n{changelog}\n\nCommits:\n{commits}\n\nChanged files:\n{files}"
+              f"Tóm tắt ngắn gọn 3-4 gạch đầu dòng Tiếng Việt về bản cập nhật APK v{ver}:\n"
+              f"{changelog}\n{commits}\n{files}"
           )
 
           gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -226,10 +226,13 @@ jobs:
 
           if gemini_key and gemini_key != "MY_GEMINI_API_KEY":
               try:
-                  url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={gemini_key}"
+                  url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key={gemini_key}"
                   payload = {
                       "contents": [{"parts": [{"text": prompt}]}],
-                      "generationConfig": {"temperature": 0.4}
+                      "generationConfig": {
+                          "temperature": 0.3,
+                          "maxOutputTokens": 200
+                      }
                   }
                   req = urllib.request.Request(
                       url,
@@ -237,7 +240,7 @@ jobs:
                       headers={"Content-Type": "application/json"},
                       method="POST"
                   )
-                  with urllib.request.urlopen(req, timeout=25) as resp:
+                  with urllib.request.urlopen(req, timeout=20) as resp:
                       data = json.loads(resp.read().decode("utf-8"))
                       result_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
               except Exception:
@@ -249,10 +252,10 @@ jobs:
                   payload = {
                       "model": "gpt-4o-mini",
                       "messages": [
-                          {"role": "system", "content": "Viết mô tả bản cập nhật APK ngắn gọn, tự nhiên bằng Tiếng Việt."},
                           {"role": "user", "content": prompt}
                       ],
-                      "temperature": 0.4
+                      "temperature": 0.3,
+                      "max_tokens": 200
                   }
                   req = urllib.request.Request(
                       url,

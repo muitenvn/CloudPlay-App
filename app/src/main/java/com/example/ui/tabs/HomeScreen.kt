@@ -199,20 +199,21 @@ private fun HeroConsolePlayDeck(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(268.dp)
+                    .height(274.dp)
             )
 
-            // Multi-stop Console Cinema Vignette Scrim
+            // Bottom-up Dark Gradient Overlay so text at bottom is crisp and doesn't clash with upper banner art
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(268.dp)
+                    .height(274.dp)
                     .background(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0.0f to Color(0x66060A08),
-                                0.42f to Color(0xCC060A08),
-                                0.80f to Color(0xF5080F0B),
+                                0.0f to Color(0x1A040806),
+                                0.30f to Color(0x99050A07),
+                                0.55f to Color(0xEB060B08),
+                                0.82f to Color(0xFA070D0A),
                                 1.0f to XboxSurface
                             )
                         )
@@ -223,11 +224,11 @@ private fun HeroConsolePlayDeck(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(268.dp)
+                    .height(274.dp)
                     .background(
                         Brush.radialGradient(
                             colors = listOf(
-                                XboxNeonGreen.copy(alpha = 0.14f),
+                                XboxNeonGreen.copy(alpha = 0.12f),
                                 Color.Transparent
                             ),
                             radius = 520f
@@ -239,19 +240,18 @@ private fun HeroConsolePlayDeck(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Top Telemetry Status Ribbon
+                // Top Status Ribbon (Clean, no fake FPS badge)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Network Handshake Status Pill
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = Color(0xE60B150F),
+                        color = Color(0xEB09120D),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             when (vpnState.mode) {
@@ -280,101 +280,63 @@ private fun HeroConsolePlayDeck(
                             )
                             Text(
                                 text = when (vpnState.mode) {
-                                    NetworkMode.DIRECT_NETWORK -> "DIRECT ISP ⚡ ZERO-LAG"
-                                    NetworkMode.VPN_JAPAN -> "BYPASS ${vpnState.currentServer.flag} ACTIVE"
-                                    NetworkMode.DISCONNECTED -> "AUTO-BYPASS READY"
+                                    NetworkMode.DIRECT_NETWORK -> "Mạng trực tiếp"
+                                    NetworkMode.VPN_JAPAN -> "Mở vùng ${vpnState.currentServer.flag}"
+                                    NetworkMode.DISCONNECTED -> "Tự ngắt VPN"
                                 },
                                 color = TextPrimary,
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    // Right: Series X Blade Spec Pill + Quick Help
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xD90B150F),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .clickable { onOpenGuide() }
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color(0xCC060B08),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f))
-                        ) {
-                            Text(
-                                text = "SERIES X • 60-120FPS",
-                                color = XboxNeonGreen,
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.HelpOutline,
+                                contentDescription = stringResource(R.string.guide_button),
+                                tint = DirectCyan,
+                                modifier = Modifier.size(15.dp)
                             )
-                        }
-
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xCC0B150F),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .clickable { onOpenGuide() }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.HelpOutline,
-                                    contentDescription = stringResource(R.string.guide_button),
-                                    tint = DirectCyan,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                // Spacer pushes headline down onto the dark bottom gradient away from upper image art
+                Spacer(modifier = Modifier.height(22.dp))
 
-                // Hero Console Headline & Spec Subtitle
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.RocketLaunch,
-                            contentDescription = null,
-                            tint = XboxNeonGreen,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.hero_tag),
-                            color = XboxNeonGreen,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.2.sp
-                        )
-                    }
-
+                // Hero Headline & Single Short Subtitle Sentence
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
                         text = stringResource(R.string.hero_title),
                         color = TextPrimary,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 23.sp,
+                        fontSize = 21.sp,
                         fontWeight = FontWeight.Black,
-                        letterSpacing = (-0.5).sp
+                        letterSpacing = (-0.3).sp,
+                        maxLines = 1
                     )
 
                     Text(
                         text = stringResource(R.string.hero_subtitle),
-                        color = TextSecondary,
+                        color = Color(0xFFD6EAE0),
                         fontSize = 12.sp,
-                        lineHeight = 16.sp
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
                     )
                 }
 
-                // Dual Tactile Console Launch Deck (Xbox Cloud Hub + Fortnite 120 FPS Free)
+                // Dual Launch Buttons (Short 2-word labels, never truncated with ellipsis)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -383,15 +345,15 @@ private fun HeroConsolePlayDeck(
                     Button(
                         onClick = onOpenXboxCloud,
                         modifier = Modifier
-                            .weight(1.18f)
-                            .height(52.dp)
+                            .weight(1f)
+                            .height(50.dp)
                             .testTag("hero_launch_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxGreen,
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
                     ) {
                         Row(
@@ -400,7 +362,7 @@ private fun HeroConsolePlayDeck(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(26.dp)
                                     .clip(CircleShape)
                                     .background(XboxNeonGreen.copy(alpha = 0.25f)),
                                 contentAlignment = Alignment.Center
@@ -409,7 +371,7 @@ private fun HeroConsolePlayDeck(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(19.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
@@ -417,15 +379,14 @@ private fun HeroConsolePlayDeck(
                                 Text(
                                     text = stringResource(R.string.btn_launch_xcloud),
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 12.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.4.sp,
                                     maxLines = 1
                                 )
                                 Text(
-                                    text = "1080p HQ • Auto-Bypass",
+                                    text = "Xbox Cloud",
                                     color = XboxNeonGreen,
-                                    fontSize = 8.5.sp,
+                                    fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
@@ -433,12 +394,12 @@ private fun HeroConsolePlayDeck(
                         }
                     }
 
-                    // Secondary Launch Button: Fortnite Free (No Game Pass Required)
+                    // Secondary Launch Button: Fortnite Free
                     Button(
                         onClick = onLaunchFortnite,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
+                            .height(50.dp)
                             .testTag("hero_launch_fortnite_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EpicBlue,
@@ -461,17 +422,16 @@ private fun HeroConsolePlayDeck(
                             Spacer(modifier = Modifier.width(6.dp))
                             Column(horizontalAlignment = Alignment.Start) {
                                 Text(
-                                    text = "FORTNITE FREE",
+                                    text = stringResource(R.string.btn_play_fortnite),
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.5.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.3.sp,
                                     maxLines = 1
                                 )
                                 Text(
-                                    text = "60-120 FPS • K.Cần Pass",
+                                    text = "Miễn phí",
                                     color = Color(0xFFB3E5FC),
-                                    fontSize = 8.5.sp,
+                                    fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
@@ -480,26 +440,34 @@ private fun HeroConsolePlayDeck(
                     }
                 }
 
-                // Active Capabilities Telemetry Strip
+                // Active Capabilities Strip (Short 2-word labels so nothing gets cut off)
+                val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
+                val graphicsShort = when (config.cellularMode) {
+                    com.example.data.CellularOptimizationMode.AUTO -> "Tự động"
+                    com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "Thấp"
+                    com.example.data.CellularOptimizationMode.MEDIUM -> "Vừa"
+                    com.example.data.CellularOptimizationMode.HIGH -> "Cao"
+                    com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "Rất cao"
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     HeroCapabilityChip(
                         icon = "🌐",
-                        label = "Vùng: ${config.getEffectiveLocale()}",
+                        label = "Vùng $regionCode",
                         accentColor = XboxNeonGreen,
                         modifier = Modifier.weight(1f)
                     )
                     HeroCapabilityChip(
                         icon = "✨",
-                        label = "Đồ họa: ${config.cellularMode.shortLabel}",
+                        label = "Đồ họa: $graphicsShort",
                         accentColor = DirectCyan,
-                        modifier = Modifier.weight(1.1f)
+                        modifier = Modifier.weight(1.15f)
                     )
                     HeroCapabilityChip(
                         icon = "🎮",
-                        label = if (gamepadStatus.hasPhysicalController) "Tay cầmật lý" else "Cảm ứng Touch",
+                        label = if (gamepadStatus.hasPhysicalController) "Tay cầm" else "Cảm ứng",
                         accentColor = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else GoldStar,
                         modifier = Modifier.weight(1f)
                     )
@@ -519,11 +487,11 @@ private fun HeroCapabilityChip(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(9.dp),
-        color = Color(0xB309120D),
-        border = androidx.compose.foundation.BorderStroke(0.7.dp, accentColor.copy(alpha = 0.32f))
+        color = Color(0xCC09120D),
+        border = androidx.compose.foundation.BorderStroke(0.7.dp, accentColor.copy(alpha = 0.35f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -532,10 +500,9 @@ private fun HeroCapabilityChip(
             Text(
                 text = label,
                 color = accentColor,
-                fontSize = 9.5.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 1
             )
         }
     }
@@ -573,36 +540,39 @@ private fun QuickNetworkCockpitCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Row 1: Cockpit Header & Live Telemetry Ping Gauge
+            // Row 1: Cockpit Header (weight 1f so right badge never overlaps or squishes)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(11.dp))
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(
                                 Brush.linearGradient(
                                     listOf(XboxNeonGreen.copy(alpha = 0.22f), DirectCyan.copy(alpha = 0.14f))
                                 )
                             )
-                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.45f), RoundedCornerShape(11.dp)),
+                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Public,
                             contentDescription = null,
                             tint = XboxNeonGreen,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -610,18 +580,20 @@ private fun QuickNetworkCockpitCard(
                             text = stringResource(R.string.cockpit_title),
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1
                         )
                         Text(
-                            text = "${vpnState.currentServer.flag} ${vpnState.currentServer.name} • ${vpnState.currentServer.protocol.uppercase()}",
+                            text = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
                             color = TextSecondary,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1
                         )
                     }
                 }
 
-                // Live Ping Telemetry Meter Pill
+                // Right Status / Ping Pill (Fixed height, never squished vertically)
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = if (hasPing) DirectCyan.copy(alpha = 0.12f) else XboxSurfaceVariant,
@@ -633,29 +605,30 @@ private fun QuickNetworkCockpitCard(
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Speed,
                             contentDescription = null,
-                            tint = if (hasPing) DirectCyan else Color.Gray,
-                            modifier = Modifier.size(14.dp)
+                            tint = if (hasPing) DirectCyan else XboxNeonGreen,
+                            modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = if (hasPing) "${directPing} ms" else "-- ms",
-                            color = if (hasPing) DirectCyan else Color.Gray,
+                            text = if (hasPing) "${directPing} ms" else "Sẵn sàng",
+                            color = if (hasPing) DirectCyan else XboxNeonGreen,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1
                         )
                     }
                 }
             }
 
-            // Row 2: Visual 2-Stage Smart Auto-Bypass Pipeline Diagram
+            // Row 2: Clean 2-Stage Summary (Mở khóa vùng • Tự ngắt VPN)
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(11.dp),
                 color = Color(0xFF08100C),
                 border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
             ) {
@@ -666,7 +639,6 @@ private fun QuickNetworkCockpitCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Stage 1: Region Bypass
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -674,26 +646,24 @@ private fun QuickNetworkCockpitCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (vpnState.mode == NetworkMode.VPN_JAPAN) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.4f)
+                                    if (vpnState.mode == NetworkMode.VPN_JAPAN) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.45f)
                                 )
                         )
                         Column {
                             Text(
-                                text = "BƯỚC 1: VƯỢT RÀO",
+                                text = "Bước 1: Mở khóa vùng",
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${vpnState.currentServer.flag} Mở khóa vùng game",
+                                text = "${vpnState.currentServer.flag} Vào game nhanh",
                                 color = TextSecondary,
-                                fontSize = 9.5.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                fontSize = 10.sp
                             )
                         }
                     }
@@ -701,12 +671,11 @@ private fun QuickNetworkCockpitCard(
                     Text(
                         text = "➔",
                         color = DirectCyan,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         modifier = Modifier.padding(horizontal = 6.dp)
                     )
 
-                    // Stage 2: Direct ISP Stream
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -714,41 +683,39 @@ private fun QuickNetworkCockpitCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else DirectCyan.copy(alpha = 0.4f)
+                                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else DirectCyan.copy(alpha = 0.45f)
                                 )
                         )
                         Column {
                             Text(
-                                text = "BƯỚC 2: DIRECT ISP",
+                                text = "Bước 2: Tự ngắt VPN",
                                 color = DirectCyan,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "⚡ Tự ngắt VPN, ping ~28ms",
+                                text = "Chơi mạng trực tiếp",
                                 color = TextSecondary,
-                                fontSize = 9.5.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                fontSize = 10.sp
                             )
                         }
                     }
                 }
             }
 
-            // Row 3: Quick VPN Engine Mode Selector Pills
+            // Row 3: Quick VPN Engine Mode Selector Pills (Thông minh / Proxy / VPN)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 val engineOptions = listOf(
-                    VpnEngine.SMART_BYPASS to "⚡ Smart Bypass",
-                    VpnEngine.PROXY_TUNNEL to "🌐 Proxy Tunnel",
-                    VpnEngine.EXTERNAL_VPN to "🛡️ VPN Ngoài"
+                    VpnEngine.SMART_BYPASS to "⚡ Thông minh",
+                    VpnEngine.PROXY_TUNNEL to "🌐 Proxy",
+                    VpnEngine.EXTERNAL_VPN to "🛡️ VPN"
                 )
                 engineOptions.forEach { (engine, label) ->
                     val selected = vpnState.engine == engine
@@ -766,12 +733,11 @@ private fun QuickNetworkCockpitCard(
                     ) {
                         Text(
                             text = label,
-                            color = if (selected) XboxNeonGreen else TextSecondary,
-                            fontSize = 9.5.sp,
-                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+                            color = if (selected) XboxNeonGreen else TextPrimary,
+                            fontSize = 10.5.sp,
+                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 7.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
@@ -791,6 +757,9 @@ private fun QuickNetworkCockpitCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -807,7 +776,9 @@ private fun QuickNetworkCockpitCard(
                                 stringResource(R.string.virtual_gamepad_title),
                             color = TextPrimary,
                             fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -821,9 +792,10 @@ private fun QuickNetworkCockpitCard(
                             else
                                 stringResource(R.string.controller_touch),
                             color = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else DirectCyan,
-                            fontSize = 9.5.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            maxLines = 1
                         )
                     }
                 }
@@ -1154,8 +1126,8 @@ private fun SmartTranslatorHomeCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
-            modifier = Modifier.padding(15.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1163,37 +1135,42 @@ private fun SmartTranslatorHomeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(11.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = XboxNeonGreen.copy(alpha = 0.16f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.45f)),
-                        modifier = Modifier.size(38.dp)
+                        modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Translate,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(
-                            text = "BỘ DỊCH THÔNG MINH (GOOGLE DỊCH xCLOUD)",
+                            text = "Dịch tự động",
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1
                         )
                         Text(
-                            text = "Dịch tự nhiên • Tự động bảo vệ tên game & phím ABXY",
+                            text = "Dịch game sang tiếng Việt",
                             color = XboxNeonGreen,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
                         )
                     }
                 }
@@ -1207,59 +1184,96 @@ private fun SmartTranslatorHomeCard(
                     )
                 ) {
                     Text(
-                        text = if (config.xcloudTranslateEnabled) "ĐANG BẬT" else "ĐANG TẮT",
+                        text = if (config.xcloudTranslateEnabled) "Đang bật" else "Đang tắt",
                         color = if (config.xcloudTranslateEnabled) XboxNeonGreen else TextSecondary,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
 
-            // Quick rules & immunity preview box
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(11.dp))
-                    .background(Color(0xFF08100C))
-                    .border(0.8.dp, XboxCardBorder, RoundedCornerShape(11.dp))
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Non-technical protection badges & well-spaced "Mở bảng dịch" button
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF08100C),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "🛡️ Bất tử: Fortnite, Forza, Halo, nút A/B/X/Y, luồng WebRTC",
-                        color = TextPrimary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "⚡ Dịch lô JSON siêu tốc • Cache LruCache(500) không tụt FPS",
-                        color = TextSecondary,
-                        fontSize = 9.5.sp
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = DirectCyan.copy(alpha = 0.14f),
-                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
-                ) {
-                    Text(
-                        text = "Mở bảng dịch ›",
-                        color = DirectCyan,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(7.dp),
+                            color = XboxSurfaceVariant.copy(alpha = 0.85f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
+                        ) {
+                            Text(
+                                text = "🛡️ Giữ tên game",
+                                color = TextPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(7.dp),
+                            color = XboxSurfaceVariant.copy(alpha = 0.85f),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
+                        ) {
+                            Text(
+                                text = "🎮 Giữ nút bấm",
+                                color = TextPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(9.dp),
+                        color = DirectCyan.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(0.9.dp, DirectCyan.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = "Mở bảng dịch",
+                                color = DirectCyan,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = DirectCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+

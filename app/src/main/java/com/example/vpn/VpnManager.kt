@@ -201,15 +201,16 @@ object VpnManager {
     }
 
     /**
-     * Determines whether the player actually needs VPN to pass Xbox region check
+     * Determines whether the player actually needs VPN to pass Xbox region check.
+     * Ignores spoofed in-WebView GeoIP results so Smart VPN always activates for launch
+     * and auto-disconnects once inside the game.
      */
     fun needsVpnToPlay(): Boolean {
         val geo = _state.value.detectedGeoIp
-        return if (geo != null) {
-            !geo.isXboxSupported
-        } else {
-            _state.value.smartDecision.needsVpn
+        if (geo != null && !geo.isFromWebView) {
+            return !geo.isXboxSupported
         }
+        return true
     }
 
     /**
@@ -224,8 +225,14 @@ object VpnManager {
             connect(context, _state.value.currentServer)
             _state.value = _state.value.copy(
                 mode = NetworkMode.VPN_JAPAN,
+                autoBypassTriggered = false,
                 smartVpnPhase = SmartVpnPhase.BYPASS_ACTIVE,
-                statusMessage = "🤖 Smart VPN: Đã TỰ ĐỘNG BẬT để vượt rào mở game..."
+                statusMessage = "🤖 Smart VPN: Đã TỰ ĐỘNG BẬT để mở khóa vùng vào game..."
+            )
+        } else {
+            _state.value = _state.value.copy(
+                autoBypassTriggered = false,
+                smartVpnPhase = SmartVpnPhase.BYPASS_ACTIVE
             )
         }
     }
@@ -238,7 +245,7 @@ object VpnManager {
         _state.value = _state.value.copy(
             mode = NetworkMode.DIRECT_NETWORK,
             smartVpnPhase = SmartVpnPhase.DIRECT_SUPPORTED_REGION,
-            statusMessage = "⚡ Smart VPN: Vị trí hợp lệ, giữ Mạng Trực Tiếp (0ms VPN lag)"
+            statusMessage = "⚡ Smart VPN: Vị trí hợp lệ, giữ Mạng Trực Tiếp"
         )
     }
 

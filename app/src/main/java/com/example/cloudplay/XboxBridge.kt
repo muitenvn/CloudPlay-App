@@ -585,6 +585,11 @@ class XboxBridge(
                                         const totalPackets = packetsReceived + packetsLost;
                                         const lostPercent = totalPackets > 0 ? parseFloat(((packetsLost / totalPackets) * 100).toFixed(1)) : 0.0;
 
+                                        if ((framesDecoded > 0 || currentBytes > 15000) && !notifiedStreamConnection) {
+                                            notifiedStreamConnection = true;
+                                            notify('onStreamConnected', 'webrtc_frames_active');
+                                        }
+
                                         notify('onStreamTelemetry', JSON.stringify({
                                             fps: fps,
                                             bitrateMbps: bitrateMbps,
@@ -612,14 +617,17 @@ class XboxBridge(
                     let lastUrl = location.href;
                     let notifiedStreamConnection = false;
 
+                    if (location.href.indexOf('/play/launch/') !== -1) {
+                        notify('onGameLaunchInitiated', document.title || 'Xbox Game');
+                    }
+
                     function handleNavigationChange() {
                         if (location.href !== lastUrl) {
                             lastUrl = location.href;
+                            notifiedStreamConnection = false;
                             notify('onUrlChanged', location.href);
                             if (location.href.indexOf('/play/launch/') !== -1) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
-                            } else {
-                                notifiedStreamConnection = false;
                             }
                         }
                     }
@@ -646,11 +654,12 @@ class XboxBridge(
                         window.addEventListener('hashchange', handleNavigationChange);
                     } catch(e) {}
 
-                    // Listen for video media events (playing / loadeddata) in capture phase
+                    // Listen for video media events (playing / loadeddata / timeupdate) in capture phase
                     function handleVideoMediaEvent(e) {
                         const target = e ? e.target : null;
-                        if (target && target.tagName === 'VIDEO' && location.href.indexOf('/play/launch/') !== -1 && !notifiedStreamConnection) {
-                            if ((target.currentTime > 0 || target.readyState >= 3) && !target.paused) {
+                        const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
+                        if (target && target.tagName === 'VIDEO' && isLaunchPage && !notifiedStreamConnection) {
+                            if ((target.currentTime > 0 || target.readyState >= 2) && !target.paused) {
                                 notifiedStreamConnection = true;
                                 notify('onStreamConnected', 'video_active');
                             }
@@ -658,6 +667,7 @@ class XboxBridge(
                     }
                     document.addEventListener('playing', handleVideoMediaEvent, true);
                     document.addEventListener('loadeddata', handleVideoMediaEvent, true);
+                    document.addEventListener('canplay', handleVideoMediaEvent, true);
                     document.addEventListener('ended', function(e) {
                         const target = e ? e.target : null;
                         if (target && target.tagName === 'VIDEO' && notifiedStreamConnection) {
@@ -666,24 +676,30 @@ class XboxBridge(
                         }
                     }, true);
 
-                    // Lightweight fallback check (2500ms) for edge cases where video mounts silently
+                    // Lightweight fallback check (2000ms) for edge cases where video mounts silently
                     setInterval(function() {
                         handleNavigationChange();
-                        if (location.href.indexOf('/play/launch/') !== -1 && !notifiedStreamConnection) {
+                        const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
+                        if (isLaunchPage && !notifiedStreamConnection) {
                             const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
-                            if (video && (video.currentTime > 0 || video.readyState >= 3) && !video.paused) {
+                            if (video && (video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
                                 notifiedStreamConnection = true;
                                 notify('onStreamConnected', 'video_active');
                             }
                         }
-                    }, 2500);
+                    }, 2000);
 
                     document.addEventListener('click', function(e) {
                         const target = e.target;
                         if (target) {
-                            const btn = target.closest('button');
-                            if (btn && (btn.innerText.includes('Play') || btn.getAttribute('data-testid') === 'play-button')) {
-                                notify('onGameLaunchInitiated', document.title || 'Xbox Game');
+                            const btn = target.closest('button, a');
+                            if (btn) {
+                                const txt = (btn.innerText || btn.getAttribute('aria-label') || '').toLowerCase();
+                                const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
+                                if (txt.includes('play') || txt.includes('chơi') || testId.includes('play') || testId.includes('launch')) {
+                                    notifiedStreamConnection = false;
+                                    notify('onGameLaunchInitiated', document.title || 'Xbox Game');
+                                }
                             }
                         }
                     }, true);

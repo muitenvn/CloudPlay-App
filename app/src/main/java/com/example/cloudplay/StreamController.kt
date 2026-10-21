@@ -45,6 +45,8 @@ class StreamController(private val context: Context) {
     val uiState: StateFlow<StreamUiState> = _uiState.asStateFlow()
 
     private var countdownJob: Job? = null
+    private var bannerDismissJob: Job? = null
+    private var launchFallbackJob: Job? = null
 
     /**
      * Cancels active coroutines when WebView or Activity is destroyed to prevent memory leaks.
@@ -52,6 +54,10 @@ class StreamController(private val context: Context) {
     fun release() {
         countdownJob?.cancel()
         countdownJob = null
+        bannerDismissJob?.cancel()
+        bannerDismissJob = null
+        launchFallbackJob?.cancel()
+        launchFallbackJob = null
         scope.cancel()
         scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     }
@@ -61,65 +67,114 @@ class StreamController(private val context: Context) {
     }
 
     fun onGameLaunchInitiated(title: String) {
-        _uiState.value = _uiState.value.copy(
-            isGameActive = true,
-            gameTitle = title
-        )
+        scope.launch {
+            launchFallbackJob?.cancel()
+            countdownJob?.cancel()
 
-        val config = SettingsRepository.config.value
-        val vpnState = VpnManager.state.value
-
-        if (config.smartVpnEnabled) {
-            if (VpnManager.needsVpnToPlay() && vpnState.mode != NetworkMode.VPN_JAPAN) {
-                VpnManager.autoTurnOnForLaunch(context)
-                showTemporaryBanner("🤖 Smart VPN: Tự động BẬT VPN Nhật Bản để vượt rào xác thực game...", BannerType.INFO, 3000)
-            } else if (!VpnManager.needsVpnToPlay()) {
-                VpnManager.ensureDirectNetwork()
-            }
-        }
-    }
-
-    fun onStreamConnected() {
-        if (_uiState.value.isStreamConnected) return
-
-        _uiState.value = _uiState.value.copy(
-            isStreamConnected = true,
-            isGameActive = true
-        )
-
-        val config = SettingsRepository.config.value
-        val vpnState = VpnManager.state.value
-
-        if ((config.smartVpnEnabled || config.autoBypassEnabled) && vpnState.mode == NetworkMode.VPN_JAPAN && !_uiState.value.autoBypassTriggered) {
-            scheduleAutoBypass(config.autoBypassDelaySeconds, "WebRTC stream kết nối thành công")
-        }
-    }
-
-    fun onStreamDisconnected() {
-        _uiState.value = _uiState.value.copy(
-            isStreamConnected = false,
-            isGameActive = false
-        )
-    }
-
-    fun onUrlChanged(url: String) {
-        val wasInGame = _uiState.value.currentUrl.contains("/launch/")
-        val nowInGame = url.contains("/launch/")
-
-        _uiState.value = _uiState.value.copy(currentUrl = url)
-
-        if (wasInGame && !nowInGame) {
-            // Player returned to catalog/home
             _uiState.value = _uiState.value.copy(
-                isGameActive = false,
+                isGameActive = true,
+                gameTitle = title,
                 isStreamConnected = false,
                 autoBypassTriggered = false
             )
 
             val config = SettingsRepository.config.value
-            if ((config.smartVpnEnabled || config.autoReconnectOnMenu) && VpnManager.needsVpnToPlay()) {
-                showTemporaryBanner("🎮 Đã thoát trận: Smart VPN tự động BẬT lại VPN để duyệt thư viện...", BannerType.INFO, 3500)
-                VpnManager.autoTurnOnForLaunch(context)
+            val vpnState = VpnManager.state.value
+
+            if (config.smartVpnEnabled || config.autoBypassEnabled) {
+                if (vpnState.mode != NetworkMode.VPN_JAPAN) {
+                    VpnManager.autoTurnOnForLaunch(context)
+                    showTemporaryBanner("🌐 Đã tự động bật VPN mở khóa vùng để vào game...", BannerType.INFO, 3500)
+                } else {
+                    showTemporaryBanner("🚀 Đang vào game: Sẽ tự động tắt VPN khi luồng game kết nối...", BannerType.INFO, 3500)
+                }
+            }
+
+            // Fallback: if WebRTC / video event inside WebView hasn't fired within 5.5s on /launch/,
+            // automatically trigger onStreamConnected() so VPN auto-disconnect and notification always run.
+            launchFallbackJob = scope.launch {
+                delay(5500)
+                if (_uiState.value.isGameActive && !_uiState.value.isStreamConnected) {
+                    onStreamConnected()
+                }
+            }
+        }
+    }
+
+    fun onStreamConnected() {
+        scope.launch {
+            launchFallbackJob?.cancel()
+            launchFallbackJob = null
+
+            if (_uiState.value.isStreamConnected && _uiState.value.autoBypassTriggered) return@launch
+
+            _uiState.value = _uiState.value.copy(
+                isStreamConnected = true,
+                isGameActive = true
+            )
+
+            val config = SettingsRepository.config.value
+
+            if ((config.smartVpnEnabled || config.autoBypassEnabled) && !_uiState.value.autoBypassTriggered) {
+                val delaySec = config.autoBypassDelaySeconds.coerceIn(1, 15)
+                try {
+                    android.widget.Toast.makeText(
+                        context,
+                        "⚡ Đã vào game! Tự động tắt VPN sau ${delaySec}s...",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } catch (_: Exception) {}
+                scheduleAutoBypass(delaySec, "Luồng game đã kết nối")
+            } else {
+                showTemporaryBanner("✅ Đã vào game! Đang dùng mạng trực tiếp.", BannerType.SUCCESS, 5000)
+            }
+        }
+    }
+
+    fun onStreamDisconnected() {
+        scope.launch {
+            launchFallbackJob?.cancel()
+            launchFallbackJob = null
+            _uiState.value = _uiState.value.copy(
+                isStreamConnected = false,
+                isGameActive = false
+            )
+        }
+    }
+
+    fun onUrlChanged(url: String) {
+        scope.launch {
+            val prevUrl = _uiState.value.currentUrl
+            val wasInLaunch = prevUrl.contains("/launch/")
+            val nowInLaunch = url.contains("/launch/")
+
+            _uiState.value = _uiState.value.copy(currentUrl = url)
+
+            if (!wasInLaunch && nowInLaunch) {
+                onGameLaunchInitiated("Xbox Cloud Game")
+            } else if (wasInLaunch && !nowInLaunch) {
+                // Player exited running game stream back to catalog/home
+                launchFallbackJob?.cancel()
+                countdownJob?.cancel()
+                _uiState.value = _uiState.value.copy(
+                    isGameActive = false,
+                    isStreamConnected = false,
+                    autoBypassTriggered = false,
+                    countdownRemainingSeconds = null
+                )
+
+                val config = SettingsRepository.config.value
+                if ((config.smartVpnEnabled || config.autoReconnectOnMenu) && VpnManager.needsVpnToPlay()) {
+                    showTemporaryBanner("🎮 Đã thoát game: Tự động bật lại VPN mở khóa vùng...", BannerType.INFO, 4000)
+                    VpnManager.autoTurnOnForLaunch(context)
+                    try {
+                        android.widget.Toast.makeText(
+                            context,
+                            "🌐 Đã thoát game: Tự động bật lại VPN mở khóa vùng",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -127,10 +182,12 @@ class StreamController(private val context: Context) {
     fun cancelAutoBypass() {
         countdownJob?.cancel()
         countdownJob = null
+        bannerDismissJob?.cancel()
         _uiState.value = _uiState.value.copy(
             countdownRemainingSeconds = null,
             showBanner = false
         )
+        showTemporaryBanner("🛡️ Đã giữ nguyên kết nối VPN theo yêu cầu.", BannerType.INFO, 3000)
     }
 
     fun forceSwitchToDirectNetwork() {
@@ -140,12 +197,13 @@ class StreamController(private val context: Context) {
 
     private fun scheduleAutoBypass(delaySeconds: Int, triggerReason: String) {
         countdownJob?.cancel()
+        bannerDismissJob?.cancel()
         countdownJob = scope.launch {
             for (sec in delaySeconds downTo 1) {
                 _uiState.value = _uiState.value.copy(
                     countdownRemainingSeconds = sec,
                     showBanner = true,
-                    bannerMessage = "⚡ Smart VPN: Tự động TẮT VPN chuyển Mạng Nhà sau ${sec}s... (Chạm để Hủy)",
+                    bannerMessage = "⚡ Đã vào game: Tự động TẮT VPN sau ${sec}s... (Chạm Hủy nếu muốn giữ)",
                     bannerType = BannerType.COUNTDOWN
                 )
                 delay(1000)
@@ -156,33 +214,46 @@ class StreamController(private val context: Context) {
     }
 
     private fun executeBypass(reason: String) {
+        bannerDismissJob?.cancel()
         _uiState.value = _uiState.value.copy(
             countdownRemainingSeconds = null,
             autoBypassTriggered = true,
             showBanner = true,
-            bannerMessage = "⚡ Smart VPN: Đã TỰ ĐỘNG TẮT VPN khi vào game! Mạng Trực Tiếp Active (Ping thấp nhất).",
+            bannerMessage = "✅ Đã TỰ ĐỘNG TẮT VPN khi vào game! Đang dùng mạng trực tiếp mượt nhất.",
             bannerType = BannerType.SUCCESS
         )
 
         vibrateFeedback()
         VpnManager.switchToDirectNetwork(context, reason)
-
-        // Dismiss banner after 4.5 seconds
         scope.launch {
-            delay(4500)
+            try {
+                android.widget.Toast.makeText(
+                    context,
+                    "✅ Đã TỰ ĐỘNG TẮT VPN — Chuyển sang mạng trực tiếp!",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } catch (_: Exception) {}
+        }
+
+        // Dismiss banner after 6.5 seconds
+        bannerDismissJob = scope.launch {
+            delay(6500)
             _uiState.value = _uiState.value.copy(showBanner = false)
         }
     }
 
-    private fun showTemporaryBanner(message: String, type: BannerType, durationMs: Long = 3000) {
+    private fun showTemporaryBanner(message: String, type: BannerType, durationMs: Long = 3500) {
+        bannerDismissJob?.cancel()
         _uiState.value = _uiState.value.copy(
             showBanner = true,
             bannerMessage = message,
             bannerType = type
         )
-        scope.launch {
+        bannerDismissJob = scope.launch {
             delay(durationMs)
-            _uiState.value = _uiState.value.copy(showBanner = false)
+            if (_uiState.value.bannerType == type) {
+                _uiState.value = _uiState.value.copy(showBanner = false)
+            }
         }
     }
 

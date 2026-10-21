@@ -162,20 +162,21 @@ fun DashboardScreen(
                 TopAppBar(
                     title = {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // Console Emblem with Neon Rim
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(RoundedCornerShape(11.dp))
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(10.dp))
                                     .border(
                                         1.2.dp,
                                         Brush.linearGradient(
                                             listOf(XboxNeonGreen, DirectCyan)
                                         ),
-                                        RoundedCornerShape(11.dp)
+                                        RoundedCornerShape(10.dp)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -187,34 +188,20 @@ fun DashboardScreen(
                                 )
                             }
 
-                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "CLOUDPLAY",
-                                        color = TextPrimary,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 16.sp,
-                                        letterSpacing = 0.8.sp
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = XboxNeonGreen.copy(alpha = 0.16f),
-                                        border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.5f))
-                                    ) {
-                                        Text(
-                                            text = "120Hz OS",
-                                            color = XboxNeonGreen,
-                                            fontFamily = JetBrainsMonoFontFamily,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(1.dp)
+                            ) {
+                                Text(
+                                    text = "CLOUDPLAY",
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 16.sp,
+                                    letterSpacing = 0.6.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -233,12 +220,12 @@ fun DashboardScreen(
                                     )
                                     Text(
                                         text = when (vpnState.mode) {
-                                            NetworkMode.DIRECT_NETWORK -> "Direct ISP • Zero-Lag"
+                                            NetworkMode.DIRECT_NETWORK -> "Mạng trực tiếp"
                                             NetworkMode.VPN_JAPAN -> "${vpnState.currentServer.flag} ${vpnState.currentServer.name}"
-                                            NetworkMode.DISCONNECTED -> "Xbox Cloud Gaming"
+                                            NetworkMode.DISCONNECTED -> "Xbox Cloud"
                                         },
                                         color = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else XboxNeonGreen,
-                                        fontSize = 9.5.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -253,43 +240,45 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(end = 10.dp)
                         ) {
-                            // 1. Live Telemetry Ping Pill
+                            // 1. Live Telemetry Ping Pill (only when real ping is measured)
                             val directPing = vpnState.directLatencyMs
                             val hasPing = directPing != null && directPing > 0
-                            val pingTint = when {
-                                !hasPing -> TextSecondary
-                                directPing < 55 -> DirectCyan
-                                directPing < 100 -> XboxNeonGreen
-                                else -> WarningAmber
-                            }
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, pingTint.copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
-                                color = pingTint.copy(alpha = 0.10f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            if (hasPing) {
+                                val pingTint = when {
+                                    directPing < 55 -> DirectCyan
+                                    directPing < 100 -> XboxNeonGreen
+                                    else -> WarningAmber
+                                }
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .border(1.dp, pingTint.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
+                                    color = pingTint.copy(alpha = 0.10f)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Speed,
-                                        contentDescription = "Ping",
-                                        tint = pingTint,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = if (hasPing) "${directPing}ms" else "--ms",
-                                        color = if (hasPing) pingTint else Color.Gray,
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = "Ping",
+                                            tint = pingTint,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = "${directPing}ms",
+                                            color = pingTint,
+                                            fontFamily = JetBrainsMonoFontFamily,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
 
-                            // 2. Language Quick Switcher Pill
+                            // 2. Language Icon Button (short 2-char code)
                             val currentLangLabel = when (config.appLanguage) {
                                 com.example.data.AppLanguage.SYSTEM -> {
                                     val sys = java.util.Locale.getDefault()
@@ -300,8 +289,9 @@ fun DashboardScreen(
                             }
                             Surface(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
+                                    .height(30.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp))
                                     .clickable {
                                         val nextLang = when (config.appLanguage) {
                                             com.example.data.AppLanguage.SYSTEM -> com.example.data.AppLanguage.VIETNAMESE
@@ -314,7 +304,7 @@ fun DashboardScreen(
                                 color = XboxSurfaceVariant.copy(alpha = 0.9f)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                    modifier = Modifier.padding(horizontal = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
@@ -328,46 +318,38 @@ fun DashboardScreen(
                                         text = currentLangLabel,
                                         color = TextPrimary,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
                                     )
                                 }
                             }
 
-                            // 3. Smart Translator Trigger Pill
+                            // 3. Translator Icon Button
                             Surface(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(9.dp))
                                     .border(
                                         1.dp,
                                         if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
-                                        RoundedCornerShape(10.dp)
+                                        RoundedCornerShape(9.dp)
                                     )
                                     .clickable { showTranslatorDialog = true }
                                     .testTag("topbar_translator_button"),
                                 color = if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.9f)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
+                                Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Translate,
-                                        contentDescription = "Bộ Dịch Thông Minh",
+                                        contentDescription = "Dịch tự động",
                                         tint = XboxNeonGreen,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = "Dịch",
-                                        color = XboxNeonGreen,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold
+                                        modifier = Modifier.size(15.dp)
                                     )
                                 }
                             }
 
-                            // 4. Quick User Guide Icon Pill
+                            // 4. Quick User Guide Icon Button
                             Surface(
                                 modifier = Modifier
                                     .size(30.dp)
@@ -578,7 +560,7 @@ private fun ConsoleFloatingNavigationDock(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
-                                tint = if (isSelected) accentColor else TextSecondary,
+                                tint = if (isSelected) accentColor else Color(0xFFC8DDD0),
                                 modifier = Modifier.size(21.dp)
                             )
                             if (tab == DashboardTab.LIBRARY && gamesCount > 0) {
@@ -594,10 +576,10 @@ private fun ConsoleFloatingNavigationDock(
 
                         Text(
                             text = label,
-                            color = if (isSelected) TextPrimary else TextSecondary,
+                            color = if (isSelected) TextPrimary else Color(0xFFD6EAE0),
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.5.sp,
-                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

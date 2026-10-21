@@ -28,37 +28,37 @@
     <string name="anti_japanese_enforcer_desc">Tự động chuyển hướng trang jp-JP/ja-JP về en-US mượt mà không gây gián đoạn.</string>
 
     <!-- Hero / Quick Play -->
-    <string name="hero_tag">BỘ TĂNG TỐC CLOUD GAMING</string>
-    <string name="hero_title">CHƠI XBOX CLOUD NGAY</string>
-    <string name="hero_subtitle">Băng thông VIP 20 Mbps • Đã Bật Bypass • 60 FPS Cố Định</string>
-    <string name="btn_launch_xcloud">VÀO XCLOUD NGAY</string>
-    <string name="btn_play_fortnite">Chiến Fortnite Free (Không Cần Pass)</string>
+    <string name="hero_tag">CHƠI GAME ĐÁM MÂY</string>
+    <string name="hero_title">CHƠI XBOX CLOUD</string>
+    <string name="hero_subtitle">Mở khóa vùng • Tự ngắt VPN</string>
+    <string name="btn_launch_xcloud">Chơi ngay</string>
+    <string name="btn_play_fortnite">Fortnite</string>
 
     <!-- Network & Hardware Cockpit -->
-    <string name="cockpit_title">Trạm Điều Khiển Mạng &amp; Tay Cầm</string>
-    <string name="cockpit_subtitle">Tự Động Vượt Rào &amp; Đường Truyền Trực Tiếp Độ Trễ Cực Thấp</string>
-    <string name="net_mode_direct">Chế độ Mạng Trực Tiếp</string>
-    <string name="net_mode_vpn">Đang Bật VPN Vượt Rào</string>
-    <string name="net_desc_direct">Đã kết nối trực tiếp nhà mạng ISP. Độ trễ cực thấp (~28ms) tối ưu cho chơi game.</string>
-    <string name="net_desc_vpn">Đang mở đường hầm VPN Nhật Bản để vượt kiểm tra khu vực khi vào game.</string>
-    <string name="btn_enable_vpn">Bật Vượt Rào VPN</string>
-    <string name="btn_switch_direct">Chế Độ Trực Tiếp (Ping Thấp)</string>
-    <string name="vpn_status_connected">Japan VPN Đang Kết Nối (Vượt Rào Khu Vực)</string>
-    <string name="vpn_status_disconnected">Mạng Trực Tiếp ISP (Độ Trễ Thấp)</string>
-    <string name="auto_bypass_enabled">Auto-Bypass Đang Bật: Tự động chuyển mạng khi vào game</string>
-    <string name="auto_bypass_triggered">Đã phát hiện luồng game! Chuyển sang mạng trực tiếp không cần reload.</string>
-    <string name="hardware_controller">Tay Cầm</string>
-    <string name="controller_connected">Đã kết nối</string>
-    <string name="controller_disconnected">Chưa kết nối</string>
-    <string name="controller_touch">Cảm ứng màn hình</string>
+    <string name="cockpit_title">Mạng &amp; Tay cầm</string>
+    <string name="cockpit_subtitle">Mở khóa vùng • Tự ngắt VPN</string>
+    <string name="net_mode_direct">Mạng trực tiếp</string>
+    <string name="net_mode_vpn">Đang bật VPN</string>
+    <string name="net_desc_direct">Đang dùng mạng trực tiếp để chơi mượt.</string>
+    <string name="net_desc_vpn">Đang mở khóa vùng để vào game.</string>
+    <string name="btn_enable_vpn">Bật VPN</string>
+    <string name="btn_switch_direct">Mạng trực tiếp</string>
+    <string name="vpn_status_connected">Đã bật VPN mở vùng</string>
+    <string name="vpn_status_disconnected">Đang dùng mạng trực tiếp</string>
+    <string name="auto_bypass_enabled">Tự ngắt VPN khi vào game</string>
+    <string name="auto_bypass_triggered">Đã vào game! Tự chuyển sang mạng trực tiếp.</string>
+    <string name="hardware_controller">Tay cầm</string>
+    <string name="controller_connected">Đã nối</string>
+    <string name="controller_disconnected">Chưa nối</string>
+    <string name="controller_touch">Cảm ứng</string>
     <string name="gamepad_none">Không có</string>
     <string name="gamepad_default_name">Tay cầm Xbox</string>
-    <string name="guide_button">Hướng Dẫn</string>
+    <string name="guide_button">Hướng dẫn</string>
 
     <!-- Featured Games -->
-    <string name="featured_games_title">Game Nổi Bật</string>
-    <string name="featured_games_subtitle">Khởi động 1 chạm vào thẳng luồng game</string>
-    <string name="btn_view_all">Xem tất cả</string>
+    <string name="featured_games_title">Game nổi bật</string>
+    <string name="featured_games_subtitle">Vào game một chạm</string>
+    <string name="btn_view_all">Tất cả</string>
     <string name="btn_play_now">Chơi ngay</string>
     <string name="badge_free">Miễn phí</string>
     <string name="badge_touch">Cảm ứng</string>

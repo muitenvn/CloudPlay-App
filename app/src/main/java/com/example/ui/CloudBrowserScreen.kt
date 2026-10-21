@@ -390,6 +390,15 @@ fun CloudBrowserScreen(
                             return false
                         }
 
+                        override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                            super.doUpdateVisitedHistory(view, url, isReload)
+                            bridge.updateCurrentUrl(url)
+                            url?.let {
+                                streamController.onUrlChanged(it)
+                                handleMainFrameNavigation(it)
+                            }
+                        }
+
                         override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
                             android.util.Log.w("CloudBrowser", "Render process fallback handled gracefully: didCrash=${detail?.didCrash()}")
                             return true

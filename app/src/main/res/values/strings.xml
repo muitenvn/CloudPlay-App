@@ -28,36 +28,36 @@
     <string name="anti_japanese_enforcer_desc">Auto-redirects jp-JP/ja-JP pages to en-US seamlessly.</string>
 
     <!-- Hero / Quick Play -->
-    <string name="hero_tag">CLOUDGAMING BOOSTER</string>
-    <string name="hero_title">PLAY XBOX CLOUD NOW</string>
-    <string name="hero_subtitle">VIP 20 Mbps • Bypass Active • Locked 60 FPS</string>
-    <string name="btn_launch_xcloud">PLAY XCLOUD NOW</string>
-    <string name="btn_play_fortnite">Free Fortnite (No Pass Req.)</string>
+    <string name="hero_tag">XBOX CLOUD</string>
+    <string name="hero_title">PLAY XBOX CLOUD</string>
+    <string name="hero_subtitle">Unlock region • Auto disconnect VPN</string>
+    <string name="btn_launch_xcloud">Play Now</string>
+    <string name="btn_play_fortnite">Fortnite</string>
 
     <!-- Network & Hardware Cockpit -->
-    <string name="cockpit_title">Network &amp; Controller Cockpit</string>
-    <string name="cockpit_subtitle">Smart Auto-Bypass &amp; Direct Low-Latency Pipeline</string>
-    <string name="net_mode_direct">Direct Network Mode</string>
-    <string name="net_mode_vpn">Bypass VPN Active</string>
-    <string name="net_desc_direct">Direct ISP connection active. Low latency (~28ms) for gaming.</string>
-    <string name="net_desc_vpn">Japan VPN tunnel active. Bypasses geo-restrictions for game launch.</string>
-    <string name="btn_enable_vpn">Enable Bypass VPN</string>
-    <string name="btn_switch_direct">Direct Mode (Low Ping)</string>
-    <string name="vpn_status_connected">Japan VPN Connected (Bypassing Region)</string>
-    <string name="vpn_status_disconnected">Direct ISP Network (Low Latency)</string>
-    <string name="auto_bypass_enabled">Auto-Bypass Active: Switching network on game launch</string>
-    <string name="auto_bypass_triggered">Game stream detected! Switched to Direct Network without reload.</string>
+    <string name="cockpit_title">Network &amp; Controller</string>
+    <string name="cockpit_subtitle">Unlock region • Auto disconnect VPN</string>
+    <string name="net_mode_direct">Direct Network</string>
+    <string name="net_mode_vpn">VPN Active</string>
+    <string name="net_desc_direct">Direct connection active for smooth gaming.</string>
+    <string name="net_desc_vpn">Region unlock active for launching games.</string>
+    <string name="btn_enable_vpn">Enable VPN</string>
+    <string name="btn_switch_direct">Direct Mode</string>
+    <string name="vpn_status_connected">VPN Connected</string>
+    <string name="vpn_status_disconnected">Direct Network</string>
+    <string name="auto_bypass_enabled">Auto switch to direct network on launch</string>
+    <string name="auto_bypass_triggered">Game started! Switched to direct network.</string>
     <string name="hardware_controller">Controller</string>
     <string name="controller_connected">Connected</string>
-    <string name="controller_disconnected">Disconnected</string>
-    <string name="controller_touch">Screen Touch</string>
+    <string name="controller_disconnected">Not connected</string>
+    <string name="controller_touch">Touch</string>
     <string name="gamepad_none">None</string>
-    <string name="gamepad_default_name">Xbox Wireless Controller</string>
-    <string name="guide_button">User Guide</string>
+    <string name="gamepad_default_name">Xbox Controller</string>
+    <string name="guide_button">Guide</string>
 
     <!-- Featured Games -->
     <string name="featured_games_title">Featured Games</string>
-    <string name="featured_games_subtitle">1-Tap launch directly into game stream</string>
+    <string name="featured_games_subtitle">One-tap game launch</string>
     <string name="btn_view_all">View All</string>
     <string name="btn_play_now">Play Now</string>
     <string name="badge_free">Free</string>

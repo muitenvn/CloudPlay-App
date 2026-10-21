@@ -476,15 +476,6 @@ fun FloatingHud(
                             tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
                             modifier = Modifier.size(13.dp)
                         )
-                        if (isThermalSupported) {
-                            Text(
-                                text = "$thermalIcon$thermalLabel",
-                                color = thermalColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.5.sp,
-                                maxLines = 1
-                            )
-                        }
                     }
                 } else {
                     // ==========================================
@@ -679,35 +670,6 @@ fun FloatingHud(
                             }
                         }
 
-                        // 5.5. Thermal Indicator on HUD (Mát / Ấm / Nóng) on API 29+
-                        if (isThermalSupported) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = thermalColor.copy(alpha = 0.2f),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .testTag("hud_thermal_badge")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = thermalIcon,
-                                        fontSize = 9.sp
-                                    )
-                                    Text(
-                                        text = thermalLabel,
-                                        color = thermalColor,
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
-
                         // 6. Minimize to Corner Dot
                         Box(
                             modifier = Modifier
@@ -728,36 +690,13 @@ fun FloatingHud(
                         }
                     }
 
-                    // Cảnh báo nhiệt độ khi từ MODERATE trở lên
-                    if (isThermalSupported && showThermalWarningBanner) {
-                        Surface(
-                            modifier = Modifier
-                                .padding(top = 2.dp, start = 3.dp, end = 3.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable { showThermalWarningBanner = false }
-                                .testTag("hud_thermal_warning_banner"),
-                            shape = RoundedCornerShape(6.dp),
-                            color = JapanRed.copy(alpha = 0.24f),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.7f))
-                        ) {
-                            Text(
-                                text = "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
-                                color = Color.White,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                maxLines = 1
-                            )
-                        }
-                    }
-
                     // ==========================================
                     // B. BẢNG MỞ RỘNG (NHỎ GỌN, DÀY THÔNG TIN, CUỘN BÊN TRONG)
                     // - Chiều rộng tối đa 38% màn hình, chiều cao tối đa 60% màn hình
                     // - Mở sát cạnh nơi HUD đang đứng (trái/phải)
                     // - Nút thu gọn rõ ràng, vùng bấm chuẩn 48dp
                     // - Bỏ ô lớn "Chất lượng đồ họa & hiệu năng máy", chỉ giữ:
-                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Pin & Sạc, Chế độ chất lượng + nút chức năng
+                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Pin & Sạc, Nhiệt độ (chỉ hiện trong mở rộng), Chế độ chất lượng + nút chức năng
                     // ==========================================
                     val panelMaxWidth = (screenMaxWidth * 0.38f).coerceAtLeast(172.dp)
                     val panelMaxHeight = (screenMaxHeight * 0.60f).coerceAtLeast(180.dp)
@@ -794,6 +733,29 @@ fun FloatingHud(
                                     hudMode = HudMode.MINIMIZED
                                 }
                             )
+
+                            // Cảnh báo nhiệt độ khi từ MODERATE trở lên (chỉ hiển thị trong bảng cài đặt mở rộng)
+                            if (isThermalSupported && showThermalWarningBanner) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { showThermalWarningBanner = false }
+                                        .testTag("hud_thermal_warning_banner"),
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = JapanRed.copy(alpha = 0.24f),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.7f))
+                                ) {
+                                    Text(
+                                        text = "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
+                                        color = Color.White,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
 
                             // Nội dung bên trong cuộn dọc nếu màn hình thấp (chiều cao tối đa 60%)
                             Column(

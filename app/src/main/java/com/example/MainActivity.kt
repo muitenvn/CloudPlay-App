@@ -95,24 +95,19 @@ class MainActivity : ComponentActivity() {
             }
 
             val baseContext = androidx.compose.ui.platform.LocalContext.current
-            val localizedConfiguration = remember(targetLocale) {
-                val conf = android.content.res.Configuration()
-                conf.setLocale(targetLocale)
-                conf.setLayoutDirection(targetLocale)
-                conf
-            }
-            val localizedWrapper = remember(targetLocale, baseContext) {
+            val (localizedConfiguration, localizedWrapper) = remember(targetLocale, baseContext.resources.configuration) {
                 val conf = android.content.res.Configuration(baseContext.resources.configuration)
                 conf.setLocale(targetLocale)
                 conf.setLayoutDirection(targetLocale)
                 val localizedCtx = baseContext.createConfigurationContext(conf)
-                object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
+                val wrapper = object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
                     override fun getResources(): android.content.res.Resources = localizedCtx.resources
                     override fun getAssets(): android.content.res.AssetManager = localizedCtx.assets
                     override fun getTheme(): android.content.res.Resources.Theme = localizedCtx.theme
                     override val activityResultRegistry: androidx.activity.result.ActivityResultRegistry
                         get() = this@MainActivity.activityResultRegistry
                 }
+                Pair(localizedCtx.resources.configuration, wrapper)
             }
 
             androidx.compose.runtime.CompositionLocalProvider(

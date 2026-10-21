@@ -79,9 +79,11 @@ import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceElevated
 import com.example.ui.theme.XboxSurfaceVariant
+import com.example.data.SettingsRepository
 import com.example.vpn.DEFAULT_SERVERS
 import com.example.vpn.LiveProxyFetcher
 import com.example.vpn.PingTester
+import com.example.vpn.RegionUnlockStatus
 import com.example.vpn.ServerLocation
 import com.example.vpn.VpnManager
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +99,8 @@ fun ServersScreen(
 ) {
     val context = LocalContext.current
     val vpnState by VpnManager.state.collectAsState()
+    val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     val scope = rememberCoroutineScope()
 
     var selectedCategory by remember { mutableStateOf("JP") }
@@ -141,6 +145,7 @@ fun ServersScreen(
         isFetchingLive = true
         scope.launch {
             val live = LiveProxyFetcher.fetchLiveProxies(country)
+            VpnManager.preCheckProxiesBatch(live)
             live.forEach { freshServer ->
                 if (allServers.none { it.id == freshServer.id }) {
                     allServers.add(0, freshServer)
@@ -150,11 +155,18 @@ fun ServersScreen(
         }
     }
 
-    val filteredServers = when (selectedCategory) {
-        "ALL" -> allServers
+    val rawFilteredServers = when (selectedCategory) {
+        "ALL" -> allServers.toList()
         "CUSTOM" -> allServers.filter { it.isCustom }
         else -> allServers.filter { it.countryCode.equals(selectedCategory, ignoreCase = true) }
     }
+
+    // 4. SẮP XẾP: xếp "Đã mở khóa" lên đầu, rồi "Chưa thử" theo ping, "Không mở khóa" và "Sai vùng" xuống cuối
+    val filteredServers = VpnManager.sortServersByUnlockAndPing(
+        servers = rawFilteredServers,
+        pingMap = serverPings.toMap(),
+        records = vpnState.unlockRecords
+    )
 
     LazyColumn(
         modifier = modifier
@@ -163,6 +175,82 @@ fun ServersScreen(
         contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        if (vpnState.unlockFailPromptServer != null) {
+            item(key = "unlock_fail_prompt_banner") {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("unlock_fail_prompt_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF1A0D10),
+                    border = androidx.compose.foundation.BorderStroke(1.2.dp, JapanRed.copy(alpha = 0.75f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) "This server cannot unlock the region, switch to another server?" else "Máy chủ này không mở khóa được, đổi sang máy chủ khác?",
+                                color = TextPrimary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${vpnState.unlockFailPromptServer?.flag ?: ""} ${vpnState.unlockFailPromptServer?.name ?: ""}",
+                                color = JapanRed,
+                                fontSize = 10.5.sp
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val switched = VpnManager.confirmSwitchToNextBestServer(context)
+                                    if (switched != null) {
+                                        onSelectServer(switched)
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 36.dp)
+                                    .testTag("confirm_switch_best_server_button")
+                            ) {
+                                Text(
+                                    text = if (isEn) "Confirm" else "Xác nhận",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                            TextButton(
+                                onClick = { VpnManager.dismissUnlockFailPrompt() },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = if (isEn) "Dismiss" else "Đóng",
+                                    color = TextSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
         item {
             // Global Routing Radar Header Deck
             Card(
@@ -275,7 +363,7 @@ fun ServersScreen(
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                                 Text(
-                                    text = "MÁY CHỦ ĐANG CHỌN: ${currentServer.flag} ${currentServer.name}",
+                                    text = if (isEn) "SELECTED SERVER: ${currentServer.flag} ${currentServer.name}" else "MÁY CHỦ ĐANG CHỌN: ${currentServer.flag} ${currentServer.name}",
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 10.5.sp,
@@ -402,7 +490,7 @@ fun ServersScreen(
                     "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
                     "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
                     "SG" to "🇸🇬 $seaLabel (${allServers.count { it.countryCode == "SG" }})",
-                    "CUSTOM" to "⚙️ Tùy Chỉnh (${allServers.count { it.isCustom }})",
+                    "CUSTOM" to if (isEn) "⚙️ Custom (${allServers.count { it.isCustom }})" else "⚙️ Tùy Chỉnh (${allServers.count { it.isCustom }})",
                     "ALL" to "🌐 $allLabel (${allServers.size})"
                 )
 
@@ -436,11 +524,14 @@ fun ServersScreen(
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
             val ping = serverPings[server.id] ?: server.lastPingMs ?: -1
+            val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
 
             ServerCard(
                 server = server,
                 isSelected = isSelected,
                 pingMs = ping,
+                unlockStatus = unlockStatus,
+                isEn = isEn,
                 onClick = { onSelectServer(server) },
                 onDelete = if (server.isCustom) {
                     {
@@ -473,6 +564,8 @@ private fun ServerCard(
     server: ServerLocation,
     isSelected: Boolean,
     pingMs: Int,
+    unlockStatus: RegionUnlockStatus,
+    isEn: Boolean = false,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
@@ -490,6 +583,20 @@ private fun ServerCard(
         pingMs < 110 -> 3
         pingMs < 170 -> 2
         else -> 1
+    }
+
+    // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử" (xám), "Sai vùng" (vàng)
+    val unlockLabel = when (unlockStatus) {
+        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
+        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
+        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested" else "Chưa thử"
+        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
+    }
+    val unlockBadgeColor = when (unlockStatus) {
+        RegionUnlockStatus.UNLOCKED -> XboxNeonGreen
+        RegionUnlockStatus.FAILED -> JapanRed
+        RegionUnlockStatus.UNTESTED -> Color(0xFF9CA3AF)
+        RegionUnlockStatus.WRONG_REGION -> WarningAmber
     }
 
     Card(
@@ -545,16 +652,17 @@ private fun ServerCard(
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Text(
                             text = server.name,
                             color = if (isSelected) XboxNeonGreen else TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 14.sp,
+                            fontSize = 13.5.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         Surface(
                             shape = RoundedCornerShape(5.dp),
@@ -565,9 +673,24 @@ private fun ServerCard(
                                 text = server.protocol.uppercase(),
                                 color = XboxNeonGreen,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 8.5.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(5.dp),
+                            color = unlockBadgeColor.copy(alpha = 0.16f),
+                            border = androidx.compose.foundation.BorderStroke(0.7.dp, unlockBadgeColor.copy(alpha = 0.6f))
+                        ) {
+                            Text(
+                                text = unlockLabel,
+                                color = unlockBadgeColor,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
                             )
                         }
                     }
@@ -636,7 +759,7 @@ private fun ServerCard(
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "ĐANG DÙNG",
+                                text = if (isEn) "ACTIVE" else "ĐANG DÙNG",
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 10.sp,

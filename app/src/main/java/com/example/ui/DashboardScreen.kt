@@ -220,7 +220,7 @@ fun DashboardScreen(
                                     )
                                     Text(
                                         text = when (vpnState.mode) {
-                                            NetworkMode.DIRECT_NETWORK -> "Mạng trực tiếp"
+                                            NetworkMode.DIRECT_NETWORK -> stringResource(R.string.net_mode_direct)
                                             NetworkMode.VPN_JAPAN -> "${vpnState.currentServer.flag} ${vpnState.currentServer.name}"
                                             NetworkMode.DISCONNECTED -> "Xbox Cloud"
                                         },
@@ -326,23 +326,25 @@ fun DashboardScreen(
                             }
 
                             // 3. Translator Icon Button
+                            val isEnUi = config.isEnglishUI()
+                            val isTranslateOn = config.isEffectiveTranslateEnabled()
                             Surface(
                                 modifier = Modifier
                                     .size(30.dp)
                                     .clip(RoundedCornerShape(9.dp))
                                     .border(
                                         1.dp,
-                                        if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
+                                        if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
                                         RoundedCornerShape(9.dp)
                                     )
                                     .clickable { showTranslatorDialog = true }
                                     .testTag("topbar_translator_button"),
-                                color = if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.9f)
+                                color = if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.9f)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.Translate,
-                                        contentDescription = "Dịch tự động",
+                                        contentDescription = if (isEnUi) "Auto Translate" else "Dịch tự động",
                                         tint = XboxNeonGreen,
                                         modifier = Modifier.size(15.dp)
                                     )
@@ -444,7 +446,8 @@ fun DashboardScreen(
                             onClearCookies = {
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 android.webkit.WebStorage.getInstance().deleteAllData()
-                                android.widget.Toast.makeText(context, "Đã xóa toàn bộ Cookie & Dữ liệu Xbox!", android.widget.Toast.LENGTH_SHORT).show()
+                                val msg = if (config.isEnglishUI()) "Cleared all Xbox cookies & site data!" else "Đã xóa toàn bộ Cookie & Dữ liệu Xbox!"
+                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )
                     }

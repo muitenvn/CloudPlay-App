@@ -187,8 +187,8 @@ fun CloudBrowserScreen(
         if (isTrusted || isTrustedDomainHost) {
             showReturnButton = false
             VpnManager.restoreProxyForGaming()
-            // Khi người dùng thoát về trang danh mục Xbox (ngoài /launch/), nối lại bộ dịch nếu không bật Chế độ máy yếu
-            if (XboxBridge.isXboxHost(targetUrl) && !targetUrl.contains("/launch/") && !config.lowEndDeviceMode) {
+            // Khi người dùng thoát về trang danh mục Xbox (ngoài /launch/), nối lại bộ dịch nếu đang bật tiếng Việt và không bật Chế độ máy yếu
+            if (XboxBridge.isXboxHost(targetUrl) && !targetUrl.contains("/launch/") && !config.lowEndDeviceMode && config.isEffectiveTranslateEnabled()) {
                 webViewInstance?.evaluateJavascript(
                     "if (window.__resumeTranslator) window.__resumeTranslator();",
                     null
@@ -208,6 +208,7 @@ fun CloudBrowserScreen(
     val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
 
     val effectiveLocale = config.getEffectiveLocale()
+    val effectiveTranslate = config.isEffectiveTranslateEnabled()
 
     // Dynamically recompute injectionScript whenever server, locale, or graphics/translation settings change
     val injectionScript = remember(
@@ -215,7 +216,7 @@ fun CloudBrowserScreen(
         config.clarityPreset,
         vpnState.currentServer,
         effectiveLocale,
-        config.xcloudTranslateEnabled,
+        effectiveTranslate,
         config.preserveGameTitles,
         config.bilingualMode,
         config.hideStreamStatsOverlay,
@@ -231,7 +232,7 @@ fun CloudBrowserScreen(
             targetCountry = vpnState.currentServer.countryCode,
             targetIp = vpnState.currentServer.ip,
             userLocale = effectiveLocale,
-            xcloudTranslate = config.xcloudTranslateEnabled,
+            xcloudTranslate = effectiveTranslate,
             preserveTitles = config.preserveGameTitles,
             bilingualMode = config.bilingualMode,
             hideStreamStats = config.hideStreamStatsOverlay,
@@ -257,18 +258,18 @@ fun CloudBrowserScreen(
         )
     }
 
-    LaunchedEffect(config.xcloudTranslateEnabled) {
+    LaunchedEffect(effectiveTranslate) {
         webViewInstance?.evaluateJavascript(
-            "if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation(${config.xcloudTranslateEnabled});",
+            "if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($effectiveTranslate); if (!$effectiveTranslate && window.__pauseTranslator) window.__pauseTranslator();",
             null
         )
     }
 
-    // 1. DỪNG BỘ DỊCH KHI ĐANG STREAM (hoặc khi bật Chế độ máy yếu), NỐI LẠI KHI NGẮT STREAM / THOÁT VỀ TRANG XBOX
-    LaunchedEffect(streamUiState.isStreamConnected, streamUiState.isGameActive, currentMainFrameUrl, config.lowEndDeviceMode) {
+    // 1. DỪNG BỘ DỊCH KHI ĐANG STREAM (hoặc khi bật Chế độ máy yếu / ngôn ngữ tiếng Anh), NỐI LẠI KHI NGẮT STREAM / THOÁT VỀ TRANG XBOX
+    LaunchedEffect(streamUiState.isStreamConnected, streamUiState.isGameActive, currentMainFrameUrl, config.lowEndDeviceMode, effectiveTranslate) {
         val wv = webViewInstance ?: return@LaunchedEffect
         val isOnLaunchPage = currentMainFrameUrl.contains("/launch/")
-        if (streamUiState.isStreamConnected || config.lowEndDeviceMode) {
+        if (streamUiState.isStreamConnected || config.lowEndDeviceMode || !effectiveTranslate) {
             wv.evaluateJavascript("if (window.__pauseTranslator) window.__pauseTranslator();", null)
         } else if (!streamUiState.isGameActive && !isOnLaunchPage && XboxBridge.isXboxHost(currentMainFrameUrl)) {
             wv.evaluateJavascript("if (window.__resumeTranslator) window.__resumeTranslator();", null)

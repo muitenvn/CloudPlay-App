@@ -39,6 +39,293 @@ object VpnManager {
     fun init(context: Context) {
         appContext = context.applicationContext
         loadPersistedServers(context.applicationContext)
+        loadPersistedUnlockRecords(context.applicationContext)
+    }
+
+    private fun loadPersistedUnlockRecords(context: Context) {
+        try {
+            val sp = context.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            val jsonStr = sp.getString("unlock_records_json", null) ?: return
+            val array = org.json.JSONArray(jsonStr)
+            val now = System.currentTimeMillis()
+            val map = mutableMapOf<String, ServerUnlockRecord>()
+            var hadExpired = false
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val key = obj.optString("serverKey", "")
+                if (key.isBlank()) continue
+                val statusStr = obj.optString("status", RegionUnlockStatus.UNTESTED.name)
+                val status = try {
+                    RegionUnlockStatus.valueOf(statusStr)
+                } catch (_: Exception) {
+                    RegionUnlockStatus.UNTESTED
+                }
+                val ts = obj.optLong("timestampMs", now)
+                val country = obj.optString("detectedCountryCode", "").ifBlank { null }
+                val record = ServerUnlockRecord(
+                    serverKey = key,
+                    status = status,
+                    timestampMs = ts,
+                    detectedCountryCode = country
+                )
+                if (record.isExpired(now)) {
+                    hadExpired = true
+                } else {
+                    map[key] = record
+                }
+            }
+            _state.value = _state.value.copy(unlockRecords = map)
+            if (hadExpired) {
+                persistUnlockRecords(context, map)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not load persisted unlock records", e)
+        }
+    }
+
+    private fun persistUnlockRecords(context: Context?, records: Map<String, ServerUnlockRecord>) {
+        val ctx = context ?: appContext ?: return
+        try {
+            val sp = ctx.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            val array = org.json.JSONArray()
+            val now = System.currentTimeMillis()
+            for ((_, rec) in records) {
+                if (rec.isExpired(now)) continue
+                val obj = org.json.JSONObject().apply {
+                    put("serverKey", rec.serverKey)
+                    put("status", rec.status.name)
+                    put("timestampMs", rec.timestampMs)
+                    if (rec.detectedCountryCode != null) {
+                        put("detectedCountryCode", rec.detectedCountryCode)
+                    }
+                }
+                array.put(obj)
+            }
+            sp.edit().putString("unlock_records_json", array.toString()).apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not persist unlock records", e)
+        }
+    }
+
+    fun getServerUnlockStatus(
+        server: ServerLocation,
+        records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords
+    ): RegionUnlockStatus {
+        val key = server.addressPortKey
+        val rec = records[key]
+        if (rec != null) {
+            val eff = rec.effectiveStatus()
+            if (eff != RegionUnlockStatus.UNTESTED) {
+                return eff
+            }
+        }
+        val code = server.countryCode.trim().uppercase()
+        if (code.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) {
+            return RegionUnlockStatus.WRONG_REGION
+        }
+        return RegionUnlockStatus.UNTESTED
+    }
+
+    private fun saveServerUnlockRecord(
+        server: ServerLocation,
+        status: RegionUnlockStatus,
+        detectedCountryCode: String? = null
+    ) {
+        val key = server.addressPortKey
+        val record = ServerUnlockRecord(
+            serverKey = key,
+            status = status,
+            timestampMs = System.currentTimeMillis(),
+            detectedCountryCode = detectedCountryCode
+        )
+        val updated = _state.value.unlockRecords.toMutableMap()
+        updated[key] = record
+        _state.value = _state.value.copy(unlockRecords = updated)
+        persistUnlockRecords(appContext, updated)
+    }
+
+    /**
+     * 1. KIỂM TRA TRƯỚC (nhẹ): khi chọn hoặc cập nhật proxy, lấy quốc gia của IP thoát
+     * (dùng GeoIpDetector sẵn có). Nếu quốc gia không thuộc danh sách vùng hỗ trợ thì gắn nhãn "Sai vùng".
+     */
+    fun preCheckProxyRegion(server: ServerLocation) {
+        val declaredCode = server.countryCode.trim().uppercase()
+        if (declaredCode.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(declaredCode)) {
+            saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, declaredCode)
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                // Kiểm tra quốc gia của IP máy chủ/proxy kết hợp GeoIpDetector.SUPPORTED_COUNTRIES
+                val detectedCountry = queryIpCountryLight(server.ip)
+                if (!detectedCountry.isNullOrBlank()) {
+                    val cleanCode = detectedCountry.trim().uppercase()
+                    if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(cleanCode)) {
+                        saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, cleanCode)
+                    } else {
+                        val existing = getServerUnlockStatus(server)
+                        if (existing == RegionUnlockStatus.WRONG_REGION) {
+                            saveServerUnlockRecord(server, RegionUnlockStatus.UNTESTED, cleanCode)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun preCheckProxiesBatch(servers: List<ServerLocation>) {
+        servers.forEach { server ->
+            val declaredCode = server.countryCode.trim().uppercase()
+            if (declaredCode.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(declaredCode)) {
+                saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, declaredCode)
+            }
+        }
+        scope.launch(Dispatchers.IO) {
+            servers.take(15).forEach { server ->
+                val currentStatus = getServerUnlockStatus(server)
+                if (currentStatus == RegionUnlockStatus.UNTESTED) {
+                    val detectedCountry = queryIpCountryLight(server.ip)
+                    if (!detectedCountry.isNullOrBlank()) {
+                        val cleanCode = detectedCountry.trim().uppercase()
+                        if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(cleanCode)) {
+                            saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, cleanCode)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun queryIpCountryLight(ip: String): String? {
+        val cleanIp = ip.trim()
+        if (cleanIp.isBlank() || cleanIp == "127.0.0.1" || cleanIp == "localhost") return null
+        return try {
+            val url = java.net.URL("https://api.country.is/$cleanIp")
+            val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 2500
+                readTimeout = 2500
+                setRequestProperty("User-Agent", "Mozilla/5.0")
+            }
+            if (conn.responseCode == 200) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                val json = org.json.JSONObject(body)
+                json.optString("country", "").ifBlank { null }
+            } else {
+                conn.disconnect()
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 2. HỌC TỪ THỰC TẾ: nhận tín hiệu UNLOCK_OK hoặc UNLOCK_FAIL từ XboxBridge
+     * Lưu kết quả theo từng máy chủ (khóa theo địa chỉ + cổng), kèm thời điểm.
+     */
+    fun onUnlockSignalReceived(signal: String) {
+        val currentServer = _state.value.currentServer
+        when (signal.trim().uppercase()) {
+            "UNLOCK_OK" -> {
+                saveServerUnlockRecord(currentServer, RegionUnlockStatus.UNLOCKED, currentServer.countryCode)
+                _state.value = _state.value.copy(
+                    unlockFailPromptServer = null,
+                    isBypassActiveInBrowser = true,
+                    statusMessage = "✅ Đã mở khóa vùng thành công: ${currentServer.name} ${currentServer.flag}"
+                )
+            }
+            "UNLOCK_FAIL" -> {
+                saveServerUnlockRecord(currentServer, RegionUnlockStatus.FAILED, currentServer.countryCode)
+                _state.value = _state.value.copy(
+                    unlockFailPromptServer = currentServer,
+                    statusMessage = "⚠️ Máy chủ này không mở khóa được, đổi sang máy chủ khác?"
+                )
+            }
+        }
+    }
+
+    fun dismissUnlockFailPrompt() {
+        _state.value = _state.value.copy(unlockFailPromptServer = null)
+    }
+
+    /**
+     * 4. SẮP XẾP: xếp "Đã mở khóa" lên đầu, rồi "Chưa thử" theo ping,
+     * "Không mở khóa" và "Sai vùng" xuống cuối.
+     */
+    fun sortServersByUnlockAndPing(
+        servers: List<ServerLocation>,
+        pingMap: Map<String, Int> = emptyMap(),
+        records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords
+    ): List<ServerLocation> {
+        return servers.sortedWith(
+            Comparator { a, b ->
+                val statusA = getServerUnlockStatus(a, records)
+                val statusB = getServerUnlockStatus(b, records)
+                val rankA = unlockSortRank(statusA)
+                val rankB = unlockSortRank(statusB)
+                if (rankA != rankB) {
+                    return@Comparator rankA.compareTo(rankB)
+                }
+                val pingA = pingMap[a.id] ?: a.lastPingMs ?: -1
+                val pingB = pingMap[b.id] ?: b.lastPingMs ?: -1
+                val validPingA = if (pingA > 0) pingA else Int.MAX_VALUE
+                val validPingB = if (pingB > 0) pingB else Int.MAX_VALUE
+                if (validPingA != validPingB) {
+                    validPingA.compareTo(validPingB)
+                } else {
+                    b.speedMbps.compareTo(a.speedMbps)
+                }
+            }
+        )
+    }
+
+    private fun unlockSortRank(status: RegionUnlockStatus): Int {
+        return when (status) {
+            RegionUnlockStatus.UNLOCKED -> 0
+            RegionUnlockStatus.UNTESTED -> 1
+            RegionUnlockStatus.FAILED -> 2
+            RegionUnlockStatus.WRONG_REGION -> 3
+        }
+    }
+
+    /**
+     * 5. TỰ CHUYỂN: khi người dùng xác nhận thông báo "Máy chủ này không mở khóa được, đổi sang máy chủ khác?",
+     * chuyển sang máy chủ tốt nhất kế tiếp (không chọn máy chủ "Không mở khóa" hoặc "Sai vùng").
+     */
+    fun confirmSwitchToNextBestServer(context: Context? = null): ServerLocation? {
+        val current = _state.value.currentServer
+        val records = _state.value.unlockRecords
+        val all = getAllServers()
+
+        // Lọc bỏ máy chủ đang lỗi và các máy chủ "Không mở khóa" / "Sai vùng"
+        val eligibleSameCountry = all.filter {
+            it.addressPortKey != current.addressPortKey &&
+                it.countryCode.equals(current.countryCode, ignoreCase = true) &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+        }
+        val eligibleAnySupported = all.filter {
+            it.addressPortKey != current.addressPortKey &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+        }
+
+        val sortedPool = sortServersByUnlockAndPing(
+            if (eligibleSameCountry.isNotEmpty()) eligibleSameCountry else eligibleAnySupported,
+            emptyMap(),
+            records
+        )
+        val bestNext = sortedPool.firstOrNull() ?: return null
+
+        _state.value = _state.value.copy(
+            currentServer = bestNext,
+            unlockFailPromptServer = null,
+            statusMessage = "🔄 Đã chuyển sang máy chủ tốt nhất kế tiếp: ${bestNext.name} ${bestNext.flag}"
+        )
+        selectServer(bestNext, context ?: appContext)
+        return bestNext
     }
 
     private fun loadPersistedServers(context: Context) {
@@ -256,12 +543,18 @@ object VpnManager {
     fun onWebViewIpDetected(ip: String, countryCode: String, countryName: String? = null, city: String? = null) {
         GeoIpDetector.onWebViewReported(ip, countryCode, countryName, city)
         val currentGeo = GeoIpDetector.currentGeoIp.value
+        if (currentGeo != null && _state.value.engine == VpnEngine.PROXY_TUNNEL && _state.value.mode == NetworkMode.VPN_JAPAN) {
+            if (!currentGeo.isXboxSupported) {
+                saveServerUnlockRecord(_state.value.currentServer, RegionUnlockStatus.WRONG_REGION, currentGeo.countryCode)
+            }
+        }
         updateSmartDecision(currentGeo)
     }
 
     fun onRegionBypassed(info: String) {
         Log.d(TAG, "Xbox Region bypassed via In-WebView Interceptor: $info")
         val currentServer = _state.value.currentServer
+        saveServerUnlockRecord(currentServer, RegionUnlockStatus.UNLOCKED, currentServer.countryCode)
         val spoofGeo = GeoIpResult(
             ip = currentServer.ip,
             countryCode = currentServer.countryCode,
@@ -273,6 +566,7 @@ object VpnManager {
         )
         _state.value = _state.value.copy(
             isBypassActiveInBrowser = true,
+            unlockFailPromptServer = null,
             detectedGeoIp = spoofGeo,
             smartVpnPhase = SmartVpnPhase.BYPASS_ACTIVE,
             statusMessage = "✅ Đã vượt rào Xbox thành công! Khu vực: ${currentServer.name} ${currentServer.flag}"
@@ -280,9 +574,11 @@ object VpnManager {
     }
 
     fun connect(context: Context, server: ServerLocation = _state.value.currentServer) {
+        preCheckProxyRegion(server)
         _state.value = _state.value.copy(
             isConnecting = true,
             currentServer = server,
+            unlockFailPromptServer = null,
             lastError = null,
             statusMessage = "Đang kết nối tới ${server.name} ${server.flag}..."
         )
@@ -400,26 +696,21 @@ object VpnManager {
     }
 
     /**
-     * Cycles to the next backup server in the same country if current server fails or loads slowly
+     * Cycles to the next backup server in the same country if current server fails or loads slowly.
+     * Skips servers marked "Không mở khóa" (FAILED) or "Sai vùng" (WRONG_REGION).
      */
     fun switchNextBackupServer(context: Context) {
-        val allServers = getAllServers()
-        val sameCountryServers = allServers.filter { it.countryCode.equals(_state.value.currentServer.countryCode, ignoreCase = true) }
-        val pool = if (sameCountryServers.isNotEmpty()) sameCountryServers else allServers
-
-        val currentIndex = pool.indexOfFirst { it.id == _state.value.currentServer.id }
-        val nextIndex = if (currentIndex in 0 until pool.size - 1) currentIndex + 1 else 0
-        val nextServer = pool[nextIndex]
-
-        _state.value = _state.value.copy(
-            currentServer = nextServer,
-            statusMessage = "🔄 Chuyển sang máy chủ dự phòng #${nextIndex + 1}: ${nextServer.name}"
-        )
-        selectServer(nextServer, context)
+        val next = confirmSwitchToNextBestServer(context)
+        if (next == null) {
+            val allServers = getAllServers()
+            val fallback = allServers.firstOrNull { it.id != _state.value.currentServer.id } ?: _state.value.currentServer
+            selectServer(fallback, context)
+        }
     }
 
     /**
-     * Finds and connects to the fastest responding server in the selected country
+     * Finds and connects to the fastest responding server in the selected country.
+     * Không tự chọn máy chủ "Không mở khóa" (FAILED) hoặc "Sai vùng" (WRONG_REGION).
      */
     fun autoSelectBestServer(countryCode: String, context: Context) {
         scope.launch {
@@ -428,9 +719,15 @@ object VpnManager {
                 statusMessage = "Đang kiểm tra và tìm máy chủ $countryCode có tốc độ tốt nhất..."
             )
 
-            val servers = getAllServers().filter { it.countryCode.equals(countryCode, ignoreCase = true) }
+            val records = _state.value.unlockRecords
+            val allInCountry = getAllServers().filter { it.countryCode.equals(countryCode, ignoreCase = true) }
+            val eligible = allInCountry.filter {
+                val st = getServerUnlockStatus(it, records)
+                st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+            }.ifEmpty { allInCountry.filter { getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED } }
+
             val tested: List<Pair<ServerLocation, Int>> = kotlinx.coroutines.coroutineScope {
-                servers.map { s ->
+                eligible.map { s ->
                     async(Dispatchers.IO) {
                         val ping = PingTester.testServerPing(s, 1200)
                         Pair(s, ping)
@@ -438,24 +735,38 @@ object VpnManager {
                 }.awaitAll()
             }
 
-            val best: ServerLocation? = tested.filter { it.second > 0 }.minByOrNull { it.second }?.first ?: servers.firstOrNull()
+            val pingMap = tested.toMap().mapKeys { it.key.id }
+            val responsive = tested.filter { it.second > 0 }.map { it.first }
+            val sortedCandidates = sortServersByUnlockAndPing(
+                if (responsive.isNotEmpty()) responsive else eligible,
+                pingMap,
+                records
+            )
+            val best: ServerLocation? = sortedCandidates.firstOrNull()
             if (best != null) {
+                val bestPing = pingMap[best.id]?.takeIf { it > 0 } ?: best.lastPingMs ?: 65
                 _state.value = _state.value.copy(
                     currentServer = best,
-                    statusMessage = "⚡ Đã chọn máy chủ tốt nhất: ${best.name} (${best.lastPingMs ?: 65}ms)"
+                    statusMessage = "⚡ Đã chọn máy chủ tốt nhất: ${best.name} (${bestPing}ms)"
                 )
                 connect(context, best)
             } else {
                 _state.value = _state.value.copy(
                     isConnecting = false,
-                    statusMessage = "⚠️ Không tìm thấy máy chủ phản hồi trong vùng $countryCode"
+                    statusMessage = "⚠️ Không tìm thấy máy chủ mở khóa hợp lệ trong vùng $countryCode"
                 )
             }
         }
     }
 
     private suspend fun findFirstResponsiveServer(countryCode: String): ServerLocation? = withContext(Dispatchers.IO) {
-        val candidates = getAllServers().filter { it.countryCode.equals(countryCode, ignoreCase = true) }
+        val records = _state.value.unlockRecords
+        val rawCandidates = getAllServers().filter {
+            it.countryCode.equals(countryCode, ignoreCase = true) &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+        }
+        val candidates = sortServersByUnlockAndPing(rawCandidates, emptyMap(), records)
         for (server in candidates) {
             if (PingTester.isHostReachable(server.ip, server.port, 800)) {
                 return@withContext server
@@ -500,8 +811,9 @@ object VpnManager {
 
     fun selectServer(server: ServerLocation, context: Context? = null) {
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
-        _state.value = _state.value.copy(currentServer = server)
+        _state.value = _state.value.copy(currentServer = server, unlockFailPromptServer = null)
         persistCustomServers(context, _state.value.customServers, server)
+        preCheckProxyRegion(server)
         if (wasConnected && context != null) {
             connect(context, server)
         }
@@ -509,8 +821,9 @@ object VpnManager {
 
     fun addCustomServer(server: ServerLocation) {
         val updated = _state.value.customServers + server
-        _state.value = _state.value.copy(customServers = updated, currentServer = server)
+        _state.value = _state.value.copy(customServers = updated, currentServer = server, unlockFailPromptServer = null)
         persistCustomServers(appContext, updated, server)
+        preCheckProxyRegion(server)
     }
 
     fun removeCustomServer(serverId: String) {
@@ -547,10 +860,18 @@ object VpnManager {
                 val builder = ProxyConfig.Builder()
                 builder.addProxyRule(ruleFor(primaryServer))
 
-                // Add up to 3 backup servers from the same region for auto-fallback in Chromium
-                val backups = getAllServers()
-                    .filter { it.id != primaryServer.id && it.countryCode == primaryServer.countryCode }
-                    .take(3)
+                // Add up to 3 backup servers from the same region (excluding FAILED / WRONG_REGION) for auto-fallback in Chromium
+                val records = _state.value.unlockRecords
+                val backups = sortServersByUnlockAndPing(
+                    getAllServers().filter {
+                        it.id != primaryServer.id &&
+                            it.countryCode == primaryServer.countryCode &&
+                            getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                            getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+                    },
+                    emptyMap(),
+                    records
+                ).take(3)
 
                 backups.forEach { backup ->
                     builder.addProxyRule(ruleFor(backup))

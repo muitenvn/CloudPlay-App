@@ -312,21 +312,28 @@ class XboxBridge(
                                         let targetName = targetCountry === 'KR' ? 'KOREACENTRAL' : 
                                                          (targetCountry === 'US' ? 'WESTUS' : 'JAPANEAST');
 
-                                        if (data.offeringSettings && data.offeringSettings.regions) {
-                                            let found = data.offeringSettings.regions.find(r => r.name.toUpperCase() === targetName);
+                                        let foundTargetRegion = false;
+                                        if (data.offeringSettings && Array.isArray(data.offeringSettings.regions)) {
+                                            let found = data.offeringSettings.regions.find(r => r && r.name && r.name.toUpperCase() === targetName);
                                             if (found) {
                                                 found.isDefault = true;
                                                 data.offeringSettings.regions.forEach(r => { if (r !== found) r.isDefault = false; });
+                                                foundTargetRegion = true;
                                             } else if (data.offeringSettings.regions.length > 0) {
                                                 data.offeringSettings.regions[0].isDefault = true;
+                                                foundTargetRegion = true;
                                             }
                                         }
 
-                                        notify('onRegionBypassed', JSON.stringify({
-                                            country: targetCountry,
-                                            ip: bypassIp,
-                                            targetRegion: targetName
-                                        }));
+                                        if (foundTargetRegion) {
+                                            window.__lastUnlockSignal = 'UNLOCK_OK';
+                                            notify('onRegionUnlockSignal', 'UNLOCK_OK');
+                                            notify('onRegionBypassed', JSON.stringify({
+                                                country: targetCountry,
+                                                ip: bypassIp,
+                                                targetRegion: targetName
+                                            }));
+                                        }
 
                                         response.json = () => Promise.resolve(data);
                                         response.text = () => Promise.resolve(JSON.stringify(data));
@@ -701,9 +708,72 @@ class XboxBridge(
                         }
                     }, true);
 
-                    // Lightweight fallback check (2000ms) for edge cases where video mounts silently
+                    function hasPlayButtonOnPage() {
+                        const els = document.querySelectorAll('button, a[role="button"], [data-testid*="play" i], [data-testid*="launch" i]');
+                        for (let i = 0; i < els.length; i++) {
+                            const el = els[i];
+                            const txt = ((el.innerText || el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('data-testid') || '')).trim().toLowerCase();
+                            if (/\bplay\b/.test(txt) || txt.includes('play with cloud') || txt.includes('chơi ngay') || txt.includes('chơi trên đám mây') || txt.includes('playbutton')) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    }
+
+                    function showUnlockFailBannerDom() {
+                        if (document.getElementById('__cloudplay_unlock_fail_banner')) return;
+                        const bar = document.createElement('div');
+                        bar.id = '__cloudplay_unlock_fail_banner';
+                        bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2147483647;background:rgba(12,20,15,0.96);border:1.5px solid #ef4444;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-family:sans-serif;max-width:92vw;color:#fff;';
+                        const msg = document.createElement('span');
+                        msg.style.cssText = 'font-size:12.5px;font-weight:700;line-height:1.35;';
+                        msg.textContent = 'Máy chủ này không mở khóa được, đổi sang máy chủ khác?';
+                        const btnOk = document.createElement('button');
+                        btnOk.style.cssText = 'background:#107C10;color:#fff;border:1px solid #22c55e;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;';
+                        btnOk.textContent = 'Xác nhận';
+                        btnOk.onclick = function() {
+                            bar.remove();
+                            if (window.CloudPlayBridge && window.CloudPlayBridge.confirmSwitchBestServer) {
+                                window.CloudPlayBridge.confirmSwitchBestServer();
+                            }
+                        };
+                        const btnClose = document.createElement('button');
+                        btnClose.style.cssText = 'background:transparent;color:#9ca3af;border:none;padding:4px 6px;font-size:12px;cursor:pointer;';
+                        btnClose.textContent = '✕';
+                        btnClose.onclick = function() {
+                            bar.remove();
+                            if (window.CloudPlayBridge && window.CloudPlayBridge.dismissUnlockFailPrompt) {
+                                window.CloudPlayBridge.dismissUnlockFailPrompt();
+                            }
+                        };
+                        bar.appendChild(msg);
+                        bar.appendChild(btnOk);
+                        bar.appendChild(btnClose);
+                        if (document.body) document.body.appendChild(bar);
+                    }
+
+                    function checkRegionLockDomState() {
+                        if (notifiedStreamConnection || !document.body) return;
+                        const bodyText = (document.body.innerText || '').toLowerCase();
+                        const hasRegionUnsupportedText =
+                            bodyText.includes('unavailable in your region') ||
+                            bodyText.includes('not available in your region') ||
+                            bodyText.includes('view supported regions') ||
+                            bodyText.includes('không khả dụng tại khu vực') ||
+                            bodyText.includes('xem các khu vực được hỗ trợ');
+                        if (hasRegionUnsupportedText && !hasPlayButtonOnPage()) {
+                            if (window.__lastUnlockSignal !== 'UNLOCK_FAIL') {
+                                window.__lastUnlockSignal = 'UNLOCK_FAIL';
+                                notify('onRegionUnlockSignal', 'UNLOCK_FAIL');
+                                showUnlockFailBannerDom();
+                            }
+                        }
+                    }
+
+                    // Lightweight fallback check (2000ms) for edge cases where video mounts silently & region lock check
                     setInterval(function() {
                         handleNavigationChange();
+                        checkRegionLockDomState();
                         const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
                         if (isLaunchPage && !notifiedStreamConnection) {
                             const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
@@ -918,6 +988,36 @@ class XboxBridge(
     }
 
     @JavascriptInterface
+    fun onRegionUnlockSignal(signal: String?) {
+        if (!isCallerTrusted()) return
+        val cleanSignal = signal?.trim()?.uppercase() ?: return
+        Log.d(TAG, "Region unlock signal: $cleanSignal")
+        VpnManager.onUnlockSignalReceived(cleanSignal)
+    }
+
+    @JavascriptInterface
+    fun confirmSwitchBestServer() {
+        if (!isCallerTrusted()) return
+        scope.launch(Dispatchers.Main) {
+            val wv = webViewRef?.get()
+            val nextServer = VpnManager.confirmSwitchToNextBestServer(wv?.context)
+            if (nextServer != null && wv != null) {
+                val locale = com.example.data.SettingsRepository.config.value.getEffectiveLocale()
+                wv.evaluateJavascript(
+                    "window.__lastUnlockSignal = null; if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: '${nextServer.countryCode}', ip: '${nextServer.ip}', locale: '$locale' }); location.reload();",
+                    null
+                )
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun dismissUnlockFailPrompt() {
+        if (!isCallerTrusted()) return
+        VpnManager.dismissUnlockFailPrompt()
+    }
+
+    @JavascriptInterface
     fun onWebViewIpDetected(jsonStr: String?) {
         if (!isCallerTrusted()) return
         if (jsonStr.isNullOrBlank()) return
@@ -947,6 +1047,7 @@ class XboxBridge(
     fun requestSmartTranslate(rawText: String?, callbackId: String?, isBilingual: Boolean) {
         if (!isCallerTrusted()) return
         if (rawText.isNullOrBlank() || callbackId.isNullOrBlank()) return
+        if (!com.example.data.SettingsRepository.config.value.isEffectiveTranslateEnabled()) return
         scope.launch(Dispatchers.IO) {
             val translated = GoogleGamingTranslator.translate(rawText, "vi", isBilingual)
             withContext(Dispatchers.Main) {
@@ -963,6 +1064,7 @@ class XboxBridge(
     fun requestBatchTranslate(jsonTexts: String?, batchId: String?, isBilingual: Boolean) {
         if (!isCallerTrusted()) return
         if (jsonTexts.isNullOrBlank() || batchId.isNullOrBlank()) return
+        if (!com.example.data.SettingsRepository.config.value.isEffectiveTranslateEnabled()) return
         scope.launch(Dispatchers.IO) {
             try {
                 val array = org.json.JSONArray(jsonTexts)

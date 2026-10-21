@@ -278,11 +278,12 @@ private fun HeroConsolePlayDeck(
                                         }
                                     )
                             )
+                            val isEn = config.isEnglishUI()
                             Text(
                                 text = when (vpnState.mode) {
-                                    NetworkMode.DIRECT_NETWORK -> "Mạng trực tiếp"
-                                    NetworkMode.VPN_JAPAN -> "Mở vùng ${vpnState.currentServer.flag}"
-                                    NetworkMode.DISCONNECTED -> "Tự ngắt VPN"
+                                    NetworkMode.DIRECT_NETWORK -> if (isEn) "Direct Net" else "Mạng trực tiếp"
+                                    NetworkMode.VPN_JAPAN -> if (isEn) "Unlocked ${vpnState.currentServer.flag}" else "Mở vùng ${vpnState.currentServer.flag}"
+                                    NetworkMode.DISCONNECTED -> if (isEn) "Auto Bypass" else "Tự ngắt VPN"
                                 },
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -429,7 +430,7 @@ private fun HeroConsolePlayDeck(
                                     maxLines = 1
                                 )
                                 Text(
-                                    text = "Miễn phí",
+                                    text = if (config.isEnglishUI()) "Free to Play" else "Miễn phí",
                                     color = Color(0xFFB3E5FC),
                                     fontSize = 9.5.sp,
                                     fontWeight = FontWeight.Bold,
@@ -441,13 +442,14 @@ private fun HeroConsolePlayDeck(
                 }
 
                 // Active Capabilities Strip (Short 2-word labels so nothing gets cut off)
+                val isEn = config.isEnglishUI()
                 val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
                 val graphicsShort = when (config.cellularMode) {
-                    com.example.data.CellularOptimizationMode.AUTO -> "Tự động"
-                    com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "Thấp"
-                    com.example.data.CellularOptimizationMode.MEDIUM -> "Vừa"
-                    com.example.data.CellularOptimizationMode.HIGH -> "Cao"
-                    com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "Rất cao"
+                    com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
+                    com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
+                    com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Medium" else "Vừa"
+                    com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
+                    com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -455,19 +457,23 @@ private fun HeroConsolePlayDeck(
                 ) {
                     HeroCapabilityChip(
                         icon = "🌐",
-                        label = "Vùng $regionCode",
+                        label = if (isEn) "Region $regionCode" else "Vùng $regionCode",
                         accentColor = XboxNeonGreen,
                         modifier = Modifier.weight(1f)
                     )
                     HeroCapabilityChip(
                         icon = "✨",
-                        label = "Đồ họa: $graphicsShort",
+                        label = if (isEn) "Quality: $graphicsShort" else "Đồ họa: $graphicsShort",
                         accentColor = DirectCyan,
                         modifier = Modifier.weight(1.15f)
                     )
                     HeroCapabilityChip(
                         icon = "🎮",
-                        label = if (gamepadStatus.hasPhysicalController) "Tay cầm" else "Cảm ứng",
+                        label = if (gamepadStatus.hasPhysicalController) {
+                            if (isEn) "Gamepad" else "Tay cầm"
+                        } else {
+                            if (isEn) "Touch" else "Cảm ứng"
+                        },
                         accentColor = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else GoldStar,
                         modifier = Modifier.weight(1f)
                     )
@@ -516,6 +522,8 @@ private fun QuickNetworkCockpitCard(
     onDisconnectVpn: () -> Unit,
     onSwitchEngine: (VpnEngine) -> Unit
 ) {
+    val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
     val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
     val directPing = vpnState.directLatencyMs
     val hasPing = directPing != null && directPing > 0
@@ -614,7 +622,7 @@ private fun QuickNetworkCockpitCard(
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = if (hasPing) "${directPing} ms" else "Sẵn sàng",
+                            text = if (hasPing) "${directPing} ms" else if (isEn) "Ready" else "Sẵn sàng",
                             color = if (hasPing) DirectCyan else XboxNeonGreen,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 11.sp,
@@ -654,14 +662,14 @@ private fun QuickNetworkCockpitCard(
                         )
                         Column {
                             Text(
-                                text = "Bước 1: Mở khóa vùng",
+                                text = if (isEn) "Step 1: Unlock Region" else "Bước 1: Mở khóa vùng",
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${vpnState.currentServer.flag} Vào game nhanh",
+                                text = if (isEn) "${vpnState.currentServer.flag} Quick Launch" else "${vpnState.currentServer.flag} Vào game nhanh",
                                 color = TextSecondary,
                                 fontSize = 10.sp
                             )
@@ -691,14 +699,14 @@ private fun QuickNetworkCockpitCard(
                         )
                         Column {
                             Text(
-                                text = "Bước 2: Tự ngắt VPN",
+                                text = if (isEn) "Step 2: Auto Disconnect" else "Bước 2: Tự ngắt VPN",
                                 color = DirectCyan,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Chơi mạng trực tiếp",
+                                text = if (isEn) "Direct Stream" else "Chơi mạng trực tiếp",
                                 color = TextSecondary,
                                 fontSize = 10.sp
                             )
@@ -713,7 +721,7 @@ private fun QuickNetworkCockpitCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 val engineOptions = listOf(
-                    VpnEngine.SMART_BYPASS to "⚡ Thông minh",
+                    VpnEngine.SMART_BYPASS to if (isEn) "⚡ Smart" else "⚡ Thông minh",
                     VpnEngine.PROXY_TUNNEL to "🌐 Proxy",
                     VpnEngine.EXTERNAL_VPN to "🛡️ VPN"
                 )
@@ -1108,6 +1116,8 @@ private fun SmartTranslatorHomeCard(
     onOpenTranslator: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    val isTranslateActive = config.isEffectiveTranslateEnabled()
 
     Card(
         modifier = Modifier
@@ -1158,7 +1168,7 @@ private fun SmartTranslatorHomeCard(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(
-                            text = "Dịch tự động",
+                            text = if (isEn) "Auto Translator" else "Dịch tự động",
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 14.sp,
@@ -1166,7 +1176,7 @@ private fun SmartTranslatorHomeCard(
                             maxLines = 1
                         )
                         Text(
-                            text = "Dịch game sang tiếng Việt",
+                            text = if (isEn) "Keep original English UI" else "Dịch game sang tiếng Việt",
                             color = XboxNeonGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
@@ -1177,15 +1187,19 @@ private fun SmartTranslatorHomeCard(
 
                 Surface(
                     shape = RoundedCornerShape(7.dp),
-                    color = if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.20f) else Color.DarkGray,
+                    color = if (isTranslateActive) XboxNeonGreen.copy(alpha = 0.20f) else Color.DarkGray,
                     border = androidx.compose.foundation.BorderStroke(
                         0.8.dp,
-                        if (config.xcloudTranslateEnabled) XboxNeonGreen.copy(alpha = 0.6f) else Color.Transparent
+                        if (isTranslateActive) XboxNeonGreen.copy(alpha = 0.6f) else Color.Transparent
                     )
                 ) {
                     Text(
-                        text = if (config.xcloudTranslateEnabled) "Đang bật" else "Đang tắt",
-                        color = if (config.xcloudTranslateEnabled) XboxNeonGreen else TextSecondary,
+                        text = if (isTranslateActive) {
+                            if (isEn) "Active" else "Đang bật"
+                        } else {
+                            if (isEn) "Disabled" else "Đang tắt"
+                        },
+                        color = if (isTranslateActive) XboxNeonGreen else TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -1221,7 +1235,7 @@ private fun SmartTranslatorHomeCard(
                             border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
                         ) {
                             Text(
-                                text = "🛡️ Giữ tên game",
+                                text = if (isEn) "🛡️ Keep Titles" else "🛡️ Giữ tên game",
                                 color = TextPrimary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -1235,7 +1249,7 @@ private fun SmartTranslatorHomeCard(
                             border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
                         ) {
                             Text(
-                                text = "🎮 Giữ nút bấm",
+                                text = if (isEn) "🎮 Keep Buttons" else "🎮 Giữ nút bấm",
                                 color = TextPrimary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -1256,7 +1270,7 @@ private fun SmartTranslatorHomeCard(
                             horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Text(
-                                text = "Mở bảng dịch",
+                                text = if (isEn) "Translator" else "Mở bảng dịch",
                                 color = DirectCyan,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 10.5.sp,

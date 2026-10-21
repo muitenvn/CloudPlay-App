@@ -237,6 +237,18 @@ data class AppConfig(
             customLocale.ifBlank { "en-US" }
         }
     }
+
+    fun isEnglishUI(): Boolean {
+        return when (appLanguage) {
+            AppLanguage.ENGLISH -> true
+            AppLanguage.VIETNAMESE -> false
+            AppLanguage.SYSTEM -> !Locale.getDefault().language.lowercase().startsWith("vi")
+        }
+    }
+
+    fun isEffectiveTranslateEnabled(): Boolean {
+        return xcloudTranslateEnabled && !isEnglishUI()
+    }
 }
 
 object SettingsRepository {
@@ -434,7 +446,17 @@ object SettingsRepository {
     }
 
     fun updateAppLanguage(language: AppLanguage) {
-        _config.update { it.copy(appLanguage = language) }
+        val autoTranslate = when (language) {
+            AppLanguage.ENGLISH -> false
+            AppLanguage.VIETNAMESE -> true
+            AppLanguage.SYSTEM -> Locale.getDefault().language.lowercase().startsWith("vi")
+        }
+        _config.update {
+            it.copy(
+                appLanguage = language,
+                xcloudTranslateEnabled = autoTranslate
+            )
+        }
         persist(_config.value)
     }
 

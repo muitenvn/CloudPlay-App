@@ -12,6 +12,35 @@ enum class VpnEngine {
     EXTERNAL_VPN     // External VPN Assistant: Use with Warp, Proton, Kiwi, etc. with auto-detect and zero-reload handoff
 }
 
+enum class RegionUnlockStatus(val labelVi: String) {
+    UNLOCKED("Đã mở khóa"),
+    FAILED("Không mở khóa"),
+    UNTESTED("Chưa thử"),
+    WRONG_REGION("Sai vùng")
+}
+
+data class ServerUnlockRecord(
+    val serverKey: String,
+    val status: RegionUnlockStatus = RegionUnlockStatus.UNTESTED,
+    val timestampMs: Long = System.currentTimeMillis(),
+    val detectedCountryCode: String? = null
+) {
+    fun isExpired(nowMs: Long = System.currentTimeMillis()): Boolean {
+        return status == RegionUnlockStatus.FAILED && (nowMs - timestampMs) >= UNLOCK_FAIL_EXPIRY_MS
+    }
+
+    fun effectiveStatus(nowMs: Long = System.currentTimeMillis()): RegionUnlockStatus {
+        return if (isExpired(nowMs)) RegionUnlockStatus.UNTESTED else status
+    }
+
+    companion object {
+        const val UNLOCK_FAIL_EXPIRY_MS: Long = 24L * 60L * 60L * 1000L // 24 giờ
+
+        fun keyFor(ip: String, port: Int): String = "${ip.trim()}:$port"
+        fun keyFor(server: ServerLocation): String = keyFor(server.ip, server.port)
+    }
+}
+
 data class ServerLocation(
     val id: String,
     val name: String,
@@ -25,8 +54,12 @@ data class ServerLocation(
     val countryCode: String = "JP",
     val isCustom: Boolean = false,
     val lastPingMs: Int? = null,
-    val isVerified: Boolean = true
-)
+    val isVerified: Boolean = true,
+    val unlockStatus: RegionUnlockStatus = RegionUnlockStatus.UNTESTED
+) {
+    val addressPortKey: String
+        get() = ServerUnlockRecord.keyFor(ip, port)
+}
 
 // Curated pool of 26+ High Quality Backup Servers with verified IP geolocations
 val DEFAULT_SERVERS = listOf(
@@ -425,5 +458,7 @@ data class VpnConnectionState(
     val smartVpnPhase: SmartVpnPhase = SmartVpnPhase.IDLE,
     val smartDecision: SmartVpnDecision = SmartVpnDecision(),
     val telemetry: StreamTelemetry = StreamTelemetry(),
-    val benchmark: SystemBenchmarkResult = SystemBenchmarkResult()
+    val benchmark: SystemBenchmarkResult = SystemBenchmarkResult(),
+    val unlockRecords: Map<String, ServerUnlockRecord> = emptyMap(),
+    val unlockFailPromptServer: ServerLocation? = null
 )

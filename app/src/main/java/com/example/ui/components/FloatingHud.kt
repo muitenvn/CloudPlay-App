@@ -15,15 +15,23 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
@@ -130,72 +138,184 @@ fun FloatingHud(
     onOpenGuide: (GuideSection) -> Unit = {},
     onOpenTranslator: () -> Unit = {},
     onToggleOrientation: () -> Unit = {},
+    videoTopRatio: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     var hudMode by rememberSaveable { mutableStateOf(HudMode.MINIMIZED) }
-    var offsetX by rememberSaveable { mutableFloatStateOf(16f) }
-    var offsetY by rememberSaveable { mutableFloatStateOf(48f) }
+    var offsetX by rememberSaveable { mutableFloatStateOf(24f) }
+    var offsetY by rememberSaveable { mutableFloatStateOf(24f) }
+    var hudWidthPx by remember { mutableStateOf(220) }
+    var hudHeightPx by remember { mutableStateOf(96) }
+    var isDragging by remember { mutableStateOf(false) }
+    var lastOrientationPortrait by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
-    var showDonateDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var isInteracting by remember { mutableStateOf(false) }
+    var isInteracting by remember { mutableStateOf(true) }
 
-    LaunchedEffect(lastInteractionTime) {
-        delay(3500)
-        isInteracting = false
+    fun markUserInteraction() {
+        lastInteractionTime = System.currentTimeMillis()
+        isInteracting = true
+    }
+
+    // A.4: Tự mờ còn khoảng 35% độ đục sau 3 giây không chạm, chạm vào thì hiện rõ lại
+    LaunchedEffect(lastInteractionTime, hudMode) {
+        if (hudMode != HudMode.EXPANDED) {
+            delay(3000)
+            isInteracting = false
+        } else {
+            isInteracting = true
+        }
     }
 
     val hudAlpha by animateFloatAsState(
-        targetValue = if (isInteracting || hudMode == HudMode.EXPANDED) 0.95f else 0.52f,
-        animationSpec = tween(400),
+        targetValue = if (isInteracting || isDragging || hudMode == HudMode.EXPANDED) 1.0f else 0.35f,
+        animationSpec = tween(350),
         label = "hud_alpha"
     )
+
+    val safeInsets = WindowInsets.safeDrawing
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize()
     ) {
         val density = androidx.compose.ui.platform.LocalDensity.current
-        val maxWidthPx = with(density) { maxWidth.toPx() }
-        val maxHeightPx = with(density) { maxHeight.toPx() }
+        val screenMaxWidth = maxWidth
+        val screenMaxHeight = maxHeight
+        val maxWidthPx = with(density) { screenMaxWidth.toPx() }
+        val maxHeightPx = with(density) { screenMaxHeight.toPx() }
+        val isPortrait = maxHeightPx > maxWidthPx
 
-        LaunchedEffect(maxWidthPx, maxHeightPx) {
+        val edgeMarginPx = with(density) { 8.dp.toPx() }
+        val safeLeftPx = (safeInsets.getLeft(density, layoutDirection).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
+        val safeTopPx = (safeInsets.getTop(density).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
+        val safeRightPx = (safeInsets.getRight(density, layoutDirection).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
+        val safeBottomPx = (safeInsets.getBottom(density).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
+
+        val maxBoundX = (maxWidthPx - safeRightPx - hudWidthPx.toFloat()).coerceAtLeast(safeLeftPx)
+        val maxBoundY = (maxHeightPx - safeBottomPx - hudHeightPx.toFloat()).coerceAtLeast(safeTopPx)
+
+        // Tính vị trí dải đen phía trên vùng video thực tế khi ở màn DỌC (Portrait)
+        val actualVideoTopPx = if (isPortrait) {
+            if (videoTopRatio > 0.04f) {
+                maxHeightPx * videoTopRatio
+            } else {
+                ((maxHeightPx - (maxWidthPx * 9f / 16f)) / 2f).coerceAtLeast(safeTopPx)
+            }
+        } else {
+            0f
+        }
+        val portraitBlackBarMaxY = if (isPortrait) {
+            (actualVideoTopPx - hudHeightPx.toFloat() - with(density) { 6.dp.toPx() }).coerceIn(safeTopPx, maxBoundY)
+        } else {
+            maxBoundY
+        }
+
+        // A.1, A.2, A.3: Đặt vị trí mặc định chuẩn khi xoay màn DỌC / NGANG và luôn kẹp trong vùng an toàn (trừ tai thỏ)
+        LaunchedEffect(maxWidthPx, maxHeightPx, hudWidthPx, hudHeightPx, isPortrait, videoTopRatio, hudMode) {
             if (maxWidthPx > 0f && maxHeightPx > 0f) {
-                val boundX = (maxWidthPx - 90f).coerceAtLeast(8f)
-                val boundY = (maxHeightPx - 50f).coerceAtLeast(8f)
-                offsetX = offsetX.coerceIn(8f, boundX)
-                offsetY = offsetY.coerceIn(8f, boundY)
+                val orientationChanged = lastOrientationPortrait != isPortrait
+                if (orientationChanged) {
+                    lastOrientationPortrait = isPortrait
+                    if (isPortrait) {
+                        // Màn DỌC: đặt HUD vào dải đen phía trên vùng video (không đè lên hình game)
+                        offsetX = safeLeftPx
+                        offsetY = portraitBlackBarMaxY
+                    } else {
+                        // Màn NGANG: mặc định ở góc trên trái hoặc trên phải
+                        val preferRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
+                        offsetX = if (preferRight) maxBoundX else safeLeftPx
+                        offsetY = safeTopPx
+                    }
+                } else {
+                    offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
+                    if (isPortrait && hudMode != HudMode.EXPANDED) {
+                        // Giữ HUD nằm trong dải đen phía trên video ở màn dọc để không đè lên hình game
+                        offsetY = offsetY.coerceIn(safeTopPx, portraitBlackBarMaxY)
+                    } else {
+                        offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
+                    }
+                }
             }
         }
 
+        val animatedOffsetX by animateFloatAsState(
+            targetValue = offsetX.coerceIn(safeLeftPx, maxBoundX),
+            animationSpec = if (isDragging) tween(0) else tween(220),
+            label = "hud_offset_x"
+        )
+        val animatedOffsetY by animateFloatAsState(
+            targetValue = offsetY.coerceIn(safeTopPx, maxBoundY),
+            animationSpec = if (isDragging) tween(0) else tween(220),
+            label = "hud_offset_y"
+        )
+        val isAnchoredRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
+
         Surface(
             modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                .pointerInput(maxWidthPx, maxHeightPx) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        lastInteractionTime = System.currentTimeMillis()
-                        isInteracting = true
-                        val boundX = (maxWidthPx - 90f).coerceAtLeast(8f)
-                        val boundY = (maxHeightPx - 50f).coerceAtLeast(8f)
-                        offsetX = (offsetX + dragAmount.x).coerceIn(8f, boundX)
-                        offsetY = (offsetY + dragAmount.y).coerceIn(8f, boundY)
+                .offset { IntOffset(animatedOffsetX.roundToInt(), animatedOffsetY.roundToInt()) }
+                .onGloballyPositioned { coords ->
+                    if (coords.size.width > 0 && coords.size.height > 0) {
+                        hudWidthPx = coords.size.width
+                        hudHeightPx = coords.size.height
                     }
+                }
+                .graphicsLayer {
+                    alpha = hudAlpha
+                }
+                .pointerInput(maxWidthPx, maxHeightPx, safeLeftPx, safeTopPx, maxBoundX, maxBoundY, isPortrait, portraitBlackBarMaxY) {
+                    detectDragGestures(
+                        onDragStart = {
+                            isDragging = true
+                            markUserInteraction()
+                        },
+                        onDragEnd = {
+                            isDragging = false
+                            markUserInteraction()
+                            if (!isPortrait) {
+                                // A.3 Màn NGANG: nếu kéo HUD vào vùng giữa phía trên (30%–70% chiều ngang) thì tự bám về mép gần nhất khi thả tay
+                                val hudCenterX = offsetX + (hudWidthPx / 2f)
+                                val inTopZone = offsetY <= (maxHeightPx * 0.45f)
+                                if (inTopZone && hudCenterX in (maxWidthPx * 0.30f)..(maxWidthPx * 0.70f)) {
+                                    offsetX = if (hudCenterX < maxWidthPx * 0.50f) safeLeftPx else maxBoundX
+                                } else {
+                                    offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
+                                }
+                                offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
+                            } else {
+                                // A.2 Màn DỌC: giữ trong vùng nhìn thấy và ưu tiên dải đen phía trên vùng video
+                                offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
+                                offsetY = offsetY.coerceIn(safeTopPx, portraitBlackBarMaxY)
+                            }
+                        },
+                        onDragCancel = {
+                            isDragging = false
+                            markUserInteraction()
+                            offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
+                            offsetY = offsetY.coerceIn(safeTopPx, if (isPortrait) portraitBlackBarMaxY else maxBoundY)
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            markUserInteraction()
+                            offsetX = (offsetX + dragAmount.x).coerceIn(safeLeftPx, maxBoundX)
+                            val yLimit = if (isPortrait && hudMode != HudMode.EXPANDED) portraitBlackBarMaxY else maxBoundY
+                            offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, yLimit)
+                        }
+                    )
                 }
                 .clip(RoundedCornerShape(14.dp))
                 .border(
                     1.dp,
-                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan.copy(alpha = 0.5f) else XboxNeonGreen.copy(alpha = 0.5f),
+                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.55f),
                     RoundedCornerShape(14.dp)
                 )
                 .testTag("floating_hud_container"),
-            color = Color(0xF20B130E).copy(alpha = hudAlpha),
+            color = Color(0xF20B130E),
             shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
                 // MINIMIZED STATE: Ultra-compact Capsule Pill (tap to expand)
                 if (hudMode == HudMode.MINIMIZED) {
@@ -220,8 +340,7 @@ fun FloatingHud(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .clickable {
-                                lastInteractionTime = System.currentTimeMillis()
-                                isInteracting = true
+                                markUserInteraction()
                                 hudMode = HudMode.COMPACT
                             }
                             .padding(horizontal = 7.dp, vertical = 4.dp)
@@ -237,7 +356,8 @@ fun FloatingHud(
                             text = pingText,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1
                         )
                         Icon(
                             imageVector = Icons.Default.Gamepad,
@@ -459,648 +579,139 @@ fun FloatingHud(
                         }
                     }
 
-                    // EXPANDED XBOX GAME BAR PANEL
+                    // ==========================================
+                    // B. BẢNG MỞ RỘNG (NHỎ GỌN, DÀY THÔNG TIN, CUỘN BÊN TRONG)
+                    // - Chiều rộng tối đa 38% màn hình, chiều cao tối đa 60% màn hình
+                    // - Mở sát cạnh nơi HUD đang đứng (trái/phải)
+                    // - Nút thu gọn rõ ràng, vùng bấm chuẩn 48dp
+                    // - Bỏ ô lớn "Chất lượng đồ họa & hiệu năng máy", chỉ giữ:
+                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Chế độ chất lượng + nút chức năng
+                    // ==========================================
+                    val panelMaxWidth = (screenMaxWidth * 0.38f).coerceAtLeast(172.dp)
+                    val panelMaxHeight = (screenMaxHeight * 0.60f).coerceAtLeast(180.dp)
+                    val scrollState = rememberScrollState()
+
                     AnimatedVisibility(
                         visible = hudMode == HudMode.EXPANDED,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = expandVertically(
+                            expandFrom = Alignment.Top
+                        ) + fadeIn(),
+                        exit = shrinkVertically(
+                            shrinkTowards = Alignment.Top
+                        ) + fadeOut()
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(top = 8.dp, start = 4.dp, end = 4.dp, bottom = 4.dp)
-                                .width(250.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(top = 4.dp, start = 2.dp, end = 2.dp, bottom = 2.dp)
+                                .width(panelMaxWidth)
+                                .widthIn(max = screenMaxWidth * 0.38f)
+                                .heightIn(max = panelMaxHeight),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
                         ) {
-                            // Game Specific Optimization Card
-                            if (gameProfile != null) {
-                                val accent = Color(gameProfile.primaryAccentHex)
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = accent.copy(alpha = 0.18f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.5f))
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = gameProfile.badge,
-                                                color = accent,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Black
-                                            )
-                                            Text(
-                                                text = gameProfile.recommendedFps,
-                                                color = TextPrimary,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Text(
-                                            text = gameProfile.title,
-                                            color = TextPrimary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            modifier = Modifier.padding(top = 2.dp)
-                                        )
-                                    }
+                            // Thanh tiêu đề + Nút THU GỌN rõ ràng, đủ lớn để bấm (48dp)
+                            ExpandedHudCollapseHeader(
+                                isAnchoredRight = isAnchoredRight,
+                                gameProfile = gameProfile,
+                                onCollapseToCompact = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.COMPACT
+                                },
+                                onCollapseToMinimized = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.MINIMIZED
                                 }
-                            }
+                            )
 
-                            // Section: Telemetry Info
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFF14221A)
-                            ) {
-                                val effectivePing = when {
-                                    telemetry.rttMs > 0 -> telemetry.rttMs
-                                    compactHasValidPing -> compactRawPing
-                                    else -> null
-                                }
-                                val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
-                                    if (effectivePing != null) "Direct (${effectivePing}ms)" else "Direct (-- ms)"
-                                } else {
-                                    if (effectivePing != null) "VPN ${vpnState.currentServer.flag} (${effectivePing}ms)" else "VPN ${vpnState.currentServer.flag} (-- ms)"
-                                }
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(text = stringResource(R.string.hud_stream_latency), color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = latencyDisplayText,
-                                            color = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(text = stringResource(R.string.hud_controller), color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = if (physicalControllerConnected) controllerName else if (virtualControllerEnabled) stringResource(R.string.hud_virtual_gamepad) else stringResource(R.string.controller_disconnected),
-                                            color = TextPrimary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Dedicated 4G & Wi-Fi Optimization Engine Card
-                            Surface(
+                            // Nội dung bên trong cuộn dọc nếu màn hình thấp (chiều cao tối đa 60%)
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
-                                color = Color(0xFF101C16)
+                                    .weight(1f, fill = false)
+                                    .verticalScroll(scrollState),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Column(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = if (networkStatus.isWifi) Icons.Default.Wifi else Icons.Default.SignalCellularAlt,
-                                                contentDescription = null,
-                                                tint = XboxNeonGreen,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                            Text(
-                                                text = "CHẤT LƯỢNG ĐỒ HỌA & HIỆU NĂNG MÁY",
-                                                color = XboxNeonGreen,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        }
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = DirectCyan.copy(alpha = 0.2f)
-                                        ) {
-                                            Text(
-                                                text = "${networkStatus.effectiveBitrateMbps} Mbps",
-                                                color = DirectCyan,
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                            )
-                                        }
+                                // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm)
+                                DenseCoreTelemetrySection(
+                                    vpnState = vpnState,
+                                    telemetry = telemetry,
+                                    compactRawPing = compactRawPing,
+                                    compactHasValidPing = compactHasValidPing,
+                                    physicalControllerConnected = physicalControllerConnected,
+                                    virtualControllerEnabled = virtualControllerEnabled,
+                                    controllerName = controllerName,
+                                    onToggleNetwork = {
+                                        markUserInteraction()
+                                        onToggleNetwork()
+                                    },
+                                    onToggleVirtualController = {
+                                        markUserInteraction()
+                                        onToggleVirtualController()
                                     }
+                                )
 
-                                    Text(
-                                        text = "${networkStatus.physicalType.icon} ${networkStatus.activeProfileName}",
-                                        color = TextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-
-                                    // Real-time WebRTC telemetry metrics strip (Real decodeTimeMs, No fake fallback)
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(Color(0xFF0A120E))
-                                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "FPS: ${if (telemetry.fps > 0) telemetry.fps else "--"}", color = XboxNeonGreen, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                                        Text(text = "Ping: ${if (telemetry.rttMs > 0) "${telemetry.rttMs}ms" else "--"}", color = if (telemetry.rttMs in 1..49) DirectCyan else if (telemetry.rttMs >= 100) JapanRed else TextPrimary, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                                        Text(text = "Bitrate: ${if (telemetry.bitrateMbps > 0) String.format("%.1f", telemetry.bitrateMbps) + "M" else "--"}", color = TextPrimary, fontSize = 8.5.sp)
-                                        Text(text = "Giải mã: ${if (telemetry.decodeTimeMs > 0) String.format("%.1f", telemetry.decodeTimeMs) + "ms" else "--"}", color = if (telemetry.decodeTimeMs in 0.1..8.5) XboxNeonGreen else if (telemetry.decodeTimeMs > 12.0) JapanRed else DirectCyan, fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold)
+                                // B.6: Chế độ chất lượng gọn & dày (không còn ô lớn chiếm hết chiều cao)
+                                DenseQualityModeSection(
+                                    networkStatus = networkStatus,
+                                    adaptiveQualityState = adaptiveQualityState,
+                                    telemetry = telemetry,
+                                    onSelectCellularMode = { mode ->
+                                        markUserInteraction()
+                                        onSelectCellularMode(mode)
+                                    },
+                                    onToggleAutoAdapting = { enabled ->
+                                        markUserInteraction()
+                                        onToggleAutoAdapting(enabled)
+                                    },
+                                    onToggleWifiSpeedFirst = { enabled ->
+                                        markUserInteraction()
+                                        onToggleWifiSpeedFirst(enabled)
                                     }
+                                )
 
-                                    // Tự Động Biến Thiên Tự Do (1..20 Mbps) vs Cố Định
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .border(0.8.dp, DirectCyan.copy(alpha = 0.35f), RoundedCornerShape(8.dp)),
-                                        color = Color(0xFF0B1610)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(7.dp),
-                                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Bolt,
-                                                        contentDescription = null,
-                                                        tint = DirectCyan,
-                                                        modifier = Modifier.size(12.dp)
-                                                    )
-                                                    Text(
-                                                        text = if (adaptiveQualityState.isAutoAdapting) {
-                                                            "TỰ ĐỘNG BIẾN THIÊN (1 ➔ 20 Mbps)"
-                                                        } else {
-                                                            "CHẾ ĐỘ CỐ ĐỊNH (KHÔNG TỰ ĐỔI)"
-                                                        },
-                                                        color = DirectCyan,
-                                                        fontSize = 8.5.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen.copy(alpha = 0.25f) else Color.DarkGray,
-                                                    modifier = Modifier.clickable { onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting) }
-                                                ) {
-                                                    Text(
-                                                        text = if (adaptiveQualityState.isAutoAdapting) "TỰ ĐỘNG: BẬT" else "ĐANG CỐ ĐỊNH",
-                                                        color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen else TextSecondary,
-                                                        fontSize = 7.5.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                                    )
-                                                }
-                                            }
+                                // Hàng nút bật/tắt nhanh: Làm nét, Ẩn bảng kỹ thuật, Dịch tự động, Công cụ dịch
+                                DenseFeatureTogglesSection(
+                                    clarityBoostActive = clarityBoostActive,
+                                    hideStreamStats = hideStreamStats,
+                                    translationActive = translationActive,
+                                    translatedCount = translatedCount,
+                                    onToggleClarityBoost = { enabled ->
+                                        markUserInteraction()
+                                        onToggleClarityBoost(enabled)
+                                    },
+                                    onToggleHideStreamStats = { enabled ->
+                                        markUserInteraction()
+                                        onToggleHideStreamStats(enabled)
+                                    },
+                                    onToggleTranslation = { enabled ->
+                                        markUserInteraction()
+                                        onToggleTranslation(enabled)
+                                    },
+                                    onOpenTranslator = {
+                                        markUserInteraction()
+                                        onOpenTranslator()
+                                    }
+                                )
 
-                                            Text(
-                                                text = "🎯 ${adaptiveQualityState.currentStep.title}",
-                                                color = TextPrimary,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-
-                                            Text(
-                                                text = adaptiveQualityState.qualityNotice,
-                                                color = TextSecondary,
-                                                fontSize = 8.sp,
-                                                lineHeight = 11.sp
-                                            )
-
-                                            // Continuous 1..20 Mbps progress spectrum (No fixed 4-bar jump!)
-                                            val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
-                                            val fillFraction = ((liveMbps - 1.0) / 19.0).toFloat().coerceIn(0.05f, 1f)
-                                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(7.dp)
-                                                        .clip(RoundedCornerShape(4.dp))
-                                                        .background(Color(0xFF14241B))
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth(fillFraction)
-                                                            .height(7.dp)
-                                                            .clip(RoundedCornerShape(4.dp))
-                                                            .background(
-                                                                androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                                    colors = listOf(XboxNeonGreen, DirectCyan)
-                                                                )
-                                                            )
-                                                    )
-                                                }
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween
-                                                ) {
-                                                    Text(
-                                                        text = if (adaptiveQualityState.isAutoAdapting) {
-                                                            "1M • 2 • 3 • 4 • 5 ... 10 ... 15 ... 20M (Tự do từng nấc)"
-                                                        } else {
-                                                            "Đang khóa cố định tại ${liveMbps.toInt()} Mbps"
-                                                        },
-                                                        color = TextSecondary,
-                                                        fontSize = 7.2.sp
-                                                    )
-                                                    Text(
-                                                        text = "${liveMbps} Mbps",
-                                                        color = XboxNeonGreen,
-                                                        fontSize = 7.5.sp,
-                                                        fontWeight = FontWeight.ExtraBold
-                                                    )
-                                                }
-                                            }
-                                        }
+                                // Hàng tác vụ nhanh: Tải lại trang, Xoay màn hình, Cài đặt, Trang chủ
+                                DenseBottomActionsSection(
+                                    onReloadPage = {
+                                        markUserInteraction()
+                                        onReloadPage()
+                                    },
+                                    onToggleOrientation = {
+                                        markUserInteraction()
+                                        onToggleOrientation()
+                                    },
+                                    onOpenSettings = {
+                                        markUserInteraction()
+                                        onOpenSettings()
+                                    },
+                                    onRequestExitHome = {
+                                        markUserInteraction()
+                                        showExitConfirmDialog = true
                                     }
-
-                                    if (telemetry.estimatedDataSavedMb > 1.0) {
-                                        Text(
-                                            text = "🌱 Đã tiết kiệm ước tính: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB dung lượng data",
-                                            color = XboxNeonGreen,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-
-                                    // Graphics & Data Mode Quick Selectors (2 hàng gọn gàng, không bị ép chữ)
-                                    Text(
-                                        text = "CHẾ ĐỘ ĐỒ HỌA & DUNG LƯỢNG:",
-                                        color = TextSecondary,
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    val hudRows = listOf(
-                                        listOf(
-                                            Triple(com.example.data.CellularOptimizationMode.AUTO, "⚡ Tự Động", "Theo mạng & máy"),
-                                            Triple(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED, "❄️ Thấp (5M)", "Tiết kiệm data")
-                                        ),
-                                        listOf(
-                                            Triple(com.example.data.CellularOptimizationMode.MEDIUM, "Trung Bình", "9M • Êm máy"),
-                                            Triple(com.example.data.CellularOptimizationMode.HIGH, "Cao", "14M • 1080p"),
-                                            Triple(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED, "Rất Cao", "20M • Tối đa")
-                                        )
-                                    )
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        hudRows.forEach { rowItems ->
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                            ) {
-                                                rowItems.forEach { (mode, label, sub) ->
-                                                    val isSelected = networkStatus.activeProfileName.contains(
-                                                        when (mode) {
-                                                            com.example.data.CellularOptimizationMode.AUTO -> "Tự Động"
-                                                            com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "Thấp"
-                                                            com.example.data.CellularOptimizationMode.MEDIUM -> "Trung Bình"
-                                                            com.example.data.CellularOptimizationMode.HIGH -> "Cao ("
-                                                            com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "Rất Cao"
-                                                        }
-                                                    )
-                                                    Surface(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .clip(RoundedCornerShape(6.dp))
-                                                            .clickable { onSelectCellularMode(mode) },
-                                                        color = if (isSelected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF14241B),
-                                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(0.9.dp, XboxNeonGreen) else null
-                                                    ) {
-                                                        Column(
-                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
-                                                            horizontalAlignment = Alignment.CenterHorizontally
-                                                        ) {
-                                                            Text(
-                                                                text = label,
-                                                                color = if (isSelected) XboxNeonGreen else TextPrimary,
-                                                                fontSize = 8.5.sp,
-                                                                fontWeight = FontWeight.Bold,
-                                                                maxLines = 1
-                                                            )
-                                                            Text(
-                                                                text = sub,
-                                                                color = TextSecondary,
-                                                                fontSize = 7.sp,
-                                                                maxLines = 1
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Low-Latency & Thermal Protection Row
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .clickable { onToggleWifiSpeedFirst(!networkStatus.speedFirstPriority) },
-                                        color = if (networkStatus.speedFirstPriority) DirectCyan.copy(alpha = 0.15f) else Color(0xFF14241B)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Ưu Tiên Độ Trễ Thấp & Giảm Tải Khi Mạng Yếu",
-                                                    color = if (networkStatus.speedFirstPriority) DirectCyan else TextPrimary,
-                                                    fontSize = 9.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Tự động giảm trễ đệm và hạ tải GPU khi sóng yếu hoặc máy nóng",
-                                                    color = TextSecondary,
-                                                    fontSize = 8.sp
-                                                )
-                                            }
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = if (networkStatus.speedFirstPriority) DirectCyan.copy(alpha = 0.3f) else Color.DarkGray
-                                            ) {
-                                                Text(
-                                                    text = if (networkStatus.speedFirstPriority) "BẬT" else "TẮT",
-                                                    color = if (networkStatus.speedFirstPriority) DirectCyan else TextSecondary,
-                                                    fontSize = 8.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Clarity Boost Quick Toggle
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { onToggleClarityBoost(!clarityBoostActive) },
-                                color = Color(0xFF14221A)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column {
-                                        Text(text = "CLARITY BOOST (LÀM NÉT)", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                        Text(
-                                            text = if (clarityBoostActive) "Đang bật (Tăng độ nét 1080p)" else "Đang tắt",
-                                            color = if (clarityBoostActive) XboxNeonGreen else TextPrimary,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (clarityBoostActive) XboxNeonGreen.copy(alpha = 0.2f) else Color.DarkGray
-                                    ) {
-                                        Text(
-                                            text = if (clarityBoostActive) "BẬT" else "TẮT",
-                                            color = if (clarityBoostActive) XboxNeonGreen else TextSecondary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Stream Stats & Decode Profile Overlay Scrubber Card
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { onToggleHideStreamStats(!hideStreamStats) },
-                                color = Color(0xFF131D1A)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Speed,
-                                                contentDescription = null,
-                                                tint = DirectCyan,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = "HỒ SƠ GIẢI MÃ & STREAM STATS",
-                                                color = TextPrimary,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = if (hideStreamStats) "Đang ẩn bảng đè màn hình (Màn hình game sạch 100%)"
-                                            else "Đang hiện bảng kỹ thuật web (Decode profile / Stream stats)",
-                                            color = if (hideStreamStats) DirectCyan else TextPrimary,
-                                            fontSize = 11.sp
-                                        )
-                                        Text(
-                                            text = "Tự động chặn thông số Decode Profile che tầm nhìn khi chơi",
-                                            color = TextSecondary.copy(alpha = 0.8f),
-                                            fontSize = 9.sp
-                                        )
-                                    }
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = if (hideStreamStats) DirectCyan.copy(alpha = 0.25f) else Color.DarkGray
-                                    ) {
-                                        Text(
-                                            text = if (hideStreamStats) "ẨN BẢNG" else "HIỆN BẢNG",
-                                            color = if (hideStreamStats) DirectCyan else TextSecondary,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Dedicated Xbox Cloud Native Translator Card (GitHub Engine)
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { onToggleTranslation(!translationActive) },
-                                color = Color(0xFF14241B)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Language,
-                                                contentDescription = null,
-                                                tint = XboxNeonGreen,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = "GOOGLE DỊCH THÔNG MINH (xCLOUD EDITION)",
-                                                color = TextPrimary,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = if (translationActive) {
-                                                if (translatedCount > 0) "Đang bật: Đã dịch $translatedCount mục (Google Dịch + 0ms UI)"
-                                                else "Đang bật: Tự động dịch mô tả game & giao diện"
-                                            } else "Đang tắt (Hiển thị ngôn ngữ gốc)",
-                                            color = if (translationActive) XboxNeonGreen else TextSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                        Text(
-                                            text = "✓ Dịch y hệt Google Dịch  ✓ Đã né tên game gốc  ✓ Không chạm stream",
-                                            color = TextSecondary.copy(alpha = 0.8f),
-                                            fontSize = 9.sp
-                                        )
-                                    }
-                                    Column(
-                                        horizontalAlignment = Alignment.End,
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (translationActive) XboxNeonGreen.copy(alpha = 0.25f) else Color.DarkGray,
-                                            modifier = Modifier.clickable { onToggleTranslation(!translationActive) }
-                                        ) {
-                                            Text(
-                                                text = if (translationActive) "BẬT" else "TẮT",
-                                                color = if (translationActive) XboxNeonGreen else TextSecondary,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = DirectCyan.copy(alpha = 0.2f),
-                                            modifier = Modifier.clickable { onOpenTranslator() }
-                                        ) {
-                                            Text(
-                                                text = "CÔNG CỤ DỊCH",
-                                                color = DirectCyan,
-                                                fontSize = 8.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Bottom Actions: Home & Full Settings
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Home / Exit Button
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { showExitConfirmDialog = true }
-                                        .testTag("hud_expanded_home_button"),
-                                    color = JapanRed.copy(alpha = 0.22f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, JapanRed.copy(alpha = 0.5f))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = JapanRed, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = stringResource(R.string.hud_return_home), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
-                                    }
-                                }
-
-                                // Rotate Screen Button (Landscape/Portrait)
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onToggleOrientation() }
-                                        .testTag("hud_expanded_rotate_button"),
-                                    color = Color.Black.copy(alpha = 0.5f),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(imageVector = Icons.Default.ScreenRotation, contentDescription = "Xoay màn hình", tint = DirectCyan, modifier = Modifier.size(13.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = "Xoay", color = DirectCyan, fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
-                                    }
-                                }
-
-                                // Full Settings Button
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onOpenSettings() }
-                                        .testTag("hud_expanded_settings_button"),
-                                    color = Color.Black.copy(alpha = 0.5f),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(imageVector = Icons.Default.Settings, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(13.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = stringResource(R.string.tab_settings), color = TextSecondary, fontSize = 11.sp)
-                                    }
-                                }
+                                )
                             }
                         }
                     }
@@ -1145,3 +756,641 @@ fun FloatingHud(
         )
     }
 }
+
+/**
+ * B.7: Thanh tiêu đề bảng mở rộng kèm nút Thu gọn lớn (chuẩn 48dp) rõ ràng, dễ bấm,
+ * tự căn theo phía trái hoặc phải nơi HUD đang đứng.
+ */
+@Composable
+private fun ExpandedHudCollapseHeader(
+    isAnchoredRight: Boolean,
+    gameProfile: com.example.data.GameOptimizationProfile?,
+    onCollapseToCompact: () -> Unit,
+    onCollapseToMinimized: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(9.dp),
+        color = Color(0xFF101D16),
+        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            if (!isAnchoredRight) {
+                CollapseTouchButton48dp(
+                    onCollapse = onCollapseToCompact,
+                    onMinimize = onCollapseToMinimized
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = if (isAnchoredRight) Alignment.Start else Alignment.End
+            ) {
+                Text(
+                    text = gameProfile?.title ?: "BẢNG ĐIỀU KHIỂN NHANH",
+                    color = TextPrimary,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (gameProfile != null) {
+                        "${gameProfile.badge} • ${gameProfile.recommendedFps}"
+                    } else {
+                        "Chạm Thu gọn để đóng bảng"
+                    },
+                    color = XboxNeonGreen,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
+
+            if (isAnchoredRight) {
+                Spacer(modifier = Modifier.width(6.dp))
+                CollapseTouchButton48dp(
+                    onCollapse = onCollapseToCompact,
+                    onMinimize = onCollapseToMinimized
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Nút thu gọn rõ ràng, chiều cao & vùng chạm chuẩn 48dp để người chơi dễ bấm ngay khi đang chơi game.
+ */
+@Composable
+private fun CollapseTouchButton48dp(
+    onCollapse: () -> Unit,
+    onMinimize: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Surface(
+            modifier = Modifier
+                .height(48.dp)
+                .width(86.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onCollapse() }
+                .testTag("hud_collapse_48dp_button"),
+            shape = RoundedCornerShape(8.dp),
+            color = XboxNeonGreen.copy(alpha = 0.22f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.7f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Thu gọn bảng HUD",
+                    tint = XboxNeonGreen,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                    text = "Thu gọn",
+                    color = Color.White,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onMinimize() }
+                .testTag("hud_minimize_48dp_button"),
+            shape = RoundedCornerShape(8.dp),
+            color = Color(0xFF16261E),
+            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "─",
+                    color = DirectCyan,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+    }
+}
+
+/**
+ * B.6 & B.7: Bảng thông số rút gọn, xếp dày, chỉ giữ 4 dòng thông tin cần xem:
+ * - Độ trễ (kèm nút đổi nhanh Direct / VPN)
+ * - FPS (kèm tốc độ truyền thực tế)
+ * - Thời gian giải mã (Decode time ms)
+ * - Tay cầm (kèm nút bật/tắt tay cầm ảo)
+ */
+@Composable
+private fun DenseCoreTelemetrySection(
+    vpnState: VpnConnectionState,
+    telemetry: com.example.cloudplay.StreamTelemetry,
+    compactRawPing: Int?,
+    compactHasValidPing: Boolean,
+    physicalControllerConnected: Boolean,
+    virtualControllerEnabled: Boolean,
+    controllerName: String,
+    onToggleNetwork: () -> Unit,
+    onToggleVirtualController: () -> Unit
+) {
+    val effectivePing = when {
+        telemetry.rttMs > 0 -> telemetry.rttMs
+        compactHasValidPing -> compactRawPing
+        else -> null
+    }
+    val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+        if (effectivePing != null) "Direct • ${effectivePing}ms" else "Direct • -- ms"
+    } else {
+        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms" else "VPN ${vpnState.currentServer.flag} • -- ms"
+    }
+
+    val fpsValueText = if (telemetry.fps > 0) "${telemetry.fps} FPS" else "-- FPS"
+    val bitrateValueText = if (telemetry.bitrateMbps > 0) {
+        String.format("%.1f Mbps", telemetry.bitrateMbps)
+    } else {
+        "-- Mbps"
+    }
+
+    val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
+        String.format("%.1f ms", telemetry.decodeTimeMs)
+    } else {
+        "-- ms"
+    }
+    val decodeColor = when {
+        telemetry.decodeTimeMs <= 0.0 -> TextSecondary
+        telemetry.decodeTimeMs <= 8.5 -> XboxNeonGreen
+        telemetry.decodeTimeMs <= 12.0 -> DirectCyan
+        else -> JapanRed
+    }
+
+    val controllerStatusText = when {
+        physicalControllerConnected -> controllerName
+        virtualControllerEnabled -> stringResource(R.string.hud_virtual_gamepad)
+        else -> stringResource(R.string.controller_disconnected)
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF121F18),
+        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder.copy(alpha = 0.7f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            // 1. Dòng Độ trễ (chạm để chuyển nhanh Direct / VPN)
+            DenseMetricRowItem(
+                label = stringResource(R.string.hud_stream_latency),
+                value = latencyDisplayText,
+                valueColor = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
+                badgeText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "Đổi VPN" else "Ngắt VPN",
+                onRowClick = onToggleNetwork
+            )
+
+            // 2. Dòng FPS & tốc độ luồng
+            DenseMetricRowItem(
+                label = "FPS",
+                value = "$fpsValueText ($bitrateValueText)",
+                valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
+            )
+
+            // 3. Dòng Thời gian giải mã
+            DenseMetricRowItem(
+                label = "Giải mã",
+                value = decodeTimeText,
+                valueColor = decodeColor
+            )
+
+            // 4. Dòng Tay cầm (chạm để bật/tắt tay cầm ảo)
+            DenseMetricRowItem(
+                label = stringResource(R.string.hud_controller),
+                value = controllerStatusText,
+                valueColor = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
+                badgeText = if (virtualControllerEnabled) "Ẩn ảo" else "Bật ảo",
+                onRowClick = onToggleVirtualController
+            )
+        }
+    }
+}
+
+@Composable
+private fun DenseMetricRowItem(
+    label: String,
+    value: String,
+    valueColor: Color,
+    badgeText: String? = null,
+    onRowClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(5.dp))
+            .then(
+                if (onRowClick != null) {
+                    Modifier.clickable { onRowClick() }
+                } else {
+                    Modifier
+                }
+            )
+            .padding(vertical = 1.5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            color = TextSecondary,
+            fontSize = 8.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = value,
+                color = valueColor,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+            if (badgeText != null) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = Color(0xFF1D3126)
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = DirectCyan,
+                        fontSize = 7.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * B.6 & B.7: Mục "Chế độ chất lượng" thu gọn, bỏ ô lớn trống,
+ * xếp các mức Tự động / Thấp / Vừa / Cao / Tối đa và nút giảm trễ trên các dòng mỏng.
+ */
+@Composable
+private fun DenseQualityModeSection(
+    networkStatus: com.example.cloudplay.NetworkOptimizerStatus,
+    adaptiveQualityState: com.example.cloudplay.AdaptiveQualityState,
+    telemetry: com.example.cloudplay.StreamTelemetry,
+    onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
+    onToggleAutoAdapting: (Boolean) -> Unit,
+    onToggleWifiSpeedFirst: (Boolean) -> Unit
+) {
+    val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF101C16),
+        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Chế độ chất lượng",
+                    color = XboxNeonGreen,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "${String.format("%.1f", liveMbps)}M",
+                        color = DirectCyan,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen.copy(alpha = 0.22f) else Color.DarkGray,
+                        modifier = Modifier.clickable { onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting) }
+                    ) {
+                        Text(
+                            text = if (adaptiveQualityState.isAutoAdapting) "Tự động" else "Cố định",
+                            color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen else TextSecondary,
+                            fontSize = 7.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.5.dp)
+                        )
+                    }
+                }
+            }
+
+            // Hàng 1: Tự động & Thấp & Vừa
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                DenseQualityPresetChip(
+                    label = "Tự động",
+                    isSelected = networkStatus.activeProfileName.contains("Tự Động"),
+                    onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.AUTO) },
+                    modifier = Modifier.weight(1f)
+                )
+                DenseQualityPresetChip(
+                    label = "Thấp",
+                    isSelected = networkStatus.activeProfileName.contains("Thấp"),
+                    onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
+                    modifier = Modifier.weight(1f)
+                )
+                DenseQualityPresetChip(
+                    label = "Vừa",
+                    isSelected = networkStatus.activeProfileName.contains("Trung Bình"),
+                    onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MEDIUM) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Hàng 2: Cao, Rất cao & Ưu tiên giảm trễ
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                DenseQualityPresetChip(
+                    label = "Cao",
+                    isSelected = networkStatus.activeProfileName.contains("Cao ("),
+                    onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.HIGH) },
+                    modifier = Modifier.weight(1f)
+                )
+                DenseQualityPresetChip(
+                    label = "Tối đa",
+                    isSelected = networkStatus.activeProfileName.contains("Rất Cao"),
+                    onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
+                    modifier = Modifier.weight(1f)
+                )
+                DenseQualityPresetChip(
+                    label = if (networkStatus.speedFirstPriority) "Giảm trễ: Bật" else "Giảm trễ: Tắt",
+                    isSelected = networkStatus.speedFirstPriority,
+                    accentColor = DirectCyan,
+                    onClick = { onToggleWifiSpeedFirst(!networkStatus.speedFirstPriority) },
+                    modifier = Modifier.weight(1.2f)
+                )
+            }
+
+            if (telemetry.estimatedDataSavedMb > 1.0) {
+                Text(
+                    text = "Tiết kiệm: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB",
+                    color = TextSecondary,
+                    fontSize = 7.5.sp,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DenseQualityPresetChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    accentColor: Color = XboxNeonGreen
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(5.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(5.dp),
+        color = if (isSelected) accentColor.copy(alpha = 0.22f) else Color(0xFF15251D),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(0.8.dp, accentColor) else null
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = if (isSelected) accentColor else TextPrimary,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * B.7: Hàng nút bật/tắt gọn cho Làm nét, Ẩn thông số web, Dịch tiếng Việt và Công cụ dịch.
+ */
+@Composable
+private fun DenseFeatureTogglesSection(
+    clarityBoostActive: Boolean,
+    hideStreamStats: Boolean,
+    translationActive: Boolean,
+    translatedCount: Int,
+    onToggleClarityBoost: (Boolean) -> Unit,
+    onToggleHideStreamStats: (Boolean) -> Unit,
+    onToggleTranslation: (Boolean) -> Unit,
+    onOpenTranslator: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        DenseQuickTogglePill(
+            label = if (clarityBoostActive) "Làm nét: Bật" else "Làm nét: Tắt",
+            active = clarityBoostActive,
+            activeColor = XboxNeonGreen,
+            onClick = { onToggleClarityBoost(!clarityBoostActive) },
+            modifier = Modifier.weight(1f)
+        )
+        DenseQuickTogglePill(
+            label = if (hideStreamStats) "Ẩn bảng: Bật" else "Ẩn bảng: Tắt",
+            active = hideStreamStats,
+            activeColor = DirectCyan,
+            onClick = { onToggleHideStreamStats(!hideStreamStats) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        DenseQuickTogglePill(
+            label = if (translationActive) {
+                if (translatedCount > 0) "Dịch VI ($translatedCount)" else "Dịch VI: Bật"
+            } else {
+                "Dịch VI: Tắt"
+            },
+            active = translationActive,
+            activeColor = XboxNeonGreen,
+            onClick = { onToggleTranslation(!translationActive) },
+            modifier = Modifier.weight(1f)
+        )
+        DenseQuickTogglePill(
+            label = "Bảng dịch",
+            active = true,
+            activeColor = DirectCyan,
+            onClick = onOpenTranslator,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun DenseQuickTogglePill(
+    label: String,
+    active: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onClick() },
+        shape = RoundedCornerShape(6.dp),
+        color = if (active) activeColor.copy(alpha = 0.18f) else Color(0xFF14221A),
+        border = androidx.compose.foundation.BorderStroke(
+            0.7.dp,
+            if (active) activeColor.copy(alpha = 0.55f) else XboxCardBorder.copy(alpha = 0.5f)
+        )
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = if (active) activeColor else TextSecondary,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * B.7: Hàng nút tác vụ dưới cùng: Tải lại trang, Xoay màn hình, Cài đặt, Trang chủ.
+ */
+@Composable
+private fun DenseBottomActionsSection(
+    onReloadPage: () -> Unit,
+    onToggleOrientation: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onRequestExitHome: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        DenseBottomActionChip(
+            icon = Icons.Default.Refresh,
+            label = "Tải lại",
+            tint = XboxNeonGreen,
+            onClick = onReloadPage,
+            modifier = Modifier.weight(1f),
+            testTag = "hud_expanded_reload_button"
+        )
+        DenseBottomActionChip(
+            icon = Icons.Default.ScreenRotation,
+            label = "Xoay",
+            tint = DirectCyan,
+            onClick = onToggleOrientation,
+            modifier = Modifier.weight(1f),
+            testTag = "hud_expanded_rotate_button"
+        )
+        DenseBottomActionChip(
+            icon = Icons.Default.Settings,
+            label = "Cài đặt",
+            tint = TextPrimary,
+            onClick = onOpenSettings,
+            modifier = Modifier.weight(1f),
+            testTag = "hud_expanded_settings_button"
+        )
+        DenseBottomActionChip(
+            icon = Icons.Default.Home,
+            label = "Thoát",
+            tint = JapanRed,
+            onClick = onRequestExitHome,
+            modifier = Modifier.weight(1f),
+            testTag = "hud_expanded_home_button"
+        )
+    }
+}
+
+@Composable
+private fun DenseBottomActionChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .testTag(testTag),
+        shape = RoundedCornerShape(6.dp),
+        color = Color(0xFF101915),
+        border = androidx.compose.foundation.BorderStroke(0.7.dp, tint.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(modifier = Modifier.width(2.5.dp))
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
+        }
+    }
+}
+

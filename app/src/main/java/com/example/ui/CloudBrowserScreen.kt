@@ -589,6 +589,25 @@ fun CloudBrowserScreen(
             )
         }
 
+        // Measure actual <video> top position in WebView so Portrait HUD sits in the top black bar above the game image
+        var videoTopRatio by remember { mutableFloatStateOf(0f) }
+        LaunchedEffect(webViewInstance, streamUiState.isGameActive) {
+            val wv = webViewInstance ?: return@LaunchedEffect
+            while (true) {
+                try {
+                    wv.evaluateJavascript(
+                        "(function(){var v=document.querySelector('video#stream-video,video[data-testid=\"stream-video\"],#segmented-video video,video');var vh=window.innerHeight||1;var vw=window.innerWidth||1;if(!v){return (vh>vw)?(Math.max(0,(vh-(vw*9/16))/2)/vh).toFixed(4):'0';}var r=v.getBoundingClientRect();var aspect=(v.videoWidth>0&&v.videoHeight>0)?(v.videoWidth/v.videoHeight):(16/9);var rh=r.width/aspect;var topPx=r.top;if(r.height>rh+4){topPx=r.top+(r.height-rh)/2;}return Math.max(0,Math.min(0.48,topPx/vh)).toFixed(4);})()"
+                    ) { res ->
+                        val parsed = res?.trim()?.removeSurrounding("\"")?.toFloatOrNull()
+                        if (parsed != null && parsed in 0f..0.48f) {
+                            videoTopRatio = parsed
+                        }
+                    }
+                } catch (_: Exception) {}
+                kotlinx.coroutines.delay(1500)
+            }
+        }
+
         // In-game Floating HUD Pill (draggable)
         FloatingHud(
             vpnState = vpnState,
@@ -655,7 +674,8 @@ fun CloudBrowserScreen(
             },
             onToggleOrientation = {
                 (activity as? com.example.MainActivity)?.toggleOrientation()
-            }
+            },
+            videoTopRatio = videoTopRatio
         )
 
         // How To Use Guide Dialog

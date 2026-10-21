@@ -119,6 +119,12 @@ enum class HudMode {
     EXPANDED
 }
 
+enum class HudDockedEdge {
+    NONE,
+    LEFT,
+    RIGHT
+}
+
 @Composable
 fun FloatingHud(
     vpnState: VpnConnectionState,
@@ -155,6 +161,7 @@ fun FloatingHud(
 ) {
     val context = LocalContext.current
     var hudMode by rememberSaveable { mutableStateOf(HudMode.MINIMIZED) }
+    var dockedEdge by rememberSaveable { mutableStateOf(HudDockedEdge.NONE) }
     var offsetX by rememberSaveable { mutableFloatStateOf(24f) }
     var offsetY by rememberSaveable { mutableFloatStateOf(24f) }
     var hudWidthPx by remember { mutableStateOf(220) }
@@ -303,10 +310,14 @@ fun FloatingHud(
         val safeRightPx = (safeInsets.getRight(density, layoutDirection).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
         val safeBottomPx = (safeInsets.getBottom(density).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
 
+        val rightScreenEdgeX = (maxWidthPx - hudWidthPx.toFloat()).coerceAtLeast(0f)
         val maxBoundX = (maxWidthPx - safeRightPx - hudWidthPx.toFloat()).coerceAtLeast(safeLeftPx)
         val maxBoundY = (maxHeightPx - safeBottomPx - hudHeightPx.toFloat()).coerceAtLeast(safeTopPx)
+        // Ngưỡng sát rìa trái/phải (10dp): chỉ khi kéo sát mép màn hình mới ẩn thành thanh gờ
+        val edgeDockThresholdPx = with(density) { 10.dp.toPx() }
+        val restorePaddingPx = with(density) { 14.dp.toPx() }
 
-        // Tính vị trí dải đen phía trên vùng video thực tế khi ở màn DỌC (Portrait)
+        // Tính vị trí dải đen phía trên vùng video thực tế khi khởi tạo ở màn DỌC (Portrait)
         val actualVideoTopPx = if (isPortrait) {
             if (videoTopRatio > 0.04f) {
                 maxHeightPx * videoTopRatio
@@ -316,52 +327,171 @@ fun FloatingHud(
         } else {
             0f
         }
-        val portraitBlackBarMaxY = if (isPortrait) {
+        val portraitDefaultY = if (isPortrait) {
             (actualVideoTopPx - hudHeightPx.toFloat() - with(density) { 6.dp.toPx() }).coerceIn(safeTopPx, maxBoundY)
         } else {
-            maxBoundY
+            safeTopPx
         }
 
-        // A.1, A.2, A.3: Đặt vị trí mặc định chuẩn khi xoay màn DỌC / NGANG và luôn kẹp trong vùng an toàn (trừ tai thỏ)
-        LaunchedEffect(maxWidthPx, maxHeightPx, hudWidthPx, hudHeightPx, isPortrait, videoTopRatio, hudMode) {
+        // Đặt vị trí mặc định khi xoay màn DỌC / NGANG và chỉ giới hạn trong phạm vi màn hình (di chuyển tự do không giới hạn vùng)
+        LaunchedEffect(maxWidthPx, maxHeightPx, hudWidthPx, hudHeightPx, isPortrait) {
             if (maxWidthPx > 0f && maxHeightPx > 0f) {
                 val orientationChanged = lastOrientationPortrait != isPortrait
                 if (orientationChanged) {
+                    val isFirstInit = lastOrientationPortrait == null
                     lastOrientationPortrait = isPortrait
-                    if (isPortrait) {
-                        // Màn DỌC: đặt HUD vào dải đen phía trên vùng video (không đè lên hình game)
+                    if (isFirstInit) {
                         offsetX = safeLeftPx
-                        offsetY = portraitBlackBarMaxY
+                        offsetY = if (isPortrait) portraitDefaultY else safeTopPx
                     } else {
-                        // Màn NGANG: mặc định ở góc trên trái hoặc trên phải
-                        val preferRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
-                        offsetX = if (preferRight) maxBoundX else safeLeftPx
-                        offsetY = safeTopPx
-                    }
-                } else {
-                    offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
-                    if (isPortrait && hudMode != HudMode.EXPANDED) {
-                        // Giữ HUD nằm trong dải đen phía trên video ở màn dọc để không đè lên hình game
-                        offsetY = offsetY.coerceIn(safeTopPx, portraitBlackBarMaxY)
-                    } else {
+                        offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
                         offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                     }
+                } else {
+                    offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                    offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                 }
             }
         }
 
         val animatedOffsetX by animateFloatAsState(
-            targetValue = offsetX.coerceIn(safeLeftPx, maxBoundX),
-            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(220),
+            targetValue = offsetX.coerceIn(0f, rightScreenEdgeX),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(200),
             label = "hud_offset_x"
         )
         val animatedOffsetY by animateFloatAsState(
             targetValue = offsetY.coerceIn(safeTopPx, maxBoundY),
-            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(220),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(200),
             label = "hud_offset_y"
         )
         val isAnchoredRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
+        val isNearEdgeForDock = isDragging && hudMode != HudMode.EXPANDED &&
+            (offsetX <= edgeDockThresholdPx || offsetX >= (rightScreenEdgeX - edgeDockThresholdPx))
 
+        if (dockedEdge != HudDockedEdge.NONE) {
+            // THANH GỜ SÁT RÌA MÀN HÌNH: Vuốt qua (hoặc chạm) để bật lại nút nổi
+            val handleWidthDp = 20.dp
+            val handleHeightDp = 62.dp
+            val handleWidthPx = with(density) { handleWidthDp.toPx() }
+            val handleHeightPx = with(density) { handleHeightDp.toPx() }
+            val swipeUnlockThresholdPx = with(density) { 10.dp.toPx() }
+            val handleX = if (dockedEdge == HudDockedEdge.LEFT) {
+                0
+            } else {
+                (maxWidthPx - handleWidthPx).roundToInt().coerceAtLeast(0)
+            }
+            val handleMaxY = (maxHeightPx - safeBottomPx - handleHeightPx).coerceAtLeast(safeTopPx)
+            val handleY = animatedOffsetY.coerceIn(safeTopPx, handleMaxY).roundToInt()
+
+            val handleAccent = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else XboxNeonGreen
+            val handleShape = if (dockedEdge == HudDockedEdge.LEFT) {
+                RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
+            } else {
+                RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
+            }
+
+            fun restoreFromEdge() {
+                markUserInteraction()
+                val restoredX = if (dockedEdge == HudDockedEdge.LEFT) {
+                    (safeLeftPx + restorePaddingPx).coerceAtMost(rightScreenEdgeX)
+                } else {
+                    (rightScreenEdgeX - safeRightPx - restorePaddingPx).coerceAtLeast(safeLeftPx)
+                }
+                offsetX = restoredX
+                dockedEdge = HudDockedEdge.NONE
+            }
+
+            Surface(
+                modifier = Modifier
+                    .offset { IntOffset(handleX, handleY) }
+                    .size(width = handleWidthDp, height = handleHeightDp)
+                    .graphicsLayer {
+                        alpha = if (isInteracting || isDragging) 0.96f else 0.45f
+                    }
+                    .pointerInput(dockedEdge, maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeRightPx, safeTopPx, handleMaxY) {
+                        var accumulatedSwipeX = 0f
+                        detectDragGestures(
+                            onDragStart = {
+                                isDragging = true
+                                accumulatedSwipeX = 0f
+                                markUserInteraction()
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                markUserInteraction()
+                            },
+                            onDragCancel = {
+                                isDragging = false
+                                markUserInteraction()
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                markUserInteraction()
+                                accumulatedSwipeX += dragAmount.x
+                                // Cho phép trượt dọc thanh gờ dọc theo rìa màn hình
+                                offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, handleMaxY)
+                                // Nếu vuốt qua vào trong màn hình -> bật lại nút nổi ngay lập tức
+                                val swipedInward = (dockedEdge == HudDockedEdge.LEFT && accumulatedSwipeX > swipeUnlockThresholdPx) ||
+                                    (dockedEdge == HudDockedEdge.RIGHT && accumulatedSwipeX < -swipeUnlockThresholdPx)
+                                if (swipedInward) {
+                                    isDragging = false
+                                    restoreFromEdge()
+                                }
+                            }
+                        )
+                    }
+                    .clip(handleShape)
+                    .clickable {
+                        restoreFromEdge()
+                    }
+                    .border(
+                        1.2.dp,
+                        handleAccent.copy(alpha = 0.85f),
+                        handleShape
+                    )
+                    .testTag("hud_edge_dock_handle"),
+                color = Color(0xF209120D),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (dockedEdge == HudDockedEdge.LEFT) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(26.dp)
+                                .clip(CircleShape)
+                                .background(handleAccent)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = "›",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    } else {
+                        Text(
+                            text = "‹",
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(26.dp)
+                                .clip(CircleShape)
+                                .background(handleAccent)
+                        )
+                    }
+                }
+            }
+        } else {
         Surface(
             modifier = Modifier
                 .offset { IntOffset(animatedOffsetX.roundToInt(), animatedOffsetY.roundToInt()) }
@@ -372,9 +502,9 @@ fun FloatingHud(
                     }
                 }
                 .graphicsLayer {
-                    alpha = hudAlpha
+                    alpha = if (isNearEdgeForDock) 0.65f else hudAlpha
                 }
-                .pointerInput(maxWidthPx, maxHeightPx, safeLeftPx, safeTopPx, maxBoundX, maxBoundY, isPortrait, portraitBlackBarMaxY) {
+                .pointerInput(maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeTopPx, maxBoundX, maxBoundY, edgeDockThresholdPx, hudMode) {
                     detectDragGestures(
                         onDragStart = {
                             isDragging = true
@@ -383,41 +513,37 @@ fun FloatingHud(
                         onDragEnd = {
                             isDragging = false
                             markUserInteraction()
-                            if (!isPortrait) {
-                                // A.3 Màn NGANG: nếu kéo HUD vào vùng giữa phía trên (30%–70% chiều ngang) thì tự bám về mép gần nhất khi thả tay
-                                val hudCenterX = offsetX + (hudWidthPx / 2f)
-                                val inTopZone = offsetY <= (maxHeightPx * 0.45f)
-                                if (inTopZone && hudCenterX in (maxWidthPx * 0.30f)..(maxWidthPx * 0.70f)) {
-                                    offsetX = if (hudCenterX < maxWidthPx * 0.50f) safeLeftPx else maxBoundX
-                                } else {
-                                    offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
-                                }
-                                offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
+                            // Chỉ khi kéo SÁT rìa màn hình bên trái hoặc bên phải mới ẩn nút nổi thành thanh gờ
+                            if (hudMode != HudMode.EXPANDED && offsetX <= edgeDockThresholdPx) {
+                                offsetX = 0f
+                                dockedEdge = HudDockedEdge.LEFT
+                            } else if (hudMode != HudMode.EXPANDED && offsetX >= (rightScreenEdgeX - edgeDockThresholdPx)) {
+                                offsetX = rightScreenEdgeX
+                                dockedEdge = HudDockedEdge.RIGHT
                             } else {
-                                // A.2 Màn DỌC: giữ trong vùng nhìn thấy và ưu tiên dải đen phía trên vùng video
-                                offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
-                                offsetY = offsetY.coerceIn(safeTopPx, portraitBlackBarMaxY)
+                                offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                             }
                         },
                         onDragCancel = {
                             isDragging = false
                             markUserInteraction()
-                            offsetX = offsetX.coerceIn(safeLeftPx, maxBoundX)
-                            offsetY = offsetY.coerceIn(safeTopPx, if (isPortrait) portraitBlackBarMaxY else maxBoundY)
+                            offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                            offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                         },
                         onDrag = { change, dragAmount ->
                             change.consume()
                             markUserInteraction()
-                            offsetX = (offsetX + dragAmount.x).coerceIn(safeLeftPx, maxBoundX)
-                            val yLimit = if (isPortrait && hudMode != HudMode.EXPANDED) portraitBlackBarMaxY else maxBoundY
-                            offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, yLimit)
+                            // Di chuyển tự do không giới hạn vùng (chỉ giới hạn trong khung màn hình)
+                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, rightScreenEdgeX)
+                            offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, maxBoundY)
                         }
                     )
                 }
                 .clip(RoundedCornerShape(14.dp))
                 .border(
-                    1.dp,
-                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.55f),
+                    if (isNearEdgeForDock) 1.6.dp else 1.dp,
+                    if (isNearEdgeForDock) Color.White else if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.55f),
                     RoundedCornerShape(14.dp)
                 )
                 .testTag("floating_hud_container"),
@@ -857,6 +983,7 @@ fun FloatingHud(
                     }
                 }
             }
+        }
         }
     }
 

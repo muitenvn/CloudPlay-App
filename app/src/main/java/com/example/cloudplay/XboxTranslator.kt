@@ -820,10 +820,82 @@ object XboxTranslator {
                 // Batched MutationObserver via requestAnimationFrame -> single requestBatchTranslate call
                 let pendingNodes = new Set();
                 let rafId = null;
+                let isTranslatorPausedForStream = false;
+                let isObserverAttached = false;
+                let startupTimer1 = null;
+                let startupTimer2 = null;
+                let resumeScanTimer = null;
+
+                function clearTranslationTimersAndRaf() {
+                    if (rafId !== null) {
+                        cancelAnimationFrame(rafId);
+                        rafId = null;
+                    }
+                    if (startupTimer1 !== null) {
+                        clearTimeout(startupTimer1);
+                        startupTimer1 = null;
+                    }
+                    if (startupTimer2 !== null) {
+                        clearTimeout(startupTimer2);
+                        startupTimer2 = null;
+                    }
+                    if (resumeScanTimer !== null) {
+                        clearTimeout(resumeScanTimer);
+                        resumeScanTimer = null;
+                    }
+                }
+
+                function attachMutationObserver() {
+                    if (isObserverAttached || isTranslatorPausedForStream) return;
+                    const target = document.body || document.documentElement;
+                    if (target) {
+                        observer.observe(target, {
+                            childList: true,
+                            subtree: true,
+                            characterData: true
+                        });
+                        isObserverAttached = true;
+                    }
+                }
+
+                // 1. DỪNG BỘ DỊCH KHI ĐANG STREAM:
+                // Ngắt MutationObserver, xóa pendingNodes, hủy requestAnimationFrame và timer dịch,
+                // nhưng vẫn giữ nguyên chức năng hideStreamStats nếu đang bật.
+                window.__pauseTranslator = function() {
+                    isTranslatorPausedForStream = true;
+                    try {
+                        observer.disconnect();
+                    } catch(e) {}
+                    isObserverAttached = false;
+                    pendingNodes.clear();
+                    queuedBatchMap = Object.create(null);
+                    clearTranslationTimersAndRaf();
+                    // Giữ chức năng ẩn bảng thông số stream (hideStats) nếu đang bật
+                    updateStatsScrubber(hideStreamStats);
+                };
+
+                // Khôi phục bộ dịch khi ngắt stream hoặc thoát về trang Xbox
+                window.__resumeTranslator = function() {
+                    isTranslatorPausedForStream = false;
+                    updateStatsScrubber(hideStreamStats);
+                    if (!isTranslationEnabled) return;
+                    attachMutationObserver();
+                    const target = document.body || document.documentElement;
+                    if (target) {
+                        runTreeWalkerPass(target, false);
+                        if (resumeScanTimer !== null) clearTimeout(resumeScanTimer);
+                        resumeScanTimer = setTimeout(function() {
+                            resumeScanTimer = null;
+                            if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                                runTreeWalkerPass(document.body || document.documentElement, false);
+                            }
+                        }, 450);
+                    }
+                };
 
                 function processBatchedNodes() {
                     rafId = null;
-                    if (!isTranslationEnabled || pendingNodes.size === 0) {
+                    if (isTranslatorPausedForStream || !isTranslationEnabled || pendingNodes.size === 0) {
                         pendingNodes.clear();
                         return;
                     }
@@ -840,6 +912,7 @@ object XboxTranslator {
                 }
 
                 const observer = new MutationObserver(function(mutations) {
+                    if (isTranslatorPausedForStream) return;
                     if (!isTranslationEnabled && !hideStreamStats) return;
 
                     for (let i = 0; i < mutations.length; i++) {
@@ -862,28 +935,35 @@ object XboxTranslator {
                 function start() {
                     const target = document.body || document.documentElement;
                     if (target) {
-                        observer.observe(target, {
-                            childList: true,
-                            subtree: true,
-                            characterData: true
-                        });
-                        runTreeWalkerPass(target, false);
+                        attachMutationObserver();
+                        if (!isTranslatorPausedForStream) {
+                            runTreeWalkerPass(target, false);
+                        }
                     } else {
                         document.addEventListener('DOMContentLoaded', function() {
-                            observer.observe(document.body, {
-                                childList: true,
-                                subtree: true,
-                                characterData: true
-                            });
-                            runTreeWalkerPass(document.body, false);
+                            attachMutationObserver();
+                            if (!isTranslatorPausedForStream) {
+                                runTreeWalkerPass(document.body, false);
+                            }
                         });
                     }
                 }
 
                 start();
-                setTimeout(() => runTreeWalkerPass(document.body, false), 800);
-                setTimeout(() => runTreeWalkerPass(document.body, false), 2500);
+                startupTimer1 = setTimeout(function() {
+                    startupTimer1 = null;
+                    if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                        runTreeWalkerPass(document.body, false);
+                    }
+                }, 800);
+                startupTimer2 = setTimeout(function() {
+                    startupTimer2 = null;
+                    if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                        runTreeWalkerPass(document.body, false);
+                    }
+                }, 2500);
             })();
         """.trimIndent()
     }
 }
+

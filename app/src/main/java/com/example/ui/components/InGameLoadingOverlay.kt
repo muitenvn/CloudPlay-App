@@ -90,36 +90,45 @@ fun InGameLoadingOverlay(
     hasGamepad: Boolean = false,
     gameProfile: GameOptimizationProfile = GameOptimizationRepository.FORTNITE_PROFILE,
     realLatencyMs: Int? = null,
+    lowEndDeviceMode: Boolean = false,
     onNavigateHome: () -> Unit = {},
     onSkip: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
         visible = isLoading,
-        enter = fadeIn(tween(260)),
-        exit = fadeOut(tween(320)),
+        enter = fadeIn(tween(if (lowEndDeviceMode) 0 else 260)),
+        exit = fadeOut(tween(if (lowEndDeviceMode) 0 else 320)),
         modifier = modifier
     ) {
         val primaryAccent = Color(gameProfile.primaryAccentHex)
         val secondaryAccent = Color(gameProfile.secondaryAccentHex)
 
-        val infiniteTransition = rememberInfiniteTransition(label = "ambient_loading")
-        val ambientGlowAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.14f,
-            targetValue = 0.28f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2000, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "ambient_glow"
-        )
+        // Khi bật Chế độ máy yếu: tắt các hiệu ứng động (infinite animation) của màn tải
+        val ambientGlowAlpha = if (lowEndDeviceMode) {
+            0.16f
+        } else {
+            val infiniteTransition = rememberInfiniteTransition(label = "ambient_loading")
+            val animatedAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.14f,
+                targetValue = 0.28f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "ambient_glow"
+            )
+            animatedAlpha
+        }
 
         var tipIndex by remember { mutableIntStateOf(0) }
-        LaunchedEffect(gameProfile.tips) {
-            while (true) {
-                delay(4000)
-                if (gameProfile.tips.isNotEmpty()) {
-                    tipIndex = (tipIndex + 1) % gameProfile.tips.size
+        LaunchedEffect(gameProfile.tips, lowEndDeviceMode) {
+            if (!lowEndDeviceMode) {
+                while (true) {
+                    delay(4000)
+                    if (gameProfile.tips.isNotEmpty()) {
+                        tipIndex = (tipIndex + 1) % gameProfile.tips.size
+                    }
                 }
             }
         }
@@ -144,7 +153,7 @@ fun InGameLoadingOverlay(
         val rawProgress = progress.coerceIn(0.06f, 1f)
         val animatedProgress by animateFloatAsState(
             targetValue = rawProgress,
-            animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            animationSpec = tween(durationMillis = if (lowEndDeviceMode) 0 else 350, easing = FastOutSlowInEasing),
             label = "smooth_progress"
         )
 

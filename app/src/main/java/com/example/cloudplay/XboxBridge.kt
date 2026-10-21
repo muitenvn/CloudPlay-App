@@ -130,7 +130,8 @@ class XboxBridge(
             cellularMode: String = "saver",
             networkTuningMode: String = "auto",
             speedFirstPriority: Boolean = true,
-            effectiveBitrateMbps: Int = 8
+            effectiveBitrateMbps: Int = 8,
+            lowEndDeviceMode: Boolean = false
         ): String {
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
@@ -147,7 +148,8 @@ class XboxBridge(
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
                         if (window.__setXCloudTranslationConfig) window.__setXCloudTranslationConfig({ preserveTitles: $preserveTitles, bilingual: $bilingualMode, hideStats: $hideStreamStats });
                         if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay($hideStreamStats);
-                        if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps });
+                        if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode });
+                        if ($lowEndDeviceMode && window.__pauseTranslator) window.__pauseTranslator();
                         return;
                     }
                     window.__cloudPlayInjected = true;
@@ -156,12 +158,16 @@ class XboxBridge(
                         cellularMode: "$cellularMode",
                         networkTuningMode: "$networkTuningMode",
                         speedFirst: $speedFirstPriority,
-                        targetBitrate: $effectiveBitrateMbps
+                        targetBitrate: $effectiveBitrateMbps,
+                        lowEndDeviceMode: $lowEndDeviceMode
                     };
 
                     window.__updateNetworkProfile = function(conf) {
                         if (!conf) return;
                         window.__networkProfile = Object.assign(window.__networkProfile || {}, conf);
+                        if (window.__networkProfile.lowEndDeviceMode && window.__pauseTranslator) {
+                            window.__pauseTranslator();
+                        }
                         console.log("[xCloud Optimizer] Network Profile Active:", window.__networkProfile);
                     };
 
@@ -223,6 +229,12 @@ class XboxBridge(
 
                     function notify(method, arg) {
                         try {
+                            if (method === 'onStreamConnected') {
+                                if (window.__pauseTranslator) window.__pauseTranslator();
+                            } else if (method === 'onStreamDisconnected') {
+                                const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                                if (!isLowEnd && window.__resumeTranslator) window.__resumeTranslator();
+                            }
                             if (window.CloudPlayBridge && window.CloudPlayBridge[method]) {
                                 window.CloudPlayBridge[method](arg);
                             }
@@ -414,18 +426,24 @@ class XboxBridge(
                                     if (desc && desc.sdp) {
                                         try {
                                             let sdp = desc.sdp;
-                                            const activeMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
-                                            const isLowSaver = activeMbps <= 6;
-                                            const isMedium = activeMbps > 6 && activeMbps <= 10;
-                                            const isHigh = activeMbps > 10 && activeMbps <= 15;
-                                            const targetKbps = Math.min(Math.max(activeMbps * 1000, 3500), 20000);
+                                            const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                                            const activeMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
+                                            const isLowSaver = isLowEndMode || activeMbps <= 6;
+                                            const isMedium = !isLowEndMode && activeMbps > 6 && activeMbps <= 10;
+                                            const isHigh = !isLowEndMode && activeMbps > 10 && activeMbps <= 15;
+                                            const targetKbps = isLowEndMode ? 5000 : Math.min(Math.max(activeMbps * 1000, 3500), 20000);
 
-                                            // Video bandwidth limit
-                                            sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
+                                            // Video bandwidth limit (+ prioritize 60 FPS in lowEndDeviceMode)
+                                            if (isLowEndMode) {
+                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:5000\r\na=framerate:60\r\n');
+                                                if (window.__pauseTranslator) window.__pauseTranslator();
+                                            } else {
+                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
+                                            }
 
                                             if (isLowSaver) {
-                                                // MỨC THẤP (TIẾT KIỆM DUNG LƯỢNG): H.264 Baseline Level 3.1 (giải mã <4ms, siêu mát máy, tiết kiệm 60% data & pin)
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;x-google-max-bitrate=5000;x-google-min-bitrate=2500;x-google-start-bitrate=4000\r\n');
+                                                // MỨC THẤP / CHẾ ĐỘ MÁY YẾU (5 Mbps cố định): H.264 Baseline Level 3.1 nhẹ trong SDP, ưu tiên 60 FPS, giải mã <4ms
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=5000;x-google-min-bitrate=2500;x-google-start-bitrate=4500\r\n');
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=48000\r\n');
                                             } else if (isMedium) {
                                                 // MỨC TRUNG BÌNH (CÂN BẰNG): H.264 Constrained/Main nhẹ nhàng cho GPU tầm trung, chống nóng máy khi chơi lâu
@@ -623,11 +641,18 @@ class XboxBridge(
 
                     function handleNavigationChange() {
                         if (location.href !== lastUrl) {
+                            const wasInLaunch = lastUrl.indexOf('/play/launch/') !== -1;
+                            const nowInLaunch = location.href.indexOf('/play/launch/') !== -1;
                             lastUrl = location.href;
                             notifiedStreamConnection = false;
                             notify('onUrlChanged', location.href);
-                            if (location.href.indexOf('/play/launch/') !== -1) {
+                            if (nowInLaunch) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
+                            } else if (wasInLaunch && !nowInLaunch) {
+                                const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                                if (!isLowEnd && window.__resumeTranslator) {
+                                    window.__resumeTranslator();
+                                }
                             }
                         }
                     }
@@ -806,6 +831,9 @@ class XboxBridge(
                     };
 
                     window.__toggleClarityBoost($clarityBoost);
+                    if ($lowEndDeviceMode && window.__pauseTranslator) {
+                        window.__pauseTranslator();
+                    }
                 })();
 
                 // ==========================================
@@ -837,21 +865,49 @@ class XboxBridge(
     @JavascriptInterface
     fun onStreamConnected(detail: String?) {
         if (!isCallerTrusted()) return
-        Log.d(TAG, "Stream established: $detail")
+        Log.d(TAG, "Stream established: $detail — pausing DOM translator")
         controller.onStreamConnected()
+        scope.launch(Dispatchers.Main) {
+            webViewRef?.get()?.evaluateJavascript(
+                "if (window.__pauseTranslator) window.__pauseTranslator();",
+                null
+            )
+        }
     }
 
     @JavascriptInterface
     fun onStreamDisconnected(detail: String?) {
         if (!isCallerTrusted()) return
-        Log.d(TAG, "Stream ended: $detail")
+        Log.d(TAG, "Stream ended: $detail — resuming DOM translator if allowed")
         controller.onStreamDisconnected()
+        scope.launch(Dispatchers.Main) {
+            val isLowEnd = com.example.data.SettingsRepository.config.value.lowEndDeviceMode
+            if (!isLowEnd) {
+                webViewRef?.get()?.evaluateJavascript(
+                    "if (window.__resumeTranslator) window.__resumeTranslator();",
+                    null
+                )
+            }
+        }
     }
 
     @JavascriptInterface
     fun onUrlChanged(url: String?) {
         if (!isCallerTrusted()) return
-        url?.let { controller.onUrlChanged(it) }
+        url?.let { targetUrl ->
+            controller.onUrlChanged(targetUrl)
+            if (!targetUrl.contains("/launch/") && isXboxHost(targetUrl)) {
+                scope.launch(Dispatchers.Main) {
+                    val isLowEnd = com.example.data.SettingsRepository.config.value.lowEndDeviceMode
+                    if (!isLowEnd) {
+                        webViewRef?.get()?.evaluateJavascript(
+                            "if (window.__resumeTranslator) window.__resumeTranslator();",
+                            null
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @JavascriptInterface

@@ -187,6 +187,13 @@ fun CloudBrowserScreen(
         if (isTrusted || isTrustedDomainHost) {
             showReturnButton = false
             VpnManager.restoreProxyForGaming()
+            // Khi người dùng thoát về trang danh mục Xbox (ngoài /launch/), nối lại bộ dịch nếu không bật Chế độ máy yếu
+            if (XboxBridge.isXboxHost(targetUrl) && !targetUrl.contains("/launch/") && !config.lowEndDeviceMode) {
+                webViewInstance?.evaluateJavascript(
+                    "if (window.__resumeTranslator) window.__resumeTranslator();",
+                    null
+                )
+            }
         } else if (!isHttpToHttpsSameDomain) {
             showReturnButton = true
             VpnManager.pauseProxyForExternalNavigation()
@@ -215,7 +222,8 @@ fun CloudBrowserScreen(
         config.cellularMode,
         config.networkTuningMode,
         config.wifiSpeedFirstPriority,
-        networkStatus.effectiveBitrateMbps
+        networkStatus.effectiveBitrateMbps,
+        config.lowEndDeviceMode
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -230,7 +238,8 @@ fun CloudBrowserScreen(
             cellularMode = config.cellularMode.id,
             networkTuningMode = config.networkTuningMode.id,
             speedFirstPriority = config.wifiSpeedFirstPriority,
-            effectiveBitrateMbps = networkStatus.effectiveBitrateMbps
+            effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps,
+            lowEndDeviceMode = config.lowEndDeviceMode
         )
     }
 
@@ -255,9 +264,21 @@ fun CloudBrowserScreen(
         )
     }
 
-    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, networkStatus.effectiveBitrateMbps) {
+    // 1. DỪNG BỘ DỊCH KHI ĐANG STREAM (hoặc khi bật Chế độ máy yếu), NỐI LẠI KHI NGẮT STREAM / THOÁT VỀ TRANG XBOX
+    LaunchedEffect(streamUiState.isStreamConnected, streamUiState.isGameActive, currentMainFrameUrl, config.lowEndDeviceMode) {
+        val wv = webViewInstance ?: return@LaunchedEffect
+        val isOnLaunchPage = currentMainFrameUrl.contains("/launch/")
+        if (streamUiState.isStreamConnected || config.lowEndDeviceMode) {
+            wv.evaluateJavascript("if (window.__pauseTranslator) window.__pauseTranslator();", null)
+        } else if (!streamUiState.isGameActive && !isOnLaunchPage && XboxBridge.isXboxHost(currentMainFrameUrl)) {
+            wv.evaluateJavascript("if (window.__resumeTranslator) window.__resumeTranslator();", null)
+        }
+    }
+
+    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, networkStatus.effectiveBitrateMbps, config.lowEndDeviceMode) {
+        val targetMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps
         webViewInstance?.evaluateJavascript(
-            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: ${networkStatus.effectiveBitrateMbps} });",
+            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: $targetMbps, lowEndDeviceMode: ${config.lowEndDeviceMode} });",
             null
         )
     }
@@ -466,6 +487,7 @@ fun CloudBrowserScreen(
             hasGamepad = gamepadStatus.hasPhysicalController,
             gameProfile = gameProfile,
             realLatencyMs = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs,
+            lowEndDeviceMode = config.lowEndDeviceMode,
             onNavigateHome = onNavigateBackToDashboard,
             onSkip = { isPageLoading = false },
             modifier = Modifier.fillMaxSize()
@@ -675,7 +697,8 @@ fun CloudBrowserScreen(
             onToggleOrientation = {
                 (activity as? com.example.MainActivity)?.toggleOrientation()
             },
-            videoTopRatio = videoTopRatio
+            videoTopRatio = videoTopRatio,
+            lowEndDeviceMode = config.lowEndDeviceMode
         )
 
         // How To Use Guide Dialog

@@ -222,6 +222,8 @@ data class AppConfig(
     val cellularMode: CellularOptimizationMode = CellularOptimizationMode.AUTO,
     val networkTuningMode: NetworkTuningMode = NetworkTuningMode.AUTO,
     val wifiSpeedFirstPriority: Boolean = true,
+    // Chế độ máy yếu (tùy chọn do người dùng bật, không tự áp cho mọi máy)
+    val lowEndDeviceMode: Boolean = false,
     // Điều khoản người dùng & Tuyên bố bản quyền nguồn mở GitHub (Better-xCloud MIT)
     val userAcceptedTerms: Boolean = false
 ) {
@@ -285,6 +287,7 @@ object SettingsRepository {
                 NetworkTuningMode.valueOf(sp.getString("network_tuning_mode", NetworkTuningMode.AUTO.name) ?: NetworkTuningMode.AUTO.name)
             } catch (_: Exception) { NetworkTuningMode.AUTO },
             wifiSpeedFirstPriority = sp.getBoolean("wifi_speed_first", true),
+            lowEndDeviceMode = sp.getBoolean("low_end_device_mode", false),
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
         _config.value = loaded
@@ -320,6 +323,7 @@ object SettingsRepository {
             putString("graphics_quality_mode_v2", c.cellularMode.name)
             putString("network_tuning_mode", c.networkTuningMode.name)
             putBoolean("wifi_speed_first", c.wifiSpeedFirstPriority)
+            putBoolean("low_end_device_mode", c.lowEndDeviceMode)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             apply()
         }
@@ -609,6 +613,11 @@ object SettingsRepository {
 
     fun updateUserAcceptedTerms(accepted: Boolean) {
         _config.update { it.copy(userAcceptedTerms = accepted) }
+        persist(_config.value)
+    }
+
+    fun updateLowEndDeviceMode(enabled: Boolean) {
+        _config.update { it.copy(lowEndDeviceMode = enabled) }
         persist(_config.value)
     }
 }

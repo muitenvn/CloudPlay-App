@@ -949,6 +949,85 @@ fun SettingsScreen(
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 5. Công tắc Chế độ máy yếu (tùy chọn do người dùng bật, không tự áp cho mọi máy)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (config.lowEndDeviceMode) Color(0xFF13241A) else Color(0xFF141D17))
+                        .border(
+                            0.8.dp,
+                            if (config.lowEndDeviceMode) XboxNeonGreen.copy(alpha = 0.6f) else XboxCardBorder,
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = if (config.lowEndDeviceMode) XboxNeonGreen else TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Chế độ máy yếu",
+                                    color = if (config.lowEndDeviceMode) XboxNeonGreen else TextPrimary,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Khóa bitrate thấp cố định (~5 Mbps), dùng H.264 nhẹ trong SDP lúc kết nối, ưu tiên 60 FPS, tắt hiệu ứng động (HUD & màn tải) và tự tạm dừng bộ dịch.",
+                                color = TextSecondary,
+                                fontSize = 10.5.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Switch(
+                            checked = config.lowEndDeviceMode,
+                            onCheckedChange = { enabled ->
+                                SettingsRepository.updateLowEndDeviceMode(enabled)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.Black,
+                                checkedTrackColor = XboxNeonGreen
+                            ),
+                            modifier = Modifier.testTag("settings_low_end_device_mode_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (config.lowEndDeviceMode) XboxNeonGreen.copy(alpha = 0.14f) else Color(0xFF0E1712),
+                        border = androidx.compose.foundation.BorderStroke(
+                            0.6.dp,
+                            if (config.lowEndDeviceMode) XboxNeonGreen.copy(alpha = 0.45f) else XboxCardBorder
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "💡 Thoát game và vào lại để áp dụng",
+                            color = if (config.lowEndDeviceMode) XboxNeonGreen else DirectCyan,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+                }
             }
         }
 

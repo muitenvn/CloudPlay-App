@@ -49,7 +49,16 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Wifi
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
 import android.widget.Toast
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -68,9 +77,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -139,8 +150,10 @@ fun FloatingHud(
     onOpenTranslator: () -> Unit = {},
     onToggleOrientation: () -> Unit = {},
     videoTopRatio: Float = 0f,
+    lowEndDeviceMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var hudMode by rememberSaveable { mutableStateOf(HudMode.MINIMIZED) }
     var offsetX by rememberSaveable { mutableFloatStateOf(24f) }
     var offsetY by rememberSaveable { mutableFloatStateOf(24f) }
@@ -151,6 +164,103 @@ fun FloatingHud(
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isInteracting by remember { mutableStateOf(true) }
+
+    // 2. THEO DÕI NHIỆT ĐỘ MÁY (API 29+, bỏ qua trên máy thấp hơn) & PIN
+    val isThermalSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+    var thermalStatus by remember { mutableIntStateOf(0) }
+    var showThermalWarningBanner by remember { mutableStateOf(false) }
+    var batteryPercent by remember { mutableIntStateOf(-1) }
+    var isBatteryCharging by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val powerManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        } else {
+            null
+        }
+
+        val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            PowerManager.OnThermalStatusChangedListener { newStatus ->
+                val wasHot = thermalStatus >= PowerManager.THERMAL_STATUS_MODERATE
+                thermalStatus = newStatus
+                val isNowHot = newStatus >= PowerManager.THERMAL_STATUS_MODERATE
+                showThermalWarningBanner = isNowHot
+                if (isNowHot && !wasHot) {
+                    try {
+                        Toast.makeText(
+                            context,
+                            "Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } catch (_: Exception) {}
+                }
+            }
+        } else {
+            null
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null && thermalListener != null) {
+            try {
+                val initialThermal = powerManager.currentThermalStatus
+                thermalStatus = initialThermal
+                showThermalWarningBanner = initialThermal >= PowerManager.THERMAL_STATUS_MODERATE
+                powerManager.addThermalStatusListener(context.mainExecutor, thermalListener)
+            } catch (_: Exception) {}
+        }
+
+        fun updateBatteryFromIntent(intent: Intent?) {
+            if (intent == null) return
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (level >= 0 && scale > 0) {
+                batteryPercent = ((level * 100f) / scale.toFloat()).roundToInt().coerceIn(0, 100)
+            }
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            isBatteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL
+        }
+
+        val batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                updateBatteryFromIntent(intent)
+            }
+        }
+
+        try {
+            val stickyIntent = context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            updateBatteryFromIntent(stickyIntent)
+        } catch (_: Exception) {}
+
+        onDispose {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null && thermalListener != null) {
+                try {
+                    powerManager.removeThermalStatusListener(thermalListener)
+                } catch (_: Exception) {}
+            }
+            try {
+                context.unregisterReceiver(batteryReceiver)
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Phân loại biểu tượng nhiệt trên HUD: mát / ấm / nóng
+    val thermalIcon = when {
+        !isThermalSupported -> ""
+        thermalStatus >= 2 -> "🔥"
+        thermalStatus == 1 -> "🌡️"
+        else -> "❄️"
+    }
+    val thermalLabel = when {
+        !isThermalSupported -> ""
+        thermalStatus >= 2 -> "Nóng"
+        thermalStatus == 1 -> "Ấm"
+        else -> "Mát"
+    }
+    val thermalColor = when {
+        thermalStatus >= 2 -> JapanRed
+        thermalStatus == 1 -> Color(0xFFFFB300)
+        else -> DirectCyan
+    }
 
     fun markUserInteraction() {
         lastInteractionTime = System.currentTimeMillis()
@@ -167,9 +277,10 @@ fun FloatingHud(
         }
     }
 
+    val targetAlpha = if (isInteracting || isDragging || hudMode == HudMode.EXPANDED) 1.0f else 0.35f
     val hudAlpha by animateFloatAsState(
-        targetValue = if (isInteracting || isDragging || hudMode == HudMode.EXPANDED) 1.0f else 0.35f,
-        animationSpec = tween(350),
+        targetValue = targetAlpha,
+        animationSpec = tween(if (lowEndDeviceMode) 0 else 350),
         label = "hud_alpha"
     )
 
@@ -241,12 +352,12 @@ fun FloatingHud(
 
         val animatedOffsetX by animateFloatAsState(
             targetValue = offsetX.coerceIn(safeLeftPx, maxBoundX),
-            animationSpec = if (isDragging) tween(0) else tween(220),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(220),
             label = "hud_offset_x"
         )
         val animatedOffsetY by animateFloatAsState(
             targetValue = offsetY.coerceIn(safeTopPx, maxBoundY),
-            animationSpec = if (isDragging) tween(0) else tween(220),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(220),
             label = "hud_offset_y"
         )
         val isAnchoredRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
@@ -365,6 +476,15 @@ fun FloatingHud(
                             tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
                             modifier = Modifier.size(13.dp)
                         )
+                        if (isThermalSupported) {
+                            Text(
+                                text = "$thermalIcon$thermalLabel",
+                                color = thermalColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.5.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
                 } else {
                     // ==========================================
@@ -559,6 +679,35 @@ fun FloatingHud(
                             }
                         }
 
+                        // 5.5. Thermal Indicator on HUD (Mát / Ấm / Nóng) on API 29+
+                        if (isThermalSupported) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = thermalColor.copy(alpha = 0.2f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .testTag("hud_thermal_badge")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = thermalIcon,
+                                        fontSize = 9.sp
+                                    )
+                                    Text(
+                                        text = thermalLabel,
+                                        color = thermalColor,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+
                         // 6. Minimize to Corner Dot
                         Box(
                             modifier = Modifier
@@ -579,13 +728,36 @@ fun FloatingHud(
                         }
                     }
 
+                    // Cảnh báo nhiệt độ khi từ MODERATE trở lên
+                    if (isThermalSupported && showThermalWarningBanner) {
+                        Surface(
+                            modifier = Modifier
+                                .padding(top = 2.dp, start = 3.dp, end = 3.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable { showThermalWarningBanner = false }
+                                .testTag("hud_thermal_warning_banner"),
+                            shape = RoundedCornerShape(6.dp),
+                            color = JapanRed.copy(alpha = 0.24f),
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.7f))
+                        ) {
+                            Text(
+                                text = "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
+                                color = Color.White,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                maxLines = 1
+                            )
+                        }
+                    }
+
                     // ==========================================
                     // B. BẢNG MỞ RỘNG (NHỎ GỌN, DÀY THÔNG TIN, CUỘN BÊN TRONG)
                     // - Chiều rộng tối đa 38% màn hình, chiều cao tối đa 60% màn hình
                     // - Mở sát cạnh nơi HUD đang đứng (trái/phải)
                     // - Nút thu gọn rõ ràng, vùng bấm chuẩn 48dp
                     // - Bỏ ô lớn "Chất lượng đồ họa & hiệu năng máy", chỉ giữ:
-                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Chế độ chất lượng + nút chức năng
+                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Pin & Sạc, Chế độ chất lượng + nút chức năng
                     // ==========================================
                     val panelMaxWidth = (screenMaxWidth * 0.38f).coerceAtLeast(172.dp)
                     val panelMaxHeight = (screenMaxHeight * 0.60f).coerceAtLeast(180.dp)
@@ -593,10 +765,10 @@ fun FloatingHud(
 
                     AnimatedVisibility(
                         visible = hudMode == HudMode.EXPANDED,
-                        enter = expandVertically(
+                        enter = if (lowEndDeviceMode) EnterTransition.None else expandVertically(
                             expandFrom = Alignment.Top
                         ) + fadeIn(),
-                        exit = shrinkVertically(
+                        exit = if (lowEndDeviceMode) ExitTransition.None else shrinkVertically(
                             shrinkTowards = Alignment.Top
                         ) + fadeOut()
                     ) {
@@ -631,7 +803,7 @@ fun FloatingHud(
                                     .verticalScroll(scrollState),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm)
+                                // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm, Pin & Nhiệt độ)
                                 DenseCoreTelemetrySection(
                                     vpnState = vpnState,
                                     telemetry = telemetry,
@@ -640,6 +812,12 @@ fun FloatingHud(
                                     physicalControllerConnected = physicalControllerConnected,
                                     virtualControllerEnabled = virtualControllerEnabled,
                                     controllerName = controllerName,
+                                    batteryPercent = batteryPercent,
+                                    isBatteryCharging = isBatteryCharging,
+                                    isThermalSupported = isThermalSupported,
+                                    thermalIcon = thermalIcon,
+                                    thermalLabel = thermalLabel,
+                                    thermalColor = thermalColor,
                                     onToggleNetwork = {
                                         markUserInteraction()
                                         onToggleNetwork()
@@ -912,6 +1090,12 @@ private fun DenseCoreTelemetrySection(
     physicalControllerConnected: Boolean,
     virtualControllerEnabled: Boolean,
     controllerName: String,
+    batteryPercent: Int,
+    isBatteryCharging: Boolean,
+    isThermalSupported: Boolean,
+    thermalIcon: String,
+    thermalLabel: String,
+    thermalColor: Color,
     onToggleNetwork: () -> Unit,
     onToggleVirtualController: () -> Unit
 ) {
@@ -949,6 +1133,19 @@ private fun DenseCoreTelemetrySection(
         physicalControllerConnected -> controllerName
         virtualControllerEnabled -> stringResource(R.string.hud_virtual_gamepad)
         else -> stringResource(R.string.controller_disconnected)
+    }
+
+    val batteryStatusText = if (batteryPercent >= 0) {
+        val chargeStr = if (isBatteryCharging) "Đang sạc ⚡" else "Không sạc"
+        "$batteryPercent% • $chargeStr"
+    } else {
+        "--% • Không rõ"
+    }
+    val batteryColor = when {
+        isBatteryCharging -> XboxNeonGreen
+        batteryPercent in 0..20 -> JapanRed
+        batteryPercent in 21..35 -> Color(0xFFFFB300)
+        else -> TextPrimary
     }
 
     Surface(
@@ -991,6 +1188,14 @@ private fun DenseCoreTelemetrySection(
                 valueColor = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
                 badgeText = if (virtualControllerEnabled) "Ẩn ảo" else "Bật ảo",
                 onRowClick = onToggleVirtualController
+            )
+
+            // 5. Dòng % Pin & trạng thái sạc (+ Nhiệt độ máy trên API 29+)
+            DenseMetricRowItem(
+                label = "Pin & Sạc",
+                value = batteryStatusText,
+                valueColor = batteryColor,
+                badgeText = if (isThermalSupported) "$thermalIcon $thermalLabel" else null
             )
         }
     }

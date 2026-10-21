@@ -142,6 +142,37 @@ object AdaptiveQualityManager {
         val cellularMode = config.cellularMode
         val current = _state.value
 
+        if (config.lowEndDeviceMode) {
+            val lowEndMbps = 5.0
+            val lowEndBuf = 20.0
+            val lowEndStep = BitrateLadderStep(
+                tier = QualityTier.SAVER,
+                targetBitrateMbps = lowEndMbps,
+                bufferHintMs = lowEndBuf.roundToInt(),
+                title = "Chế Độ Máy Yếu • 5 Mbps (H.264 Nhẹ • 60FPS)",
+                description = "Khóa cố định 5 Mbps, H.264 nhẹ, ưu tiên 60 FPS, tắt hiệu ứng động & dừng dịch khi chơi"
+            )
+            val idx = (lowEndMbps.roundToInt() - 1).coerceIn(0, FULL_CONTINUOUS_SPECTRUM.lastIndex)
+            _state.value = current.copy(
+                isAutoAdapting = false,
+                ladderSteps = FULL_CONTINUOUS_SPECTRUM,
+                currentStep = lowEndStep,
+                currentStepIndex = idx,
+                smoothBitrateMbps = lowEndMbps,
+                smoothBufferMs = lowEndBuf,
+                minAutoMbps = 1.0,
+                maxAutoMbps = 5.0,
+                qualityGrade = "Chế Độ Máy Yếu (5M)",
+                qualityNotice = "🛡️ Chế độ máy yếu: Khóa 5 Mbps • H.264 nhẹ • Ưu tiên 60 FPS (Thoát game và vào lại để áp dụng)"
+            )
+            QualityAdapter.applyAdaptiveBitrate(
+                targetBitrateMbps = lowEndMbps,
+                bufferHintMs = lowEndBuf,
+                smoothGlide = true
+            )
+            return
+        }
+
         if (cellularMode == CellularOptimizationMode.AUTO) {
             // Chế độ Tự Động: Không bị khóa vào 1 thang cố định mà mở toàn dải 1M..20M (1, 2, 3, 4, 5, 6, 7, 8, 9... 20)
             val initialSeedMbps = when {

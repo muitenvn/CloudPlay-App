@@ -202,7 +202,12 @@ object NetworkOptimizer {
         val summary: String
         val badge: String
 
-        when (cellularMode) {
+        if (config.lowEndDeviceMode) {
+            profileName = "Chế Độ Máy Yếu (Cố Định • 5M • H.264 Nhẹ • 60FPS)"
+            bitrate = 5
+            summary = "Đang bật Chế độ máy yếu: Khóa cố định 5 Mbps, dùng H.264 nhẹ trong SDP, ưu tiên 60 FPS, tắt hiệu ứng động và tự dừng bộ dịch khi chơi."
+            badge = "🛡️ Máy Yếu (5M)"
+        } else when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
                 val liveAutoMbps = AdaptiveQualityManager.state.value.smoothBitrateMbps
                     .takeIf { it in 1.0..20.0 }
@@ -309,16 +314,22 @@ object NetworkOptimizer {
             _telemetry.value = newTelemetry
             AdaptiveQualityManager.evaluateTelemetry(newTelemetry)
 
-            // If in AUTO mode, sync live stepless bitrate (1..20M) back to NetworkOptimizer status
+            // If in AUTO mode (and not in lowEndDeviceMode), sync live stepless bitrate (1..20M) back to NetworkOptimizer status
             val config = SettingsRepository.config.value
-            if (config.cellularMode == CellularOptimizationMode.AUTO) {
+            if (config.lowEndDeviceMode) {
+                _status.value = _status.value.copy(
+                    effectiveBitrateMbps = 5,
+                    activeProfileName = "Chế Độ Máy Yếu (Cố Định • 5M • H.264 Nhẹ • 60FPS)",
+                    profileBadge = "🛡️ Máy Yếu (5M)"
+                )
+            } else if (config.cellularMode == CellularOptimizationMode.AUTO) {
                 val autoState = AdaptiveQualityManager.state.value
                 val liveMbps = autoState.smoothBitrateMbps
                 val mbpsLabel = if (liveMbps % 1.0 == 0.0) "${liveMbps.toInt()}M" else "${liveMbps}M"
                 _status.value = _status.value.copy(
                     effectiveBitrateMbps = liveMbps.toInt().coerceIn(1, 20),
                     activeProfileName = "Đồ Họa: Tự Động Linh Hoạt • $mbpsLabel (Tự do 1–20M)",
-                    profileBadge = "⚡ Tự Động ($mbpsLabel)"
+                    profileBadge = "🛡️ Tự Động ($mbpsLabel)".replace("🛡️", "⚡")
                 )
             }
         } catch (e: Exception) {

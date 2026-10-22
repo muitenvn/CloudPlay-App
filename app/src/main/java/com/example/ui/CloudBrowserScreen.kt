@@ -223,7 +223,8 @@ fun CloudBrowserScreen(
         config.cellularMode,
         config.networkTuningMode,
         config.wifiSpeedFirstPriority,
-        config.lowEndDeviceMode
+        config.lowEndDeviceMode,
+        config.showVirtualController
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -239,7 +240,8 @@ fun CloudBrowserScreen(
             networkTuningMode = config.networkTuningMode.id,
             speedFirstPriority = config.wifiSpeedFirstPriority,
             effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps,
-            lowEndDeviceMode = config.lowEndDeviceMode
+            lowEndDeviceMode = config.lowEndDeviceMode,
+            virtualGamepadEnabled = config.showVirtualController
         )
     }
 
@@ -290,6 +292,14 @@ fun CloudBrowserScreen(
         )
         webViewInstance?.evaluateJavascript(
             "if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay(${config.hideStreamStatsOverlay});",
+            null
+        )
+    }
+
+    // Đồng bộ tức thì trạng thái Tay cầm ảo với WebView (Tắt tay cầm ảo -> ngắt kết nối Gamepad giả lập để Fortnite hiện HUD Cảm ứng Epic gốc)
+    LaunchedEffect(config.showVirtualController, webViewInstance) {
+        webViewInstance?.evaluateJavascript(
+            "if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled(${config.showVirtualController});",
             null
         )
     }
@@ -483,8 +493,23 @@ fun CloudBrowserScreen(
             }
         )
 
-        val gameProfile = remember(initialUrl) {
-            com.example.data.GameOptimizationRepository.getProfileForUrl(initialUrl)
+        val gameProfile = remember(initialUrl, currentMainFrameUrl) {
+            val currentProfile = com.example.data.GameOptimizationRepository.getProfileForUrl(currentMainFrameUrl)
+            if (currentProfile.gameId != "generic") currentProfile
+            else com.example.data.GameOptimizationRepository.getProfileForUrl(initialUrl)
+        }
+
+        // Kích hoạt chế độ Fortnite Arena (Đệm 8ms + tự động chọn bố cục FPS Pro khi bật tay cầm ảo lần đầu trong Fortnite)
+        LaunchedEffect(gameProfile.gameId, webViewInstance) {
+            val isFn = gameProfile.gameId == "fortnite"
+            webViewInstance?.evaluateJavascript(
+                "window.__fortniteArenaMode = $isFn; if ($isFn && window.__setAdaptiveBitrate) window.__setAdaptiveBitrate(${if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps}, 8.0, false);",
+                null
+            )
+            if (isFn && config.gamepadLayoutPreset == com.example.data.GamepadLayoutPreset.STANDARD) {
+                SettingsRepository.updateGamepadLayoutPreset(com.example.data.GamepadLayoutPreset.FPS_PRO)
+                SettingsRepository.updateGamepadSprintLockEnabled(true)
+            }
         }
 
         // Dedicated Game Loading Screen (Optimized for Portrait & Landscape)
@@ -722,7 +747,18 @@ fun CloudBrowserScreen(
                 (activity as? com.example.MainActivity)?.toggleOrientation()
             },
             videoTopRatio = videoTopRatio,
-            lowEndDeviceMode = config.lowEndDeviceMode
+            lowEndDeviceMode = config.lowEndDeviceMode,
+            onSelectFortniteControlMode = { useVirtualFpsPro ->
+                if (useVirtualFpsPro) {
+                    SettingsRepository.updateGamepadLayoutPreset(com.example.data.GamepadLayoutPreset.FPS_PRO)
+                    SettingsRepository.updateGamepadSprintLockEnabled(true)
+                    SettingsRepository.updateShowVirtualController(true)
+                    webViewInstance?.evaluateJavascript("if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled(true);", null)
+                } else {
+                    SettingsRepository.updateShowVirtualController(false)
+                    webViewInstance?.evaluateJavascript("if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled(false);", null)
+                }
+            }
         )
 
         // How To Use Guide Dialog

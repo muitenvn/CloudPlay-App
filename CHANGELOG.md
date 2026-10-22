@@ -2,13 +2,18 @@
 
 Tài liệu này ghi nhận chi tiết các thay đổi thực tế của từng bản cập nhật và được hệ thống xuất APK tự động trích xuất vào trang phát hành (GitHub Releases).
 
-## [v1.3.0] - Nâng cấp Hệ thống Control & Tay cầm Cảm ứng Pro
-### 🎮 Cải tiến Hệ thống Điều khiển (Pro Control System)
+## [v1.3.0] - Tối ưu Độc quyền Fortnite Arena & Hệ thống Tay cầm Cảm ứng Pro
+### ⚡ Tối ưu Độc quyền Fortnite (Fortnite Arena Mode)
+- **Đệm khung hình 8ms Zero-Delay & Luồng 120 FPS:** Hạ bộ đệm WebRTC (`playoutDelayHint` & `jitterBufferTarget`) xuống `8ms` cho hình ảnh và `6ms` cho âm thanh, đồng thời thương lượng `a=framerate:120` trong SDP với máy chủ Xbox Series X cho Fortnite.
+- **Chuyển đổi 1 chạm giữa Cảm ứng Epic gốc & Tay cầm FPS Pro:** Khi chọn `👆 Cảm ứng Epic`, hệ thống tự động ngắt kết nối tay cầm giả lập (`gamepaddisconnected`) để Fortnite hiển thị đầy đủ bộ nút cảm ứng xây nhà/bắn súng gốc của Epic Games mà không bị xung đột; khi chọn `🎮 Tay cầm FPS Pro`, tự động kích hoạt bố cục ngắm bắn (cần phải R lớn hơn +15% & Auto-Sprint L3).
+- **Âm thanh Bước chân & Tiếng súng Định hướng (128kbps CBR Opus + FEC):** Nâng cấp luồng âm thanh Stereo Opus CBR 128kbps kèm chống mất gói In-Band FEC riêng cho Fortnite để nghe rõ tiếng bước chân và hướng giao tranh.
+- **Cảm ứng đa điểm Claw 4 ngón chống trễ:** Vô hiệu hóa hoàn toàn cử chỉ trình duyệt gây trễ (`touch-action: none`) và tự động bỏ qua hộp thoại cảnh báo thiếu tay cầm khi khởi động Fortnite.
+
+### 🎮 Cải tiến Hệ thống Điều khiển (Pro Control System - Chuẩn Fair-Play)
 - **D-Pad trượt 8 hướng & ABXY trượt/combo đa điểm:** Hỗ trợ trượt ngón tay mượt mà qua 8 hướng (bao gồm 4 hướng chéo) trên D-Pad và vuốt/nhấn tổ hợp 2 nút liền kề trên cụm ABXY.
 - **Bổ sung nút L3 / R3, Cò ga tuyến tính & Tự động chạy nhanh (Auto-Sprint L3):** Thêm nút L3/R3 chuyên dụng, cò ga/phanh tuyến tính (0–100%) trong chế độ Đua xe và tự kích hoạt chạy nhanh L3 khi đẩy kịch cần trái L.
 - **Ngắm bắn bằng cảm biến Con quay hồi chuyển (Gyroscope):** Kết hợp nghiêng máy thật (`Sensor.TYPE_GYROSCOPE`) để tinh chỉnh tâm ngắm cần phải R mượt mà.
 - **Bảng tùy chỉnh nhanh `⚙ Control` trong game & Kéo thả vị trí nút tự do:** Cho phép đổi nhanh 4 bố cục (`Xbox Standard`, `FPS Pro`, `Racing`, `Compact`), chỉnh kích thước (75%–135%), độ mờ, độ nhạy, vùng chết (Deadzone), cường độ rung và kéo thả từng cụm nút đến vị trí bất kỳ trên màn hình.
-- **Cầu nối W3C Gamepad API siêu tốc (`__cpBtn` / `__cpStick`):** Gọi trực tiếp hàm JS tốc độ cao không qua cấp phát sự kiện DOM, tự kích hoạt `gamepadconnected` và hợp nhất mượt mà giữa tay cầm Bluetooth vật lý cùng tay cầm ảo.
 
 ---
 

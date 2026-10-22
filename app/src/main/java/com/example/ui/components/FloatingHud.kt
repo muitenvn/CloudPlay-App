@@ -158,6 +158,7 @@ fun FloatingHud(
     onToggleOrientation: () -> Unit = {},
     videoTopRatio: Float = 0f,
     lowEndDeviceMode: Boolean = false,
+    onSelectFortniteControlMode: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -896,6 +897,18 @@ fun FloatingHud(
                                     .verticalScroll(scrollState),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
+                                // B.5: Thẻ tối ưu độc quyền cho Fortnite (Chuyển nhanh Cảm ứng Epic vs Tay cầm FPS Pro + 8ms Zero-Delay)
+                                if (gameProfile?.gameId == "fortnite") {
+                                    FortniteExclusiveHudCard(
+                                        isEn = isEn,
+                                        virtualControllerEnabled = virtualControllerEnabled,
+                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
+                                            markUserInteraction()
+                                            onSelectFortniteControlMode(useVirtualFpsPro)
+                                        }
+                                    )
+                                }
+
                                 // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm, Pin & Nhiệt độ)
                                 DenseCoreTelemetrySection(
                                     vpnState = vpnState,
@@ -1026,6 +1039,111 @@ fun FloatingHud(
             containerColor = XboxSurface,
             shape = RoundedCornerShape(16.dp)
         )
+    }
+}
+
+@Composable
+private fun FortniteExclusiveHudCard(
+    isEn: Boolean,
+    virtualControllerEnabled: Boolean,
+    onSelectFortniteControlMode: (Boolean) -> Unit
+) {
+    val fortniteBlue = Color(0xFF0095FF)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("hud_fortnite_arena_card"),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF0A1929).copy(alpha = 0.94f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, fortniteBlue.copy(alpha = 0.65f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isEn) "⚡ FORTNITE ARENA TUNING" else "⚡ TỐI ƯU RIÊNG FORTNITE",
+                    color = fortniteBlue,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+                Text(
+                    text = "8ms • 120Hz • 128k",
+                    color = XboxNeonGreen,
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val isEpicTouchActive = !virtualControllerEnabled
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isEpicTouchActive) fortniteBlue.copy(alpha = 0.28f) else Color(0x26FFFFFF),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.8.dp,
+                        if (isEpicTouchActive) fortniteBlue else Color.White.copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onSelectFortniteControlMode(false) }
+                        .testTag("hud_fortnite_epic_touch_btn")
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isEn) "👆 Epic Touch" else "👆 Cảm ứng Epic",
+                            color = if (isEpicTouchActive) Color.White else TextSecondary,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (virtualControllerEnabled) XboxNeonGreen.copy(alpha = 0.25f) else Color(0x26FFFFFF),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.8.dp,
+                        if (virtualControllerEnabled) XboxNeonGreen else Color.White.copy(alpha = 0.15f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onSelectFortniteControlMode(true) }
+                        .testTag("hud_fortnite_fps_pad_btn")
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isEn) "🎮 FPS Pro Pad" else "🎮 Tay cầm FPS Pro",
+                            color = if (virtualControllerEnabled) XboxNeonGreen else TextSecondary,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -131,7 +131,8 @@ class XboxBridge(
             networkTuningMode: String = "auto",
             speedFirstPriority: Boolean = true,
             effectiveBitrateMbps: Int = 8,
-            lowEndDeviceMode: Boolean = false
+            lowEndDeviceMode: Boolean = false,
+            virtualGamepadEnabled: Boolean = false
         ): String {
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
@@ -149,10 +150,18 @@ class XboxBridge(
                         if (window.__setXCloudTranslationConfig) window.__setXCloudTranslationConfig({ preserveTitles: $preserveTitles, bilingual: $bilingualMode, hideStats: $hideStreamStats });
                         if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay($hideStreamStats);
                         if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode });
+                        if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($virtualGamepadEnabled);
                         if ($lowEndDeviceMode && window.__pauseTranslator) window.__pauseTranslator();
                         return;
                     }
                     window.__cloudPlayInjected = true;
+                    window.__virtualGamepadEnabled = $virtualGamepadEnabled;
+
+                    function isFortniteSession() {
+                        const h = (location.href || '').toLowerCase();
+                        return h.indexOf('fortnite') !== -1 || h.indexOf('bt5p2x999vh2') !== -1 || !!window.__fortniteArenaMode;
+                    }
+                    window.__isFortniteSession = isFortniteSession;
 
                     window.__networkProfile = {
                         cellularMode: "$cellularMode",
@@ -171,7 +180,7 @@ class XboxBridge(
                         console.log("[xCloud Optimizer] Network Profile Active:", window.__networkProfile);
                     };
 
-                    const initialBufSec = ($speedFirstPriority || $lowEndDeviceMode) ? 0.012 : 0.016;
+                    const initialBufSec = isFortniteSession() ? 0.008 : (($speedFirstPriority || $lowEndDeviceMode) ? 0.012 : 0.016);
                     window.__currentBufferSec = initialBufSec;
                     window.__targetBufferSec = initialBufSec;
                     window.__bufferGlideTimer = null;
@@ -452,16 +461,19 @@ class XboxBridge(
                                         try {
                                             let sdp = desc.sdp;
                                             const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                                            const isFortnite = isFortniteSession();
                                             const activeMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
                                             const isLowSaver = isLowEndMode || activeMbps <= 6;
                                             const isMedium = !isLowEndMode && activeMbps > 6 && activeMbps <= 10;
                                             const isHigh = !isLowEndMode && activeMbps > 10 && activeMbps <= 15;
-                                            const targetKbps = isLowEndMode ? 5000 : Math.min(Math.max(activeMbps * 1000, 3500), 20000);
+                                            const targetKbps = isLowEndMode ? 5000 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 6000 : 3500), 20000);
 
-                                            // Video bandwidth limit (+ prioritize 60 FPS in lowEndDeviceMode)
+                                            // Video bandwidth limit (+ 120 FPS negotiation for Fortnite on Xbox Series X blades, or 60 FPS in lowEndDeviceMode)
                                             if (isLowEndMode) {
                                                 sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:5000\r\na=framerate:60\r\n');
                                                 if (window.__pauseTranslator) window.__pauseTranslator();
+                                            } else if (isFortnite) {
+                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:120\r\n');
                                             } else {
                                                 sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
                                             }
@@ -469,19 +481,19 @@ class XboxBridge(
                                             if (isLowSaver) {
                                                 // MỨC THẤP / CHẾ ĐỘ MÁY YẾU (5 Mbps cố định): H.264 Baseline Level 3.1 nhẹ trong SDP, ưu tiên 60 FPS, giải mã <4ms
                                                 sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=5000;x-google-min-bitrate=2500;x-google-start-bitrate=4500\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=48000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '96000;cbr=1;useinbandfec=1' : '48000') + '\r\n');
                                             } else if (isMedium) {
                                                 // MỨC TRUNG BÌNH (CÂN BẰNG): H.264 Constrained/Main nhẹ nhàng cho GPU tầm trung, chống nóng máy khi chơi lâu
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;x-google-max-bitrate=9000;x-google-min-bitrate=4000;x-google-start-bitrate=7000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=64000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;x-google-max-bitrate=' + (isFortnite ? '10000' : '9000') + ';x-google-min-bitrate=' + (isFortnite ? '5000' : '4000') + ';x-google-start-bitrate=8000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '128000;cbr=1;useinbandfec=1' : '64000') + '\r\n');
                                             } else if (isHigh) {
                                                 // MỨC CAO (SẮC NÉT 1080P): 14 Mbps chuẩn Full HD 60/120fps
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=14000;x-google-min-bitrate=5000;x-google-start-bitrate=10000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=96000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=' + (isFortnite ? '16000' : '14000') + ';x-google-min-bitrate=6000;x-google-start-bitrate=12000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '128000;cbr=1;useinbandfec=1;maxplaybackrate=48000' : '96000') + '\r\n');
                                             } else {
                                                 // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA): 20 Mbps max visual quality (hỗ trợ 120 FPS)
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=20000;x-google-min-bitrate=8000;x-google-start-bitrate=14000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=128000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=20000;x-google-min-bitrate=8000;x-google-start-bitrate=15000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=128000;maxplaybackrate=48000\r\n');
                                             }
                                             desc = new RTCSessionDescription({ type: desc.type, sdp: sdp });
                                         } catch(sdpErr) {}
@@ -489,12 +501,15 @@ class XboxBridge(
                                     return origSetRemote(desc);
                                 };
 
-                                // Hardware Decoder Stabilization: Ultra-low latency jitter buffer (10-12ms)
+                                // Hardware Decoder Stabilization: 8ms Arena Zero-Delay for Fortnite, 12-16ms for standard games
                                 pc.addEventListener('track', function(evt) {
                                     try {
                                         if (evt.receiver) {
+                                            const isFortnite = isFortniteSession();
                                             const isFast = !!(window.__networkProfile && (window.__networkProfile.speedFirst || window.__networkProfile.lowEndDeviceMode));
-                                            const delaySec = isFast ? 0.012 : 0.016;
+                                            const videoDelaySec = isFortnite ? 0.008 : (isFast ? 0.012 : 0.016);
+                                            const isAudioTrack = evt.track && evt.track.kind === 'audio';
+                                            const delaySec = isAudioTrack ? Math.max(0.006, videoDelaySec - 0.002) : videoDelaySec;
                                             if ('playoutDelayHint' in evt.receiver) {
                                                 evt.receiver.playoutDelayHint = delaySec;
                                             }
@@ -797,6 +812,31 @@ class XboxBridge(
                         }
                     }
 
+                    function ensureFortniteMultiTouchClawCss() {
+                        if (document.getElementById('__cloudplay_fortnite_claw_css')) return;
+                        try {
+                            const style = document.createElement('style');
+                            style.id = '__cloudplay_fortnite_claw_css';
+                            style.textContent = 'video, canvas, #game-stream, [data-testid*="stream" i], [data-testid*="media" i], [data-testid*="touch" i] { touch-action: none !important; overscroll-behavior: none !important; user-select: none !important; -webkit-user-select: none !important; -webkit-touch-callout: none !important; -webkit-user-drag: none !important; -webkit-tap-highlight-color: transparent !important; }';
+                            (document.head || document.documentElement).appendChild(style);
+                        } catch(e) {}
+                    }
+
+                    function tryAutoBypassFortniteControllerModal() {
+                        if (!isFortniteSession() || location.href.indexOf('/launch/') === -1) return;
+                        try {
+                            const buttons = document.querySelectorAll('button, [role="button"]');
+                            for (let i = 0; i < buttons.length; i++) {
+                                const b = buttons[i];
+                                const t = ((b.innerText || b.textContent || '') + ' ' + (b.getAttribute('aria-label') || '')).toLowerCase();
+                                if (t.includes('continue anyway') || t.includes('tiếp tục') || t.includes('play with touch') || t.includes('chơi bằng cảm ứng')) {
+                                    b.click();
+                                    break;
+                                }
+                            }
+                        } catch(e) {}
+                    }
+
                     function optimizeVideoElementLowLatency(video) {
                         if (!video || video.__cpLowLatencyTuned) return;
                         video.__cpLowLatencyTuned = true;
@@ -804,6 +844,10 @@ class XboxBridge(
                             video.playsInline = true;
                             if ('disablePictureInPicture' in video) video.disablePictureInPicture = true;
                             if ('disableRemotePlayback' in video) video.disableRemotePlayback = true;
+                            video.style.touchAction = 'none';
+                            video.style.userSelect = 'none';
+                            video.style.webkitUserSelect = 'none';
+                            ensureFortniteMultiTouchClawCss();
                         } catch(e) {}
                     }
 
@@ -814,13 +858,17 @@ class XboxBridge(
                             checkRegionLockDomState();
                         }
                         const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
-                        if (isLaunchPage && !notifiedStreamConnection) {
-                            const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
-                            if (video) {
-                                optimizeVideoElementLowLatency(video);
-                                if ((video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
-                                    notifiedStreamConnection = true;
-                                    notify('onStreamConnected', 'video_active');
+                        if (isLaunchPage) {
+                            ensureFortniteMultiTouchClawCss();
+                            if (!notifiedStreamConnection) {
+                                tryAutoBypassFortniteControllerModal();
+                                const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                                if (video) {
+                                    optimizeVideoElementLowLatency(video);
+                                    if ((video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
+                                        notifiedStreamConnection = true;
+                                        notify('onStreamConnected', 'video_active');
+                                    }
                                 }
                             }
                         }
@@ -842,15 +890,15 @@ class XboxBridge(
                     }, true);
 
                     // ==========================================
-                    // 6. Synthetic Gamepad Hook & Anti-AFK (Ultra-Low-Latency Direct Bridge)
+                    // 6. Synthetic Gamepad Hook & Anti-AFK (Ultra-Low-Latency Direct Bridge + Fortnite Native Touch Coexistence)
                     // ==========================================
                     const nowTs = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-                    let virtualGamepadActive = false;
+                    let virtualGamepadActive = !!window.__virtualGamepadEnabled;
                     let gamepadConnectedDispatched = false;
                     const virtualGamepadState = {
                         id: "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
                         index: 0,
-                        connected: true,
+                        connected: !!window.__virtualGamepadEnabled,
                         timestamp: nowTs(),
                         mapping: "standard",
                         axes: [0, 0, 0, 0],
@@ -860,6 +908,7 @@ class XboxBridge(
 
                     function ensureGamepadConnectedEvent() {
                         virtualGamepadActive = true;
+                        virtualGamepadState.connected = true;
                         if (!gamepadConnectedDispatched) {
                             gamepadConnectedDispatched = true;
                             try {
@@ -869,6 +918,33 @@ class XboxBridge(
                             } catch (e) {}
                         }
                     }
+
+                    window.__setVirtualGamepadEnabled = function(enabled) {
+                        const isEn = !!enabled;
+                        window.__virtualGamepadEnabled = isEn;
+                        if (isEn) {
+                            ensureGamepadConnectedEvent();
+                        } else {
+                            // Disconnect synthetic gamepad so Fortnite Native Epic Touch Controls activate cleanly without controller conflict
+                            virtualGamepadActive = false;
+                            virtualGamepadState.connected = false;
+                            for (let i = 0; i < 4; i++) virtualGamepadState.axes[i] = 0;
+                            for (let b = 0; b < 17; b++) {
+                                virtualGamepadState.buttons[b].pressed = false;
+                                virtualGamepadState.buttons[b].touched = false;
+                                virtualGamepadState.buttons[b].value = 0;
+                            }
+                            virtualGamepadState.timestamp = nowTs();
+                            if (gamepadConnectedDispatched) {
+                                gamepadConnectedDispatched = false;
+                                try {
+                                    const evt = new Event('gamepaddisconnected');
+                                    evt.gamepad = virtualGamepadState;
+                                    window.dispatchEvent(evt);
+                                } catch (e) {}
+                            }
+                        }
+                    };
 
                     window.__cpBtn = function(idx, pressed, analogVal) {
                         if (idx >= 0 && idx < 17) {
@@ -916,7 +992,7 @@ class XboxBridge(
                     // Anti-AFK Keep-Alive trigger
                     if ($antiAfk) {
                         setInterval(function() {
-                            if (location.href.indexOf('/play/launch/') !== -1) {
+                            if (location.href.indexOf('/play/launch/') !== -1 && (window.__virtualGamepadEnabled || virtualGamepadActive)) {
                                 virtualGamepadState.timestamp = nowTs();
                             }
                         }, 180000);
@@ -934,9 +1010,12 @@ class XboxBridge(
                                     break;
                                 }
                             }
+                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
                             if (!physPad) {
-                                list[0] = virtualGamepadState;
-                            } else if (virtualGamepadActive) {
+                                if (shouldExposeVirtual) {
+                                    list[0] = virtualGamepadState;
+                                }
+                            } else if (shouldExposeVirtual) {
                                 // Hybrid merge: allow on-screen virtual buttons/sticks to work even while a physical pad is connected
                                 const mergedButtons = [];
                                 for (let b = 0; b < 17; b++) {

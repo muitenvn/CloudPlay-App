@@ -39,35 +39,35 @@ object GameOptimizationRepository {
     val FORTNITE_PROFILE = GameOptimizationProfile(
         gameId = "fortnite",
         title = "FORTNITE BATTLE ROYALE",
-        subtitle = "Tối ưu độc quyền: Hỗ trợ 60–120 FPS • Free 100% • Epic Touch Cảm Ứng • Zero-Delay",
-        subtitleEn = "Exclusive Tuning: 60–120 FPS Ready • 100% Free • Native Epic Touch • Zero-Delay",
+        subtitle = "Tối ưu độc quyền: Đệm 8ms Zero-Delay • 120 FPS SDP • Âm thanh bước chân 128kbps • Chuyển nhanh Epic Touch / FPS Pro",
+        subtitleEn = "Exclusive Tuning: 8ms Zero-Delay Buffer • 120 FPS SDP • 128kbps Footsteps Audio • Instant Epic Touch / FPS Pro Switch",
         bannerResId = R.drawable.fortnite_cloud_poster_1791719536404,
         primaryAccentHex = 0xFF0074E4, // Fortnite Electric Blue
         secondaryAccentHex = 0xFF9C27B0, // Epic Purple
-        badge = "TỐI ƯU ĐỘC QUYỀN FORTNITE • 120 FPS",
-        badgeEn = "FORTNITE EXCLUSIVE • 120 FPS",
+        badge = "⚡ TỐI ƯU ĐỘC QUYỀN FORTNITE • 120 FPS",
+        badgeEn = "⚡ FORTNITE ARENA EXCLUSIVE • 120 FPS",
         isFreeToPlay = true,
         recommendedFps = "60–120 FPS",
         nativeTouchSupport = true,
-        loadingQuote = "Nhảy dù Battle Bus • Loot súng huyền thoại • Giành Victory Royale! 👑",
-        loadingQuoteEn = "Drop from the Battle Bus • Loot legendary gear • Claim Victory Royale! 👑",
+        loadingQuote = "Nhảy dù Battle Bus • Xây tường 0ms • Giành Victory Royale! 👑",
+        loadingQuoteEn = "Drop from the Battle Bus • Zero-delay builds • Claim Victory Royale! 👑",
         tips = listOf(
-            "Fortnite trên Xbox Cloud hỗ trợ chế độ 120 FPS (trên phần cứng máy chủ Xbox Series X)! Bạn có thể bật 120 FPS Mode trong phần Cài đặt Video của Fortnite.",
-            "Fortnite là game MIỄN PHÍ 100% trên Xbox Cloud, không cần mua gói Game Pass Ultimate!",
-            "Game hỗ trợ phím cảm ứng riêng của Epic Games. Bạn có thể bấm biểu tượng 🎮 trên Game Bar để ẩn tay cầm ảo nếu dùng cảm ứng của game.",
-            "Chế độ Direct Network Bypass giữ ping dưới 30ms, giúp bắn shotgun và xây nhà không bị delay phản xạ."
+            "Đã kích hoạt Đệm 8ms Arena Zero-Delay & thương lượng luồng 120 FPS trực tiếp với máy chủ Xbox Series X cho Fortnite!",
+            "Mở Game Bar để chuyển 1 chạm giữa [👆 Cảm ứng Epic] (ngắt tay cầm ảo để hiện HUD xây nhà/bắn súng gốc của Epic) và [🎮 Tay cầm FPS Pro] (cần ngắm phải lớn +15%).",
+            "Âm thanh Opus 128kbps CBR + In-Band FEC đã được bật riêng cho Fortnite giúp nghe rõ tiếng bước chân, tiếng mở rương và hướng tiếng súng.",
+            "Lớp cảm ứng Claw 4 ngón chống trễ đã được kích hoạt để xây nhà, sửa tường (Edit) và vẩy Shotgun mượt tối đa."
         ),
         tipsEn = listOf(
-            "Fortnite on Xbox Cloud supports 120 FPS Mode on Xbox Series X server blades! Enable 120 FPS Mode inside Fortnite Video Settings.",
-            "Fortnite is 100% FREE to play on Xbox Cloud Gaming — no Game Pass Ultimate subscription required!",
-            "Native Epic touch controls are supported. Toggle the virtual gamepad off in the HUD if you prefer native touch.",
-            "Direct Network Bypass keeps latency ultra-low for instant building and shotgun reflexes."
+            "8ms Arena Zero-Delay playout buffer & 120 FPS SDP negotiation are active for Fortnite on Xbox Series X blades!",
+            "Open the HUD Game Bar to switch in 1 tap between [👆 Epic Native Touch] (cleanly hides virtual gamepad so Epic's touch HUD appears) and [🎮 FPS Pro Pad] (+15% Right Stick).",
+            "128kbps CBR Stereo Opus with In-Band FEC is active for crystal-clear footsteps, chest cues, and directional gunfire.",
+            "4-Finger Claw zero-delay multi-touch protection is enabled for responsive building, wall editing, and shotgun flicks."
         ),
         checklist = listOf(
-            OptimizationCheckItem("Máy chủ thi đấu", "Định tuyến xCloud Tokyo/Singapore (<30ms)", true, "Arena Server", "xCloud Tokyo/Singapore routing (<30ms)"),
-            OptimizationCheckItem("Tần số khung hình", "Đồng bộ màn hình 60–120Hz (Hỗ trợ 120 FPS Mode)", true, "Frame Rate", "60–120Hz display sync (120 FPS Mode ready)"),
-            OptimizationCheckItem("Chế độ điều khiển", "Hỗ trợ kép: Touch Epic Controls + Gamepad", true, "Input Mode", "Dual support: Native Epic Touch + Gamepad"),
-            OptimizationCheckItem("Tối ưu phản xạ", "Kích hoạt Low-Latency Shooter Preset 60–120FPS", true, "Reflex Tuning", "Low-Latency Shooter Preset 60–120FPS active")
+            OptimizationCheckItem("Đệm khung hình 8ms", "WebRTC Playout 8ms + 120Hz SDP Series X", true, "8ms Frame Buffer", "8ms WebRTC Playout + 120Hz Series X SDP"),
+            OptimizationCheckItem("Chuyển đổi điều khiển", "Tự động nhường HUD Cảm ứng Epic hoặc bật FPS Pro", true, "Smart Input Switch", "Clean Epic Native Touch or FPS Pro Pad (+15% Aim)"),
+            OptimizationCheckItem("Âm thanh bước chân", "Opus 128kbps CBR Stereo định hướng tiếng chân/súng", true, "Footsteps Audio", "Opus 128kbps CBR Stereo directional footsteps"),
+            OptimizationCheckItem("Cảm ứng Claw 4 ngón", "Chống trễ đa điểm khi xây nhà & vẩy tâm", true, "4-Finger Claw Touch", "Zero-delay multi-touch for fast builds & edits")
         )
     )
 

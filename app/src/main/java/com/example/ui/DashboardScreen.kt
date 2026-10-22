@@ -548,6 +548,7 @@ private fun ConsoleFloatingNavigationDock(
                             shape = RoundedCornerShape(16.dp)
                         )
                         .clickable { onSelectTab(tab) }
+                        .testTag("nav_tab_${tab.name.lowercase()}")
                         .padding(vertical = 8.dp, horizontal = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {

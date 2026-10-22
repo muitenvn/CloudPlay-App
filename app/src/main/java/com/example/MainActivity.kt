@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
         VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
         GameLibraryRepository.init(applicationContext)
+        com.example.data.SessionHistoryRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
 

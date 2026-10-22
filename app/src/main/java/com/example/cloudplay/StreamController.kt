@@ -47,17 +47,35 @@ class StreamController(private val context: Context) {
     private var countdownJob: Job? = null
     private var bannerDismissJob: Job? = null
     private var launchFallbackJob: Job? = null
+    private var sessionSampleJob: Job? = null
+
+    private var sessionStartTimeMillis: Long = 0L
+    private var sessionPingSum: Long = 0L
+    private var sessionPingCount: Int = 0
+    private var sessionFpsSum: Long = 0L
+    private var sessionFpsCount: Int = 0
+    private var sessionDecodeSum: Double = 0.0
+    private var sessionDecodeCount: Int = 0
+    private var sessionThermalHot: Boolean = false
+    private val sessionPingSamples = mutableListOf<Int>()
+
+    init {
+        com.example.data.SessionHistoryRepository.init(context)
+    }
 
     /**
      * Cancels active coroutines when WebView or Activity is destroyed to prevent memory leaks.
      */
     fun release() {
+        finalizeActiveSessionIfNeeded()
         countdownJob?.cancel()
         countdownJob = null
         bannerDismissJob?.cancel()
         bannerDismissJob = null
         launchFallbackJob?.cancel()
         launchFallbackJob = null
+        sessionSampleJob?.cancel()
+        sessionSampleJob = null
         scope.cancel()
         scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     }
@@ -71,9 +89,22 @@ class StreamController(private val context: Context) {
             launchFallbackJob?.cancel()
             countdownJob?.cancel()
 
+            val existingTitle = _uiState.value.gameTitle
+            val isIncomingGeneric = title.isBlank() ||
+                title.equals("Xbox Cloud Game", ignoreCase = true) ||
+                title.equals("Xbox Game", ignoreCase = true)
+            val resolvedTitle = if (isIncomingGeneric && !existingTitle.isNullOrBlank() &&
+                !existingTitle.equals("Xbox Cloud Game", ignoreCase = true) &&
+                !existingTitle.equals("Xbox Game", ignoreCase = true)
+            ) {
+                existingTitle
+            } else {
+                com.example.data.SessionHistoryRepository.resolveCleanGameTitle(title, _uiState.value.currentUrl)
+            }
+
             _uiState.value = _uiState.value.copy(
                 isGameActive = true,
-                gameTitle = title,
+                gameTitle = resolvedTitle,
                 isStreamConnected = false,
                 autoBypassTriggered = false
             )
@@ -115,11 +146,20 @@ class StreamController(private val context: Context) {
             launchFallbackJob?.cancel()
             launchFallbackJob = null
 
+            if (sessionStartTimeMillis == 0L) {
+                startSessionTracking()
+            }
+
             if (_uiState.value.isStreamConnected && _uiState.value.autoBypassTriggered) return@launch
 
+            val updatedTitle = com.example.data.SessionHistoryRepository.resolveCleanGameTitle(
+                _uiState.value.gameTitle,
+                _uiState.value.currentUrl
+            )
             _uiState.value = _uiState.value.copy(
                 isStreamConnected = true,
-                isGameActive = true
+                isGameActive = true,
+                gameTitle = updatedTitle
             )
 
             val config = SettingsRepository.config.value
@@ -149,11 +189,144 @@ class StreamController(private val context: Context) {
         scope.launch {
             launchFallbackJob?.cancel()
             launchFallbackJob = null
+            finalizeActiveSessionIfNeeded()
             _uiState.value = _uiState.value.copy(
                 isStreamConnected = false,
                 isGameActive = false
             )
         }
+    }
+
+    private fun startSessionTracking() {
+        sessionSampleJob?.cancel()
+        sessionStartTimeMillis = System.currentTimeMillis()
+        sessionPingSum = 0L
+        sessionPingCount = 0
+        sessionFpsSum = 0L
+        sessionFpsCount = 0
+        sessionDecodeSum = 0.0
+        sessionDecodeCount = 0
+        sessionThermalHot = checkDeviceThermalModerateOrHigher()
+        sessionPingSamples.clear()
+
+        // Take initial sample and then sample every 5 seconds (up to 60 samples)
+        sessionSampleJob = scope.launch {
+            while (true) {
+                captureTelemetrySample()
+                delay(5000)
+            }
+        }
+    }
+
+    private fun captureTelemetrySample() {
+        val t = NetworkOptimizer.telemetry.value
+        val vpn = VpnManager.state.value
+        val ping = when {
+            t.rttMs > 0 -> t.rttMs
+            vpn.mode == NetworkMode.DIRECT_NETWORK -> vpn.directLatencyMs ?: vpn.latencyMs ?: 0
+            else -> vpn.latencyMs ?: 0
+        }
+        if (ping > 0) {
+            sessionPingSum += ping
+            sessionPingCount += 1
+            if (sessionPingSamples.size >= 60) {
+                sessionPingSamples.removeAt(0)
+            }
+            sessionPingSamples.add(ping)
+        }
+        if (t.fps > 0) {
+            sessionFpsSum += t.fps
+            sessionFpsCount += 1
+        }
+        if (t.decodeTimeMs > 0.0) {
+            sessionDecodeSum += t.decodeTimeMs
+            sessionDecodeCount += 1
+        }
+        if (!sessionThermalHot && checkDeviceThermalModerateOrHigher()) {
+            sessionThermalHot = true
+        }
+    }
+
+    private fun checkDeviceThermalModerateOrHigher(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+        return try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            (pm?.currentThermalStatus ?: 0) >= android.os.PowerManager.THERMAL_STATUS_MODERATE
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun finalizeActiveSessionIfNeeded() {
+        val startMs = sessionStartTimeMillis
+        if (startMs <= 0L) return
+        sessionStartTimeMillis = 0L
+        sessionSampleJob?.cancel()
+        sessionSampleJob = null
+
+        val nowMs = System.currentTimeMillis()
+        val durationSec = ((nowMs - startMs) / 1000L).coerceAtLeast(0L)
+        if (durationSec < 30L) {
+            sessionPingSamples.clear()
+            return
+        }
+
+        // Capture one last sample if none were recorded yet
+        if (sessionPingCount == 0 && sessionFpsCount == 0 && sessionDecodeCount == 0) {
+            captureTelemetrySample()
+        }
+
+        val vpn = VpnManager.state.value
+        val fallbackPing = if (vpn.mode == NetworkMode.DIRECT_NETWORK) {
+            vpn.directLatencyMs ?: vpn.latencyMs ?: 0
+        } else {
+            vpn.latencyMs ?: 0
+        }
+        val avgPing = if (sessionPingCount > 0) {
+            (sessionPingSum / sessionPingCount).toInt()
+        } else {
+            fallbackPing.coerceAtLeast(0)
+        }
+        val avgFps = if (sessionFpsCount > 0) {
+            (sessionFpsSum / sessionFpsCount).toInt()
+        } else {
+            NetworkOptimizer.telemetry.value.fps.let { if (it > 0) it else 60 }
+        }
+        val rawAvgDecode = if (sessionDecodeCount > 0) {
+            sessionDecodeSum / sessionDecodeCount
+        } else {
+            NetworkOptimizer.telemetry.value.decodeTimeMs
+        }
+        val avgDecode = ((rawAvgDecode * 10.0).toInt()) / 10.0
+        val samplesSnapshot = if (sessionPingSamples.isNotEmpty()) {
+            sessionPingSamples.takeLast(60)
+        } else if (avgPing > 0) {
+            listOf(avgPing)
+        } else {
+            emptyList()
+        }
+        sessionPingSamples.clear()
+
+        val resolvedGameTitle = com.example.data.SessionHistoryRepository.resolveCleanGameTitle(
+            _uiState.value.gameTitle,
+            _uiState.value.currentUrl
+        )
+
+        val record = com.example.data.PlaySessionRecord(
+            id = "sess_${startMs}",
+            gameTitle = resolvedGameTitle,
+            startTimeMillis = startMs,
+            durationSeconds = durationSec,
+            serverName = vpn.currentServer.name,
+            isDirectNetwork = vpn.mode == NetworkMode.DIRECT_NETWORK,
+            avgPingMs = avgPing,
+            avgFps = avgFps,
+            avgDecodeMs = avgDecode,
+            isSlowDecode = avgDecode > 12.0,
+            isThermalHot = sessionThermalHot,
+            pingSamples = samplesSnapshot
+        )
+        com.example.data.SessionHistoryRepository.recordSession(record)
     }
 
     fun onUrlChanged(url: String) {
@@ -165,11 +338,16 @@ class StreamController(private val context: Context) {
             _uiState.value = _uiState.value.copy(currentUrl = url)
 
             if (!wasInLaunch && nowInLaunch) {
-                onGameLaunchInitiated("Xbox Cloud Game")
+                val resolvedTitle = com.example.data.SessionHistoryRepository.resolveCleanGameTitle(
+                    _uiState.value.gameTitle,
+                    url
+                )
+                onGameLaunchInitiated(resolvedTitle)
             } else if (wasInLaunch && !nowInLaunch) {
                 // Player exited running game stream back to catalog/home
                 launchFallbackJob?.cancel()
                 countdownJob?.cancel()
+                finalizeActiveSessionIfNeeded()
                 _uiState.value = _uiState.value.copy(
                     isGameActive = false,
                     isStreamConnected = false,

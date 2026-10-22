@@ -7,7 +7,7 @@
 
     <!-- Navigation Tabs -->
     <string name="tab_home">Trang chủ</string>
-    <string name="tab_library">Thư viện</string>
+    <string name="tab_library">Game</string>
     <string name="tab_servers">Máy chủ</string>
     <string name="tab_settings">Cài đặt</string>
 

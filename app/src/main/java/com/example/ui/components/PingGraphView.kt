@@ -140,68 +140,82 @@ fun PingVisualizerCard(
             val strokeColor = if (mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed
             val sampleData = if (history.isEmpty()) listOf(130, 125, 120, 115, 30, 28, 26, 25) else history
 
-            Canvas(
+            PingSparklineChart(
+                samples = sampleData,
+                strokeColor = strokeColor,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.25f))
-            ) {
-                val paddingPx = 8.dp.toPx()
-                val effectiveWidth = (size.width - 2 * paddingPx).coerceAtLeast(1f)
-                val height = size.height
-                if (sampleData.size < 2) return@Canvas
+            )
+        }
+    }
+}
 
-                val maxVal = (sampleData.maxOrNull() ?: 150).coerceAtLeast(100).toFloat()
-                val minVal = (sampleData.minOrNull() ?: 20).coerceAtMost(20).toFloat()
-                val range = (maxVal - minVal).coerceAtLeast(1f)
+@Composable
+fun PingSparklineChart(
+    samples: List<Int>,
+    strokeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black.copy(alpha = 0.25f))
+    ) {
+        val paddingPx = 8.dp.toPx()
+        val effectiveWidth = (size.width - 2 * paddingPx).coerceAtLeast(1f)
+        val height = size.height
+        if (samples.isEmpty()) return@Canvas
 
-                val stepX = effectiveWidth / (sampleData.size - 1)
-                val path = Path()
-                val fillPath = Path()
+        val dataPoints = if (samples.size == 1) listOf(samples[0], samples[0]) else samples
+        val maxVal = (dataPoints.maxOrNull() ?: 150).coerceAtLeast(100).toFloat()
+        val minVal = (dataPoints.minOrNull() ?: 20).coerceAtMost(20).toFloat()
+        val range = (maxVal - minVal).coerceAtLeast(1f)
 
-                sampleData.forEachIndexed { index, value ->
-                    val x = paddingPx + index * stepX
-                    val normalizedY = (value - minVal) / range
-                    val y = height - (normalizedY * (height * 0.7f) + height * 0.15f)
+        val stepX = effectiveWidth / (dataPoints.size - 1)
+        val path = Path()
+        val fillPath = Path()
 
-                    if (index == 0) {
-                        path.moveTo(x, y)
-                        fillPath.moveTo(x, height)
-                        fillPath.lineTo(x, y)
-                    } else {
-                        path.lineTo(x, y)
-                        fillPath.lineTo(x, y)
-                    }
-                }
+        dataPoints.forEachIndexed { index, value ->
+            val x = paddingPx + index * stepX
+            val normalizedY = (value - minVal) / range
+            val y = height - (normalizedY * (height * 0.7f) + height * 0.15f)
 
-                val lastX = paddingPx + effectiveWidth
-                fillPath.lineTo(lastX, height)
-                fillPath.close()
-
-                // Draw gradient fill
-                drawPath(
-                    path = fillPath,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(strokeColor.copy(alpha = 0.35f), Color.Transparent),
-                        startY = 0f,
-                        endY = height
-                    )
-                )
-
-                // Draw stroke
-                drawPath(
-                    path = path,
-                    color = strokeColor,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                )
-
-                // Highlight latest point safely without edge clipping
-                val lastVal = sampleData.last()
-                val lastY = height - (((lastVal - minVal) / range) * (height * 0.7f) + height * 0.15f)
-                drawCircle(color = strokeColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
-                drawCircle(color = Color.White, radius = 2.dp.toPx(), center = Offset(lastX, lastY))
+            if (index == 0) {
+                path.moveTo(x, y)
+                fillPath.moveTo(x, height)
+                fillPath.lineTo(x, y)
+            } else {
+                path.lineTo(x, y)
+                fillPath.lineTo(x, y)
             }
         }
+
+        val lastX = paddingPx + effectiveWidth
+        fillPath.lineTo(lastX, height)
+        fillPath.close()
+
+        // Draw gradient fill
+        drawPath(
+            path = fillPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(strokeColor.copy(alpha = 0.35f), Color.Transparent),
+                startY = 0f,
+                endY = height
+            )
+        )
+
+        // Draw stroke
+        drawPath(
+            path = path,
+            color = strokeColor,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Highlight latest point safely without edge clipping
+        val lastVal = dataPoints.last()
+        val lastY = height - (((lastVal - minVal) / range) * (height * 0.7f) + height * 0.15f)
+        drawCircle(color = strokeColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
+        drawCircle(color = Color.White, radius = 2.dp.toPx(), center = Offset(lastX, lastY))
     }
 }

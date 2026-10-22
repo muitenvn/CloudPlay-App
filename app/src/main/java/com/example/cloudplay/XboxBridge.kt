@@ -208,10 +208,11 @@ class XboxBridge(
                                     if (r && r.track) {
                                         if (r.track.kind === 'video') {
                                             if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
-                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal;
+                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal * 1000.0;
                                         } else if (r.track.kind === 'audio') {
                                             const audioSec = Math.max(0.008, secVal - 0.002);
                                             if ('playoutDelayHint' in r) r.playoutDelayHint = audioSec;
+                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = audioSec * 1000.0;
                                         }
                                     }
                                 }
@@ -468,11 +469,11 @@ class XboxBridge(
                                             const isHigh = !isLowEndMode && activeMbps > 10 && activeMbps <= 15;
                                             const targetKbps = isLowEndMode ? 5000 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 6000 : 3500), 20000);
 
-                                            // Video bandwidth limit (+ 120 FPS negotiation for Fortnite on Xbox Series X blades, or 60 FPS in lowEndDeviceMode)
+                                            // Video bandwidth limit (+ 120 FPS negotiation for Fortnite only when High/Ultra >= 14 Mbps and not lowEndDeviceMode)
                                             if (isLowEndMode) {
                                                 sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:5000\r\na=framerate:60\r\n');
                                                 if (window.__pauseTranslator) window.__pauseTranslator();
-                                            } else if (isFortnite) {
+                                            } else if (isFortnite && activeMbps >= 14) {
                                                 sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:120\r\n');
                                             } else {
                                                 sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
@@ -514,7 +515,7 @@ class XboxBridge(
                                                 evt.receiver.playoutDelayHint = delaySec;
                                             }
                                             if ('jitterBufferTarget' in evt.receiver) {
-                                                evt.receiver.jitterBufferTarget = delaySec;
+                                                evt.receiver.jitterBufferTarget = delaySec * 1000.0;
                                             }
                                         }
                                     } catch(trackErr) {}
@@ -528,6 +529,10 @@ class XboxBridge(
                                             window.__activeStatsIntervalId = null;
                                         }
                                         statsIntervalId = null;
+                                    }
+                                    if (window.__bufferGlideTimer !== null && window.__bufferGlideTimer !== undefined) {
+                                        clearInterval(window.__bufferGlideTimer);
+                                        window.__bufferGlideTimer = null;
                                     }
                                 }
 

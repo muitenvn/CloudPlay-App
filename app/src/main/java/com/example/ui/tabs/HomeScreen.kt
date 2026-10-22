@@ -1,5 +1,6 @@
 package com.example.ui.tabs
 
+import android.content.Context
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -29,20 +30,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.RocketLaunch
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,12 +50,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -75,7 +75,6 @@ import com.example.ui.components.GuideSection
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.EpicBlue
 import com.example.ui.theme.GoldStar
-import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
@@ -92,6 +91,9 @@ import com.example.vpn.NetworkMode
 import com.example.vpn.VpnConnectionState
 import com.example.vpn.VpnEngine
 
+private const val RECENT_GAME_PREFS = "cloudplay_recent_game_prefs"
+private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
+
 @Composable
 fun HomeScreen(
     vpnState: VpnConnectionState,
@@ -107,6 +109,24 @@ fun HomeScreen(
     onOpenTranslator: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val recentPrefs = remember(context) {
+        context.getSharedPreferences(RECENT_GAME_PREFS, Context.MODE_PRIVATE)
+    }
+    var lastPlayedId by remember {
+        mutableStateOf(recentPrefs.getString(KEY_LAST_PLAYED_ID, null))
+    }
+
+    val recordAndLaunch: (GameBookmark) -> Unit = { game ->
+        recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, game.id).apply()
+        lastPlayedId = game.id
+        onLaunchGame(game.playUrl)
+    }
+
+    val lastPlayedGame = remember(lastPlayedId, featuredGames) {
+        lastPlayedId?.let { id -> featuredGames.find { it.id == id } }
+    }
+
     val scrollState = rememberScrollState()
 
     Column(
@@ -114,37 +134,34 @@ fun HomeScreen(
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 1. Hero Quick Play Deck 2.0 (Next-Gen Xbox Series X / ROG Console Showcase)
+        // 1. Banner chính: nút vào Xbox, nút Fortnite và 3 chip nhanh
         HeroConsolePlayDeck(
             vpnState = vpnState,
             gamepadStatus = gamepadStatus,
             onOpenXboxCloud = onOpenXboxCloud,
             onLaunchFortnite = {
-                onLaunchGame("https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2")
+                val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
+                recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
+                lastPlayedId = "fortnite"
+                onLaunchGame(fortniteUrl)
             },
             onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
         )
 
-        // 2. Tactical Hardware & Network Cockpit 2.0 (2-Stage Pipeline + Engine Selector + Controller Telemetry)
+        // 2. Hàng trạng thái mạng nhỏ gọn: tên máy chủ + ping + nút bật/tắt VPN
         QuickNetworkCockpitCard(
             vpnState = vpnState,
-            gamepadStatus = gamepadStatus,
             onConnectVpn = onConnectVpn,
-            onDisconnectVpn = onDisconnectVpn,
-            onSwitchEngine = onSwitchEngine
+            onDisconnectVpn = onDisconnectVpn
         )
 
-        // 3. Smart Gaming Translator Deck 2.0 (Live Preview + Immunity Shield Badges)
-        SmartTranslatorHomeCard(
-            onOpenTranslator = onOpenTranslator
-        )
-
-        // 4. Featured Games Vault Carousel (1-Tap Cloud Stream Launch)
+        // 3. Mục Game nổi bật + nút "Chơi tiếp" cho game vừa chơi gần nhất
         FeaturedGamesSection(
             featuredGames = featuredGames,
-            onLaunchGame = onLaunchGame,
+            lastPlayedGame = lastPlayedGame,
+            onLaunchBookmark = recordAndLaunch,
             onNavigateToLibrary = onNavigateToLibrary
         )
 
@@ -194,61 +211,40 @@ private fun HeroConsolePlayDeck(
             )
             .testTag("hero_console_play_deck"),
         colors = CardDefaults.cardColors(containerColor = XboxSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            // Background Art: AAA Xbox Cloud artwork
             Image(
                 painter = painterResource(id = R.drawable.gamepass_hub_banner_1791394609676),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(274.dp)
+                    .height(256.dp)
             )
 
-            // Bottom-up Dark Gradient Overlay so text at bottom is crisp and doesn't clash with upper banner art
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(274.dp)
+                    .height(256.dp)
                     .background(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color(0x1A040806),
-                                0.30f to Color(0x99050A07),
-                                0.55f to Color(0xEB060B08),
-                                0.82f to Color(0xFA070D0A),
+                                0.35f to Color(0xA6050A07),
+                                0.65f to Color(0xEB060B08),
                                 1.0f to XboxSurface
                             )
                         )
                     )
             )
 
-            // Subtle Radial Emerald Spotlight
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(274.dp)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                XboxNeonGreen.copy(alpha = 0.12f),
-                                Color.Transparent
-                            ),
-                            radius = 520f
-                        )
-                    )
-            )
-
-            // Content Layer
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Top Status Ribbon (Clean, no fake FPS badge)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -288,7 +284,7 @@ private fun HeroConsolePlayDeck(
                                 text = when (vpnState.mode) {
                                     NetworkMode.DIRECT_NETWORK -> if (isEn) "Direct Net" else "Mạng trực tiếp"
                                     NetworkMode.VPN_JAPAN -> if (isEn) "Unlocked ${vpnState.currentServer.flag}" else "Mở vùng ${vpnState.currentServer.flag}"
-                                    NetworkMode.DISCONNECTED -> if (isEn) "Auto Bypass" else "Tự ngắt VPN"
+                                    NetworkMode.DISCONNECTED -> if (isEn) "Auto VPN" else "Tự tắt VPN"
                                 },
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -318,21 +314,17 @@ private fun HeroConsolePlayDeck(
                     }
                 }
 
-                // Spacer pushes headline down onto the dark bottom gradient away from upper image art
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Hero Headline & Single Short Subtitle Sentence
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = stringResource(R.string.hero_title),
                         color = TextPrimary,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 21.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
-                        letterSpacing = (-0.3).sp,
                         maxLines = 1
                     )
-
                     Text(
                         text = stringResource(R.string.hero_subtitle),
                         color = Color(0xFFD6EAE0),
@@ -342,111 +334,69 @@ private fun HeroConsolePlayDeck(
                     )
                 }
 
-                // Dual Launch Buttons (Short 2-word labels, never truncated with ellipsis)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Primary Launch Button: Xbox Cloud Gaming
                     Button(
                         onClick = onOpenXboxCloud,
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
+                            .height(48.dp)
                             .testTag("hero_launch_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxGreen,
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape)
-                                    .background(XboxNeonGreen.copy(alpha = 0.25f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column(horizontalAlignment = Alignment.Start) {
-                                Text(
-                                    text = stringResource(R.string.btn_launch_xcloud),
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = "Xbox Cloud",
-                                    color = XboxNeonGreen,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.btn_launch_xcloud),
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1
+                        )
                     }
 
-                    // Secondary Launch Button: Fortnite Free
                     Button(
                         onClick = onLaunchFortnite,
                         modifier = Modifier
                             .weight(1f)
-                            .height(50.dp)
+                            .height(48.dp)
                             .testTag("hero_launch_fortnite_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EpicBlue,
                             contentColor = Color.White
                         ),
                         shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = null,
-                                tint = GoldStar,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column(horizontalAlignment = Alignment.Start) {
-                                Text(
-                                    text = stringResource(R.string.btn_play_fortnite),
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    text = if (config.isEnglishUI()) "Free to Play" else "Miễn phí",
-                                    color = Color(0xFFB3E5FC),
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = GoldStar,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.btn_play_fortnite),
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1
+                        )
                     }
                 }
 
-                // Active Capabilities Strip (Short 2-word labels so nothing gets cut off)
                 val isEn = config.isEnglishUI()
                 val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
                 val graphicsShort = when (config.cellularMode) {
@@ -522,10 +472,8 @@ private fun HeroCapabilityChip(
 @Composable
 private fun QuickNetworkCockpitCard(
     vpnState: VpnConnectionState,
-    gamepadStatus: GamepadStatus,
     onConnectVpn: () -> Unit,
-    onDisconnectVpn: () -> Unit,
-    onSwitchEngine: (VpnEngine) -> Unit
+    onDisconnectVpn: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
@@ -536,317 +484,99 @@ private fun QuickNetworkCockpitCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .border(
                 1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        XboxCardBorder,
-                        if (isConnected) XboxNeonGreen.copy(alpha = 0.45f) else XboxCardBorder,
-                        XboxCardBorder
-                    )
-                ),
-                RoundedCornerShape(20.dp)
+                if (isConnected) XboxNeonGreen.copy(alpha = 0.45f) else XboxCardBorder,
+                RoundedCornerShape(16.dp)
             )
             .testTag("network_cockpit_card"),
         colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Row 1: Cockpit Header (weight 1f so right badge never overlaps or squishes)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(XboxNeonGreen.copy(alpha = 0.22f), DirectCyan.copy(alpha = 0.14f))
-                                )
-                            )
-                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.45f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Public,
-                            contentDescription = null,
-                            tint = XboxNeonGreen,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            text = stringResource(R.string.cockpit_title),
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            maxLines = 1
-                        )
-                    }
-                }
+                Text(text = vpnState.currentServer.flag, fontSize = 18.sp)
+                Text(
+                    text = vpnState.currentServer.name,
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
 
-                // Right Status / Ping Pill (Fixed height, never squished vertically)
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (hasPing) DirectCyan.copy(alpha = 0.12f) else XboxSurfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (hasPing) DirectCyan.copy(alpha = 0.14f) else XboxSurfaceVariant,
                     border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (hasPing) DirectCyan.copy(alpha = 0.55f) else XboxCardBorder
+                        0.8.dp,
+                        if (hasPing) DirectCyan.copy(alpha = 0.5f) else XboxCardBorder
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Speed,
                             contentDescription = null,
                             tint = if (hasPing) DirectCyan else XboxNeonGreen,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                         Text(
-                            text = if (hasPing) "${directPing} ms" else if (isEn) "Ready" else "Sẵn sàng",
+                            text = if (hasPing) "${directPing}ms" else if (isEn) "Ready" else "Sẵn sàng",
                             color = if (hasPing) DirectCyan else XboxNeonGreen,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-
-            // Row 2: Clean 2-Stage Summary (Mở khóa vùng • Tự ngắt VPN)
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(11.dp),
-                color = Color(0xFF08100C),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (vpnState.mode == NetworkMode.VPN_JAPAN) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.45f)
-                                )
-                        )
-                        Column {
-                            Text(
-                                text = if (isEn) "Step 1: Unlock Region" else "Bước 1: Mở khóa vùng",
-                                color = XboxNeonGreen,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isEn) "${vpnState.currentServer.flag} Quick Launch" else "${vpnState.currentServer.flag} Vào game nhanh",
-                                color = TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "➔",
-                        color = DirectCyan,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp)
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else DirectCyan.copy(alpha = 0.45f)
-                                )
-                        )
-                        Column {
-                            Text(
-                                text = if (isEn) "Step 2: Auto Disconnect" else "Bước 2: Tự ngắt VPN",
-                                color = DirectCyan,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isEn) "Direct Stream" else "Chơi mạng trực tiếp",
-                                color = TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Row 3: Quick VPN Engine Mode Selector Pills (Thông minh / Proxy / VPN)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val engineOptions = listOf(
-                    VpnEngine.SMART_BYPASS to if (isEn) "⚡ Smart" else "⚡ Thông minh",
-                    VpnEngine.PROXY_TUNNEL to "🌐 Proxy",
-                    VpnEngine.EXTERNAL_VPN to "🛡️ VPN"
-                )
-                engineOptions.forEach { (engine, label) ->
-                    val selected = vpnState.engine == engine
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(9.dp))
-                            .clickable { onSwitchEngine(engine) },
-                        shape = RoundedCornerShape(9.dp),
-                        color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant.copy(alpha = 0.6f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            0.8.dp,
-                            if (selected) XboxNeonGreen else XboxCardBorder
-                        )
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (selected) XboxNeonGreen else TextPrimary,
-                            fontSize = 10.5.sp,
-                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            maxLines = 1,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 7.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                }
-            }
-
-            // Row 4: Controller & Touch Hardware Status
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(11.dp),
-                color = Color(0xFF0A140F),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder.copy(alpha = 0.7f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Gamepad,
-                            contentDescription = null,
-                            tint = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else DirectCyan,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = if (gamepadStatus.hasPhysicalController)
-                                gamepadStatus.controllerName
-                            else
-                                stringResource(R.string.virtual_gamepad_title),
-                            color = TextPrimary,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (gamepadStatus.hasPhysicalController) XboxNeonGreen.copy(alpha = 0.16f) else DirectCyan.copy(alpha = 0.14f)
-                    ) {
-                        Text(
-                            text = if (gamepadStatus.hasPhysicalController)
-                                stringResource(R.string.controller_connected)
-                            else
-                                stringResource(R.string.controller_touch),
-                            color = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else DirectCyan,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1
                         )
                     }
                 }
             }
 
-            // Row 5: Tactile Connect / Disconnect Toggle Button
             Button(
-                onClick = {
-                    if (isConnected) onDisconnectVpn() else onConnectVpn()
-                },
+                onClick = { if (isConnected) onDisconnectVpn() else onConnectVpn() },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(44.dp)
+                    .height(36.dp)
                     .testTag("quick_vpn_toggle_button"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isConnected) XboxSurfaceElevated else XboxGreen
                 ),
-                shape = RoundedCornerShape(12.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = if (isConnected) Icons.Default.CheckCircle else Icons.Default.VpnKey,
-                        contentDescription = null,
-                        tint = if (isConnected) XboxNeonGreen else Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isConnected) stringResource(R.string.net_mode_direct) else stringResource(R.string.btn_enable_vpn),
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
-                    )
-                }
+                Icon(
+                    imageVector = if (isConnected) Icons.Default.CheckCircle else Icons.Default.VpnKey,
+                    contentDescription = null,
+                    tint = if (isConnected) XboxNeonGreen else Color.White,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    text = if (isConnected) stringResource(R.string.btn_switch_direct) else stringResource(R.string.btn_enable_vpn),
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -855,10 +585,11 @@ private fun QuickNetworkCockpitCard(
 @Composable
 private fun FeaturedGamesSection(
     featuredGames: List<GameBookmark>,
-    onLaunchGame: (String) -> Unit,
+    lastPlayedGame: GameBookmark?,
+    onLaunchBookmark: (GameBookmark) -> Unit,
     onNavigateToLibrary: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -920,12 +651,80 @@ private fun FeaturedGamesSection(
             }
         }
 
+        // Nút "Chơi tiếp" cho game vừa chơi gần nhất nếu đã có dữ liệu
+        if (lastPlayedGame != null) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { onLaunchBookmark(lastPlayedGame) }
+                    .testTag("continue_last_game_button"),
+                shape = RoundedCornerShape(14.dp),
+                color = XboxSurfaceVariant.copy(alpha = 0.92f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Gamepad,
+                            contentDescription = null,
+                            tint = DirectCyan,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Text(
+                            text = "${stringResource(R.string.btn_continue_game)}: ${lastPlayedGame.title}",
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxGreen
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.btn_continue_game),
+                                color = Color.White,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
             items(featuredGames, key = { it.id }) { game ->
-                FeaturedGameCard(game = game, onLaunch = { onLaunchGame(game.playUrl) })
+                FeaturedGameCard(game = game, onLaunch = { onLaunchBookmark(game) })
             }
         }
     }
@@ -957,7 +756,6 @@ private fun FeaturedGameCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column {
-            // Poster Art with Vignette & Floating Badges
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -990,7 +788,6 @@ private fun FeaturedGameCard(
                     }
                 }
 
-                // Bottom dark gradient scrim over image
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1002,7 +799,6 @@ private fun FeaturedGameCard(
                         )
                 )
 
-                // Top-left Badge Tag
                 if (localizedBadge != null) {
                     Surface(
                         shape = RoundedCornerShape(bottomEnd = 10.dp),
@@ -1021,7 +817,6 @@ private fun FeaturedGameCard(
                     }
                 }
 
-                // Top-right Touch icon indicator
                 if (game.supportsTouch) {
                     Surface(
                         shape = CircleShape,
@@ -1042,7 +837,6 @@ private fun FeaturedGameCard(
                 }
             }
 
-            // Game Metadata & Launch Trigger
             Column(
                 modifier = Modifier.padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1119,184 +913,3 @@ private fun FeaturedGameCard(
         }
     }
 }
-
-@Composable
-private fun SmartTranslatorHomeCard(
-    onOpenTranslator: () -> Unit
-) {
-    val config by SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
-    val isTranslateActive = config.isEffectiveTranslateEnabled()
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(XboxNeonGreen.copy(alpha = 0.55f), DirectCyan.copy(alpha = 0.55f))
-                ),
-                RoundedCornerShape(20.dp)
-            )
-            .clickable { onOpenTranslator() }
-            .testTag("home_smart_translator_card"),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = XboxNeonGreen.copy(alpha = 0.16f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.45f)),
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Translate,
-                                contentDescription = null,
-                                tint = XboxNeonGreen,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            text = if (isEn) "Auto Translator" else "Dịch tự động",
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = if (isEn) "Keep original English UI" else "Dịch game sang tiếng Việt",
-                            color = XboxNeonGreen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(7.dp),
-                    color = if (isTranslateActive) XboxNeonGreen.copy(alpha = 0.20f) else Color.DarkGray,
-                    border = androidx.compose.foundation.BorderStroke(
-                        0.8.dp,
-                        if (isTranslateActive) XboxNeonGreen.copy(alpha = 0.6f) else Color.Transparent
-                    )
-                ) {
-                    Text(
-                        text = if (isTranslateActive) {
-                            if (isEn) "Active" else "Đang bật"
-                        } else {
-                            if (isEn) "Disabled" else "Đang tắt"
-                        },
-                        color = if (isTranslateActive) XboxNeonGreen else TextSecondary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Non-technical protection badges & well-spaced "Mở bảng dịch" button
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF08100C),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = XboxSurfaceVariant.copy(alpha = 0.85f),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
-                        ) {
-                            Text(
-                                text = if (isEn) "🛡️ Keep Titles" else "🛡️ Giữ tên game",
-                                color = TextPrimary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = XboxSurfaceVariant.copy(alpha = 0.85f),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder)
-                        ) {
-                            Text(
-                                text = if (isEn) "🎮 Keep Buttons" else "🎮 Giữ nút bấm",
-                                color = TextPrimary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(9.dp),
-                        color = DirectCyan.copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(0.9.dp, DirectCyan.copy(alpha = 0.5f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "Translator" else "Mở bảng dịch",
-                                color = DirectCyan,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = DirectCyan,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-

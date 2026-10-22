@@ -36,18 +36,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Wifi
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -60,17 +57,12 @@ import android.widget.Toast
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1069,14 +1061,14 @@ private fun FortniteExclusiveHudCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEn) "⚡ FORTNITE ARENA TUNING" else "⚡ TỐI ƯU RIÊNG FORTNITE",
+                    text = if (isEn) "⚡ FORTNITE EXCLUSIVE" else "⚡ TỐI ƯU RIÊNG FORTNITE",
                     color = fortniteBlue,
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1
                 )
                 Text(
-                    text = "8ms • 120Hz • 128k",
+                    text = if (isEn) "Ultra Smooth • 120FPS" else "Siêu nhạy • 120FPS",
                     color = XboxNeonGreen,
                     fontSize = 7.5.sp,
                     fontWeight = FontWeight.Bold,

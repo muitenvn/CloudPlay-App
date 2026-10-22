@@ -20,32 +20,33 @@
     <string name="current_language">Language</string>
 
     <!-- Xbox Web Language -->
-    <string name="section_xbox_web_language">XBOX CLOUD WEB REGION</string>
-    <string name="xbox_web_language_desc">Select display region for Xbox.com interface. Eliminates forced Japanese when using Tokyo servers.</string>
-    <string name="xbox_lang_system_match">System Auto (en-US fallback)</string>
-    <string name="xbox_lang_custom">Custom Xbox Region</string>
-    <string name="anti_japanese_enforcer">Anti-Japanese Enforcer</string>
-    <string name="anti_japanese_enforcer_desc">Auto-redirects jp-JP/ja-JP pages to en-US seamlessly.</string>
+    <string name="section_xbox_web_language">XBOX PAGE LANGUAGE</string>
+    <string name="xbox_web_language_desc">Choose display language for Xbox pages and prevent forced Japanese menus.</string>
+    <string name="xbox_lang_system_match">Follow Device Language (Default en-US)</string>
+    <string name="xbox_lang_custom">Custom Xbox Language</string>
+    <string name="anti_japanese_enforcer">Prevent Forced Japanese</string>
+    <string name="anti_japanese_enforcer_desc">Automatically keeps Xbox pages in English instead of Japanese.</string>
 
     <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">PLAY XBOX CLOUD</string>
-    <string name="hero_subtitle">Unlock region • Auto disconnect VPN</string>
+    <string name="hero_subtitle">Unlock region • Auto turn off VPN</string>
     <string name="btn_launch_xcloud">Play Now</string>
     <string name="btn_play_fortnite">Fortnite</string>
+    <string name="btn_continue_game">Continue</string>
 
     <!-- Network & Hardware Cockpit -->
     <string name="cockpit_title">Network &amp; Controller</string>
-    <string name="cockpit_subtitle">Unlock region • Auto disconnect VPN</string>
+    <string name="cockpit_subtitle">Unlock region • Auto turn off VPN</string>
     <string name="net_mode_direct">Direct Network</string>
-    <string name="net_mode_vpn">VPN Active</string>
+    <string name="net_mode_vpn">VPN On</string>
     <string name="net_desc_direct">Direct connection active for smooth gaming.</string>
     <string name="net_desc_vpn">Region unlock active for launching games.</string>
-    <string name="btn_enable_vpn">Enable VPN</string>
-    <string name="btn_switch_direct">Direct Mode</string>
-    <string name="vpn_status_connected">VPN Connected</string>
+    <string name="btn_enable_vpn">Turn On VPN</string>
+    <string name="btn_switch_direct">Turn Off VPN</string>
+    <string name="vpn_status_connected">VPN On</string>
     <string name="vpn_status_disconnected">Direct Network</string>
-    <string name="auto_bypass_enabled">Auto switch to direct network on launch</string>
+    <string name="auto_bypass_enabled">Auto turn off VPN on launch</string>
     <string name="auto_bypass_triggered">Game started! Switched to direct network.</string>
     <string name="hardware_controller">Controller</string>
     <string name="controller_connected">Connected</string>
@@ -57,7 +58,7 @@
 
     <!-- Featured Games -->
     <string name="featured_games_title">Featured Games</string>
-    <string name="featured_games_subtitle">One-tap game launch</string>
+    <string name="featured_games_subtitle">Quick game launch</string>
     <string name="btn_view_all">View All</string>
     <string name="btn_play_now">Play Now</string>
     <string name="badge_free">Free</string>
@@ -81,77 +82,77 @@
     <string name="btn_delete">Delete</string>
 
     <!-- Servers Screen -->
-    <string name="servers_title">Bypass VPN &amp; Proxy Mesh</string>
-    <string name="servers_subtitle">Select low-latency server nodes to bypass xCloud geo-blocks</string>
+    <string name="servers_title">Region Unlock Servers</string>
+    <string name="servers_subtitle">servers available to unlock game region</string>
     <string name="cat_japan">Japan (Tokyo/Osaka)</string>
     <string name="cat_korea">Korea (Seoul)</string>
     <string name="cat_sea">SE Asia (Singapore)</string>
     <string name="cat_usa">United States</string>
-    <string name="btn_ping_all">Ping All Servers</string>
-    <string name="btn_fetch_live">Fetch Live Proxies</string>
-    <string name="btn_add_custom_server">Add Custom Node</string>
+    <string name="btn_ping_all">Check Ping</string>
+    <string name="btn_fetch_live">Update Servers</string>
+    <string name="btn_add_custom_server">Add Server</string>
     <string name="server_active">Connected</string>
     <string name="server_optimal">Optimal</string>
     <string name="server_testing">Testing ping...</string>
 
     <!-- Settings Screen -->
-    <string name="section_auto_bypass">AUTO BYPASS &amp; NETWORK TUNING</string>
-    <string name="smart_vpn_title">Smart Auto-Bypass</string>
-    <string name="smart_vpn_desc">Automatically connects VPN to launch game, then switches to direct ISP network for lowest latency.</string>
-    <string name="stealth_headers_title">Stealth Headers &amp; Mesh</string>
-    <string name="stealth_headers_desc">Spoofs low-latency routing headers and bypasses ISP throttling.</string>
-    <string name="section_cellular_wifi">GRAPHICS QUALITY &amp; DEVICE PERFORMANCE</string>
-    <string name="section_graphics_quality">GRAPHICS QUALITY &amp; DEVICE PERFORMANCE</string>
+    <string name="section_auto_bypass">SMART VPN &amp; NETWORK</string>
+    <string name="smart_vpn_title">Smart VPN</string>
+    <string name="smart_vpn_desc">Turns on VPN to open the game, then switches to direct network for smooth play.</string>
+    <string name="stealth_headers_title">Fast Region Unlock</string>
+    <string name="stealth_headers_desc">Unlocks game region quickly with minimal delay.</string>
+    <string name="section_cellular_wifi">GRAPHICS &amp; PERFORMANCE</string>
+    <string name="section_graphics_quality">GRAPHICS &amp; PERFORMANCE</string>
     <string name="graphics_quality_auto">Auto (Recommended)</string>
-    <string name="graphics_quality_auto_desc">Automatically tunes quality to maintain 60 FPS and prevent phone overheating.</string>
+    <string name="graphics_quality_auto_desc">Adjusts to network quality and helps keep your phone cool.</string>
     <string name="graphics_quality_saver">Data Saver (Low)</string>
-    <string name="graphics_quality_saver_desc">~5 Mbps, lowest device heat &amp; battery drain, saves up to 60% mobile data.</string>
+    <string name="graphics_quality_saver_desc">Low data use, keeps phone cool and saves battery.</string>
     <string name="graphics_quality_medium">Medium</string>
-    <string name="graphics_quality_medium_desc">~9 Mbps, balanced image clarity and smooth device thermals.</string>
+    <string name="graphics_quality_medium_desc">Balanced image clarity and cool device temperature.</string>
     <string name="graphics_quality_high">High</string>
-    <string name="graphics_quality_high_desc">~14 Mbps, crisp 1080p stream with sharp textures.</string>
+    <string name="graphics_quality_high_desc">Sharp 1080p image with clear details.</string>
     <string name="graphics_quality_ultra">Ultra (Max)</string>
-    <string name="graphics_quality_ultra_desc">~20 Mbps, maximum xCloud visual fidelity for powerful devices.</string>
+    <string name="graphics_quality_ultra_desc">Highest visual quality for fast networks and strong phones.</string>
     <string name="cellular_mode_saver">Data Saver (Low)</string>
-    <string name="cellular_mode_saver_desc">~5 Mbps, cool device thermals, saves data.</string>
-    <string name="cellular_mode_max">Ultra (Max 20M)</string>
-    <string name="cellular_mode_max_desc">Uncapped bandwidth for maximum graphics quality.</string>
-    <string name="wifi_speed_first">Speed First Priority</string>
-    <string name="wifi_speed_first_desc">Prioritizes packet arrival time over heavy buffering.</string>
-    <string name="section_clarity">GRAPHICS &amp; CLARITY BOOST</string>
-    <string name="clarity_boost_title">Clarity Boost (AMD CAS / Bicubic)</string>
-    <string name="clarity_boost_desc">Sharpens WebRTC stream textures and removes stream blur.</string>
+    <string name="cellular_mode_saver_desc">Saves mobile data and keeps phone cool.</string>
+    <string name="cellular_mode_max">Ultra (Max)</string>
+    <string name="cellular_mode_max_desc">Highest graphics quality for strong networks.</string>
+    <string name="wifi_speed_first">Smooth Response Priority</string>
+    <string name="wifi_speed_first_desc">Reduces input delay when network fluctuates.</string>
+    <string name="section_clarity">IMAGE QUALITY &amp; CONTROLS</string>
+    <string name="clarity_boost_title">Clarity Boost (Sharpening)</string>
+    <string name="clarity_boost_desc">Makes game images sharper and clearer.</string>
     <string name="preset_off">Off</string>
     <string name="preset_balanced">Balanced (Recommended)</string>
     <string name="preset_sharp">Ultra Sharp</string>
-    <string name="preset_oled">OLED Punch</string>
+    <string name="preset_oled">Vivid Colors</string>
     <string name="section_controls">CONTROLS &amp; UTILITIES</string>
-    <string name="anti_afk_title">Anti-AFK Keep-Alive</string>
-    <string name="anti_afk_desc">Prevents Xbox session disconnect after 15 minutes of inactivity.</string>
-    <string name="polling_boost_title">Input Polling Boost (120Hz/240Hz)</string>
-    <string name="polling_boost_desc">Reduces controller input response time to near-zero.</string>
-    <string name="floating_hud_title">Floating Telemetry HUD</string>
-    <string name="floating_hud_desc">Shows live ping, FPS, bitrate and quick controls while gaming.</string>
-    <string name="virtual_gamepad_title">On-Screen Virtual Gamepad</string>
-    <string name="virtual_gamepad_desc">Play games using on-screen virtual buttons when no physical gamepad is attached.</string>
-    <string name="section_storage">STORAGE &amp; MAINTENANCE</string>
-    <string name="clear_cookies_title">Clear Web Cache &amp; Cookies</string>
-    <string name="clear_cookies_desc">Cleans login sessions and cached data to resolve loading issues.</string>
+    <string name="anti_afk_title">Prevent Idle Disconnect</string>
+    <string name="anti_afk_desc">Keeps game session active when idle.</string>
+    <string name="polling_boost_title">Fast Controller Response</string>
+    <string name="polling_boost_desc">Improves button response speed.</string>
+    <string name="floating_hud_title">In-Game Quick Bar (HUD)</string>
+    <string name="floating_hud_desc">Shows live ping, FPS, and quick settings while playing.</string>
+    <string name="virtual_gamepad_title">Touch Controller</string>
+    <string name="virtual_gamepad_desc">Play with on-screen touch buttons when no controller is connected.</string>
+    <string name="section_storage">CACHE &amp; ACCOUNT</string>
+    <string name="clear_cookies_title">Clear Cache &amp; Cookies</string>
+    <string name="clear_cookies_desc">Clears saved login data to fix loading issues.</string>
     <string name="btn_clear_cookies">Clear Data Now</string>
-    <string name="toast_cookies_cleared">Web cache and cookies cleared successfully!</string>
+    <string name="toast_cookies_cleared">Cache and cookies cleared!</string>
 
     <!-- Cloud Browser & Floating HUD -->
-    <string name="hud_stream_latency">STREAM LATENCY</string>
+    <string name="hud_stream_latency">PING</string>
     <string name="hud_controller">CONTROLLER</string>
-    <string name="hud_clarity_boost">CLARITY BOOST</string>
-    <string name="hud_vietnamese_translator">VIETNAMESE TRANSLATOR</string>
-    <string name="hud_return_home">Return to Home</string>
+    <string name="hud_clarity_boost">SHARPENING</string>
+    <string name="hud_vietnamese_translator">TRANSLATOR</string>
+    <string name="hud_return_home">Return Home</string>
     <string name="hud_reload">Reload Page</string>
-    <string name="hud_virtual_gamepad">Virtual Gamepad</string>
+    <string name="hud_virtual_gamepad">Touch Gamepad</string>
     <string name="hud_network_switch">Switch Network</string>
-    <string name="dialog_exit_title">Leave Game Session?</string>
-    <string name="dialog_exit_message">Do you want to exit the current Xbox game stream and return to the main dashboard?</string>
+    <string name="dialog_exit_title">Leave Game?</string>
+    <string name="dialog_exit_message">Do you want to exit the game and return to the home screen?</string>
     <string name="btn_confirm_exit">Exit Game</string>
-    <string name="loading_stream">Loading Xbox Cloud Gaming stream...</string>
-    <string name="loading_tip">Tip: Auto-Bypass will switch to direct network once stream connects for ~28ms ping!</string>
+    <string name="loading_stream">Connecting to Xbox Cloud...</string>
+    <string name="loading_tip">Tip: VPN turns off automatically once the game starts for smoother play.</string>
 </resources>

@@ -370,7 +370,7 @@ fun ServersScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Endpoint: ${currentServer.azureEndpoint} • ${currentServer.protocol.uppercase()}",
+                                    text = if (isEn) "Region: ${currentServer.countryCode} • Ready" else "Khu vực: ${currentServer.countryCode} • Sẵn sàng",
                                     color = TextSecondary,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 9.sp,
@@ -833,9 +833,9 @@ private fun CustomProxyDialog(
             ) {
                 Text(
                     text = if (isEn) {
-                        "Enter your custom SOCKS5 or HTTP proxy details (Cloudflare WARP, private VPS, v2ray...)"
+                        "Enter your custom server address and port"
                     } else {
-                        "Nhập thông tin proxy SOCKS5 hoặc HTTP riêng (Cloudflare WARP, VPS cá nhân, v2ray...)"
+                        "Nhập địa chỉ máy chủ và cổng kết nối riêng"
                     },
                     color = TextSecondary,
                     fontSize = 12.sp

@@ -249,6 +249,55 @@ enum class AppLanguage(val code: String, val title: String, val titleEn: String)
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
 }
 
+enum class GamepadLayoutPreset(
+    val titleVi: String,
+    val titleEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    STANDARD(
+        "Chuẩn Xbox (Standard)",
+        "Xbox Standard",
+        "Bố cục công thái học cân đối cho mọi thể loại game",
+        "Balanced ergonomic layout for all game genres"
+    ),
+    FPS_PRO(
+        "Bắn Súng (FPS Pro)",
+        "FPS / Shooter Pro",
+        "Tăng diện tích cần ngắm R (+18%), ưu tiên cò LT/RT & L3/R3",
+        "Larger Right Stick (+18%), prioritized LT/RT triggers & L3/R3"
+    ),
+    RACING(
+        "Đua Xe (Forza / Racing)",
+        "Racing / Driving",
+        "Tối ưu cò ga/phanh LT/RT & cần lái L độ chính xác cao",
+        "Optimized LT/RT throttle/brake triggers & high-precision Left Stick"
+    ),
+    COMPACT(
+        "Gọn Nhẹ (RPG / Turn-Based)",
+        "Compact / RPG",
+        "Thu gọn kích thước cụm nút để tối đa tầm nhìn màn hình",
+        "Compact footprint to maximize visible game screen area"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
+enum class GamepadHapticLevel(
+    val titleVi: String,
+    val titleEn: String,
+    val durationMs: Long,
+    val amplitude: Int
+) {
+    OFF("Tắt", "Off", 0L, 0),
+    LIGHT("Nhẹ", "Light", 10L, 65),
+    MEDIUM("Vừa", "Medium", 18L, 140),
+    STRONG("Mạnh", "Strong", 28L, 255);
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+}
+
 data class AppConfig(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM, // Tự động chọn tiếng Việt / tiếng Anh theo hệ thống
     val smartVpnEnabled: Boolean = true, // Tự động kiểm tra IP & điều khiển bật/tắt thông minh
@@ -263,6 +312,16 @@ data class AppConfig(
     val inputPollingBoost: Boolean = true, // Tăng tần số lấy mẫu tay cầm 120Hz/240Hz
     val showFloatingHud: Boolean = true,
     val showVirtualController: Boolean = false,
+    val gamepadScale: Float = 1.0f, // 0.75f .. 1.35f
+    val gamepadOpacity: Float = 0.70f, // 0.25f .. 0.95f
+    val gamepadDeadzone: Float = 0.08f, // 0.02f .. 0.25f
+    val gamepadSensitivity: Float = 1.0f, // 0.60f .. 1.60f
+    val gamepadLayoutPreset: GamepadLayoutPreset = GamepadLayoutPreset.STANDARD,
+    val gamepadHapticLevel: GamepadHapticLevel = GamepadHapticLevel.MEDIUM,
+    val gamepadGyroEnabled: Boolean = false,
+    val gamepadGyroSensitivity: Float = 1.0f,
+    val gamepadSprintLockEnabled: Boolean = true,
+    val gamepadCustomOffsets: String = "",
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
@@ -340,6 +399,20 @@ object SettingsRepository {
             antiAfkKeepAlive = sp.getBoolean("anti_afk", true),
             inputPollingBoost = sp.getBoolean("input_polling_boost", true),
             showVirtualController = sp.getBoolean("show_virtual_controller", false),
+            gamepadScale = sp.getFloat("gamepad_scale", 1.0f).coerceIn(0.75f, 1.35f),
+            gamepadOpacity = sp.getFloat("gamepad_opacity", 0.70f).coerceIn(0.25f, 0.95f),
+            gamepadDeadzone = sp.getFloat("gamepad_deadzone", 0.08f).coerceIn(0.02f, 0.25f),
+            gamepadSensitivity = sp.getFloat("gamepad_sensitivity", 1.0f).coerceIn(0.60f, 1.60f),
+            gamepadLayoutPreset = try {
+                GamepadLayoutPreset.valueOf(sp.getString("gamepad_layout_preset", GamepadLayoutPreset.STANDARD.name) ?: GamepadLayoutPreset.STANDARD.name)
+            } catch (_: Exception) { GamepadLayoutPreset.STANDARD },
+            gamepadHapticLevel = try {
+                GamepadHapticLevel.valueOf(sp.getString("gamepad_haptic_level", GamepadHapticLevel.MEDIUM.name) ?: GamepadHapticLevel.MEDIUM.name)
+            } catch (_: Exception) { GamepadHapticLevel.MEDIUM },
+            gamepadGyroEnabled = sp.getBoolean("gamepad_gyro_enabled", false),
+            gamepadGyroSensitivity = sp.getFloat("gamepad_gyro_sensitivity", 1.0f).coerceIn(0.40f, 2.50f),
+            gamepadSprintLockEnabled = sp.getBoolean("gamepad_sprint_lock", true),
+            gamepadCustomOffsets = sp.getString("gamepad_custom_offsets", "") ?: "",
             systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
             stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
             autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),
@@ -382,6 +455,16 @@ object SettingsRepository {
             putBoolean("anti_afk", c.antiAfkKeepAlive)
             putBoolean("input_polling_boost", c.inputPollingBoost)
             putBoolean("show_virtual_controller", c.showVirtualController)
+            putFloat("gamepad_scale", c.gamepadScale)
+            putFloat("gamepad_opacity", c.gamepadOpacity)
+            putFloat("gamepad_deadzone", c.gamepadDeadzone)
+            putFloat("gamepad_sensitivity", c.gamepadSensitivity)
+            putString("gamepad_layout_preset", c.gamepadLayoutPreset.name)
+            putString("gamepad_haptic_level", c.gamepadHapticLevel.name)
+            putBoolean("gamepad_gyro_enabled", c.gamepadGyroEnabled)
+            putFloat("gamepad_gyro_sensitivity", c.gamepadGyroSensitivity)
+            putBoolean("gamepad_sprint_lock", c.gamepadSprintLockEnabled)
+            putString("gamepad_custom_offsets", c.gamepadCustomOffsets)
             putBoolean("system_revolution", c.systemRevolutionEnabled)
             putBoolean("stealth_headers", c.stealthHeadersEnabled)
             putBoolean("auto_healing_mesh", c.autoHealingProxyMesh)
@@ -702,6 +785,61 @@ object SettingsRepository {
 
     fun updateLowEndDeviceMode(enabled: Boolean) {
         _config.update { it.copy(lowEndDeviceMode = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadScale(scale: Float) {
+        _config.update { it.copy(gamepadScale = scale.coerceIn(0.75f, 1.35f)) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadOpacity(opacity: Float) {
+        _config.update { it.copy(gamepadOpacity = opacity.coerceIn(0.25f, 0.95f)) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadDeadzone(deadzone: Float) {
+        _config.update { it.copy(gamepadDeadzone = deadzone.coerceIn(0.02f, 0.25f)) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadSensitivity(sensitivity: Float) {
+        _config.update { it.copy(gamepadSensitivity = sensitivity.coerceIn(0.60f, 1.60f)) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadLayoutPreset(preset: GamepadLayoutPreset) {
+        _config.update { it.copy(gamepadLayoutPreset = preset) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadHapticLevel(level: GamepadHapticLevel) {
+        _config.update { it.copy(gamepadHapticLevel = level) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadGyroEnabled(enabled: Boolean) {
+        _config.update { it.copy(gamepadGyroEnabled = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadGyroSensitivity(sensitivity: Float) {
+        _config.update { it.copy(gamepadGyroSensitivity = sensitivity.coerceIn(0.40f, 2.50f)) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadSprintLockEnabled(enabled: Boolean) {
+        _config.update { it.copy(gamepadSprintLockEnabled = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadCustomOffsets(offsets: String) {
+        _config.update { it.copy(gamepadCustomOffsets = offsets) }
+        persist(_config.value)
+    }
+
+    fun resetGamepadCustomOffsets() {
+        _config.update { it.copy(gamepadCustomOffsets = "") }
         persist(_config.value)
     }
 }

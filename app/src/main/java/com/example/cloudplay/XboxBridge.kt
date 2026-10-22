@@ -842,44 +842,74 @@ class XboxBridge(
                     }, true);
 
                     // ==========================================
-                    // 6. Synthetic Gamepad Hook & Anti-AFK
+                    // 6. Synthetic Gamepad Hook & Anti-AFK (Ultra-Low-Latency Direct Bridge)
                     // ==========================================
+                    const nowTs = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+                    let virtualGamepadActive = false;
+                    let gamepadConnectedDispatched = false;
                     const virtualGamepadState = {
-                        id: "Xbox 360 Controller (CloudPlay Gamepad)",
+                        id: "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
                         index: 0,
                         connected: true,
-                        timestamp: Date.now(),
+                        timestamp: nowTs(),
                         mapping: "standard",
                         axes: [0, 0, 0, 0],
-                        buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }))
+                        buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+                        vibrationActuator: null
+                    };
+
+                    function ensureGamepadConnectedEvent() {
+                        virtualGamepadActive = true;
+                        if (!gamepadConnectedDispatched) {
+                            gamepadConnectedDispatched = true;
+                            try {
+                                const evt = new Event('gamepadconnected');
+                                evt.gamepad = virtualGamepadState;
+                                window.dispatchEvent(evt);
+                            } catch (e) {}
+                        }
+                    }
+
+                    window.__cpBtn = function(idx, pressed, analogVal) {
+                        if (idx >= 0 && idx < 17) {
+                            ensureGamepadConnectedEvent();
+                            const v = (typeof analogVal === 'number') ? Math.max(0, Math.min(1, analogVal)) : (pressed ? 1.0 : 0.0);
+                            const isPressed = pressed || v > 0.12;
+                            virtualGamepadState.buttons[idx].pressed = isPressed;
+                            virtualGamepadState.buttons[idx].touched = isPressed || v > 0.01;
+                            virtualGamepadState.buttons[idx].value = v;
+                            virtualGamepadState.timestamp = nowTs();
+                        }
+                    };
+
+                    window.__cpStick = function(xAxis, xVal, yAxis, yVal) {
+                        ensureGamepadConnectedEvent();
+                        if (xAxis >= 0 && xAxis < 4) virtualGamepadState.axes[xAxis] = Math.max(-1, Math.min(1, xVal));
+                        if (yAxis >= 0 && yAxis < 4) virtualGamepadState.axes[yAxis] = Math.max(-1, Math.min(1, yVal));
+                        virtualGamepadState.timestamp = nowTs();
                     };
 
                     window.addEventListener('virtual_gamepad_button', function(e) {
-                        const idx = e.detail.index;
-                        const pressed = e.detail.pressed;
-                        if (idx >= 0 && idx < 17) {
-                            virtualGamepadState.buttons[idx].pressed = pressed;
-                            virtualGamepadState.buttons[idx].touched = pressed;
-                            virtualGamepadState.buttons[idx].value = pressed ? 1.0 : 0.0;
-                            virtualGamepadState.timestamp = Date.now();
+                        if (e && e.detail) {
+                            window.__cpBtn(e.detail.index, e.detail.pressed, e.detail.value);
                         }
                     });
 
                     window.addEventListener('virtual_gamepad_axis', function(e) {
-                        const axis = e.detail.axis;
-                        const val = e.detail.value;
-                        if (axis >= 0 && axis < 4) {
-                            virtualGamepadState.axes[axis] = val;
-                            virtualGamepadState.timestamp = Date.now();
+                        if (e && e.detail) {
+                            const axis = e.detail.axis;
+                            const val = e.detail.value;
+                            if (axis >= 0 && axis < 4) {
+                                ensureGamepadConnectedEvent();
+                                virtualGamepadState.axes[axis] = val;
+                                virtualGamepadState.timestamp = nowTs();
+                            }
                         }
                     });
 
                     window.addEventListener('virtual_gamepad_axes_pair', function(e) {
-                        const d = e.detail;
-                        if (d) {
-                            if (d.xAxis >= 0 && d.xAxis < 4) virtualGamepadState.axes[d.xAxis] = d.xVal;
-                            if (d.yAxis >= 0 && d.yAxis < 4) virtualGamepadState.axes[d.yAxis] = d.yVal;
-                            virtualGamepadState.timestamp = Date.now();
+                        if (e && e.detail) {
+                            window.__cpStick(e.detail.xAxis, e.detail.xVal, e.detail.yAxis, e.detail.yVal);
                         }
                     });
 
@@ -887,7 +917,7 @@ class XboxBridge(
                     if ($antiAfk) {
                         setInterval(function() {
                             if (location.href.indexOf('/play/launch/') !== -1) {
-                                virtualGamepadState.timestamp = Date.now();
+                                virtualGamepadState.timestamp = nowTs();
                             }
                         }, 180000);
                     }
@@ -897,15 +927,42 @@ class XboxBridge(
                         navigator.getGamepads = function() {
                             const real = origGetGamepads ? origGetGamepads() : [];
                             const list = Array.from(real || []);
-                            let hasConnected = false;
+                            let physPad = null;
                             for (let i = 0; i < list.length; i++) {
                                 if (list[i] && list[i].connected) {
-                                    hasConnected = true;
+                                    physPad = list[i];
                                     break;
                                 }
                             }
-                            if (!hasConnected) {
+                            if (!physPad) {
                                 list[0] = virtualGamepadState;
+                            } else if (virtualGamepadActive) {
+                                // Hybrid merge: allow on-screen virtual buttons/sticks to work even while a physical pad is connected
+                                const mergedButtons = [];
+                                for (let b = 0; b < 17; b++) {
+                                    const vb = virtualGamepadState.buttons[b] || { pressed: false, touched: false, value: 0 };
+                                    const pb = (physPad.buttons && physPad.buttons[b]) ? physPad.buttons[b] : { pressed: false, touched: false, value: 0 };
+                                    mergedButtons.push({
+                                        pressed: !!(vb.pressed || pb.pressed),
+                                        touched: !!(vb.touched || pb.touched),
+                                        value: Math.max(vb.value || 0, pb.value || 0)
+                                    });
+                                }
+                                const mergedAxes = [0, 0, 0, 0];
+                                for (let a = 0; a < 4; a++) {
+                                    const va = virtualGamepadState.axes[a] || 0;
+                                    const pa = (physPad.axes && physPad.axes[a]) ? physPad.axes[a] : 0;
+                                    mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
+                                }
+                                list[physPad.index || 0] = {
+                                    id: physPad.id || virtualGamepadState.id,
+                                    index: physPad.index || 0,
+                                    connected: true,
+                                    timestamp: Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp),
+                                    mapping: "standard",
+                                    axes: mergedAxes,
+                                    buttons: mergedButtons
+                                };
                             }
                             return list;
                         };

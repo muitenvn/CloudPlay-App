@@ -2,6 +2,16 @@
 
 Tài liệu này ghi nhận chi tiết các thay đổi thực tế của từng bản cập nhật và được hệ thống xuất APK tự động trích xuất vào trang phát hành (GitHub Releases).
 
+## [v1.3.0] - Nâng cấp Hệ thống Control & Tay cầm Cảm ứng Pro
+### 🎮 Cải tiến Hệ thống Điều khiển (Pro Control System)
+- **D-Pad trượt 8 hướng & ABXY trượt/combo đa điểm:** Hỗ trợ trượt ngón tay mượt mà qua 8 hướng (bao gồm 4 hướng chéo) trên D-Pad và vuốt/nhấn tổ hợp 2 nút liền kề trên cụm ABXY.
+- **Bổ sung nút L3 / R3, Cò ga tuyến tính & Tự động chạy nhanh (Auto-Sprint L3):** Thêm nút L3/R3 chuyên dụng, cò ga/phanh tuyến tính (0–100%) trong chế độ Đua xe và tự kích hoạt chạy nhanh L3 khi đẩy kịch cần trái L.
+- **Ngắm bắn bằng cảm biến Con quay hồi chuyển (Gyroscope):** Kết hợp nghiêng máy thật (`Sensor.TYPE_GYROSCOPE`) để tinh chỉnh tâm ngắm cần phải R mượt mà.
+- **Bảng tùy chỉnh nhanh `⚙ Control` trong game & Kéo thả vị trí nút tự do:** Cho phép đổi nhanh 4 bố cục (`Xbox Standard`, `FPS Pro`, `Racing`, `Compact`), chỉnh kích thước (75%–135%), độ mờ, độ nhạy, vùng chết (Deadzone), cường độ rung và kéo thả từng cụm nút đến vị trí bất kỳ trên màn hình.
+- **Cầu nối W3C Gamepad API siêu tốc (`__cpBtn` / `__cpStick`):** Gọi trực tiếp hàm JS tốc độ cao không qua cấp phát sự kiện DOM, tự kích hoạt `gamepadconnected` và hợp nhất mượt mà giữa tay cầm Bluetooth vật lý cùng tay cầm ảo.
+
+---
+
 ## [v1.2.0] - Hoàn thiện 100% Tiếng Anh, Tối ưu Hiệu năng & Giảm Độ trễ, Sửa lỗi Log & Cải tiến Xuất APK
 ### ✨ Tính năng & Trải nghiệm người dùng (UX & Localization)
 - **Hoàn thiện 100% ngôn ngữ Tiếng Anh (Full English UI):** Dịch đầy đủ toàn bộ các màn hình (`HomeScreen`, `GameLibraryScreen`, `ServersScreen`, `SettingsScreen`), hộp thoại (`CustomProxyDialog`, `HowToUseGuideDialog`, `SmartTranslatorDialog`, `UserTermsAgreementDialog`), màn hình chờ vào game (`InGameLoadingOverlay`), thanh `FloatingHud`, thông báo trạng thái (`StreamController`, `AdaptiveQualityManager`, `NetworkOptimizer`), và thông báo nền (`XboxCloudVpnService`).

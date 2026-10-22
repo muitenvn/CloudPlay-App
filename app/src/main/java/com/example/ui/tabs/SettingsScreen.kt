@@ -1308,20 +1308,31 @@ fun SettingsScreen(
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = XboxNeonGreen)
                     )
                 }
+            }
+        }
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Virtual Touch Gamepad
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        // Section 4B: Pro Control & Virtual Gamepad System
+        item {
+            SettingsCard(title = if (isEn) "PRO CONTROL & TOUCH GAMEPAD SYSTEM" else "HỆ THỐNG CONTROL & TAY CẦM CẢM ỨNG PRO") {
+                // Virtual Touch Gamepad Master Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isEn) "On-Screen Virtual Touch Controller" else "Tay cầm ảo trên màn hình",
+                            text = if (isEn) "On-Screen Virtual Touch Controller" else "Tay cầm cảm ứng Pro trên màn hình",
                             color = TextPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = if (isEn) "Show virtual D-Pad, thumbsticks, and ABXY buttons when no physical controller is connected" else "Hiện D-Pad, cần Analog và nút ABXY khi không có tay cầm Bluetooth",
+                            text = if (isEn) {
+                                "8-way slide D-Pad, slide/combo ABXY, L3/R3, Gyro aiming & free button drag"
+                            } else {
+                                "D-Pad trượt 8 hướng, ABXY trượt/combo, L3/R3, ngắm Gyro & kéo thả vị trí nút tự do"
+                            },
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -1329,8 +1340,291 @@ fun SettingsScreen(
                     Switch(
                         checked = config.showVirtualController,
                         onCheckedChange = { SettingsRepository.updateShowVirtualController(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = XboxNeonGreen),
+                        modifier = Modifier.testTag("settings_switch_virtual_controller")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Layout Presets
+                Text(
+                    text = if (isEn) "Controller Layout Preset" else "Bố cục tay cầm theo thể loại game",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.example.data.GamepadLayoutPreset.entries.forEach { preset ->
+                        val isSelected = config.gamepadLayoutPreset == preset
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { SettingsRepository.updateGamepadLayoutPreset(preset) },
+                            color = if (isSelected) XboxSurfaceVariant else Color.Transparent
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = preset.localizedTitle(isEn),
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = preset.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Sliders Box: Size, Opacity, Stick Sensitivity, Deadzone
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Size Slider
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (isEn) "Button Scale (Size)" else "Kích thước cụm nút",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "${(config.gamepadScale * 100).toInt()}%",
+                            color = XboxNeonGreen,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.gamepadScale,
+                        onValueChange = { SettingsRepository.updateGamepadScale(it) },
+                        valueRange = 0.75f..1.35f,
+                        colors = SliderDefaults.colors(thumbColor = XboxNeonGreen, activeTrackColor = XboxNeonGreen)
+                    )
+
+                    // Opacity Slider
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (isEn) "Control Opacity" else "Độ đậm mờ nút bấm",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "${(config.gamepadOpacity * 100).toInt()}%",
+                            color = DirectCyan,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.gamepadOpacity,
+                        onValueChange = { SettingsRepository.updateGamepadOpacity(it) },
+                        valueRange = 0.25f..0.95f,
+                        colors = SliderDefaults.colors(thumbColor = DirectCyan, activeTrackColor = DirectCyan)
+                    )
+
+                    // Analog Sensitivity Curve
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (isEn) "Analog Stick Sensitivity Curve" else "Độ nhạy đường cong cần Analog",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "${(config.gamepadSensitivity * 100).toInt()}%",
+                            color = XboxNeonGreen,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.gamepadSensitivity,
+                        onValueChange = { SettingsRepository.updateGamepadSensitivity(it) },
+                        valueRange = 0.60f..1.60f,
+                        colors = SliderDefaults.colors(thumbColor = XboxNeonGreen, activeTrackColor = XboxNeonGreen)
+                    )
+
+                    // Analog Deadzone
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (isEn) "Analog Stick Center Deadzone" else "Vùng chết tâm cần Analog (Deadzone)",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "${(config.gamepadDeadzone * 100).toInt()}%",
+                            color = DirectCyan,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.gamepadDeadzone,
+                        onValueChange = { SettingsRepository.updateGamepadDeadzone(it) },
+                        valueRange = 0.02f..0.25f,
+                        colors = SliderDefaults.colors(thumbColor = DirectCyan, activeTrackColor = DirectCyan)
+                    )
+                }
+
+                // Haptic Vibration Strength Row
+                Text(
+                    text = if (isEn) "Haptic Vibration Feedback" else "Cường độ rung phản hồi xúc giác (Haptics)",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    com.example.data.GamepadHapticLevel.entries.forEach { level ->
+                        val selected = config.gamepadHapticLevel == level
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { SettingsRepository.updateGamepadHapticLevel(level) },
+                            color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF0E1813),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (selected) XboxNeonGreen else XboxCardBorder
+                            )
+                        ) {
+                            Text(
+                                text = level.localizedTitle(isEn),
+                                color = if (selected) XboxNeonGreen else TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(vertical = 7.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                // Pro Gameplay Assists: Gyro Aiming, Turbo Auto-Fire, Auto-Sprint L3, 120Hz Polling
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isEn) "🎯 Gyroscope Motion Aiming (Right Stick)" else "🎯 Ngắm bắn bằng Con quay hồi chuyển (Gyro)",
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) "Tilt your phone to fine-tune Right Stick camera/crosshair aim" else "Nghiêng nhẹ điện thoại để tinh chỉnh tâm ngắm cần phải R trong game bắn súng",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                    Switch(
+                        checked = config.gamepadGyroEnabled,
+                        onCheckedChange = { SettingsRepository.updateGamepadGyroEnabled(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = DirectCyan)
+                    )
+                }
+
+                if (config.gamepadGyroEnabled) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = if (isEn) "Gyro Sensitivity" else "Độ nhạy cảm biến Gyro",
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = "${(config.gamepadGyroSensitivity * 100).toInt()}%",
+                            color = DirectCyan,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.gamepadGyroSensitivity,
+                        onValueChange = { SettingsRepository.updateGamepadGyroSensitivity(it) },
+                        valueRange = 0.40f..2.50f,
+                        colors = SliderDefaults.colors(thumbColor = DirectCyan, activeTrackColor = DirectCyan)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isEn) "🏃 Auto-Sprint L3 on Left Stick Push" else "🏃 Đẩy kịch cần trái L để tự chạy nhanh (Auto L3)",
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isEn) "Pushing the Left Stick fully forward automatically triggers L3 Sprint" else "Đẩy cần di chuyển L hết cỡ về phía trước sẽ tự kích hoạt nút L3 chạy nhanh",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                    Switch(
+                        checked = config.gamepadSprintLockEnabled,
+                        onCheckedChange = { SettingsRepository.updateGamepadSprintLockEnabled(it) },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = XboxNeonGreen)
                     )
+                }
+
+                if (config.gamepadCustomOffsets.isNotBlank()) {
+                    OutlinedButton(
+                        onClick = {
+                            SettingsRepository.resetGamepadCustomOffsets()
+                            Toast.makeText(
+                                context,
+                                if (isEn) "Reset controller button positions to default" else "Đã đặt lại vị trí các cụm nút về mặc định",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) "Reset Custom Button Positions" else "Đặt Lại Vị Trí Nút Đã Kéo Thả Về Mặc Định",
+                            color = DirectCyan,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

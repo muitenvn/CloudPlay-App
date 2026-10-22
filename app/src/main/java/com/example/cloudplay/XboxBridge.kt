@@ -76,6 +76,17 @@ class XboxBridge(
 
         fun isXboxHost(url: String?): Boolean {
             if (url.isNullOrBlank()) return false
+            val parsedScheme: String? = try {
+                android.net.Uri.parse(url)?.scheme?.lowercase()
+            } catch (_: Exception) {
+                null
+            } ?: try {
+                java.net.URI(url).scheme?.lowercase()
+            } catch (_: Exception) {
+                null
+            }
+            if (parsedScheme != "https") return false
+
             val host: String = try {
                 android.net.Uri.parse(url)?.host?.lowercase()
             } catch (_: Exception) {
@@ -1108,8 +1119,8 @@ class XboxBridge(
 
     private fun isCallerTrusted(): Boolean {
         val url = currentNavigatedUrl
-        if (url.isNullOrBlank()) return true
-        return isTrustedHost(url) || isXboxHost(url)
+        if (url.isNullOrBlank()) return false
+        return isTrustedHost(url)
     }
 
     @JavascriptInterface
@@ -1158,7 +1169,9 @@ class XboxBridge(
     fun onUrlChanged(url: String?) {
         if (!isCallerTrusted()) return
         url?.let { targetUrl ->
-            currentNavigatedUrl = targetUrl
+            if (isTrustedHost(targetUrl)) {
+                currentNavigatedUrl = targetUrl
+            }
             controller.onUrlChanged(targetUrl)
             if (!targetUrl.contains("/launch/") && isXboxHost(targetUrl)) {
                 scope.launch(Dispatchers.Main) {
@@ -1197,8 +1210,11 @@ class XboxBridge(
             val nextServer = VpnManager.confirmSwitchToNextBestServer(wv?.context)
             if (nextServer != null && wv != null) {
                 val locale = com.example.data.SettingsRepository.config.value.getEffectiveLocale()
+                val safeCountry = JSONObject.quote(nextServer.countryCode)
+                val safeIp = JSONObject.quote(nextServer.ip)
+                val safeLocale = JSONObject.quote(locale)
                 wv.evaluateJavascript(
-                    "window.__lastUnlockSignal = null; if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: '${nextServer.countryCode}', ip: '${nextServer.ip}', locale: '$locale' }); location.reload();",
+                    "window.__lastUnlockSignal = null; if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale }); location.reload();",
                     null
                 )
             }

@@ -140,41 +140,41 @@ fun UserTermsAgreementDialog(
                 ) {
                     LegalSection(
                         icon = Icons.Default.SportsEsports,
-                        title = if (isEn) "1. Purpose & Independent Nature" else "1. Mục Đích Sử Dụng & Tính Chất Độc Lập",
+                        title = if (isEn) "1. Purpose & Fair Play Commitment" else "1. Mục Đích Sử Dụng & Cam Kết Chơi Công Bằng",
                         content = if (isEn) {
-                            "CloudPlay is an independent, non-profit open-source utility. It provides a hardware-accelerated WebRTC browser environment and personal network routing tools to help reduce latency and improve stream quality for personal cloud gaming."
+                            "CloudPlay is an independent, non-profit open-source utility designed to help reduce connection delay and improve image clarity for cloud gaming. The app strictly adheres to Fair Play: it contains NO cheats, NO macro/turbo fire, and NEVER modifies game files or memory."
                         } else {
-                            "CloudPlay là tiện ích công cụ mã nguồn mở độc lập, phi lợi nhuận. Ứng dụng cung cấp môi trường trình duyệt WebRTC tối ưu hóa phần cứng và tiện ích định tuyến mạng cá nhân nhằm hỗ trợ cải thiện độ trễ và chất lượng đường truyền khi trải nghiệm chơi game đám mây cá nhân."
-                        }
-                    )
-
-                    LegalSection(
-                        icon = Icons.Default.Gavel,
-                        title = if (isEn) "2. Microsoft & Xbox Non-Affiliation Disclaimer" else "2. Tuyên Bố Miễn Trừ Trách Nhiệm Với Microsoft & Xbox",
-                        content = if (isEn) {
-                            "This application is NOT affiliated with, owned by, sponsored, authorized, or endorsed by Microsoft Corporation, Xbox, Xbox Game Pass, or any of its subsidiaries. All related trademarks, logos, and brand names (Xbox, Xbox Cloud Gaming, Microsoft) are the exclusive property of Microsoft Corporation."
-                        } else {
-                            "Ứng dụng HOÀN TOÀN KHÔNG liên kết, không thuộc quyền sở hữu, không được tài trợ, ủy quyền hay chứng thực bởi Microsoft Corporation, Xbox, Xbox Game Pass hay bất kỳ công ty con nào. Mọi nhãn hiệu, biểu trưng và tên thương mại liên quan (Xbox, Xbox Cloud Gaming, Microsoft) thuộc quyền sở hữu độc quyền của Microsoft Corporation."
-                        }
-                    )
-
-                    LegalSection(
-                        icon = Icons.Default.Code,
-                        title = if (isEn) "3. GitHub Open-Source License (MIT License)" else "3. Tuân Thủ Giấy Phép Mã Nguồn Mở GitHub (MIT License)",
-                        content = if (isEn) {
-                            "This app integrates WebRTC stream optimizations, Clarity Boost, and region check bypasses based on the community project Better-xCloud (https://github.com/redphx/better-xcloud) by redphx under the MIT License:\n\n\"Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files... THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED...\""
-                        } else {
-                            "Ứng dụng trích dẫn và tích hợp các giải pháp tối ưu hóa stream WebRTC, Clarity Boost và vượt kiểm tra khu vực dựa trên dự án cộng đồng Better-xCloud (https://github.com/redphx/better-xcloud) của tác giả redphx theo giấy phép mã nguồn mở MIT License:\n\n\"Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files... THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED...\""
+                            "CloudPlay là tiện ích mã nguồn mở độc lập, phi lợi nhuận giúp giảm độ trễ kết nối và cải thiện độ nét hình ảnh khi chơi game đám mây. Ứng dụng tuân thủ tuyệt đối nguyên tắc Chơi công bằng (Fair Play): KHÔNG chứa tính năng gian lận, KHÔNG có bắn liên thanh (macro/turbo) và KHÔNG can thiệp dữ liệu trò chơi."
                         }
                     )
 
                     LegalSection(
                         icon = Icons.Default.Lock,
-                        title = if (isEn) "4. Strict Security & Privacy" else "4. Bảo Mật Tuyệt Đối & Quyền Riêng Tư",
+                        title = if (isEn) "2. Account Security, Payment Isolation & Local Data" else "2. Bảo Mật Tài Khoản, Thanh Toán & Dữ Liệu Cục Bộ",
                         content = if (isEn) {
-                            "This application strictly does NOT collect, store, or transmit your Microsoft account credentials, passwords, or personal data to any external servers. All authentication occurs directly between your device and official Microsoft servers (login.live.com) via secure Android WebView."
+                            "• No credential collection: Sign-in takes place directly on official Microsoft pages (login.live.com, xbox.com) over HTTPS.\n• Payment protection: Relay servers are automatically paused when navigating to external or payment pages.\n• 100% local storage: Settings, game bookmarks, and play session history are stored only on your device and can be deleted anytime."
                         } else {
-                            "Ứng dụng cam kết tuyệt đối không thu thập, không lưu trữ và không gửi thông tin đăng nhập, tài khoản, mật khẩu Microsoft hay bất kỳ dữ liệu cá nhân nào của bạn ra máy chủ bên ngoài. Mọi thao tác xác thực diễn ra hoàn toàn trực tiếp giữa thiết bị của bạn và hệ thống chính thức của Microsoft (login.live.com) qua cơ chế WebView bảo mật."
+                            "• Không thu thập tài khoản: Quá trình đăng nhập diễn ra trực tiếp trên trang chính thức của Microsoft (login.live.com, xbox.com) qua kết nối mã hóa HTTPS.\n• Bảo vệ giao dịch: Tự động ngắt máy chủ trung gian khi mở trang thanh toán hoặc trang bên ngoài.\n• Lưu trữ cục bộ 100%: Cài đặt, danh sách game và lịch sử phiên chơi chỉ lưu trên điện thoại của bạn, có thể xóa bất cứ lúc nào."
+                        }
+                    )
+
+                    LegalSection(
+                        icon = Icons.Default.Gavel,
+                        title = if (isEn) "3. Microsoft & Xbox Non-Affiliation Disclaimer" else "3. Tuyên Bố Độc Lập Với Microsoft & Xbox",
+                        content = if (isEn) {
+                            "This application is NOT affiliated with, owned by, sponsored, authorized, or endorsed by Microsoft Corporation or Xbox. All trademarks, logos, and brand names (Xbox, Xbox Cloud Gaming, Game Pass, Microsoft) belong to Microsoft Corporation."
+                        } else {
+                            "Ứng dụng HOÀN TOÀN KHÔNG liên kết, không thuộc sở hữu, không được tài trợ hay ủy quyền bởi Microsoft Corporation hoặc Xbox. Mọi nhãn hiệu, biểu trưng và tên gọi (Xbox, Xbox Cloud Gaming, Game Pass, Microsoft) thuộc quyền sở hữu của Microsoft Corporation."
+                        }
+                    )
+
+                    LegalSection(
+                        icon = Icons.Default.Code,
+                        title = if (isEn) "4. Open-Source License (MIT License)" else "4. Giấy Phép Mã Nguồn Mở (MIT License)",
+                        content = if (isEn) {
+                            "This app incorporates stream display and touch control improvements inspired by the open-source project Better-xCloud (https://github.com/redphx/better-xcloud) by redphx under the MIT License (provided 'AS IS', without warranty of any kind)."
+                        } else {
+                            "Ứng dụng kế thừa một số giải pháp hiển thị và điều khiển cảm ứng từ dự án mã nguồn mở cộng đồng Better-xCloud (https://github.com/redphx/better-xcloud) của tác giả redphx theo giấy phép MIT License (cung cấp 'NGUYÊN TRẠNG', không kèm bảo đảm dưới bất kỳ hình thức nào)."
                         }
                     )
 
@@ -182,9 +182,9 @@ fun UserTermsAgreementDialog(
                         icon = Icons.Default.Person,
                         title = if (isEn) "5. User Responsibility" else "5. Trách Nhiệm Người Dùng",
                         content = if (isEn) {
-                            "You are responsible for your personal Xbox Game Pass account and compliance with the Microsoft Services Agreement. This application serves solely as a client-side web browsing optimization tool."
+                            "You are responsible for using your personal account in accordance with the Microsoft Services Agreement, game publisher rules, and applicable local regulations."
                         } else {
-                            "Bạn tự chịu trách nhiệm về tài khoản Xbox Game Pass cá nhân và cam kết tuân thủ Thỏa thuận Dịch vụ của Microsoft (Microsoft Services Agreement). Ứng dụng chỉ đóng vai trò công cụ hỗ trợ trải nghiệm duyệt web kỹ thuật số cho người dùng cuối."
+                            "Bạn tự chịu trách nhiệm khi sử dụng tài khoản cá nhân và cam kết tuân thủ Thỏa thuận Dịch vụ của Microsoft, quy tắc của nhà phát hành trò chơi cũng như quy định pháp luật hiện hành."
                         }
                     )
                 }
@@ -209,9 +209,9 @@ fun UserTermsAgreementDialog(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isEn) {
-                            "I have read, understood the disclaimer, and agree to the terms above."
+                            "I have read, understood the security & privacy notice, and agree to the terms above."
                         } else {
-                            "Tôi đã đọc, hiểu rõ tuyên bố miễn trừ và đồng ý với các điều khoản trên."
+                            "Tôi đã đọc, hiểu rõ chính sách bảo mật & miễn trừ và đồng ý với các điều khoản trên."
                         },
                         fontSize = 12.sp,
                         color = if (agreedToTerms) TextPrimary else TextSecondary,
@@ -233,10 +233,16 @@ fun UserTermsAgreementDialog(
                             .height(48.dp)
                             .testTag("decline_terms_button"),
                         shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (isDismissible) TextSecondary else Color(0xFFFF5252)
+                        )
                     ) {
                         Text(
-                            text = if (isEn) "Decline & Exit" else "Từ chối & Thoát",
+                            text = if (isDismissible) {
+                                if (isEn) "Close" else "Đóng"
+                            } else {
+                                if (isEn) "Decline & Exit" else "Từ chối & Thoát"
+                            },
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold
                         )

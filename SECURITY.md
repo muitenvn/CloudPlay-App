@@ -1,73 +1,53 @@
-# Chính Sách Bảo Mật (Security Policy) - CloudPlay
+# Chính sách Bảo mật / Security Policy
 
-Tài liệu này mô tả các nguyên tắc bảo mật, kiến trúc cách ly và quy trình báo cáo lỗ hổng cho ứng dụng **CloudPlay / Cloud VPN Switcher**.
+Tài liệu này trình bày các nguyên tắc bảo vệ tài khoản, quyền riêng tư dữ liệu và cách báo cáo lỗ hổng bảo mật cho dự án **CloudPlay Optimizer**.
 
----
-
-## 1. Triết Lý Bảo Mật: Zero-Trust & Lưu Trữ Cục Bộ (Local-Only)
-
-CloudPlay được thiết kế theo mô hình **Zero-Trust Client** dành riêng cho trải nghiệm chơi game đám mây Xbox Cloud Gaming (xCloud):
-- **Không gửi thông tin đăng nhập về máy chủ bên thứ ba**: Mọi quá trình đăng nhập Xbox / Microsoft được thực hiện trực tiếp trên trang chủ chính thức của Microsoft (`login.live.com`, `login.microsoftonline.com`, `xbox.com`).
-- **Không can thiệp chứng chỉ SSL (No SSL Bumping/MITM)**: Ứng dụng không bao giờ cài đặt chứng chỉ gốc (root CA) hay giải mã gói tin mã hóa TLS/HTTPS của người dùng.
-- **Dữ liệu lưu trữ hoàn toàn trên thiết bị**: Cấu hình proxy, tùy chọn ngôn ngữ, bookmark game và thiết lập chất lượng được lưu trữ cục bộ trong bộ nhớ an toàn của Android (`Context.MODE_PRIVATE`). Ứng dụng không sử dụng dịch vụ đám mây trung gian hay Firebase để thu thập thông tin người dùng.
+This document outlines account protection principles, data privacy practices, and how to report security vulnerabilities for **CloudPlay Optimizer**.
 
 ---
 
-## 2. Kiểm Soát Tên Miền & Cách Ly WebView (Domain Isolation)
+## 1. Phiên bản được hỗ trợ / Supported Versions
 
-Để ngăn chặn các cuộc tấn công qua trang web giả mạo hoặc chuyển hướng độc hại:
+Chỉ phiên bản mới nhất trên nhánh `main` được cập nhật bản vá bảo mật:
+Only the latest version on the `main` branch actively receives security updates:
 
-1. **Danh sách tên miền tin cậy (Strict Whitelist)**:
-   Mọi script can thiệp tối ưu hóa luồng chỉ được thực thi trên các máy chủ được xác minh thuộc hạ tầng của Microsoft:
-   - `xbox.com` (và các tên miền con)
-   - `xboxlive.com`
-   - `xboxservices.com`
-   - `live.com` / `live.net`
-   - `microsoft.com` / `microsoftonline.com`
-   - `msauth.net`
-
-2. **Xác thực giao thức HTTPS**:
-   Chỉ cho phép tải nội dung qua giao thức `https://`. Mọi liên kết không an toàn `http://` đều bị từ chối hoặc chặn thực thi bridge.
-
-3. **Cách ly JavaScript Interface (`@JavascriptInterface`)**:
-   Tất cả hàm giao tiếp giữa WebView và Kotlin trong `XboxBridge` đều chạy qua cổng kiểm tra nguồn gốc `isCallerTrusted()`. Nếu người dùng điều hướng ra ngoài danh sách tên miền tin cậy, toàn bộ các hàm API của bridge sẽ ngay lập tức bị vô hiệu hóa.
+| Phiên bản / Version | Hỗ trợ / Supported |
+| :--- | :--- |
+| `main` (Mới nhất / Latest) | :white_check_mark: Có / Yes |
+| Các bản cũ / Older releases | :x: Không / No |
 
 ---
 
-## 3. Bảo Vệ Giao Dịch & Thanh Toán (External Navigation Safety)
+## 2. Nguyên tắc Bảo mật & Quyền riêng tư / Security & Privacy Principles
 
-Khi người dùng thực hiện mua sắm gói Game Pass hoặc thanh toán qua thẻ ngân hàng/3D-Secure:
-- Hệ thống tự động kích hoạt cơ chế `pauseProxyForExternalNavigation()`.
-- Proxy được ngắt tạm thời để toàn bộ giao dịch đi thẳng qua mạng ISP trực tiếp của thiết bị, loại bỏ hoàn toàn nguy cơ máy chủ proxy ghi log hoặc can thiệp thông tin giao dịch thẻ.
-- Sau khi hoàn tất và trở về trang game, proxy hoặc mạng trực tiếp sẽ được khôi phục tự động qua `restoreProxyForGaming()`.
+### 2.1. Bảo vệ tài khoản Microsoft & Xbox / Account Protection
+- **Đăng nhập trực tiếp (Direct Sign-In):** Mọi thao tác đăng nhập diễn ra trực tiếp trên trang chính thức của Microsoft (`login.live.com`, `microsoftonline.com`, `xbox.com`) qua kết nối mã hóa HTTPS.
+- **Không thu thập mật khẩu (Zero Credential Collection):** Ứng dụng không đọc, không ghi nhật ký và không gửi mật khẩu, mã xác thực hai bước (2FA) hay thông tin cá nhân của bạn ra bất kỳ máy chủ bên thứ ba nào.
+- **Direct HTTPS Sign-In:** All authentication happens directly on official Microsoft pages over HTTPS. The app never reads, logs, or transmits your password, 2FA codes, or personal credentials to any third-party server.
 
----
+### 2.2. Cách ly trang thanh toán & liên kết ngoài / Payment & External Page Isolation
+- **Tự động ngắt chuyển tiếp mạng khi thanh toán:** Khi phát hiện trang mua hàng, thanh toán (`cart`, `checkout`, `billing`, `payment`, `redeem`) hoặc tên miền bên ngoài danh sách tin cậy, ứng dụng sẽ tự động tạm dừng chế độ chuyển tiếp mạng hoặc mở bằng trình duyệt mặc định của điện thoại để bảo vệ thông tin thẻ/tài khoản ngân hàng.
+- **Automatic Payment Isolation:** When navigating to billing, checkout, or untrusted external pages, network relay automatically pauses or opens in your system browser to keep payment details strictly between your device and Microsoft.
 
-## 4. Đo Đạc WebRTC Telemetry Minh Bạch
+### 2.3. Dữ liệu 100% nội bộ trên máy / 100% Local On-Device Storage
+- **Lưu trữ riêng tư (`MODE_PRIVATE`):** Cài đặt ứng dụng, danh sách game yêu thích và lịch sử phiên chơi (thời lượng, FPS, độ trễ mạng) chỉ được lưu cục bộ trong bộ nhớ riêng của ứng dụng trên điện thoại.
+- **Không theo dõi từ xa (No Cloud Tracking):** Dự án không tích hợp bộ thu thập hành vi người dùng và không đồng bộ lịch sử chơi lên đám mây. Bạn có thể xóa toàn bộ dữ liệu bất cứ lúc nào trong phần **Cài đặt**.
+- **Strictly Local Data:** Settings, saved games, and play session history (duration, average FPS, ping) are stored exclusively on your device (`SharedPreferences` in `MODE_PRIVATE`) and can be cleared anytime in **Settings**.
 
-- Toàn bộ thông số như **Thời gian giải mã (decodeTimeMs)**, **Bitrate (Mbps)**, **Ping (RTT)**, **Jitter**, và **Rớt khung (Frames Dropped)** được đọc trực tiếp từ chuẩn W3C `RTCPeerConnection.getStats()`.
-- Dữ liệu này chỉ được xử lý trong RAM nội bộ để phục vụ:
-  1. Hiển thị bảng HUD nổi cho người chơi theo dõi độ trễ.
-  2. Cung cấp dữ liệu cho `AdaptiveQualityManager` để tự động hạ bậc bitrate khi mạng yếu hoặc GPU quá tải, ngăn ngừa hiện tượng giật đứng khung hình.
-- Ứng dụng **không có bất kỳ cơ chế telemetry ngầm** nào gửi dữ liệu này ra bên ngoài thiết bị.
-
----
-
-## 5. Báo Cáo Lỗ Hổng Bảo Mật (Vulnerability Reporting)
-
-Nếu bạn phát hiện bất kỳ vấn đề bảo mật nào trong mã nguồn hoặc cách ly mạng của CloudPlay:
-
-1. **Vui lòng không công khai lỗ hổng lên issue tracker công cộng trước khi nhóm phát triển khắc phục.**
-2. Gửi email chi tiết về mã lỗi, các bước tái hiện (PoC) tới email của người bảo trì dự án hoặc mở một báo cáo bảo mật riêng tư (Private Security Advisory) trên GitHub.
-3. Nhóm bảo trì cam kết:
-   - Phản hồi xác nhận trong vòng **24-48 giờ**.
-   - Cung cấp bản vá khắc phục trong thời gian sớm nhất tùy thuộc vào mức độ nghiêm trọng.
+### 2.4. Ràng buộc an toàn hệ thống / Technical Safeguards
+- **Chặn kết nối không mã hóa (`usesCleartextTraffic="false"`):** Toàn bộ kết nối trong ứng dụng bắt buộc dùng HTTPS.
+- **Kiểm tra tên miền nghiêm ngặt (Strict Origin Verification):** Cầu nối giao tiếp giữa trang web và ứng dụng (`JavascriptInterface`) cùng quyền truy cập âm thanh/tay cầm chỉ hoạt động khi trang hiện tại thuộc danh sách tên miền chính thức của Microsoft/Xbox qua giao thức `https://`.
+- **Chơi công bằng (Fair Play):** Ứng dụng chỉ hỗ trợ hiển thị nút bấm cảm ứng tiêu chuẩn và tối ưu độ mượt hình ảnh; hoàn toàn không có tính năng bắn liên thanh (macro/turbo), khóa tâm hay can thiệp dữ liệu trò chơi.
+- **System Safeguards:** Enforces HTTPS-only traffic (`usesCleartextTraffic="false"`), strict domain boundary validation for WebView bridges and permissions, safe parameter quoting, and a strict Fair Play policy (no macros, turbo fire, or game data modification).
 
 ---
 
-## 6. Phiên Bản Được Hỗ Trợ (Supported Versions)
+## 3. Báo cáo Lỗ hổng Bảo mật / Reporting a Vulnerability
 
-| Phiên Bản | Hỗ Trợ Bảo Mật | Ghi Chú |
-| :--- | :--- | :--- |
-| 1.0.x (Hiện tại) | Có | Nhận đầy đủ bản vá lỗi mạng & cách ly WebView |
-| < 1.0.0 | Không | Vui lòng nâng cấp lên bản mới nhất |
+Nếu bạn phát hiện lỗi bảo mật (ví dụ: rò rỉ phiên đăng nhập, vượt qua kiểm tra tên miền tin cậy, hoặc lỗi thực thi mã trong WebView), vui lòng **không công khai lỗi ngay trên mục Issues chung**:
+
+If you discover a security vulnerability (such as session leakage, origin validation bypass, or WebView injection), please **do not open a public issue immediately**:
+
+1. Sử dụng tính năng **Report a vulnerability** (Private Security Advisory) trong tab **Security** của kho lưu trữ GitHub này. / Use the **Report a vulnerability** button under the **Security** tab of this GitHub repository.
+2. Mô tả ngắn gọn các bước tái hiện lỗi và mức độ ảnh hưởng. / Provide clear steps to reproduce the issue and its potential impact.
+3. Nhóm phát triển sẽ phản hồi trong vòng **48 giờ** và phối hợp phát hành bản vá sớm nhất. / We will review and respond within **48 hours** to coordinate a fix.

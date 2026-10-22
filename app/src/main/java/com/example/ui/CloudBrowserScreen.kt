@@ -252,8 +252,11 @@ fun CloudBrowserScreen(
             "https://www.xbox.com",
             "MSPC-LOCALE=$effectiveLocale; domain=.xbox.com; path=/"
         )
+        val safeCountry = org.json.JSONObject.quote(vpnState.currentServer.countryCode)
+        val safeIp = org.json.JSONObject.quote(vpnState.currentServer.ip)
+        val safeLocale = org.json.JSONObject.quote(effectiveLocale)
         webViewInstance?.evaluateJavascript(
-            "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: '${vpnState.currentServer.countryCode}', ip: '${vpnState.currentServer.ip}', locale: '$effectiveLocale' });",
+            "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale });",
             null
         )
     }
@@ -460,9 +463,10 @@ fun CloudBrowserScreen(
 
                         override fun onPermissionRequest(request: PermissionRequest?) {
                             if (request == null) return
-                            val originHost = request.origin?.host ?: ""
-                            val isXboxOrigin = originHost.endsWith("xbox.com") || originHost.endsWith("live.com") || originHost.endsWith("microsoft.com")
-                            if (isXboxOrigin) {
+                            val originScheme = request.origin?.scheme?.lowercase()
+                            val originHost = request.origin?.host?.lowercase() ?: ""
+                            val isTrustedOrigin = originScheme == "https" && XboxBridge.isTrustedDomainHost(originHost)
+                            if (isTrustedOrigin) {
                                 val audioResources = request.resources.filter { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE }.toTypedArray()
                                 if (audioResources.isNotEmpty()) {
                                     request.grant(audioResources)

@@ -1,132 +1,64 @@
-# 🎮 CloudPlay - Xbox Cloud Gaming Booster & Client
+# CloudPlay Optimizer (Xbox Cloud Gaming Helper)
 
-<p align="center">
-  <img src="https://img.shields.io/github/v/release/muitenvn/CloudPlay-App?color=00c853&label=Latest%20Release&style=for-the-badge" alt="Release Badge" />
-  <img src="https://img.shields.io/github/actions/workflow/status/muitenvn/CloudPlay-App/build-and-release-apk.yml?branch=main&label=Build%20Status&style=for-the-badge" alt="Build Badge" />
-  <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-blue?style=for-the-badge&logo=android" alt="Android Badge" />
-  <img src="https://img.shields.io/badge/Ping%20Vietnam-25%E2%80%9335ms-brightgreen?style=for-the-badge" alt="Ping Badge" />
-</p>
+**CloudPlay Optimizer** là ứng dụng hỗ trợ chơi **Xbox Cloud Gaming (xCloud)** trên Android mượt mà hơn, lấy cảm hứng từ dự án mã nguồn mở [Better-xCloud](https://github.com/redphx/better-xcloud) (Giấy phép MIT). Ứng dụng tập trung vào sự ổn định, dễ sử dụng, bảo mật tài khoản và nguyên tắc **Chơi công bằng (Fair Play)**.
+
+**CloudPlay Optimizer** is an Android companion app designed to deliver a smoother **Xbox Cloud Gaming (xCloud)** experience, inspired by the open-source [Better-xCloud](https://github.com/redphx/better-xcloud) project (MIT License). It focuses on stability, simplicity, account security, and **Fair Play**.
 
 ---
 
-## Tiếng Việt
+## Tính năng chính / Key Features
 
-### 📖 Giới thiệu
+### 1. Tối ưu Hình ảnh & Độ mượt / Stream & Performance Optimization
+- **Chọn mức chất lượng linh hoạt:** Hỗ trợ chế độ Tự động hoặc chọn mức chất lượng hình ảnh phù hợp với tốc độ mạng (áp dụng khi bắt đầu phiên chơi; tự động điều chỉnh êm bộ đệm khi đang chơi).
+- **Chế độ máy yếu & Tự giảm tải khi máy nóng:** Giữ ổn định 60 FPS trên thiết bị phổ thông, chỉ mở 120 FPS cho Fortnite khi chọn chất lượng Cao trên máy khỏe, và tự động hạ hiệu ứng khi thiết bị quá nhiệt.
+- **Adaptive Stream & Thermal Protection:** Smoothly balances playback buffer during gameplay, keeps safe 60 FPS defaults for everyday devices (enabling 120 FPS in Fortnite only on high quality presets), and automatically scales down visual load when the phone overheats.
 
-CloudPlay là ứng dụng Android mã nguồn mở giúp cải thiện trải nghiệm chơi Xbox Cloud Gaming (xCloud) trên các thiết bị Android, đặc biệt phù hợp với người dùng ở Việt Nam và khu vực Đông Nam Á. Ứng dụng tập trung vào việc tối ưu hóa kết nối mạng, cải thiện trải nghiệm điều khiển và tăng khả năng sử dụng trên mạng di động và Wi‑Fi.
+### 2. Kết nối & Máy chủ thông minh / Smart Network & Server Selection
+- **Đo độ trễ (Ping) trực tiếp:** Kiểm tra nhanh máy chủ gần nhất (Nhật Bản, Hàn Quốc, Singapore, Úc, Mỹ, Châu Âu) để vào game nhanh và ít giật lag.
+- **Hỗ trợ vượt giới hạn vùng:** Giúp truy cập trang Xbox Cloud Gaming tại các khu vực chưa hỗ trợ chính thức và tự động ngắt chuyển tiếp khi vào luồng video để giảm độ trễ.
+- **Region Bypass & Fast Server Check:** Quickly tests latency across global regions and helps connect from unsupported regions while keeping video streaming direct and low-latency.
 
-Lưu ý quan trọng: Người dùng cần tuân thủ Điều khoản sử dụng của Microsoft, các chính sách của nền tảng và quy định pháp luật địa phương. Dự án này không khuyến khích hoặc hỗ trợ bất kỳ hành vi vi phạm bản quyền, phá khóa, lách luật hay can thiệp trái phép vào dịch vụ của bên thứ ba.
+### 3. Tay cầm cảm ứng & Chơi công bằng / Touch Controls & Fair Play
+- **Tay cầm ảo tùy chỉnh:** Hỗ trợ bố cục chuẩn Xbox, bố cục riêng cho **Fortnite**, tùy chỉnh vị trí, kích thước, độ trong suốt nút bấm và ngắm con quay hồi chuyển (Gyro).
+- **Cam kết Chơi công bằng (Fair Play):** Hoàn toàn **không** có tính năng bắn liên thanh (Turbo/Macro), tự động khóa cò hay bất kỳ công cụ gian lận nào can thiệp vào tính công bằng của trò chơi.
+- **Customizable Touch Controls (Fair Play):** Standard Xbox and Fortnite-tailored touch layouts with customizable button placement, size, opacity, and gyro aiming—strictly free of turbo-fire, macros, or unfair gameplay assists.
 
-### ✨ Tính năng nổi bật
+### 4. Tab Game: Thư viện & Lịch sử phiên chơi / Games Tab: Library & Session History
+- **Thư viện nhanh:** Mở nhanh các tựa game phổ biến hoặc tiếp tục ngay trò chơi vừa chơi gần nhất từ Trang chủ.
+- **Lịch sử phiên chơi trực quan:** Tự động ghi lại thời lượng chơi, FPS trung bình, độ trễ mạng (Ping) và trạng thái nhiệt độ máy của từng phiên chơi ngay trên thiết bị.
+- **Quick Library & Session History:** Jump straight back into your most recently played game from the Home screen, and review past session duration, average FPS, ping, and thermal performance in the **Games** tab.
 
-- ⚡ Tối ưu hóa kết nối mạng
-  - Giảm độ trễ và cải thiện chất lượng luồng trong điều kiện mạng thực tế.
-  - Hỗ trợ tối ưu cho các kết nối Wi‑Fi 5GHz và mạng di động 4G/5G.
-
-- 🎮 HUD nổi
-  - Hiển thị ping, trạng thái mạng và các nút điều khiển nhanh.
-
-- 🌐 Dịch nội dung và hỗ trợ đa ngôn ngữ
-  - Hỗ trợ dịch giao diện, mô tả game và thông tin trực quan.
-  - Chế độ song ngữ với trải nghiệm Tiếng Việt và Tiếng Anh.
-
-- 🧩 Giao diện hiện đại
-  - Thiết kế mượt, dễ sử dụng và xây dựng bằng Jetpack Compose (Material 3).
-
-- 🔒 Bảo mật và quyền riêng tư
-  - Không thu thập mật khẩu hay thông tin đăng nhập người dùng.
-
-### 📥 Tải xuống
-
-Bạn có thể tải APK mới nhất từ tab Releases của repository:
-
-- GitHub Releases: https://github.com/muitenvn/CloudPlay-App/releases/latest
-- GitHub Actions: https://github.com/muitenvn/CloudPlay-App/actions
-
-### ⚙️ Build / Tự build
-
-Yêu cầu: Android SDK 36 (hoặc 35+), JDK 21.
-
-```bash
-# Clone repository
-git clone https://github.com/muitenvn/CloudPlay-App.git
-cd CloudPlay-App
-
-# Cấp quyền thực thi cho gradlew
-chmod +x gradlew
-
-# Biên dịch APK Debug
-./gradlew assembleDebug
-```
-
-### 🧾 Bản quyền & Tuyên bố từ chối trách nhiệm
-
-- CloudPlay là dự án độc lập và không liên kết chính thức với Microsoft, Xbox hoặc các dịch vụ của họ.
-- Tất cả thương hiệu như Xbox, Xbox Cloud Gaming, Game Pass, v.v. thuộc quyền sở hữu của các chủ sở hữu tương ứng.
-- Tác giả không chịu trách nhiệm cho việc người dùng lạm dụng phần mềm để vi phạm thỏa thuận, pháp luật hoặc quyền của bên thứ ba.
+### 5. Bảng điều khiển nhanh (HUD) & Dịch màn hình / Quick HUD & Screen Translator
+- **HUD gọn nhẹ trong lúc chơi:** Xem nhanh FPS, Ping, chỉnh tay cầm cảm ứng và mở hộp **Cài đặt nhanh** (chất lượng, chế độ máy yếu, bật/tắt dịch) ngay trong màn hình chơi mà không bị làm phiền.
+- **Dịch phụ đề & menu trực tiếp trên máy:** Hỗ trợ dịch chữ trên màn hình sang tiếng Việt hoặc ngôn ngữ đã chọn bằng mô hình dịch ngoại tuyến trên thiết bị.
+- **Compact In-Game HUD & On-Device Translator:** Check real-time FPS/ping, adjust touch controls, toggle **Quick Settings** on the fly, and translate in-game menus or subtitles directly on your device.
 
 ---
 
-## English
+## Bảo mật & Quyền riêng tư / Security & Privacy
 
-### 📖 Overview
+Ứng dụng được thiết kế theo nguyên tắc an toàn tối đa cho người dùng (xem chi tiết tại [SECURITY.md](SECURITY.md)):
+The app is built with strict user safety guarantees (see [SECURITY.md](SECURITY.md) for full details):
 
-CloudPlay is an open-source Android application designed to improve the Xbox Cloud Gaming (xCloud) experience on Android devices, especially for users in Vietnam and Southeast Asia. The project focuses on network optimization, smoother controls, and better usability on mobile networks and Wi‑Fi.
-
-Important notice: Users must comply with Microsoft's terms of service, relevant platform policies, and local laws. This project does not encourage or support copyright violations, bypassing restrictions, or unauthorized interference with third-party services.
-
-### ✨ Key Features
-
-- ⚡ Network optimization
-  - Reduces latency and improves streaming quality under real-world conditions.
-  - Optimized for Wi‑Fi 5GHz and 4G/5G mobile connections.
-
-- 🎮 Floating HUD
-  - Displays ping, connection status, and quick controls.
-
-- 🌐 Translation and multilingual support
-  - Supports UI translation, game descriptions, and visual information.
-  - Bilingual experience with Vietnamese and English.
-
-- 🧩 Modern interface
-  - Smooth, user-friendly UI built with Jetpack Compose (Material 3).
-
-- 🔒 Security and privacy
-  - Does not collect user passwords or login credentials.
-
-### 📥 Download
-
-You can download the latest APK from the GitHub Releases page:
-
-- GitHub Releases: https://github.com/muitenvn/CloudPlay-App/releases/latest
-- GitHub Actions: https://github.com/muitenvn/CloudPlay-App/actions
-
-### ⚙️ Build
-
-Requirements: Android SDK 36 (or 35+), JDK 21.
-
-```bash
-# Clone repository
-git clone https://github.com/muitenvn/CloudPlay-App.git
-cd CloudPlay-App
-
-# Make gradlew executable
-chmod +x gradlew
-
-# Build Debug APK
-./gradlew assembleDebug
-```
-
-### 🧾 Copyright & Disclaimer
-
-- CloudPlay is an independent project and is not officially affiliated with Microsoft, Xbox, or their services.
-- All trademarks such as Xbox, Xbox Cloud Gaming, Game Pass, etc. belong to their respective owners.
-- The author is not responsible for any misuse of the software that violates agreements, laws, or third-party rights.
+1. **Đăng nhập an toàn qua HTTPS:** Bạn đăng nhập trực tiếp trên tên miền chính thức của Microsoft (`login.live.com`, `xbox.com`). Ứng dụng không thu thập hay lưu mật khẩu của bạn. / **Direct HTTPS Sign-In:** Authenticate directly on official Microsoft domains; credentials are never collected or stored.
+2. **Cách ly trang thanh toán:** Tự động tắt chuyển tiếp mạng hoặc mở bằng trình duyệt ngoài khi bạn vào trang mua hàng/thanh toán của Microsoft. / **Payment Page Isolation:** Network relay automatically pauses on billing, cart, and checkout pages.
+3. **Lưu trữ 100% trên thiết bị:** Cài đặt, danh sách game và lịch sử phiên chơi chỉ nằm trong bộ nhớ riêng tư của ứng dụng trên máy bạn, không gửi lên đám mây. / **100% On-Device Data:** Settings, saved games, and session history remain strictly on your device.
 
 ---
 
-## ☕ Ủng hộ / Support
+## Điều khoản sử dụng & Miễn trừ trách nhiệm / Terms of Use & Disclaimer
 
-Nếu bạn thấy ứng dụng hữu ích và muốn hỗ trợ phát triển, bạn có thể đóng góp hoặc tài trợ theo hướng phù hợp với quy định hiện hành.
+Khi tải và sử dụng ứng dụng này, bạn đồng ý với các điều khoản sau (cũng được hiển thị rõ trong ứng dụng):
+By downloading and using this application, you agree to the following terms (also accessible anytime inside the app under **Settings**):
 
-If you find the app useful and want to support development, you can contribute or sponsor in a way that complies with applicable regulations.
+- **Không liên kết với Microsoft / Non-Affiliation:** Đây là dự án hỗ trợ độc lập của cộng đồng, **không** phải ứng dụng chính thức và không được tài trợ hay phê duyệt bởi Microsoft Corporation hay Xbox. Nhãn hiệu *Xbox*, *Xbox Cloud Gaming* và *Fortnite* thuộc về chủ sở hữu tương ứng. / This is an independent community companion app and is **not** affiliated with, endorsed, or sponsored by Microsoft Corporation or Xbox.
+- **Trách nhiệm người dùng / User Responsibility:** Người dùng tự chịu trách nhiệm tuân thủ Điều khoản Dịch vụ của Microsoft (Microsoft Services Agreement) và quy tắc ứng xử của từng trò chơi khi sử dụng dịch vụ đám mây. / Users are solely responsible for complying with the Microsoft Services Agreement and each game's code of conduct.
+- **Bản quyền mã nguồn mở / Open-Source License:** Dự án kế thừa ý tưởng tối ưu từ [Better-xCloud](https://github.com/redphx/better-xcloud) của tác giả **redphx** và được phát hành theo [Giấy phép MIT (MIT License)](https://opensource.org/licenses/MIT). Phần mềm được cung cấp "nguyên trạng" (AS-IS) không kèm bảo đảm thương mại.
+
+---
+
+## Hướng dẫn cài đặt & biên dịch / Build Instructions
+
+1. Mở dự án bằng **Android Studio** (hỗ trợ Android SDK 34+). / Open the project in **Android Studio** (Android SDK 34+).
+2. Đồng bộ Gradle và chạy mục tiêu `app` trên thiết bị Android thực tế (Android 8.0 trở lên). / Sync Gradle and run the `app` configuration on an Android device (Android 8.0+).
+3. Trong lần mở đầu tiên, vui lòng đọc và xác nhận **Điều khoản sử dụng & Bảo mật** trước khi đăng nhập tài khoản Xbox của bạn. / On first launch, review and accept the **Terms of Use & Security Notice** before signing in to your Xbox account.

@@ -876,13 +876,13 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4.3 Điều khoản & bản quyền
-                SettingsCard(title = if (isEn) "Terms & License" else "Điều khoản & bản quyền") {
+                // 4.3 Điều khoản, bảo mật & bản quyền
+                SettingsCard(title = if (isEn) "Terms, Security & License" else "Điều khoản, bảo mật & bản quyền") {
                     Text(
                         text = if (isEn) {
-                            "Independent app integrating open-source optimizations from Better-xCloud (MIT License)."
+                            "Independent app • Fair Play (no macro/cheats) • 100% local data • Open-source MIT License (Better-xCloud)."
                         } else {
-                            "Ứng dụng độc lập tích hợp mã nguồn mở từ dự án Better-xCloud (Giấy phép MIT)."
+                            "Ứng dụng độc lập • Chơi công bằng (không macro/gian lận) • Dữ liệu lưu cục bộ 100% • Giấy phép nguồn mở MIT (Better-xCloud)."
                         },
                         color = TextSecondary,
                         fontSize = 11.sp
@@ -896,7 +896,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                             Text(
-                                text = if (isEn) "View Terms & MIT License" else "Xem điều khoản & giấy phép MIT",
+                                text = if (isEn) "View Terms, Security & MIT License" else "Xem điều khoản, bảo mật & giấy phép MIT",
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold

@@ -309,23 +309,29 @@ object AdaptiveQualityManager {
         }
 
         // Theo dõi thời gian giải mã trung bình > 12ms liên tục 10 giây (hoặc >= 7 mẫu liên tiếp):
-        // hạ và lưu mức bitrate thấp hơn 1 bậc (15 -> 12 -> 10 -> 8) cho lần chơi sau
+        // Chỉ tự lưu mức thấp hơn (15 -> 12 -> 10 -> 8) khi đang bật Tự động (isAutoAdapting == true).
+        // Nếu người dùng chọn mức cố định thì không tự đổi mức của họ, chỉ hiện ghi chú gợi ý.
         var steppedDownForNextSession = false
+        var fixedDecodeSlowHint = false
         if (effectiveDecode > 12.0) {
             val now = System.currentTimeMillis()
             if (highDecodeStartMs == 0L) highDecodeStartMs = now
             highDecodeTicks++
-            if ((now - highDecodeStartMs >= 10_000L || highDecodeTicks >= 7)) {
-                val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(8)
-                val nextLowerMbps = when {
-                    baseMbps >= 15 -> 12
-                    baseMbps >= 12 -> 10
-                    else -> 8
-                }
-                if (savedNextSessionMbps != nextLowerMbps) {
-                    savedNextSessionMbps = nextLowerMbps
-                    SettingsRepository.updateMaxBitrate(nextLowerMbps)
-                    steppedDownForNextSession = true
+            if (now - highDecodeStartMs >= 10_000L || highDecodeTicks >= 7) {
+                if (current.isAutoAdapting) {
+                    val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(8)
+                    val nextLowerMbps = when {
+                        baseMbps >= 15 -> 12
+                        baseMbps >= 12 -> 10
+                        else -> 8
+                    }
+                    if (savedNextSessionMbps != nextLowerMbps) {
+                        savedNextSessionMbps = nextLowerMbps
+                        SettingsRepository.updateMaxBitrate(nextLowerMbps)
+                        steppedDownForNextSession = true
+                    }
+                } else {
+                    fixedDecodeSlowHint = true
                 }
                 highDecodeStartMs = now
                 highDecodeTicks = 0
@@ -408,10 +414,15 @@ object AdaptiveQualityManager {
         }
 
         val fixedGrade = if (isEn) "Fixed (${current.smoothBitrateMbps.toInt()}M)" else "Cố Định (${current.smoothBitrateMbps.toInt()}M)"
-        if (current.qualityGrade != fixedGrade || steppedDownForNextSession) {
+        val fixedSuggestion = if (isEn) {
+            "💡 Device is busy, consider choosing a lower quality level"
+        } else {
+            "💡 Máy hơi quá tải, gợi ý chọn mức chất lượng thấp hơn"
+        }
+        if (current.qualityGrade != fixedGrade || fixedDecodeSlowHint) {
             _state.value = current.copy(
                 qualityGrade = fixedGrade,
-                qualityNotice = "📌 $nextSessionNote"
+                qualityNotice = if (fixedDecodeSlowHint) fixedSuggestion else "📌 $nextSessionNote"
             )
         }
     }

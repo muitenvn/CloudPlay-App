@@ -451,7 +451,7 @@ fun DashboardScreen(
                             onClearCookies = {
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 android.webkit.WebStorage.getInstance().deleteAllData()
-                                val msg = if (config.isEnglishUI()) "Cleared all Xbox cookies & site data!" else "Đã xóa toàn bộ Cookie & Dữ liệu Xbox!"
+                                val msg = if (config.isEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
                                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )

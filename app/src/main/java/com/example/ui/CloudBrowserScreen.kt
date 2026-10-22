@@ -110,8 +110,7 @@ fun CloudBrowserScreen(
     var bridgeInstance by remember { mutableStateOf<XboxBridge?>(null) }
     var pageLoadingProgress by remember { mutableFloatStateOf(0f) }
     var isPageLoading by remember { mutableStateOf(true) }
-    var showGuideDialog by remember { mutableStateOf(false) }
-    var guideInitialSection by remember { mutableStateOf(com.example.ui.components.GuideSection.ZERO_LAG) }
+    var showQuickSettingsDialog by remember { mutableStateOf(false) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
     var lastXboxUrl by remember { mutableStateOf(initialUrl) }
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
@@ -694,8 +693,7 @@ fun CloudBrowserScreen(
                 SettingsRepository.updateShowVirtualController(!config.showVirtualController)
             },
             onOpenSettings = {
-                guideInitialSection = com.example.ui.components.GuideSection.ZERO_LAG
-                showGuideDialog = true
+                showQuickSettingsDialog = true
             },
             onNavigateHome = onNavigateBackToDashboard,
             onReloadPage = { webViewInstance?.reload() },
@@ -736,10 +734,6 @@ fun CloudBrowserScreen(
             onSelectCellularMode = { mode -> SettingsRepository.updateCellularMode(mode) },
             onToggleWifiSpeedFirst = { enabled -> SettingsRepository.updateWifiSpeedFirstPriority(enabled) },
             gameProfile = gameProfile,
-            onOpenGuide = { section ->
-                guideInitialSection = section
-                showGuideDialog = true
-            },
             onOpenTranslator = {
                 showTranslatorDialog = true
             },
@@ -761,12 +755,178 @@ fun CloudBrowserScreen(
             }
         )
 
-        // How To Use Guide Dialog
-        if (showGuideDialog) {
-            com.example.ui.components.HowToUseGuideDialog(
-                initialSection = guideInitialSection,
-                onDismiss = { showGuideDialog = false }
-            )
+        // Compact In-Game Quick Settings Dialog (Quality Level, Low-End Mode, Translation Toggle)
+        if (showQuickSettingsDialog) {
+            val isEn = config.isEnglishUI()
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { showQuickSettingsDialog = false }
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, XboxCardBorder, RoundedCornerShape(18.dp))
+                        .testTag("in_game_quick_settings_dialog"),
+                    color = XboxSurface.copy(alpha = 0.98f),
+                    shadowElevation = 12.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isEn) "Quick Settings" else "Cài đặt nhanh",
+                                color = TextPrimary,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color.White.copy(alpha = 0.08f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showQuickSettingsDialog = false }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = if (isEn) "Close" else "Đóng",
+                                    tint = TextPrimary,
+                                    modifier = Modifier
+                                        .padding(6.dp)
+                                        .size(16.dp)
+                                )
+                            }
+                        }
+
+                        // 1. Mức chất lượng
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = if (isEn) "Quality Level" else "Mức chất lượng",
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                com.example.data.CellularOptimizationMode.entries.forEach { mode ->
+                                    val selected = config.cellularMode == mode
+                                    val shortTitle = when (mode) {
+                                        com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
+                                        com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
+                                        com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
+                                        com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
+                                        com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { SettingsRepository.updateCellularMode(mode) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (selected) XboxNeonGreen else XboxCardBorder
+                                        )
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.padding(vertical = 7.dp, horizontal = 2.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = shortTitle,
+                                                color = if (selected) XboxNeonGreen else TextPrimary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            Text(
+                                text = if (isEn) "New level takes effect next session" else "Mức mới có tác dụng ở lần chơi sau",
+                                color = DirectCyan,
+                                fontSize = 10.sp
+                            )
+                        }
+
+                        // 2. Chế độ máy yếu
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
+                                    color = TextPrimary,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (isEn) "Light graphics & cool 60 FPS" else "Đồ họa nhẹ, giữ máy mát 60 FPS",
+                                    color = Color(0xFFB0C4B8),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            androidx.compose.material3.Switch(
+                                checked = config.lowEndDeviceMode,
+                                onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
+                                colors = androidx.compose.material3.SwitchDefaults.colors(
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = XboxNeonGreen
+                                )
+                            )
+                        }
+
+                        // 3. Bật/tắt bộ dịch
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEn) "Auto Translate (Vietnamese)" else "Dịch tự động tiếng Việt",
+                                    color = TextPrimary,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (isEn) "Translate Xbox web menus" else "Dịch menu và thông báo trang Xbox",
+                                    color = Color(0xFFB0C4B8),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            androidx.compose.material3.Switch(
+                                checked = effectiveTranslate,
+                                onCheckedChange = { enabled ->
+                                    if (config.isEnglishUI() && enabled) {
+                                        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
+                                    }
+                                    SettingsRepository.updateXcloudTranslate(enabled)
+                                    webViewInstance?.evaluateJavascript(
+                                        "if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($enabled);",
+                                        null
+                                    )
+                                },
+                                colors = androidx.compose.material3.SwitchDefaults.colors(
+                                    checkedThumbColor = Color.Black,
+                                    checkedTrackColor = DirectCyan
+                                )
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // Smart Translator Dialog

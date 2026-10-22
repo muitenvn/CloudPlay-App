@@ -145,7 +145,6 @@ fun FloatingHud(
     onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit = {},
     onToggleWifiSpeedFirst: (Boolean) -> Unit = {},
     gameProfile: com.example.data.GameOptimizationProfile? = null,
-    onOpenGuide: (GuideSection) -> Unit = {},
     onOpenTranslator: () -> Unit = {},
     onToggleOrientation: () -> Unit = {},
     videoTopRatio: Float = 0f,

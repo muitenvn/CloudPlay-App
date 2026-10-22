@@ -123,7 +123,7 @@ fun ServersScreen(
 
     val serverPings = remember { mutableStateMapOf<String, Int>() }
 
-    fun testAllServers() {
+    fun testAllServers(autoPickBest: Boolean = false) {
         isTestingAll = true
         scope.launch(Dispatchers.IO) {
             val deferreds = allServers.map { server ->
@@ -138,6 +138,27 @@ fun ServersScreen(
                 serverPings[id] = ping
             }
             isTestingAll = false
+            if (autoPickBest) {
+                val candidates = VpnManager.sortServersByUnlockAndPing(
+                    servers = allServers.toList(),
+                    pingMap = serverPings.toMap(),
+                    records = vpnState.unlockRecords
+                )
+                val best = candidates.firstOrNull { (serverPings[it.id] ?: -1) > 0 } ?: candidates.firstOrNull()
+                if (best != null) {
+                    kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        onSelectServer(best)
+                        val bestPing = serverPings[best.id] ?: -1
+                        val pingSuffix = if (bestPing > 0) " (${bestPing}ms)" else ""
+                        val msg = if (isEn) {
+                            "Selected best server: ${best.flag} ${best.name}$pingSuffix"
+                        } else {
+                            "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name}$pingSuffix"
+                        }
+                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
@@ -379,18 +400,53 @@ fun ServersScreen(
                                 )
                             }
 
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = DirectCyan.copy(alpha = 0.15f)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = "${currentServer.speedMbps} Mbps",
-                                    color = DirectCyan,
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                )
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = XboxGreen.copy(alpha = 0.25f),
+                                    border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable(enabled = !isTestingAll) { testAllServers(autoPickBest = true) }
+                                        .testTag("auto_pick_best_server_button")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = null,
+                                            tint = XboxNeonGreen,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                        Text(
+                                            text = if (isEn) "Auto Best" else "Chọn tối ưu",
+                                            color = XboxNeonGreen,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = DirectCyan.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${currentServer.speedMbps} Mbps",
+                                        color = DirectCyan,
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -401,7 +457,7 @@ fun ServersScreen(
                         horizontalArrangement = Arrangement.spacedBy(7.dp)
                     ) {
                         Button(
-                            onClick = { testAllServers() },
+                            onClick = { testAllServers(autoPickBest = false) },
                             enabled = !isTestingAll,
                             modifier = Modifier
                                 .weight(1.1f)
@@ -978,17 +1034,30 @@ private fun CustomProxyDialog(
                 onClick = {
                     val p = port.toIntOrNull() ?: 8080
                     val speed = speedMbps.toIntOrNull() ?: 200
+                    val cc = countryCode.trim().uppercase()
+                    val resolvedFlag = when (cc) {
+                        "JP" -> "🇯🇵"
+                        "KR" -> "🇰🇷"
+                        "US" -> "🇺🇸"
+                        "SG" -> "🇸🇬"
+                        "TW" -> "🇹🇼"
+                        "HK" -> "🇭🇰"
+                        "AU" -> "🇦🇺"
+                        "VN" -> "🇻🇳"
+                        "DE", "GB", "UK", "FR", "NL", "EU" -> "🇪🇺"
+                        else -> "🌐"
+                    }
                     val server = ServerLocation(
                         id = "custom_${System.currentTimeMillis()}",
                         name = name.ifBlank { "Custom Proxy" },
-                        flag = if (countryCode.uppercase() == "JP") "🇯🇵" else "🌐",
+                        flag = resolvedFlag,
                         ip = host.trim(),
                         port = p,
                         protocol = protocol.trim().lowercase(),
                         azureEndpoint = azureEndpoint.ifBlank { "japaneast.cloudapp.azure.com" },
                         description = description.ifBlank { if (isEn) "Custom proxy" else "Proxy cá nhân" },
                         speedMbps = speed,
-                        countryCode = countryCode.uppercase(),
+                        countryCode = cc,
                         isCustom = true,
                         isVerified = true
                     )

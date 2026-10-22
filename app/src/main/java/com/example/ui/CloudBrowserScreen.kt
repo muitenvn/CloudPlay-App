@@ -181,6 +181,13 @@ fun CloudBrowserScreen(
         // Chỉ lưu URL có host thuộc xbox.com (bỏ login.live.com, microsoftonline.com...)
         if (XboxBridge.isXboxHost(targetUrl)) {
             lastXboxUrl = targetUrl
+            if (targetUrl.contains("/play/games/") || targetUrl.contains("/play/launch/")) {
+                com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                    rawTitle = webViewInstance?.title,
+                    rawUrl = targetUrl,
+                    markAsLastPlayed = true
+                )
+            }
         }
 
         if (isTrusted || isTrustedDomainHost) {

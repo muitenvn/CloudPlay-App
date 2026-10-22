@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.AlertDialog
@@ -51,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.data.GameLibraryRepository
 import com.example.data.PlaySessionRecord
 import com.example.data.SessionHistoryRepository
@@ -83,8 +87,15 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+private enum class HistoryFilterMode {
+    ALL,
+    SMOOTH,
+    ALERTS
+}
+
 @Composable
 fun SessionHistoryScreen(
+    onLaunchGame: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val sessions by SessionHistoryRepository.sessions.collectAsState()
@@ -94,6 +105,29 @@ fun SessionHistoryScreen(
 
     var selectedSession by remember { mutableStateOf<PlaySessionRecord?>(null) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var filterMode by remember { mutableStateOf(HistoryFilterMode.ALL) }
+
+    val filteredSessions = remember(sessions, filterMode) {
+        when (filterMode) {
+            HistoryFilterMode.ALL -> sessions
+            HistoryFilterMode.SMOOTH -> sessions.filter { it.avgFps >= 55 && !it.isSlowDecode && !it.isThermalHot }
+            HistoryFilterMode.ALERTS -> sessions.filter { it.isSlowDecode || it.isThermalHot || it.avgPingMs > 110 }
+        }
+    }
+
+    fun resolvePlayUrlForSession(session: PlaySessionRecord): String {
+        val trimmed = session.gameTitle.trim()
+        val matched = allGames.firstOrNull { it.title.equals(trimmed, ignoreCase = true) }
+            ?: allGames.firstOrNull {
+                it.title.contains(trimmed, ignoreCase = true) ||
+                    trimmed.contains(it.title, ignoreCase = true)
+            }
+        return when {
+            matched != null -> matched.playUrl
+            trimmed.contains("fortnite", ignoreCase = true) -> "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
+            else -> config.targetRegionUrl
+        }
+    }
 
     val oneWeekAgoMs = remember(sessions) {
         System.currentTimeMillis() - 7L * 24L * 3600L * 1000L
@@ -115,7 +149,7 @@ fun SessionHistoryScreen(
 
     Column(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // 1. Thẻ tổng quan "Tuần này"
         WeeklySummaryCard(
@@ -126,6 +160,56 @@ fun SessionHistoryScreen(
             isEn = isEn,
             onClearAllClick = { showClearConfirmDialog = true }
         )
+
+        // Bộ lọc nhanh khi có lịch sử
+        if (sessions.isNotEmpty()) {
+            val smoothCount = remember(sessions) {
+                sessions.count { it.avgFps >= 55 && !it.isSlowDecode && !it.isThermalHot }
+            }
+            val alertCount = remember(sessions) {
+                sessions.count { it.isSlowDecode || it.isThermalHot || it.avgPingMs > 110 }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val filterItems = listOf(
+                    HistoryFilterMode.ALL to (if (isEn) "All (${sessions.size})" else "Tất cả (${sessions.size})"),
+                    HistoryFilterMode.SMOOTH to (if (isEn) "Smooth ($smoothCount)" else "Mượt ($smoothCount)"),
+                    HistoryFilterMode.ALERTS to (if (isEn) "Alerts ($alertCount)" else "Cần lưu ý ($alertCount)")
+                )
+                filterItems.forEach { (mode, label) ->
+                    val isSelected = filterMode == mode
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { filterMode = mode }
+                            .testTag("history_filter_${mode.name.lowercase()}"),
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.85f),
+                        border = BorderStroke(
+                            0.9.dp,
+                            if (isSelected) XboxNeonGreen else XboxCardBorder
+                        )
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) XboxNeonGreen else TextSecondary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Gợi ý thông minh ngắn ở đầu trang (nếu có)
         if (globalSmartTip != null) {
@@ -184,7 +268,7 @@ fun SessionHistoryScreen(
                 contentPadding = PaddingValues(bottom = 84.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(sessions, key = { it.id }) { session ->
+                items(filteredSessions, key = { it.id }) { session ->
                     val matchedBookmark = remember(session.gameTitle, allGames) {
                         val trimmed = session.gameTitle.trim()
                         allGames.firstOrNull { it.title.equals(trimmed, ignoreCase = true) }
@@ -196,9 +280,13 @@ fun SessionHistoryScreen(
                     SessionHistoryItemCard(
                         session = session,
                         coverDrawableResId = matchedBookmark?.drawableResId,
+                        coverImageUrl = matchedBookmark?.imageUrl,
                         accentColorHex = matchedBookmark?.accentColorHex ?: 0xFF107C10L,
                         isEn = isEn,
-                        onClick = { selectedSession = session }
+                        onClick = { selectedSession = session },
+                        onPlayAgain = if (onLaunchGame != null) {
+                            { onLaunchGame(resolvePlayUrlForSession(session)) }
+                        } else null
                     )
                 }
             }
@@ -215,6 +303,13 @@ fun SessionHistoryScreen(
             smartTip = bestServerTip,
             isEn = isEn,
             onDismiss = { selectedSession = null },
+            onPlayAgain = if (onLaunchGame != null) {
+                {
+                    val url = resolvePlayUrlForSession(activeSession)
+                    selectedSession = null
+                    onLaunchGame(url)
+                }
+            } else null,
             onDelete = {
                 SessionHistoryRepository.deleteSession(activeSession.id)
                 selectedSession = null
@@ -447,9 +542,11 @@ private fun SmartSuggestionBanner(text: String) {
 private fun SessionHistoryItemCard(
     session: PlaySessionRecord,
     coverDrawableResId: Int?,
+    coverImageUrl: String? = null,
     accentColorHex: Long,
     isEn: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onPlayAgain: (() -> Unit)? = null
 ) {
     Card(
         modifier = Modifier
@@ -500,6 +597,21 @@ private fun SessionHistoryItemCard(
                             tint = Color.White,
                             modifier = Modifier.size(26.dp)
                         )
+                        if (!coverImageUrl.isNullOrBlank()) {
+                            val context = LocalContext.current
+                            val request = remember(coverImageUrl) {
+                                ImageRequest.Builder(context)
+                                    .data(coverImageUrl)
+                                    .crossfade(false)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = request,
+                                contentDescription = session.gameTitle,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }
@@ -543,24 +655,61 @@ private fun SessionHistoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // 3 chip số liệu (Ping / FPS / Giải mã) + nhãn cảnh báo nhỏ
+                // 3 chip số liệu (Ping / FPS / Giải mã) + nút Chơi lại nhanh
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    MetricChip(
-                        text = "Ping ${session.avgPingMs}ms",
-                        color = pingMetricColor(session.avgPingMs)
-                    )
-                    MetricChip(
-                        text = "${session.avgFps} FPS",
-                        color = fpsMetricColor(session.avgFps)
-                    )
-                    MetricChip(
-                        text = if (isEn) "Dec ${session.avgDecodeMs}ms" else "Giải mã ${session.avgDecodeMs}ms",
-                        color = decodeMetricColor(session.avgDecodeMs)
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MetricChip(
+                            text = "Ping ${session.avgPingMs}ms",
+                            color = pingMetricColor(session.avgPingMs)
+                        )
+                        MetricChip(
+                            text = "${session.avgFps} FPS",
+                            color = fpsMetricColor(session.avgFps)
+                        )
+                        MetricChip(
+                            text = if (isEn) "Dec ${session.avgDecodeMs}ms" else "Giải mã ${session.avgDecodeMs}ms",
+                            color = decodeMetricColor(session.avgDecodeMs)
+                        )
+                    }
+
+                    if (onPlayAgain != null) {
+                        Surface(
+                            shape = RoundedCornerShape(7.dp),
+                            color = XboxGreen.copy(alpha = 0.25f),
+                            border = BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.55f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .clickable { onPlayAgain() }
+                                .testTag("session_play_again_${session.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = if (isEn) "Play Again" else "Chơi lại",
+                                    tint = XboxNeonGreen,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Text(
+                                    text = if (isEn) "Play" else "Chơi lại",
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                    }
                 }
 
                 if (session.isThermalHot || session.isSlowDecode) {
@@ -645,6 +794,7 @@ private fun SessionDetailDialog(
     smartTip: String?,
     isEn: Boolean,
     onDismiss: () -> Unit,
+    onPlayAgain: (() -> Unit)? = null,
     onDelete: () -> Unit
 ) {
     val chartSamples = remember(session.pingSamples, session.avgPingMs) {
@@ -852,7 +1002,35 @@ private fun SessionDetailDialog(
                     SmartSuggestionBanner(text = smartTip)
                 }
 
-                // Nút xóa phiên và nút đóng
+                // Nút Chơi lại, Xóa phiên và Đóng
+                if (onPlayAgain != null) {
+                    Button(
+                        onClick = onPlayAgain,
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                            .testTag("detail_play_again_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isEn) "Play Again: ${session.gameTitle}" else "Chơi lại: ${session.gameTitle}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -884,7 +1062,8 @@ private fun SessionDetailDialog(
 
                     Button(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
+                        border = BorderStroke(1.dp, XboxCardBorder),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)

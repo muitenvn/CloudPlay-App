@@ -27,10 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -57,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -64,6 +68,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.R
 import com.example.data.GameBookmark
 import com.example.data.GameFilterTab
@@ -95,28 +101,33 @@ fun GameLibraryScreen(
     modifier: Modifier = Modifier
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
+    val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
+    val isSyncingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
     val isEn = config.isEnglishUI()
     var activeSection by remember { mutableStateOf(GameTabSection.LIBRARY) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(GameFilterTab.ALL) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val filteredGames = remember(games, selectedTab, searchQuery) {
+    val filteredGames = remember(games, selectedTab, searchQuery, favoriteIds) {
         games.filter { game ->
             val matchesTab = when (selectedTab) {
                 GameFilterTab.ALL -> true
+                GameFilterTab.FAVORITES -> game.id in favoriteIds
                 GameFilterTab.FREE_TO_PLAY -> game.freeToPlay
                 GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
                 GameFilterTab.GAME_PASS -> !game.freeToPlay
             }
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 game.title.contains(searchQuery, ignoreCase = true) ||
-                    game.category.contains(searchQuery, ignoreCase = true)
+                    game.category.contains(searchQuery, ignoreCase = true) ||
+                    game.categoryEn.contains(searchQuery, ignoreCase = true)
             }
             matchesTab && matchesSearch
-        }
+        }.sortedByDescending { it.id in favoriteIds }
     }
 
+    val favCount = remember(games, favoriteIds) { games.count { it.id in favoriteIds } }
     val freeCount = remember(games) { games.count { it.freeToPlay } }
     val touchCount = remember(games) { games.count { it.supportsTouch } }
 
@@ -182,6 +193,10 @@ fun GameLibraryScreen(
 
             if (activeSection == GameTabSection.HISTORY) {
                 SessionHistoryScreen(
+                    onLaunchGame = { url ->
+                        GameLibraryRepository.recordLastPlayedByUrl(url)
+                        onLaunchGame(url)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -206,7 +221,10 @@ fun GameLibraryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             Text(
                                 text = if (isEn) "XBOX CLOUD GAMING VAULT" else "KHO GAME XBOX CLOUD VAULT",
                                 color = XboxNeonGreen,
@@ -216,38 +234,85 @@ fun GameLibraryScreen(
                                 letterSpacing = 0.8.sp
                             )
                             Text(
-                                text = if (isEn) "${games.size} titles ready • $freeCount Free • $touchCount Touch" else "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng",
-                                color = TextSecondary,
-                                fontSize = 10.5.sp
+                                text = if (isSyncingCatalog) {
+                                    if (isEn) "Syncing live Xbox catalog & covers..." else "Đang tự động tải kho game & ảnh bìa Xbox..."
+                                } else {
+                                    if (isEn) "${games.size} titles ready • $freeCount Free • $touchCount Touch" else "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng"
+                                },
+                                color = if (isSyncingCatalog) DirectCyan else TextSecondary,
+                                fontSize = 10.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = XboxNeonGreen.copy(alpha = 0.16f),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { showAddDialog = true }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = DirectCyan.copy(alpha = 0.14f),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.55f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable(enabled = !isSyncingCatalog) {
+                                        GameLibraryRepository.syncLiveXboxCatalog(force = true)
+                                    }
+                                    .testTag("sync_xbox_catalog_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    tint = XboxNeonGreen,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.btn_add_game),
-                                    color = XboxNeonGreen,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = null,
+                                        tint = DirectCyan,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = if (isSyncingCatalog) {
+                                            if (isEn) "..." else "..."
+                                        } else {
+                                            if (isEn) "Sync" else "Tải kho"
+                                        },
+                                        color = DirectCyan,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = XboxNeonGreen.copy(alpha = 0.16f),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { showAddDialog = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = XboxNeonGreen,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.btn_add_game),
+                                        color = XboxNeonGreen,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
                         }
                     }
@@ -301,6 +366,7 @@ fun GameLibraryScreen(
                 // 3. Category Tabs Carousel
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
+                    GameFilterTab.FAVORITES to (if (isEn) "❤️ Favorites ($favCount)" else "❤️ Yêu thích ($favCount)"),
                     GameFilterTab.FREE_TO_PLAY to "⚡ ${stringResource(R.string.filter_free)} ($freeCount)",
                     GameFilterTab.TOUCH_FRIENDLY to "👆 ${stringResource(R.string.filter_touch)} ($touchCount)",
                     GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
@@ -371,7 +437,12 @@ fun GameLibraryScreen(
                         items(filteredGames, key = { it.id }) { game ->
                             LibraryGameCard(
                                 game = game,
-                                onPlay = { onLaunchGame(game.playUrl) },
+                                isFavorite = game.id in favoriteIds,
+                                onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
+                                onPlay = {
+                                    GameLibraryRepository.recordLastPlayed(game.id)
+                                    onLaunchGame(game.playUrl)
+                                },
                                 onDeleteCustom = if (game.id.startsWith("custom_")) {
                                     { GameLibraryRepository.removeCustomGame(game.id) }
                                 } else null
@@ -413,6 +484,8 @@ fun GameLibraryScreen(
 @Composable
 private fun LibraryGameCard(
     game: GameBookmark,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onPlay: () -> Unit,
     onDeleteCustom: (() -> Unit)? = null
 ) {
@@ -461,6 +534,21 @@ private fun LibraryGameCard(
                         tint = Color.White.copy(alpha = 0.3f),
                         modifier = Modifier.size(52.dp)
                     )
+                    if (!game.imageUrl.isNullOrBlank()) {
+                        val context = LocalContext.current
+                        val request = remember(game.imageUrl, config.lowEndDeviceMode) {
+                            ImageRequest.Builder(context)
+                                .data(game.imageUrl)
+                                .crossfade(!config.lowEndDeviceMode)
+                                .build()
+                        }
+                        AsyncImage(
+                            model = request,
+                            contentDescription = game.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 
@@ -534,6 +622,28 @@ private fun LibraryGameCard(
                                     .size(13.dp)
                             )
                         }
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xCC060B08),
+                        border = androidx.compose.foundation.BorderStroke(
+                            0.6.dp,
+                            if (isFavorite) JapanRed.copy(alpha = 0.75f) else XboxCardBorder
+                        ),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable { onToggleFavorite() }
+                            .testTag("fav_library_${game.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isEn) "Favorite" else "Yêu thích",
+                            tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier
+                                .padding(5.dp)
+                                .size(13.dp)
+                        )
                     }
 
                     if (onDeleteCustom != null) {

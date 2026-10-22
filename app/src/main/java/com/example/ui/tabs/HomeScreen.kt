@@ -34,6 +34,8 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -67,14 +69,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.R
 import com.example.cloudplay.GamepadStatus
 import com.example.data.GameBookmark
+import com.example.data.GameLibraryRepository
+import com.example.data.SessionHistoryRepository
 import com.example.data.SettingsRepository
 import com.example.ui.components.GuideSection
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.EpicBlue
 import com.example.ui.theme.GoldStar
+import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
@@ -113,18 +120,41 @@ fun HomeScreen(
     val recentPrefs = remember(context) {
         context.getSharedPreferences(RECENT_GAME_PREFS, Context.MODE_PRIVATE)
     }
-    var lastPlayedId by remember {
+    val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
+    val repoLastPlayedId by GameLibraryRepository.lastPlayedId.collectAsState()
+    val recentSessions by SessionHistoryRepository.sessions.collectAsState()
+    var localLastPlayedId by remember {
         mutableStateOf(recentPrefs.getString(KEY_LAST_PLAYED_ID, null))
     }
+    val effectiveLastPlayedId = repoLastPlayedId ?: localLastPlayedId
 
     val recordAndLaunch: (GameBookmark) -> Unit = { game ->
         recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, game.id).apply()
-        lastPlayedId = game.id
+        localLastPlayedId = game.id
+        GameLibraryRepository.recordLastPlayed(game.id)
         onLaunchGame(game.playUrl)
     }
 
-    val lastPlayedGame = remember(lastPlayedId, featuredGames) {
-        lastPlayedId?.let { id -> featuredGames.find { it.id == id } }
+    val sortedFeaturedGames = remember(featuredGames, favoriteIds) {
+        featuredGames.sortedByDescending { it.id in favoriteIds }.take(18)
+    }
+
+    val lastPlayedGame = remember(effectiveLastPlayedId, featuredGames, recentSessions) {
+        val byId = effectiveLastPlayedId?.let { id ->
+            featuredGames.find { it.id.equals(id, ignoreCase = true) }
+        }
+        if (byId != null) {
+            byId
+        } else {
+            val latestTitle = recentSessions.firstOrNull()?.gameTitle?.trim()
+            if (!latestTitle.isNullOrBlank()) {
+                featuredGames.firstOrNull {
+                    it.title.equals(latestTitle, ignoreCase = true) ||
+                        it.title.contains(latestTitle, ignoreCase = true) ||
+                        latestTitle.contains(it.title, ignoreCase = true)
+                }
+            } else null
+        }
     }
 
     val scrollState = rememberScrollState()
@@ -144,7 +174,8 @@ fun HomeScreen(
             onLaunchFortnite = {
                 val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
                 recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
-                lastPlayedId = "fortnite"
+                localLastPlayedId = "fortnite"
+                GameLibraryRepository.recordLastPlayed("fortnite")
                 onLaunchGame(fortniteUrl)
             },
             onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
@@ -159,9 +190,11 @@ fun HomeScreen(
 
         // 3. Mục Game nổi bật + nút "Chơi tiếp" cho game vừa chơi gần nhất
         FeaturedGamesSection(
-            featuredGames = featuredGames,
+            featuredGames = sortedFeaturedGames,
+            favoriteIds = favoriteIds,
             lastPlayedGame = lastPlayedGame,
             onLaunchBookmark = recordAndLaunch,
+            onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
             onNavigateToLibrary = onNavigateToLibrary
         )
 
@@ -585,8 +618,10 @@ private fun QuickNetworkCockpitCard(
 @Composable
 private fun FeaturedGamesSection(
     featuredGames: List<GameBookmark>,
+    favoriteIds: Set<String>,
     lastPlayedGame: GameBookmark?,
     onLaunchBookmark: (GameBookmark) -> Unit,
+    onToggleFavorite: (GameBookmark) -> Unit,
     onNavigateToLibrary: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -724,7 +759,12 @@ private fun FeaturedGamesSection(
             contentPadding = PaddingValues(horizontal = 2.dp)
         ) {
             items(featuredGames, key = { it.id }) { game ->
-                FeaturedGameCard(game = game, onLaunch = { onLaunchBookmark(game) })
+                FeaturedGameCard(
+                    game = game,
+                    isFavorite = game.id in favoriteIds,
+                    onToggleFavorite = { onToggleFavorite(game) },
+                    onLaunch = { onLaunchBookmark(game) }
+                )
             }
         }
     }
@@ -733,6 +773,8 @@ private fun FeaturedGamesSection(
 @Composable
 private fun FeaturedGameCard(
     game: GameBookmark,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onLaunch: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
@@ -785,6 +827,21 @@ private fun FeaturedGameCard(
                             tint = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.size(38.dp)
                         )
+                        if (!game.imageUrl.isNullOrBlank()) {
+                            val context = LocalContext.current
+                            val request = remember(game.imageUrl, config.lowEndDeviceMode) {
+                                ImageRequest.Builder(context)
+                                    .data(game.imageUrl)
+                                    .crossfade(!config.lowEndDeviceMode)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = request,
+                                contentDescription = game.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
 
@@ -817,18 +874,40 @@ private fun FeaturedGameCard(
                     }
                 }
 
-                if (game.supportsTouch) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (game.supportsTouch) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xCC060B08)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TouchApp,
+                                contentDescription = "Touch",
+                                tint = DirectCyan,
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(12.dp)
+                            )
+                        }
+                    }
                     Surface(
                         shape = CircleShape,
                         color = Color(0xCC060B08),
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
+                            .clip(CircleShape)
+                            .clickable { onToggleFavorite() }
+                            .testTag("fav_featured_${game.id}")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.TouchApp,
-                            contentDescription = "Touch",
-                            tint = DirectCyan,
+                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (isEn) "Favorite" else "Yêu thích",
+                            tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.75f),
                             modifier = Modifier
                                 .padding(4.dp)
                                 .size(12.dp)

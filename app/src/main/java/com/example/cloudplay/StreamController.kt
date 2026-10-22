@@ -61,6 +61,7 @@ class StreamController(private val context: Context) {
 
     init {
         com.example.data.SessionHistoryRepository.init(context)
+        com.example.data.GameLibraryRepository.init(context)
     }
 
     /**
@@ -84,6 +85,26 @@ class StreamController(private val context: Context) {
         release()
     }
 
+    fun onWebGameMetadataDetected(
+        title: String?,
+        url: String,
+        imageUrl: String?,
+        supportsTouch: Boolean?
+    ) {
+        scope.launch {
+            val bookmark = com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                rawTitle = title,
+                rawUrl = url.ifBlank { _uiState.value.currentUrl },
+                imageUrl = imageUrl,
+                supportsTouch = supportsTouch,
+                markAsLastPlayed = true
+            )
+            if (bookmark != null && !bookmark.title.equals("Xbox Cloud Game", ignoreCase = true)) {
+                _uiState.value = _uiState.value.copy(gameTitle = bookmark.title)
+            }
+        }
+    }
+
     fun onGameLaunchInitiated(title: String) {
         scope.launch {
             launchFallbackJob?.cancel()
@@ -102,9 +123,16 @@ class StreamController(private val context: Context) {
                 com.example.data.SessionHistoryRepository.resolveCleanGameTitle(title, _uiState.value.currentUrl)
             }
 
+            val syncedBookmark = com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                rawTitle = resolvedTitle,
+                rawUrl = _uiState.value.currentUrl,
+                markAsLastPlayed = true
+            )
+            val finalTitle = syncedBookmark?.title ?: resolvedTitle
+
             _uiState.value = _uiState.value.copy(
                 isGameActive = true,
-                gameTitle = resolvedTitle,
+                gameTitle = finalTitle,
                 isStreamConnected = false,
                 autoBypassTriggered = false
             )
@@ -156,10 +184,15 @@ class StreamController(private val context: Context) {
                 _uiState.value.gameTitle,
                 _uiState.value.currentUrl
             )
+            val syncedBookmark = com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                rawTitle = updatedTitle,
+                rawUrl = _uiState.value.currentUrl,
+                markAsLastPlayed = true
+            )
             _uiState.value = _uiState.value.copy(
                 isStreamConnected = true,
                 isGameActive = true,
-                gameTitle = updatedTitle
+                gameTitle = syncedBookmark?.title ?: updatedTitle
             )
 
             val config = SettingsRepository.config.value
@@ -334,11 +367,23 @@ class StreamController(private val context: Context) {
             val prevUrl = _uiState.value.currentUrl
             val wasInLaunch = prevUrl.contains("/launch/")
             val nowInLaunch = url.contains("/launch/")
+            val isGamePage = url.contains("/play/games/") || nowInLaunch
 
-            _uiState.value = _uiState.value.copy(currentUrl = url)
+            val detectedBookmark = if (isGamePage) {
+                com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                    rawTitle = null,
+                    rawUrl = url,
+                    markAsLastPlayed = true
+                )
+            } else null
+
+            _uiState.value = _uiState.value.copy(
+                currentUrl = url,
+                gameTitle = detectedBookmark?.title ?: _uiState.value.gameTitle
+            )
 
             if (!wasInLaunch && nowInLaunch) {
-                val resolvedTitle = com.example.data.SessionHistoryRepository.resolveCleanGameTitle(
+                val resolvedTitle = detectedBookmark?.title ?: com.example.data.SessionHistoryRepository.resolveCleanGameTitle(
                     _uiState.value.gameTitle,
                     url
                 )

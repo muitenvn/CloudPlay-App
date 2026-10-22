@@ -264,6 +264,25 @@ fun SmartTranslatorDialog(
                                 clipboardManager.setText(AnnotatedString(text))
                                 copiedFeedback = true
                             },
+                            onPasteAndTranslate = {
+                                val clipText = clipboardManager.getText()?.text?.trim()
+                                if (!clipText.isNullOrBlank()) {
+                                    inputText = clipText
+                                    isTranslating = true
+                                    scope.launch {
+                                        translationResult = GoogleGamingTranslator.translateWithAnalysis(
+                                            rawText = clipText,
+                                            targetLang = "vi",
+                                            bilingual = config.bilingualMode
+                                        )
+                                        isTranslating = false
+                                    }
+                                }
+                            },
+                            onClearInput = {
+                                inputText = ""
+                                translationResult = null
+                            },
                             onSelectSample = { sample ->
                                 inputText = sample
                                 isTranslating = true
@@ -313,6 +332,8 @@ private fun LiveTranslateSection(
     bilingualMode: Boolean,
     onTranslate: () -> Unit,
     onCopy: (String) -> Unit,
+    onPasteAndTranslate: () -> Unit,
+    onClearInput: () -> Unit,
     onSelectSample: (String) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -324,12 +345,54 @@ private fun LiveTranslateSection(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Sample chips
-        Text(
-            text = if (isEn) "SAMPLE PHRASES TO TEST SMART PROTECTION & TRANSLATION:" else "MẪU CÂU THỬ NGHIỆM ĐỂ KIỂM TRA NÉ & DỊCH:",
-            color = TextSecondary,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (isEn) "SAMPLE PHRASES:" else "MẪU CÂU THỬ NHANH:",
+                color = TextSecondary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(7.dp),
+                    color = XboxNeonGreen.copy(alpha = 0.16f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(7.dp))
+                        .clickable { onPasteAndTranslate() }
+                        .testTag("translator_paste_button")
+                ) {
+                    Text(
+                        text = if (isEn) "📋 Paste & Translate" else "📋 Dán & Dịch",
+                        color = XboxNeonGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                if (inputText.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(7.dp),
+                        color = Color(0xFF1E1416),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(7.dp))
+                            .clickable { onClearInput() }
+                            .testTag("translator_clear_button")
+                    ) {
+                        Text(
+                            text = if (isEn) "✕ Clear" else "✕ Xóa",
+                            color = JapanRed,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -679,9 +742,9 @@ private fun SmartRulesSection(isEn: Boolean) {
                 }
                 Text(
                     text = if (isEn) {
-                        "1. Scans DOM via lightweight Native TreeWalker (<2ms).\n2. Matches 0ms UI dictionary from Better-xCloud community.\n3. Tokenizes game titles & controller buttons into protected placeholders.\n4. Sends remaining text to Google Neural Translate.\n5. Restores original game titles & button tokens seamlessly.\n6. Caches in RAM for instant 0ms lookup on repeat visits."
+                        "1. Scans web menus quickly without slowing down your device.\n2. Translates common Xbox interface buttons instantly using a built-in dictionary.\n3. Keeps game titles and controller button names in their original form.\n4. Translates longer descriptions and story summaries into natural Vietnamese.\n5. Saves translated phrases in memory so repeat visits open immediately."
                     } else {
-                        "1. Quét DOM bằng Native TreeWalker siêu nhẹ (<2ms).\n2. Đối chiếu từ điển UI 0ms của cộng đồng GitHub Better-xCloud.\n3. Nhận diện tokenized game titles và nút bấm để đóng gói bảo vệ.\n4. Gửi đoạn văn bản cần dịch tới Google Neural Translate qua mạng.\n5. Tự động giải mã placeholder đưa tên game nguyên bản về vị trí cũ.\n6. Lưu vào RAM Cache để lần truy cập sau hiển thị ngay lập tức không tốn data."
+                        "1. Quét nhanh các mục menu trên trang mà không làm nặng máy.\n2. Dịch tức thì các nút giao diện Xbox quen thuộc bằng từ điển có sẵn.\n3. Giữ nguyên tên riêng của trò chơi và ký hiệu nút tay cầm (A, B, X, Y, LT, RT).\n4. Dịch mượt phần mô tả cốt truyện và thông báo sang tiếng Việt tự nhiên.\n5. Lưu tạm các câu đã dịch để lần mở sau hiển thị ngay lập tức."
                     },
                     color = TextSecondary,
                     fontSize = 9.5.sp,

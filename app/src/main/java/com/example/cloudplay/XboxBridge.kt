@@ -693,19 +693,106 @@ class XboxBridge(
                     let lastUrl = location.href;
                     let notifiedStreamConnection = false;
                     let regionCheckCountForUrl = 0;
+                    const discoveredCardUrls = new Set();
+
+                    function extractActiveGameDomMetadata(overrideUrl, clickedEl) {
+                        try {
+                            const href = overrideUrl || location.href;
+                            if (!href || (href.indexOf('/play/games/') === -1 && href.indexOf('/play/launch/') === -1)) return null;
+                            let title = '';
+                            if (clickedEl) {
+                                title = (clickedEl.getAttribute('aria-label') || clickedEl.getAttribute('title') || clickedEl.innerText || '').trim();
+                            }
+                            if (!title || title.length < 2 || /^(play|chơi|chơi ngay)$/i.test(title)) {
+                                const h1 = document.querySelector('h1');
+                                if (h1 && h1.textContent) title = h1.textContent.trim();
+                            }
+                            if (!title || title.length < 2) {
+                                title = (document.title || '').replace(/\s*[•|\-–—]\s*Xbox.*$/i, '').trim();
+                            }
+                            let imgUrl = '';
+                            if (clickedEl) {
+                                const cardImg = clickedEl.querySelector('img[src]');
+                                if (cardImg && cardImg.src) imgUrl = cardImg.src;
+                            }
+                            if (!imgUrl) {
+                                const ogImg = document.querySelector('meta[property="og:image"]');
+                                if (ogImg && ogImg.content) imgUrl = ogImg.content;
+                            }
+                            if (!imgUrl) {
+                                const storeImg = document.querySelector('img[src*="store-images.s-microsoft.com"]');
+                                if (storeImg && storeImg.src) imgUrl = storeImg.src;
+                            }
+                            const supportsTouch = !!document.querySelector('[aria-label*="touch" i], [data-testid*="touch" i]');
+                            return {
+                                title: title || '',
+                                url: href,
+                                imageUrl: imgUrl || '',
+                                supportsTouch: supportsTouch
+                            };
+                        } catch(e) {
+                            return null;
+                        }
+                    }
+
+                    function reportActiveWebGame(overrideUrl, clickedEl) {
+                        const meta = extractActiveGameDomMetadata(overrideUrl, clickedEl);
+                        if (meta) {
+                            notify('onWebGameDetected', JSON.stringify(meta));
+                        }
+                    }
+
+                    function scanVisibleCatalogGameCards() {
+                        if (notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection) return;
+                        try {
+                            const links = document.querySelectorAll('a[href*="/play/games/"]');
+                            if (!links || links.length === 0) return;
+                            const batch = [];
+                            for (let i = 0; i < links.length && batch.length < 24; i++) {
+                                const a = links[i];
+                                const rawHref = a.href || a.getAttribute('href') || '';
+                                if (!rawHref || rawHref.indexOf('/play/games/') === -1) continue;
+                                const cleanUrl = rawHref.split('?')[0];
+                                if (discoveredCardUrls.has(cleanUrl)) continue;
+                                const img = a.querySelector('img[src]');
+                                const imgSrc = img ? (img.currentSrc || img.src || '') : '';
+                                let title = (a.getAttribute('aria-label') || (img ? img.alt : '') || a.innerText || '').trim();
+                                title = title.split('\n')[0].replace(/^(play|chơi)\s+/i, '').trim();
+                                if (!title && !imgSrc) continue;
+                                discoveredCardUrls.add(cleanUrl);
+                                batch.push({
+                                    title: title,
+                                    url: cleanUrl,
+                                    imageUrl: imgSrc,
+                                    supportsTouch: !!(a.innerHTML && a.innerHTML.toLowerCase().indexOf('touch') !== -1)
+                                });
+                            }
+                            if (batch.length > 0) {
+                                notify('onCatalogCardsDiscovered', JSON.stringify(batch));
+                            }
+                        } catch(e) {}
+                    }
 
                     if (location.href.indexOf('/play/launch/') !== -1) {
+                        reportActiveWebGame(location.href, null);
                         notify('onGameLaunchInitiated', document.title || 'Xbox Game');
+                    } else if (location.href.indexOf('/play/games/') !== -1) {
+                        setTimeout(function() { reportActiveWebGame(location.href, null); }, 600);
                     }
 
                     function handleNavigationChange() {
                         if (location.href !== lastUrl) {
                             const wasInLaunch = lastUrl.indexOf('/play/launch/') !== -1;
                             const nowInLaunch = location.href.indexOf('/play/launch/') !== -1;
+                            const nowInGamePage = location.href.indexOf('/play/games/') !== -1;
                             lastUrl = location.href;
                             notifiedStreamConnection = false;
                             regionCheckCountForUrl = 0;
                             notify('onUrlChanged', location.href);
+                            if (nowInLaunch || nowInGamePage) {
+                                reportActiveWebGame(location.href, null);
+                                setTimeout(function() { reportActiveWebGame(location.href, null); }, 900);
+                            }
                             if (nowInLaunch) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
                             } else if (wasInLaunch && !nowInLaunch) {
@@ -744,8 +831,10 @@ class XboxBridge(
                         const target = e ? e.target : null;
                         const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
                         if (target && target.tagName === 'VIDEO' && isLaunchPage && !notifiedStreamConnection) {
+                            optimizeVideoElementLowLatency(target);
                             if ((target.currentTime > 0 || target.readyState >= 2) && !target.paused) {
                                 notifiedStreamConnection = true;
+                                reportActiveWebGame(location.href, null);
                                 notify('onStreamConnected', 'video_active');
                             }
                         }
@@ -858,11 +947,14 @@ class XboxBridge(
                         video.__cpLowLatencyTuned = true;
                         try {
                             video.playsInline = true;
+                            video.autoplay = true;
                             if ('disablePictureInPicture' in video) video.disablePictureInPicture = true;
                             if ('disableRemotePlayback' in video) video.disableRemotePlayback = true;
                             video.style.touchAction = 'none';
                             video.style.userSelect = 'none';
                             video.style.webkitUserSelect = 'none';
+                            video.style.willChange = 'transform';
+                            video.style.contain = 'layout style paint';
                             ensureFortniteMultiTouchClawCss();
                         } catch(e) {}
                     }
@@ -883,22 +975,30 @@ class XboxBridge(
                                     optimizeVideoElementLowLatency(video);
                                     if ((video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
                                         notifiedStreamConnection = true;
+                                        reportActiveWebGame(location.href, null);
                                         notify('onStreamConnected', 'video_active');
                                     }
                                 }
                             }
+                        } else {
+                            scanVisibleCatalogGameCards();
                         }
                     }, 2500);
 
                     document.addEventListener('click', function(e) {
                         const target = e.target;
                         if (target) {
+                            const gameLink = target.closest('a[href*="/play/games/"], a[href*="/play/launch/"]');
+                            if (gameLink && gameLink.href) {
+                                reportActiveWebGame(gameLink.href, gameLink);
+                            }
                             const btn = target.closest('button, a');
                             if (btn) {
                                 const txt = (btn.innerText || btn.getAttribute('aria-label') || '').toLowerCase();
                                 const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
                                 if (txt.includes('play') || txt.includes('chơi') || testId.includes('play') || testId.includes('launch')) {
                                     notifiedStreamConnection = false;
+                                    reportActiveWebGame( (gameLink && gameLink.href) ? gameLink.href : location.href, gameLink || btn );
                                     notify('onGameLaunchInitiated', document.title || 'Xbox Game');
                                 }
                             }
@@ -1134,6 +1234,32 @@ class XboxBridge(
         if (!isCallerTrusted()) return
         Log.d(TAG, "Game launch detected: $gameTitle")
         controller.onGameLaunchInitiated(gameTitle ?: "Xbox Game")
+    }
+
+    @JavascriptInterface
+    fun onWebGameDetected(jsonStr: String?) {
+        if (!isCallerTrusted() || jsonStr.isNullOrBlank()) return
+        try {
+            val obj = JSONObject(jsonStr)
+            val title = obj.optString("title", "").takeIf { it.isNotBlank() }
+            val url = obj.optString("url", "").trim()
+            val imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() }
+            val supportsTouch = if (obj.has("supportsTouch")) obj.optBoolean("supportsTouch", true) else null
+            controller.onWebGameMetadataDetected(
+                title = title,
+                url = url,
+                imageUrl = imageUrl,
+                supportsTouch = supportsTouch
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not parse onWebGameDetected: ${e.message}")
+        }
+    }
+
+    @JavascriptInterface
+    fun onCatalogCardsDiscovered(jsonArrayStr: String?) {
+        if (!isCallerTrusted() || jsonArrayStr.isNullOrBlank()) return
+        com.example.data.GameLibraryRepository.ingestDiscoveredWebGames(jsonArrayStr)
     }
 
     @JavascriptInterface

@@ -742,9 +742,63 @@ class XboxBridge(
                         }
                     }
 
+                    let lastReportedProfileKey = '';
+                    let lastJumpBackCount = 0;
+
                     function scanVisibleCatalogGameCards() {
                         if (notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection) return;
                         try {
+                            // 1. Detect Xbox Gamertag, Gamerpic & Subscription Tier from xbox.com/play header
+                            const profileBtn = document.querySelector(
+                                'button[aria-label*="Profile" i], button[aria-label*="Hồ sơ" i], button[data-testid*="profile" i], [data-testid*="gamerpic" i], [class*="ProfileButton" i]'
+                            );
+                            if (profileBtn) {
+                                const avatarImg = profileBtn.querySelector('img[src]') || document.querySelector('img[alt*="gamerpic" i], img[class*="gamerpic" i], img[src*="ssl-images-microsoft.com"], img[src*="xboxlive.com"]');
+                                const avatarSrc = avatarImg ? (avatarImg.currentSrc || avatarImg.src || '') : '';
+                                let rawLabel = (profileBtn.getAttribute('aria-label') || profileBtn.innerText || (avatarImg ? avatarImg.alt : '') || '').trim();
+                                rawLabel = rawLabel.replace(/^(profile|hồ sơ|account|tài khoản|open profile menu for)\s*[:\-]?\s*/i, '').split('\n')[0].trim();
+                                if (rawLabel && rawLabel.length >= 2 && rawLabel.length <= 28 && !/sign\s*in|đăng\s*nhập/i.test(rawLabel)) {
+                                    const subBadgeEl = document.querySelector('[class*=" ultimate" i], [data-testid*="ultimate" i], [aria-label*="Ultimate" i]');
+                                    const tier = subBadgeEl ? 'Game Pass Ultimate' : 'Xbox Cloud Account';
+                                    const pKey = rawLabel + '|' + avatarSrc;
+                                    if (pKey !== lastReportedProfileKey) {
+                                        lastReportedProfileKey = pKey;
+                                        notify('onXboxProfileDetected', JSON.stringify({
+                                            gamertag: rawLabel,
+                                            avatarUrl: avatarSrc,
+                                            tier: tier
+                                        }));
+                                    }
+                                }
+                            }
+
+                            // 2. Detect "Jump back in" (Chơi gần đây trên Xbox Cloud) carousel
+                            const sections = document.querySelectorAll('section, [aria-label*="Jump back in" i], [aria-label*="Recently played" i], [data-testid*="jump" i]');
+                            const jumpItems = [];
+                            for (let s = 0; s < sections.length; s++) {
+                                const sec = sections[s];
+                                const heading = sec.querySelector('h2, h3, [role="heading"]');
+                                const hText = ((heading ? heading.innerText : '') + ' ' + (sec.getAttribute('aria-label') || '')).toLowerCase();
+                                if (hText.indexOf('jump back in') !== -1 || hText.indexOf('recently played') !== -1 || hText.indexOf('tiếp tục') !== -1 || hText.indexOf('gần đây') !== -1) {
+                                    const jLinks = sec.querySelectorAll('a[href*="/play/games/"], a[href*="/play/launch/"]');
+                                    for (let j = 0; j < jLinks.length && jumpItems.length < 8; j++) {
+                                        const ja = jLinks[j];
+                                        const jHref = (ja.href || ja.getAttribute('href') || '').split('?')[0];
+                                        if (!jHref) continue;
+                                        const jImg = ja.querySelector('img[src]');
+                                        const jImgSrc = jImg ? (jImg.currentSrc || jImg.src || '') : '';
+                                        let jTitle = (ja.getAttribute('aria-label') || (jImg ? jImg.alt : '') || ja.innerText || '').trim();
+                                        jTitle = jTitle.split('\n')[0].replace(/^(play|chơi)\s+/i, '').trim();
+                                        jumpItems.push({ title: jTitle, url: jHref, imageUrl: jImgSrc });
+                                    }
+                                }
+                            }
+                            if (jumpItems.length > 0 && jumpItems.length !== lastJumpBackCount) {
+                                lastJumpBackCount = jumpItems.length;
+                                notify('onXboxJumpBackInDetected', JSON.stringify(jumpItems));
+                            }
+
+                            // 3. Scrape visible Xbox Cloud catalog game cards
                             const links = document.querySelectorAll('a[href*="/play/games/"]');
                             if (!links || links.length === 0) return;
                             const batch = [];
@@ -1260,6 +1314,25 @@ class XboxBridge(
     fun onCatalogCardsDiscovered(jsonArrayStr: String?) {
         if (!isCallerTrusted() || jsonArrayStr.isNullOrBlank()) return
         com.example.data.GameLibraryRepository.ingestDiscoveredWebGames(jsonArrayStr)
+    }
+
+    @JavascriptInterface
+    fun onXboxProfileDetected(jsonStr: String?) {
+        if (!isCallerTrusted() || jsonStr.isNullOrBlank()) return
+        try {
+            val obj = JSONObject(jsonStr)
+            val gamertag = obj.optString("gamertag", "").takeIf { it.isNotBlank() }
+            val avatarUrl = obj.optString("avatarUrl", "").takeIf { it.isNotBlank() }
+            val tier = obj.optString("tier", "").takeIf { it.isNotBlank() }
+            com.example.data.GameLibraryRepository.onXboxProfileSynced(gamertag, avatarUrl, tier)
+        } catch (_: Exception) {
+        }
+    }
+
+    @JavascriptInterface
+    fun onXboxJumpBackInDetected(jsonArrayStr: String?) {
+        if (!isCallerTrusted() || jsonArrayStr.isNullOrBlank()) return
+        com.example.data.GameLibraryRepository.onXboxJumpBackInSynced(jsonArrayStr)
     }
 
     @JavascriptInterface

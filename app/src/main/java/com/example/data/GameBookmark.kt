@@ -19,10 +19,24 @@ import java.util.Locale
 enum class GameFilterTab {
     ALL,
     FAVORITES,
+    POPULAR,
+    RECENTLY_ADDED,
     FREE_TO_PLAY,
     TOUCH_FRIENDLY,
     GAME_PASS
 }
+
+data class XboxCloudSyncStatus(
+    val gamertag: String? = null,
+    val avatarUrl: String? = null,
+    val subscriptionTier: String? = null,
+    val cloudServiceOnline: Boolean = true,
+    val cloudLatencyMs: Int? = null,
+    val totalCloudCatalogCount: Int = 0,
+    val syncedCatalogCount: Int = 0,
+    val jumpBackInIds: List<String> = emptyList(),
+    val lastSyncTimeMs: Long = 0L
+)
 
 data class GameBookmark(
     val id: String,
@@ -37,7 +51,12 @@ data class GameBookmark(
     val rating: String = "4.8",
     val categoryEn: String = category,
     val badgeEn: String? = badge,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val heroImageUrl: String? = null,
+    val description: String? = null,
+    val publisher: String? = null,
+    val isPopular: Boolean = false,
+    val isRecentlyAdded: Boolean = false
 ) {
     fun localizedCategory(isEn: Boolean): String = if (isEn) {
         if (category == "Game tùy chỉnh") "Custom Game" else categoryEn
@@ -48,143 +67,33 @@ data class GameBookmark(
     } else badge
 }
 
-val INITIAL_XBOX_GAMES = listOf(
-    GameBookmark(
-        id = "forza_horizon_5",
-        title = "Forza Horizon 5",
-        category = "Đua xe thế giới mở",
-        categoryEn = "Open-World Racing",
-        playUrl = "https://www.xbox.com/en-US/play/games/forza-horizon-5-standard-edition/9NKX70BBC2HN",
-        freeToPlay = false,
-        supportsTouch = true,
-        accentColorHex = 0xFFFF007A,
-        badge = "Siêu Phẩm 60FPS",
-        badgeEn = "60FPS Masterpiece",
-        drawableResId = R.drawable.forza_cover_art_1791438033687,
-        rating = "4.9"
-    ),
-    GameBookmark(
-        id = "starfield",
-        title = "Starfield",
-        category = "Nhập vai viễn tưởng",
-        categoryEn = "Sci-Fi Space RPG",
-        playUrl = "https://www.xbox.com/en-US/play/games/starfield/9NCJSX2VD4B0",
-        freeToPlay = false,
-        supportsTouch = false,
-        accentColorHex = 0xFF1B4965,
-        badge = "Khám Phá Vũ Trụ",
-        badgeEn = "Space Exploration",
-        drawableResId = R.drawable.cyber_gaming_banner_1791438050320,
-        rating = "4.7"
-    ),
-    GameBookmark(
-        id = "fortnite",
-        title = "Fortnite",
-        category = "Sinh tồn / Battle Royale (Hỗ trợ 120FPS)",
-        categoryEn = "Battle Royale (120FPS Ready)",
-        playUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2",
-        freeToPlay = true,
-        supportsTouch = true,
-        accentColorHex = 0xFF0074E4,
-        badge = "Hỗ Trợ 120FPS • Free 100%",
-        badgeEn = "120FPS Ready • 100% Free",
-        drawableResId = R.drawable.fortnite_cloud_poster_1791719536404,
-        rating = "4.9"
-    ),
-    GameBookmark(
-        id = "halo_infinite",
-        title = "Halo Infinite",
-        category = "Hành động / Bắn súng",
-        categoryEn = "Action / Arena Shooter",
-        playUrl = "https://www.xbox.com/en-US/play/games/halo-infinite/9PP5G1F0C2B6",
-        freeToPlay = false,
-        supportsTouch = true,
-        accentColorHex = 0xFF2D6A4F,
-        badge = "Chiến Binh Master Chief",
-        badgeEn = "Master Chief Saga",
-        drawableResId = R.drawable.cloudplay_hero_banner_1791392804712,
-        rating = "4.6"
-    ),
-    GameBookmark(
-        id = "persona_3_reload",
-        title = "Persona 3 Reload",
-        category = "JRPG / Anime",
-        categoryEn = "JRPG / Anime",
-        playUrl = "https://www.xbox.com/en-US/play/games/persona-3-reload/9NZ8X7D58R0R",
-        freeToPlay = false,
-        supportsTouch = true,
-        accentColorHex = 0xFF0A2472,
-        badge = "Cốt truyện đỉnh",
-        badgeEn = "Top Story",
-        rating = "4.9"
-    ),
-    GameBookmark(
-        id = "palworld",
-        title = "Palworld",
-        category = "Sinh tồn / Bắt thú",
-        categoryEn = "Survival / Creature Collector",
-        playUrl = "https://www.xbox.com/en-US/play/games/palworld/9NKVB39XZ8QR",
-        freeToPlay = false,
-        supportsTouch = false,
-        accentColorHex = 0xFF38B000,
-        badge = "Rất Hot",
-        badgeEn = "Trending",
-        rating = "4.8"
-    ),
-    GameBookmark(
-        id = "flight_simulator",
-        title = "Microsoft Flight Simulator",
-        category = "Mô phỏng phi công",
-        categoryEn = "Flight Simulation",
-        playUrl = "https://www.xbox.com/en-US/play/games/microsoft-flight-simulator-standard-game-of-the-year-edition/9PMQDM08SNK9",
-        freeToPlay = false,
-        supportsTouch = false,
-        accentColorHex = 0xFF0077B6,
-        badge = "Bản đồ toàn cầu",
-        badgeEn = "World Map",
-        rating = "4.9"
-    ),
-    GameBookmark(
-        id = "gta_v",
-        title = "Grand Theft Auto V",
-        category = "Hành động thế giới mở",
-        categoryEn = "Open-World Action",
-        playUrl = "https://www.xbox.com/en-US/play/games/grand-theft-auto-v/9NXHG24D2H10",
-        freeToPlay = false,
-        supportsTouch = false,
-        accentColorHex = 0xFF386641,
-        badge = "Game Pass",
-        badgeEn = "Game Pass",
-        rating = "4.9"
-    ),
-    GameBookmark(
-        id = "minecraft_dungeons",
-        title = "Minecraft Dungeons",
-        category = "Phiêu lưu hầm ngục",
-        categoryEn = "Dungeon Crawler",
-        playUrl = "https://www.xbox.com/en-US/play/games/minecraft-dungeons/9N8NJLR6B392",
-        freeToPlay = false,
-        supportsTouch = true,
-        accentColorHex = 0xFFB07D62,
-        badge = "Touch Controls",
-        badgeEn = "Touch Controls",
-        rating = "4.7"
-    )
-)
+// Kho game để trống hoàn toàn trước khi quét để chỉ hiển thị ảnh bìa thật từ máy chủ Xbox (trừ tài nguyên ảnh Fortnite)
+val INITIAL_XBOX_GAMES: List<GameBookmark> = emptyList()
+private const val FORTNITE_PRODUCT_ID = "BT5P2X999VH2"
+private val FORTNITE_POSTER_RES_ID = R.drawable.fortnite_cloud_poster_1791719536404
 
 object GameLibraryRepository {
     private const val PREFS_NAME = "cloudplay_custom_games_prefs"
     private const val RECENT_PREFS_NAME = "cloudplay_recent_game_prefs"
     private const val KEY_CUSTOM_GAMES_JSON = "custom_games_json"
-    private const val KEY_SYNCED_GAMES_JSON = "synced_xbox_games_json_v1"
+    private const val KEY_SYNCED_GAMES_JSON = "synced_xbox_games_json_v3"
     private const val KEY_LAST_CATALOG_SYNC_MS = "last_catalog_sync_ms"
     private const val KEY_FAVORITE_IDS = "favorite_game_ids"
     private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
+    private const val KEY_XBOX_GAMERTAG = "xbox_gamertag"
+    private const val KEY_XBOX_AVATAR_URL = "xbox_avatar_url"
+    private const val KEY_XBOX_SUB_TIER = "xbox_sub_tier"
+    private const val KEY_XBOX_TOTAL_CLOUD = "xbox_total_cloud_count"
+    private const val KEY_XBOX_JUMP_BACK_IDS = "xbox_jump_back_ids"
 
     private const val CLOUD_CATALOG_SIGL_URL =
         "https://catalog.gamepass.com/sigls/v2?id=29a81209-df6f-41fd-a528-2ae6b91f719c&language=en-us&market=US"
     private const val TOUCH_CATALOG_SIGL_URL =
         "https://catalog.gamepass.com/sigls/v2?id=7d86c25b-b99e-4090-90b3-54a7514b0240&language=en-us&market=US"
+    private const val POPULAR_CLOUD_SIGL_URL =
+        "https://catalog.gamepass.com/sigls/v2?id=f6f1f99f-9b49-4ccd-b3bf-4d9767a77f5e&language=en-us&market=US"
+    private const val RECENTLY_ADDED_SIGL_URL =
+        "https://catalog.gamepass.com/sigls/v2?id=f13cf6b4-57e6-4459-89df-6aec18cf0538&language=en-us&market=US"
 
     private val ACCENT_PALETTE = longArrayOf(
         0xFF107C10L, 0xFF0074E4L, 0xFFFF007AL, 0xFF00B4D8L,
@@ -194,6 +103,15 @@ object GameLibraryRepository {
     private var prefs: SharedPreferences? = null
     private var recentPrefs: SharedPreferences? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Volatile
+    private var cachedAllCloudProductIds: List<String> = emptyList()
+    @Volatile
+    private var cachedTouchIds: Set<String> = emptySet()
+    @Volatile
+    private var cachedPopularIds: Set<String> = emptySet()
+    @Volatile
+    private var cachedRecentIds: Set<String> = emptySet()
 
     private val _games = MutableStateFlow(INITIAL_XBOX_GAMES)
     val games: StateFlow<List<GameBookmark>> = _games.asStateFlow()
@@ -207,9 +125,15 @@ object GameLibraryRepository {
     private val _isSyncingCatalog = MutableStateFlow(false)
     val isSyncingCatalog: StateFlow<Boolean> = _isSyncingCatalog.asStateFlow()
 
+    private val _isSearchingLiveXbox = MutableStateFlow(false)
+    val isSearchingLiveXbox: StateFlow<Boolean> = _isSearchingLiveXbox.asStateFlow()
+
+    private val _xboxStatus = MutableStateFlow(XboxCloudSyncStatus())
+    val xboxStatus: StateFlow<XboxCloudSyncStatus> = _xboxStatus.asStateFlow()
+
     /**
      * Initializes persistent storage for custom user-added games, auto-synced Xbox Cloud catalog games,
-     * favorites, and last played game via SharedPreferences.
+     * favorites, Xbox profile status, and last played game via SharedPreferences.
      */
     fun init(context: Context) {
         if (prefs == null) {
@@ -231,8 +155,30 @@ object GameLibraryRepository {
             _lastPlayedId.value = savedLast
 
             val lastSyncMs = sharedPrefs.getLong(KEY_LAST_CATALOG_SYNC_MS, 0L)
+            val savedGamertag = sharedPrefs.getString(KEY_XBOX_GAMERTAG, null)?.takeIf { it.isNotBlank() }
+            val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
+            val savedTier = sharedPrefs.getString(KEY_XBOX_SUB_TIER, null)?.takeIf { it.isNotBlank() }
+            val savedTotalCloud = sharedPrefs.getInt(KEY_XBOX_TOTAL_CLOUD, 0)
+            val savedJumpBackRaw = sharedPrefs.getString(KEY_XBOX_JUMP_BACK_IDS, "") ?: ""
+            val savedJumpBack = savedJumpBackRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+
+            _xboxStatus.value = XboxCloudSyncStatus(
+                gamertag = savedGamertag,
+                avatarUrl = savedAvatar,
+                subscriptionTier = savedTier,
+                cloudServiceOnline = true,
+                totalCloudCatalogCount = savedTotalCloud.coerceAtLeast(_games.value.size),
+                syncedCatalogCount = _games.value.size,
+                jumpBackInIds = savedJumpBack,
+                lastSyncTimeMs = lastSyncMs
+            )
+
             val now = System.currentTimeMillis()
-            if (syncedList.size < 15 || (now - lastSyncMs) > 12 * 3600 * 1000L) {
+            val needsAutoFullScan = syncedList.isEmpty() ||
+                (savedTotalCloud > 0 && syncedList.size < (savedTotalCloud - 20)) ||
+                syncedList.size < 120 ||
+                (now - lastSyncMs) > 6 * 3600 * 1000L
+            if (needsAutoFullScan) {
                 syncLiveXboxCatalog(force = false)
             }
         }
@@ -242,39 +188,36 @@ object GameLibraryRepository {
         customList: List<GameBookmark>,
         syncedList: List<GameBookmark>
     ) {
-        val syncedByProductId = syncedList.associateBy { extractProductId(it.playUrl) }
-        val syncedById = syncedList.associateBy { it.id.lowercase(Locale.ROOT) }
-
-        val enrichedInitial = INITIAL_XBOX_GAMES.map { initGame ->
-            val pid = extractProductId(initGame.playUrl)
-            val match = (if (pid.isNotBlank()) syncedByProductId[pid] else null)
-                ?: syncedById[initGame.id.lowercase(Locale.ROOT)]
-            if (match != null && !match.imageUrl.isNullOrBlank()) {
-                initGame.copy(imageUrl = match.imageUrl)
-            } else {
-                initGame
-            }
-        }
-
         val existingIds = HashSet<String>()
         val existingProductIds = HashSet<String>()
-        val merged = ArrayList<GameBookmark>(customList.size + enrichedInitial.size + syncedList.size)
+        val merged = ArrayList<GameBookmark>(customList.size + syncedList.size)
 
         fun addUnique(item: GameBookmark) {
             val idKey = item.id.lowercase(Locale.ROOT)
             val pid = extractProductId(item.playUrl)
+            val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+            // Chỉ giữ game đã có ảnh thật từ Xbox hoặc Fortnite (hoặc game do người dùng tự thêm)
+            if (!item.id.startsWith("custom_") && !isFortnite && item.imageUrl.isNullOrBlank()) return
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
-            merged.add(item)
+            val finalItem = if (isFortnite && item.drawableResId == null) {
+                item.copy(id = "fortnite", drawableResId = FORTNITE_POSTER_RES_ID)
+            } else {
+                item
+            }
+            merged.add(finalItem)
         }
 
         customList.forEach { addUnique(it) }
-        enrichedInitial.forEach { addUnique(it) }
         syncedList.forEach { addUnique(it) }
 
         _games.value = merged
+        _xboxStatus.value = _xboxStatus.value.copy(
+            syncedCatalogCount = merged.size,
+            totalCloudCatalogCount = _xboxStatus.value.totalCloudCatalogCount.coerceAtLeast(merged.size)
+        )
     }
 
     fun extractProductId(url: String?): String {
@@ -324,7 +267,7 @@ object GameLibraryRepository {
             .ifBlank { "Xbox Cloud Game" }
     }
 
-    private fun normalizeImageUrl(rawImg: String?): String? {
+    private fun normalizeImageUrl(rawImg: String?, width: Int = 360, height: Int = 540): String? {
         val trimmed = rawImg?.trim().orEmpty()
         if (trimmed.isBlank() || trimmed.startsWith("data:")) return null
         val httpsUrl = when {
@@ -334,7 +277,7 @@ object GameLibraryRepository {
             else -> return null
         }
         return if (httpsUrl.contains("store-images.s-microsoft.com") && !httpsUrl.contains("?")) {
-            "$httpsUrl?w=360&h=540&format=jpg"
+            "$httpsUrl?w=$width&h=$height&format=jpg"
         } else {
             httpsUrl
         }
@@ -368,6 +311,71 @@ object GameLibraryRepository {
         )
         if (result == null && trimmed.contains("fortnite", ignoreCase = true)) {
             recordLastPlayed("fortnite")
+        }
+    }
+
+    /**
+     * Updates the user's live Xbox Live profile detected from the signed-in Xbox Cloud WebView.
+     */
+    fun onXboxProfileSynced(gamertag: String?, avatarUrl: String?, subscriptionTier: String?) {
+        val cleanTag = gamertag?.trim()?.takeIf {
+            it.isNotBlank() &&
+                !it.equals("Sign in", ignoreCase = true) &&
+                !it.equals("Đăng nhập", ignoreCase = true) &&
+                !it.equals("Xbox", ignoreCase = true) &&
+                it.length in 2..28
+        } ?: return
+        val cleanAvatar = normalizeImageUrl(avatarUrl, width = 160, height = 160)
+        val cleanTier = subscriptionTier?.trim()?.takeIf { it.isNotBlank() } ?: "Xbox Cloud Gaming"
+        val current = _xboxStatus.value
+        if (current.gamertag == cleanTag && current.avatarUrl == (cleanAvatar ?: current.avatarUrl)) return
+
+        val updated = current.copy(
+            gamertag = cleanTag,
+            avatarUrl = cleanAvatar ?: current.avatarUrl,
+            subscriptionTier = cleanTier
+        )
+        _xboxStatus.value = updated
+        prefs?.edit()
+            ?.putString(KEY_XBOX_GAMERTAG, updated.gamertag)
+            ?.putString(KEY_XBOX_AVATAR_URL, updated.avatarUrl ?: "")
+            ?.putString(KEY_XBOX_SUB_TIER, updated.subscriptionTier ?: "")
+            ?.apply()
+    }
+
+    /**
+     * Syncs the user's "Jump back in" (Recently played on Xbox Cloud) carousel detected from xbox.com/play.
+     */
+    fun onXboxJumpBackInSynced(jsonArrayStr: String) {
+        if (jsonArrayStr.isBlank()) return
+        ioScope.launch {
+            try {
+                val arr = JSONArray(jsonArrayStr)
+                if (arr.length() == 0) return@launch
+                val jumpIds = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    val rawUrl = obj.optString("url", "").trim()
+                    val rawTitle = obj.optString("title", "").trim()
+                    val rawImg = obj.optString("imageUrl", "").trim()
+                    if (rawUrl.isBlank()) continue
+                    val bookmark = onWebGamePlayedOrDiscovered(
+                        rawTitle = rawTitle,
+                        rawUrl = rawUrl,
+                        imageUrl = rawImg,
+                        markAsLastPlayed = (i == 0 && _lastPlayedId.value == null)
+                    )
+                    if (bookmark != null && bookmark.id !in jumpIds) {
+                        jumpIds.add(bookmark.id)
+                    }
+                }
+                if (jumpIds.isNotEmpty()) {
+                    val mergedJumpIds = (jumpIds + _xboxStatus.value.jumpBackInIds).distinct().take(10)
+                    _xboxStatus.value = _xboxStatus.value.copy(jumpBackInIds = mergedJumpIds)
+                    prefs?.edit()?.putString(KEY_XBOX_JUMP_BACK_IDS, mergedJumpIds.joinToString(","))?.apply()
+                }
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -431,7 +439,7 @@ object GameLibraryRepository {
             if (markAsLastPlayed) {
                 recordLastPlayed(matched.id)
             }
-            if (updatedItem.imageUrl.isNullOrBlank() && updatedItem.drawableResId == null && productId.isNotBlank()) {
+            if ((updatedItem.imageUrl.isNullOrBlank() || updatedItem.description.isNullOrBlank()) && productId.isNotBlank()) {
                 fetchSingleProductMetadataAsync(productId)
             }
             return updatedItem
@@ -463,11 +471,7 @@ object GameLibraryRepository {
             category = category ?: "Xbox Cloud Game Pass",
             categoryEn = category ?: "Xbox Cloud Game Pass",
             playUrl = canonicalPlayUrl,
-            freeToPlay = resolvedTitle.contains("Fortnite", ignoreCase = true) ||
-                resolvedTitle.contains("Roblox", ignoreCase = true) ||
-                resolvedTitle.contains(" Overwatch", ignoreCase = true) ||
-                resolvedTitle.contains("Apex Legends", ignoreCase = true) ||
-                resolvedTitle.contains("Call of Duty: Warzone", ignoreCase = true),
+            freeToPlay = isFreeToPlayTitle(resolvedTitle),
             supportsTouch = supportsTouch ?: true,
             accentColorHex = accent,
             badge = "Xbox Cloud",
@@ -483,10 +487,24 @@ object GameLibraryRepository {
         if (markAsLastPlayed) {
             recordLastPlayed(newBookmark.id)
         }
-        if (normImage == null && productId.isNotBlank()) {
+        if (productId.isNotBlank()) {
             fetchSingleProductMetadataAsync(productId)
         }
         return newBookmark
+    }
+
+    private fun isFreeToPlayTitle(title: String): Boolean {
+        return title.contains("Fortnite", ignoreCase = true) ||
+            title.contains("Roblox", ignoreCase = true) ||
+            title.contains("Overwatch", ignoreCase = true) ||
+            title.contains("Apex Legends", ignoreCase = true) ||
+            title.contains("Warzone", ignoreCase = true) ||
+            title.contains("Halo Infinite", ignoreCase = true) ||
+            title.contains("Rocket League", ignoreCase = true) ||
+            title.contains("Destiny 2", ignoreCase = true) ||
+            title.contains("The Finals", ignoreCase = true) ||
+            title.contains("Valorant", ignoreCase = true) ||
+            title.contains("Genshin", ignoreCase = true)
     }
 
     /**
@@ -548,7 +566,7 @@ object GameLibraryRepository {
                                 category = "Xbox Cloud Game Pass",
                                 categoryEn = "Xbox Cloud Game Pass",
                                 playUrl = canonicalUrl,
-                                freeToPlay = cleanTitle.contains("Fortnite", ignoreCase = true),
+                                freeToPlay = isFreeToPlayTitle(cleanTitle),
                                 supportsTouch = touch,
                                 accentColorHex = accent,
                                 badge = if (touch) "Cảm ứng • Cloud" else "Game Pass",
@@ -564,6 +582,7 @@ object GameLibraryRepository {
                 if (changed) {
                     _games.value = currentList
                     saveSyncedGames(currentList)
+                    _xboxStatus.value = _xboxStatus.value.copy(syncedCatalogCount = currentList.size)
                 }
             } catch (_: Exception) {
             }
@@ -571,51 +590,156 @@ object GameLibraryRepository {
     }
 
     /**
-     * Dynamically fetches real Xbox Cloud Gaming titles, categories, ratings, touch support,
-     * and official poster cover art from Microsoft's Game Pass & DisplayCatalog APIs.
+     * Tự động quét toàn bộ kho game Xbox Cloud theo từng lô (streaming batches)
+     * và lấy ảnh bìa thật từ máy chủ Microsoft mà không cần người dùng bấm nút +40.
      */
-    fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 55) {
+    fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 500) {
         if (_isSyncingCatalog.value && !force) return
         ioScope.launch {
             _isSyncingCatalog.value = true
+            val startPingMs = System.currentTimeMillis()
             try {
-                val touchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 200).toSet()
-                val cloudIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = maxCatalogGames)
+                val allCloudIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = 500)
+                val catalogRtt = (System.currentTimeMillis() - startPingMs).toInt().coerceIn(15, 2500)
+                val touchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 300).toSet()
+                val popularIds = fetchSiglProductIds(POPULAR_CLOUD_SIGL_URL, maxCount = 100).toSet()
+                val recentIds = fetchSiglProductIds(RECENTLY_ADDED_SIGL_URL, maxCount = 80).toSet()
 
-                val initialProductIds = INITIAL_XBOX_GAMES.mapNotNull {
-                    extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }
+                if (allCloudIds.isNotEmpty()) {
+                    cachedAllCloudProductIds = allCloudIds
                 }
+                if (touchIds.isNotEmpty()) cachedTouchIds = touchIds
+                if (popularIds.isNotEmpty()) cachedPopularIds = popularIds
+                if (recentIds.isNotEmpty()) cachedRecentIds = recentIds
 
-                val targetProductIds = (initialProductIds + cloudIds)
+                val prioritizedCloudIds = (listOf(FORTNITE_PRODUCT_ID) + popularIds.toList() + recentIds.toList() + allCloudIds)
                     .map { it.uppercase(Locale.ROOT) }
                     .distinct()
-                    .take(maxCatalogGames + initialProductIds.size)
+                    .take(maxCatalogGames)
 
-                if (targetProductIds.isEmpty()) return@launch
-
-                val fetchedBookmarks = mutableListOf<GameBookmark>()
-                targetProductIds.chunked(20).forEach { batch ->
-                    val batchResults = fetchDisplayCatalogProducts(batch, touchIds)
-                    fetchedBookmarks.addAll(batchResults)
+                if (prioritizedCloudIds.isEmpty()) {
+                    _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = false)
+                    return@launch
                 }
 
-                if (fetchedBookmarks.isNotEmpty()) {
-                    val sharedPrefs = prefs
-                    val customList = if (sharedPrefs != null) {
-                        loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
-                    } else {
-                        _games.value.filter { it.id.startsWith("custom_") }
+                val totalCloud = prioritizedCloudIds.size.coerceAtLeast(allCloudIds.size)
+                _xboxStatus.value = _xboxStatus.value.copy(
+                    cloudServiceOnline = true,
+                    cloudLatencyMs = catalogRtt,
+                    totalCloudCatalogCount = totalCloud
+                )
+
+                val sharedPrefs = prefs
+                val customList = if (sharedPrefs != null) {
+                    loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
+                } else {
+                    _games.value.filter { it.id.startsWith("custom_") }
+                }
+                val existingSynced = if (sharedPrefs != null) {
+                    loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
+                } else emptyList()
+
+                val existingPids = existingSynced
+                    .filter { !it.imageUrl.isNullOrBlank() || it.id == "fortnite" }
+                    .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
+                    .toSet()
+
+                val idsToFetch = if (force) {
+                    prioritizedCloudIds
+                } else {
+                    prioritizedCloudIds.filter { it !in existingPids }
+                }
+
+                val runningSynced = existingSynced.toMutableList()
+                idsToFetch.chunked(25).forEach { batch ->
+                    val batchResults = fetchDisplayCatalogProducts(
+                        bigIds = batch,
+                        touchIds = cachedTouchIds,
+                        popularIds = cachedPopularIds,
+                        recentIds = cachedRecentIds
+                    )
+                    if (batchResults.isNotEmpty()) {
+                        runningSynced.addAll(batchResults)
+                        val deduped = runningSynced.distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                        rebuildMergedGames(customList, deduped)
+                        _xboxStatus.value = _xboxStatus.value.copy(
+                            cloudServiceOnline = true,
+                            cloudLatencyMs = catalogRtt,
+                            totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
+                            syncedCatalogCount = _games.value.size
+                        )
                     }
-                    val existingSynced = if (sharedPrefs != null) {
-                        loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
-                    } else emptyList()
+                }
 
-                    val combinedSynced = (fetchedBookmarks + existingSynced)
-                        .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                saveSyncedGames(_games.value)
+                val nowMs = System.currentTimeMillis()
+                _xboxStatus.value = _xboxStatus.value.copy(
+                    cloudServiceOnline = true,
+                    cloudLatencyMs = catalogRtt,
+                    totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
+                    syncedCatalogCount = _games.value.size,
+                    lastSyncTimeMs = nowMs
+                )
+                sharedPrefs?.edit()
+                    ?.putLong(KEY_LAST_CATALOG_SYNC_MS, nowMs)
+                    ?.putInt(KEY_XBOX_TOTAL_CLOUD, totalCloud.coerceAtLeast(_games.value.size))
+                    ?.apply()
+            } catch (_: Exception) {
+                _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = false)
+            } finally {
+                _isSyncingCatalog.value = false
+            }
+        }
+    }
 
-                    rebuildMergedGames(customList, combinedSynced)
-                    saveSyncedGames(_games.value)
-                    sharedPrefs?.edit()?.putLong(KEY_LAST_CATALOG_SYNC_MS, System.currentTimeMillis())?.apply()
+    /**
+     * Loads the next batch of unsynced Xbox Cloud games from Microsoft's full Cloud SIGL feed.
+     */
+    fun loadMoreXboxCatalogGames(batchSize: Int = 40) {
+        if (_isSyncingCatalog.value) return
+        ioScope.launch {
+            _isSyncingCatalog.value = true
+            try {
+                if (cachedAllCloudProductIds.isEmpty()) {
+                    cachedAllCloudProductIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = 450)
+                }
+                if (cachedTouchIds.isEmpty()) {
+                    cachedTouchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 250).toSet()
+                }
+                val existingPids = _games.value
+                    .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
+                    .toSet()
+
+                val nextBatchIds = cachedAllCloudProductIds
+                    .filter { it.uppercase(Locale.ROOT) !in existingPids }
+                    .take(batchSize)
+
+                if (nextBatchIds.isEmpty()) {
+                    syncLiveXboxCatalog(force = true, maxCatalogGames = (_games.value.size + batchSize).coerceAtMost(240))
+                    return@launch
+                }
+
+                val newBookmarks = mutableListOf<GameBookmark>()
+                nextBatchIds.chunked(20).forEach { chunk ->
+                    newBookmarks.addAll(
+                        fetchDisplayCatalogProducts(
+                            bigIds = chunk,
+                            touchIds = cachedTouchIds,
+                            popularIds = cachedPopularIds,
+                            recentIds = cachedRecentIds
+                        )
+                    )
+                }
+
+                if (newBookmarks.isNotEmpty()) {
+                    val current = _games.value
+                    val merged = (current + newBookmarks).distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                    _games.value = merged
+                    saveSyncedGames(merged)
+                    _xboxStatus.value = _xboxStatus.value.copy(
+                        syncedCatalogCount = merged.size,
+                        totalCloudCatalogCount = cachedAllCloudProductIds.size.coerceAtLeast(merged.size)
+                    )
                 }
             } catch (_: Exception) {
             } finally {
@@ -624,10 +748,91 @@ object GameLibraryRepository {
         }
     }
 
+    /**
+     * Searches Microsoft's live DisplayCatalog API by keyword, resolves full cover art & metadata,
+     * adds discovered Xbox games to the local library, and returns matching results via callback.
+     */
+    fun searchMicrosoftXboxCatalog(
+        query: String,
+        onResult: (List<GameBookmark>) -> Unit = {}
+    ) {
+        val cleanQuery = query.trim()
+        if (cleanQuery.length < 2) {
+            onResult(emptyList())
+            return
+        }
+        ioScope.launch {
+            _isSearchingLiveXbox.value = true
+            try {
+                val encoded = java.net.URLEncoder.encode(cleanQuery, "UTF-8")
+                val suggestUrl =
+                    "https://displaycatalog.mp.microsoft.com/v7.0/productFamilies/autosuggest?market=US&languages=en-us&productFamilyNames=Games&query=$encoded"
+                val conn = (URL(suggestUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    requestMethod = "GET"
+                    setRequestProperty("Accept", "application/json")
+                }
+                val discoveredIds = mutableListOf<String>()
+                try {
+                    if (conn.responseCode == 200) {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        val root = JSONObject(body)
+                        val resultsArr = root.optJSONArray("Results")
+                        if (resultsArr != null) {
+                            for (i in 0 until resultsArr.length()) {
+                                val group = resultsArr.optJSONObject(i) ?: continue
+                                val prods = group.optJSONArray("Products") ?: continue
+                                for (j in 0 until prods.length()) {
+                                    val p = prods.optJSONObject(j) ?: continue
+                                    val pid = p.optString("ProductId", "").trim().uppercase(Locale.ROOT)
+                                    if (pid.length == 12 && pid.all { it.isLetterOrDigit() } && pid !in discoveredIds) {
+                                        discoveredIds.add(pid)
+                                        if (discoveredIds.size >= 16) break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    conn.disconnect()
+                }
+
+                if (discoveredIds.isNotEmpty()) {
+                    val fetched = fetchDisplayCatalogProducts(
+                        bigIds = discoveredIds,
+                        touchIds = cachedTouchIds,
+                        popularIds = cachedPopularIds,
+                        recentIds = cachedRecentIds
+                    )
+                    if (fetched.isNotEmpty()) {
+                        val current = _games.value
+                        val merged = (current + fetched).distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                        _games.value = merged
+                        saveSyncedGames(merged)
+                        _xboxStatus.value = _xboxStatus.value.copy(syncedCatalogCount = merged.size)
+                        onResult(fetched)
+                        return@launch
+                    }
+                }
+                onResult(emptyList())
+            } catch (_: Exception) {
+                onResult(emptyList())
+            } finally {
+                _isSearchingLiveXbox.value = false
+            }
+        }
+    }
+
     private fun fetchSingleProductMetadataAsync(productId: String) {
         ioScope.launch {
             try {
-                val results = fetchDisplayCatalogProducts(listOf(productId.uppercase(Locale.ROOT)), emptySet())
+                val results = fetchDisplayCatalogProducts(
+                    bigIds = listOf(productId.uppercase(Locale.ROOT)),
+                    touchIds = cachedTouchIds,
+                    popularIds = cachedPopularIds,
+                    recentIds = cachedRecentIds
+                )
                 val fetched = results.firstOrNull() ?: return@launch
                 val current = _games.value
                 var changed = false
@@ -639,6 +844,9 @@ object GameLibraryRepository {
                             category = if (item.category == "Xbox Cloud Game Pass") fetched.category else item.category,
                             categoryEn = if (item.categoryEn == "Xbox Cloud Game Pass") fetched.categoryEn else item.categoryEn,
                             imageUrl = item.imageUrl ?: fetched.imageUrl,
+                            heroImageUrl = item.heroImageUrl ?: fetched.heroImageUrl,
+                            description = item.description ?: fetched.description,
+                            publisher = item.publisher ?: fetched.publisher,
                             rating = fetched.rating
                         )
                     } else item
@@ -680,7 +888,9 @@ object GameLibraryRepository {
 
     private fun fetchDisplayCatalogProducts(
         bigIds: List<String>,
-        touchIds: Set<String>
+        touchIds: Set<String>,
+        popularIds: Set<String> = emptySet(),
+        recentIds: Set<String> = emptySet()
     ): List<GameBookmark> {
         if (bigIds.isEmpty()) return emptyList()
         val joined = bigIds.joinToString(",")
@@ -713,6 +923,16 @@ object GameLibraryRepository {
                     .replace(" Standard Edition", "", ignoreCase = true)
                     .trim()
 
+                val shortDesc = locProps.optString("ShortDescription", "").trim()
+                    .ifBlank { locProps.optString("ProductDescription", "").trim() }
+                    .replace(Regex("\\s+"), " ")
+                    .take(280)
+                    .takeIf { it.isNotBlank() }
+
+                val publisherName = locProps.optString("PublisherName", "").trim()
+                    .ifBlank { locProps.optString("DeveloperName", "").trim() }
+                    .takeIf { it.isNotBlank() }
+
                 // Pick best cover image: Poster -> BoxArt -> TitledHeroArt -> SuperHeroArt
                 val imagesArr = locProps.optJSONArray("Images")
                 var posterUri: String? = null
@@ -727,12 +947,13 @@ object GameLibraryRepository {
                         when (purpose) {
                             "Poster" -> if (posterUri == null) posterUri = uri
                             "BoxArt" -> if (boxArtUri == null) boxArtUri = uri
-                            "TitledHeroArt", "SuperHeroArt", "FeaturePromotionalSquareArt" ->
+                            "SuperHeroArt", "TitledHeroArt", "FeaturePromotionalSquareArt" ->
                                 if (heroUri == null) heroUri = uri
                         }
                     }
                 }
-                val bestImageUrl = normalizeImageUrl(posterUri ?: boxArtUri ?: heroUri)
+                val bestImageUrl = normalizeImageUrl(posterUri ?: boxArtUri ?: heroUri, width = 360, height = 540)
+                val bestHeroUrl = normalizeImageUrl(heroUri ?: boxArtUri ?: posterUri, width = 720, height = 405)
 
                 val props = prod.optJSONObject("Properties")
                 val rawCat = props?.optString("Category", "")?.takeIf { it.isNotBlank() }
@@ -755,25 +976,53 @@ object GameLibraryRepository {
                     }
                 }
 
-                val isTouch = productId in touchIds
-                val slug = slugifyTitle(cleanTitle)
+                val isFortnite = productId.equals(FORTNITE_PRODUCT_ID, ignoreCase = true) ||
+                    cleanTitle.equals("Fortnite", ignoreCase = true)
+                // Bỏ qua game nếu chưa lấy được ảnh thật (trừ Fortnite dùng ảnh riêng)
+                if (!isFortnite && bestImageUrl.isNullOrBlank()) continue
+
+                val isTouch = productId in touchIds || isFortnite
+                val isPop = productId in popularIds || isFortnite
+                val isRecent = productId in recentIds
+                val slug = if (isFortnite) "fortnite" else slugifyTitle(cleanTitle)
                 val playUrl = "https://www.xbox.com/en-US/play/games/$slug/$productId"
                 val accent = ACCENT_PALETTE[(cleanTitle.hashCode() and 0x7FFFFFFF) % ACCENT_PALETTE.size]
 
+                val badgeVi = when {
+                    isFortnite -> "Hỗ Trợ 120FPS • Free 100%"
+                    isRecent -> "Mới lên kệ • Cloud"
+                    isPop -> "Top Hot • Xbox"
+                    isTouch -> "Cảm ứng • Cloud"
+                    else -> "Game Pass"
+                }
+                val badgeEn = when {
+                    isFortnite -> "120FPS Ready • 100% Free"
+                    isRecent -> "New on Cloud"
+                    isPop -> "Popular • Xbox"
+                    isTouch -> "Touch • Cloud"
+                    else -> "Game Pass"
+                }
+
                 results.add(
                     GameBookmark(
-                        id = "xbox_${productId.lowercase(Locale.ROOT)}",
+                        id = if (isFortnite) "fortnite" else "xbox_${productId.lowercase(Locale.ROOT)}",
                         title = cleanTitle,
                         category = catVi,
                         categoryEn = catEn,
                         playUrl = playUrl,
-                        freeToPlay = cleanTitle.contains("Fortnite", ignoreCase = true),
+                        freeToPlay = isFreeToPlayTitle(cleanTitle),
                         supportsTouch = isTouch,
                         accentColorHex = accent,
-                        badge = if (isTouch) "Cảm ứng • Cloud" else "Game Pass",
-                        badgeEn = if (isTouch) "Touch • Cloud" else "Game Pass",
+                        badge = badgeVi,
+                        badgeEn = badgeEn,
+                        drawableResId = if (isFortnite) FORTNITE_POSTER_RES_ID else null,
                         rating = ratingStr,
-                        imageUrl = bestImageUrl
+                        imageUrl = if (isFortnite) null else bestImageUrl,
+                        heroImageUrl = bestHeroUrl,
+                        description = shortDesc,
+                        publisher = publisherName,
+                        isPopular = isPop,
+                        isRecentlyAdded = isRecent
                     )
                 )
             }
@@ -808,11 +1057,13 @@ object GameLibraryRepository {
                 val title = obj.optString("title", "").trim()
                 val playUrl = obj.optString("playUrl", "").trim()
                 if (title.isBlank() || playUrl.isBlank()) continue
+                val id = obj.optString("id", "custom_$i")
+                val isFortnite = id == "fortnite" || extractProductId(playUrl).equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
                 val cat = obj.optString("category", "Xbox Cloud Game Pass")
                 val badge = obj.optString("badge", "").takeIf { it.isNotBlank() }
                 list.add(
                     GameBookmark(
-                        id = obj.optString("id", "custom_$i"),
+                        id = if (isFortnite) "fortnite" else id,
                         title = title,
                         category = cat,
                         categoryEn = obj.optString("categoryEn", cat),
@@ -822,8 +1073,14 @@ object GameLibraryRepository {
                         accentColorHex = obj.optLong("accentColorHex", 0xFF107C10L),
                         badge = badge,
                         badgeEn = obj.optString("badgeEn", badge ?: "").takeIf { it.isNotBlank() },
+                        drawableResId = if (isFortnite) FORTNITE_POSTER_RES_ID else null,
                         rating = obj.optString("rating", "4.8"),
-                        imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() }
+                        imageUrl = if (isFortnite) null else obj.optString("imageUrl", "").takeIf { it.isNotBlank() },
+                        heroImageUrl = obj.optString("heroImageUrl", "").takeIf { it.isNotBlank() },
+                        description = obj.optString("description", "").takeIf { it.isNotBlank() },
+                        publisher = obj.optString("publisher", "").takeIf { it.isNotBlank() },
+                        isPopular = obj.optBoolean("isPopular", false),
+                        isRecentlyAdded = obj.optBoolean("isRecentlyAdded", false)
                     )
                 )
             }
@@ -841,8 +1098,9 @@ object GameLibraryRepository {
 
     private fun saveSyncedGames(allGames: List<GameBookmark>) {
         val sharedPrefs = prefs ?: return
-        val syncedGames = allGames.filter { !it.id.startsWith("custom_") && it.drawableResId == null || !it.imageUrl.isNullOrBlank() }
-            .take(120)
+        val syncedGames = allGames
+            .filter { !it.id.startsWith("custom_") && (!it.imageUrl.isNullOrBlank() || it.id == "fortnite") }
+            .take(550)
         saveGamesListToPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON, syncedGames)
     }
 
@@ -863,6 +1121,11 @@ object GameLibraryRepository {
                     put("badgeEn", game.badgeEn ?: "")
                     put("rating", game.rating)
                     put("imageUrl", game.imageUrl ?: "")
+                    put("heroImageUrl", game.heroImageUrl ?: "")
+                    put("description", game.description ?: "")
+                    put("publisher", game.publisher ?: "")
+                    put("isPopular", game.isPopular)
+                    put("isRecentlyAdded", game.isRecentlyAdded)
                 }
                 arr.put(obj)
             }

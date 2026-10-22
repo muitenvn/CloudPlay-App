@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -103,17 +104,22 @@ fun GameLibraryScreen(
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
     val isSyncingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
+    val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
+    val xboxStatus by GameLibraryRepository.xboxStatus.collectAsState()
     val isEn = config.isEnglishUI()
     var activeSection by remember { mutableStateOf(GameTabSection.LIBRARY) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(GameFilterTab.ALL) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedDetailGame by remember { mutableStateOf<GameBookmark?>(null) }
 
     val filteredGames = remember(games, selectedTab, searchQuery, favoriteIds) {
         games.filter { game ->
             val matchesTab = when (selectedTab) {
                 GameFilterTab.ALL -> true
                 GameFilterTab.FAVORITES -> game.id in favoriteIds
+                GameFilterTab.POPULAR -> game.isPopular || game.rating >= "4.9"
+                GameFilterTab.RECENTLY_ADDED -> game.isRecentlyAdded
                 GameFilterTab.FREE_TO_PLAY -> game.freeToPlay
                 GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
                 GameFilterTab.GAME_PASS -> !game.freeToPlay
@@ -121,13 +127,16 @@ fun GameLibraryScreen(
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 game.title.contains(searchQuery, ignoreCase = true) ||
                     game.category.contains(searchQuery, ignoreCase = true) ||
-                    game.categoryEn.contains(searchQuery, ignoreCase = true)
+                    game.categoryEn.contains(searchQuery, ignoreCase = true) ||
+                    (game.publisher?.contains(searchQuery, ignoreCase = true) == true)
             }
             matchesTab && matchesSearch
         }.sortedByDescending { it.id in favoriteIds }
     }
 
     val favCount = remember(games, favoriteIds) { games.count { it.id in favoriteIds } }
+    val popCount = remember(games) { games.count { it.isPopular || it.rating >= "4.9" } }
+    val recentCount = remember(games) { games.count { it.isRecentlyAdded } }
     val freeCount = remember(games) { games.count { it.freeToPlay } }
     val touchCount = remember(games) { games.count { it.supportsTouch } }
 
@@ -233,11 +242,14 @@ fun GameLibraryScreen(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.8.sp
                             )
+                            val totalCloud = xboxStatus.totalCloudCatalogCount.coerceAtLeast(games.size)
                             Text(
                                 text = if (isSyncingCatalog) {
-                                    if (isEn) "Syncing live Xbox catalog & covers..." else "Đang tự động tải kho game & ảnh bìa Xbox..."
+                                    if (isEn) "Auto-scanning Xbox Cloud (${games.size}/$totalCloud)..."
+                                    else "Đang tự động quét kho Xbox (${games.size}/$totalCloud)..."
                                 } else {
-                                    if (isEn) "${games.size} titles ready • $freeCount Free • $touchCount Touch" else "${games.size} tựa game sẵn sàng • $freeCount Free • $touchCount Cảm ứng"
+                                    if (isEn) "${games.size}/$totalCloud Cloud • $freeCount Free • $touchCount Touch"
+                                    else "${games.size}/$totalCloud game Cloud • $freeCount Free • $touchCount Cảm ứng"
                                 },
                                 color = if (isSyncingCatalog) DirectCyan else TextSecondary,
                                 fontSize = 10.5.sp,
@@ -247,7 +259,7 @@ fun GameLibraryScreen(
                         }
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
@@ -274,7 +286,7 @@ fun GameLibraryScreen(
                                     )
                                     Text(
                                         text = if (isSyncingCatalog) {
-                                            if (isEn) "..." else "..."
+                                            "..."
                                         } else {
                                             if (isEn) "Sync" else "Tải kho"
                                         },
@@ -367,6 +379,8 @@ fun GameLibraryScreen(
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
                     GameFilterTab.FAVORITES to (if (isEn) "❤️ Favorites ($favCount)" else "❤️ Yêu thích ($favCount)"),
+                    GameFilterTab.POPULAR to (if (isEn) "🔥 Xbox Popular ($popCount)" else "🔥 Phổ biến Xbox ($popCount)"),
+                    GameFilterTab.RECENTLY_ADDED to (if (isEn) "🆕 New on Cloud ($recentCount)" else "🆕 Mới lên kệ ($recentCount)"),
                     GameFilterTab.FREE_TO_PLAY to "⚡ ${stringResource(R.string.filter_free)} ($freeCount)",
                     GameFilterTab.TOUCH_FRIENDLY to "👆 ${stringResource(R.string.filter_touch)} ($touchCount)",
                     GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
@@ -399,6 +413,58 @@ fun GameLibraryScreen(
                     }
                 }
 
+                // Live Microsoft Xbox Store Search bar trigger when user types a query
+                if (searchQuery.trim().length >= 2) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = DirectCyan.copy(alpha = 0.12f),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(enabled = !isSearchingLiveXbox) {
+                                GameLibraryRepository.searchMicrosoftXboxCatalog(searchQuery)
+                            }
+                            .testTag("live_xbox_search_bar_button")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = DirectCyan,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Text(
+                                    text = if (isSearchingLiveXbox) {
+                                        if (isEn) "Searching Microsoft Xbox Store for \"$searchQuery\"..."
+                                        else "Đang tìm \"$searchQuery\" trực tiếp trên máy chủ Microsoft Xbox..."
+                                    } else {
+                                        if (isEn) "Tap to search & import \"$searchQuery\" live from Xbox Store"
+                                        else "Chạm để tìm & tự động nhập \"$searchQuery\" từ máy chủ Xbox"
+                                    },
+                                    color = DirectCyan,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // 4. Adaptive Grid of Games (2 columns in Portrait, 3-4 in Landscape)
                 if (filteredGames.isEmpty()) {
                     Box(
@@ -409,7 +475,7 @@ fun GameLibraryScreen(
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Gamepad,
@@ -418,12 +484,37 @@ fun GameLibraryScreen(
                                 modifier = Modifier.size(48.dp)
                             )
                             Text(
-                                text = if (isEn) "No matching games found" else "Không tìm thấy tựa game nào phù hợp",
-                                color = TextSecondary,
+                                text = if (isSyncingCatalog && games.isEmpty()) {
+                                    if (isEn) "Scanning Xbox Cloud games & real cover art..."
+                                    else "Đang tự động quét game và lấy ảnh bìa thật từ Xbox Cloud..."
+                                } else {
+                                    if (isEn) "No matching games found in local vault"
+                                    else "Chưa có game này trong kho đã tải"
+                                },
+                                color = if (isSyncingCatalog && games.isEmpty()) DirectCyan else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 13.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
+                            if (searchQuery.trim().length >= 2) {
+                                Button(
+                                    onClick = { GameLibraryRepository.searchMicrosoftXboxCatalog(searchQuery) },
+                                    enabled = !isSearchingLiveXbox,
+                                    colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = if (isSearchingLiveXbox) {
+                                            if (isEn) "Searching Xbox..." else "Đang tìm trên Xbox..."
+                                        } else {
+                                            if (isEn) "Search \"$searchQuery\" on Xbox Cloud" else "Tìm \"$searchQuery\" trên Xbox Cloud"
+                                        },
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -439,6 +530,7 @@ fun GameLibraryScreen(
                                 game = game,
                                 isFavorite = game.id in favoriteIds,
                                 onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
+                                onShowDetail = { selectedDetailGame = game },
                                 onPlay = {
                                     GameLibraryRepository.recordLastPlayed(game.id)
                                     onLaunchGame(game.playUrl)
@@ -475,6 +567,25 @@ fun GameLibraryScreen(
                 onAdd = { title, url ->
                     GameLibraryRepository.addCustomGame(title, url)
                     showAddDialog = false
+                },
+                onLaunchDirect = { game ->
+                    showAddDialog = false
+                    GameLibraryRepository.recordLastPlayed(game.id)
+                    onLaunchGame(game.playUrl)
+                }
+            )
+        }
+
+        selectedDetailGame?.let { detailGame ->
+            XboxGameDetailDialog(
+                game = detailGame,
+                isFavorite = detailGame.id in favoriteIds,
+                onToggleFavorite = { GameLibraryRepository.toggleFavorite(detailGame.id) },
+                onDismiss = { selectedDetailGame = null },
+                onPlay = {
+                    selectedDetailGame = null
+                    GameLibraryRepository.recordLastPlayed(detailGame.id)
+                    onLaunchGame(detailGame.playUrl)
                 }
             )
         }
@@ -486,6 +597,7 @@ private fun LibraryGameCard(
     game: GameBookmark,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    onShowDetail: () -> Unit,
     onPlay: () -> Unit,
     onDeleteCustom: (() -> Unit)? = null
 ) {
@@ -627,6 +739,25 @@ private fun LibraryGameCard(
                     Surface(
                         shape = CircleShape,
                         color = Color(0xCC060B08),
+                        border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxCardBorder),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable { onShowDetail() }
+                            .testTag("info_library_${game.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = if (isEn) "Xbox Info" else "Thông tin Xbox",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier
+                                .padding(5.dp)
+                                .size(13.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xCC060B08),
                         border = androidx.compose.foundation.BorderStroke(
                             0.6.dp,
                             if (isFavorite) JapanRed.copy(alpha = 0.75f) else XboxCardBorder
@@ -744,44 +875,310 @@ private fun LibraryGameCard(
 }
 
 @Composable
-private fun AddGameDialog(
+private fun XboxGameDetailDialog(
+    game: GameBookmark,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onDismiss: () -> Unit,
-    onAdd: (String, String) -> Unit
+    onPlay: () -> Unit
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
+    val bannerUrl = game.heroImageUrl ?: game.imageUrl
+    val productId = remember(game.playUrl) { GameLibraryRepository.extractProductId(game.playUrl) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = game.title,
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 17.sp
+                )
+                if (!game.publisher.isNullOrBlank()) {
+                    Text(
+                        text = game.publisher,
+                        color = XboxNeonGreen,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(145.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(game.accentColorHex), XboxDark)
+                            )
+                        )
+                        .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (game.drawableResId != null) {
+                        Image(
+                            painter = painterResource(id = game.drawableResId),
+                            contentDescription = game.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else if (!bannerUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = bannerUrl,
+                            contentDescription = game.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Gamepad,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(0.7.dp, GoldStar.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = "★ ${game.rating}",
+                            color = GoldStar,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurfaceVariant,
+                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder)
+                    ) {
+                        Text(
+                            text = game.localizedCategory(isEn),
+                            color = TextPrimary,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    if (productId.isNotBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = DirectCyan.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.45f))
+                        ) {
+                            Text(
+                                text = "ID: $productId",
+                                color = DirectCyan,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                Text(
+                    text = game.description ?: if (isEn) {
+                        "Official Xbox Cloud Gaming title linked directly from Microsoft Store. Supports instant cloud streaming without downloading."
+                    } else {
+                        "Tựa game chính thức liên kết trực tiếp từ máy chủ Microsoft Xbox Cloud Gaming. Hỗ trợ chơi ngay trên đám mây không cần tải về."
+                    },
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onPlay,
+                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = if (isEn) "Play on Xbox Cloud" else "Chơi trên Xbox Cloud",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onToggleFavorite) {
+                    Text(
+                        text = if (isFavorite) {
+                            if (isEn) "♥ Saved" else "♥ Đã thích"
+                        } else {
+                            if (isEn) "♡ Favorite" else "♡ Yêu thích"
+                        },
+                        color = if (isFavorite) JapanRed else XboxNeonGreen
+                    )
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(if (isEn) "Close" else "Đóng", color = TextSecondary)
+                }
+            }
+        },
+        containerColor = XboxSurface
+    )
+}
+
+@Composable
+private fun AddGameDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, String) -> Unit,
+    onLaunchDirect: (GameBookmark) -> Unit = {}
+) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
+    val isEn = config.isEnglishUI()
     var title by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("https://www.xbox.com/en-US/play/games/") }
+    var liveResults by remember { mutableStateOf<List<GameBookmark>>(emptyList()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (isEn) "Add Game to Vault" else "Thêm Game Vào Thư Viện",
+                text = if (isEn) "Link / Add Xbox Cloud Game" else "Liên Kết / Thêm Game Xbox Cloud",
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = if (isEn) "Paste an Xbox Cloud Gaming URL to create a persistent 1-tap launch shortcut." else "Dán link trò chơi trên Xbox Cloud Gaming để tạo phím tắt vào thẳng game 1 chạm (được lưu bền vững trên máy).",
+                    text = if (isEn) {
+                        "Type any game name to search Microsoft Xbox Store automatically (with cover art & link), or paste a custom URL."
+                    } else {
+                        "Gõ tên game bất kỳ rồi bấm 'Tìm trên Xbox' để tự động lấy ảnh bìa, thông tin và link chuẩn từ Microsoft, hoặc tự dán link."
+                    },
                     color = TextSecondary,
-                    fontSize = 12.sp
+                    fontSize = 11.5.sp
                 )
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(if (isEn) "Game Title (e.g. Persona 3 Reload)" else "Tên Game (VD: Persona 3 Reload)") },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = XboxNeonGreen,
-                        unfocusedBorderColor = XboxCardBorder,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text(if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên Game (VD: Black Ops 6)") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = XboxNeonGreen,
+                            unfocusedBorderColor = XboxCardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        )
                     )
-                )
+                    Button(
+                        onClick = {
+                            if (title.trim().length >= 2) {
+                                GameLibraryRepository.searchMicrosoftXboxCatalog(title) { found ->
+                                    liveResults = found.take(5)
+                                    found.firstOrNull()?.let { first ->
+                                        title = first.title
+                                        url = first.playUrl
+                                    }
+                                }
+                            }
+                        },
+                        enabled = !isSearchingLiveXbox && title.trim().length >= 2,
+                        colors = ButtonDefaults.buttonColors(containerColor = DirectCyan.copy(alpha = 0.2f)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (isSearchingLiveXbox) "..." else if (isEn) "Find Xbox" else "Tìm Xbox",
+                            color = DirectCyan,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                if (liveResults.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            text = if (isEn) "Imported from Microsoft Xbox Store (tap to launch):" else "Đã tự động thêm từ Microsoft Xbox Store (chạm để chơi ngay):",
+                            color = XboxNeonGreen,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        liveResults.forEach { item ->
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = XboxSurfaceVariant,
+                                border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onLaunchDirect(item) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = item.title,
+                                            color = TextPrimary,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = item.publisher ?: item.localizedCategory(isEn),
+                                            color = TextSecondary,
+                                            fontSize = 10.sp,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Text(
+                                        text = if (isEn) "PLAY ▶" else "CHƠI ▶",
+                                        color = XboxNeonGreen,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },

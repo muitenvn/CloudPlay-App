@@ -754,17 +754,54 @@ private fun FeaturedGamesSection(
             }
         }
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp)
-        ) {
-            items(featuredGames, key = { it.id }) { game ->
-                FeaturedGameCard(
-                    game = game,
-                    isFavorite = game.id in favoriteIds,
-                    onToggleFavorite = { onToggleFavorite(game) },
-                    onLaunch = { onLaunchBookmark(game) }
-                )
+        if (featuredGames.isEmpty()) {
+            val config by SettingsRepository.config.collectAsState()
+            val isEn = config.isEnglishUI()
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = XboxSurface.copy(alpha = 0.9f),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Gamepad,
+                        contentDescription = null,
+                        tint = DirectCyan,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (isEn) {
+                            "Auto-scanning real games & cover art from Xbox Cloud..."
+                        } else {
+                            "Đang tự động quét game và lấy ảnh bìa thật từ Xbox Cloud..."
+                        },
+                        color = TextSecondary,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp)
+            ) {
+                items(featuredGames, key = { it.id }) { game ->
+                    FeaturedGameCard(
+                        game = game,
+                        isFavorite = game.id in favoriteIds,
+                        onToggleFavorite = { onToggleFavorite(game) },
+                        onLaunch = { onLaunchBookmark(game) }
+                    )
+                }
             }
         }
     }

@@ -524,15 +524,10 @@ private fun ConsoleLiveTelemetryRibbon(
         com.example.data.VideoAspectRatioMode.CUSTOM_SCALE ->
             "${(config.videoScaleX * 100).toInt()}x${(config.videoScaleY * 100).toInt()}%"
     }
-    val isDirectStreamRec =
-        config.recordingCaptureEngine == com.example.data.RecordingCaptureEngine.DIRECT_STREAM
-    val recLabel = if (isDirectStreamRec) {
-        if (isEn) "Stream 0% Lag" else "Quay Luồng 0% Lag"
-    } else {
-        if (isEn) "HW 16:9 Lock" else "Ghi Màn (16:9)"
-    }
+    val graphicsLabel = if (isEn) config.cellularMode.shortLabelEn else config.cellularMode.shortLabel
     val fpsCapLabel = "${config.streamFpsCap.fps} FPS"
 
+    // Next-Gen Live Console Telemetry Ribbon (Core Graphics, Aspect Ratio & 60FPS Input)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -541,7 +536,7 @@ private fun ConsoleLiveTelemetryRibbon(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Interactive 1-tap Aspect Ratio cycler pill
+        // 1. Interactive 1-tap Aspect Ratio cycler pill (16:9 Chuẩn / 18:9 Rộng / Tràn viền / Kéo giãn)
         Surface(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
@@ -553,7 +548,10 @@ private fun ConsoleLiveTelemetryRibbon(
                 .testTag("ribbon_aspect_ratio_chip"),
             shape = RoundedCornerShape(8.dp),
             color = DirectCyan.copy(alpha = 0.12f),
-            border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.45f))
+            border = androidx.compose.foundation.BorderStroke(
+                0.7.dp,
+                DirectCyan.copy(alpha = 0.45f)
+            )
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
@@ -572,24 +570,21 @@ private fun ConsoleLiveTelemetryRibbon(
             }
         }
 
-        // 2. Interactive 1-tap Capture Engine toggle pill
+        // 2. Interactive 1-tap Core Graphics & Bitrate mode toggle pill (Tự động / Thấp / Vừa / Cao / Rất cao)
         Surface(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable {
-                    val nextEngine = if (isDirectStreamRec) {
-                        com.example.data.RecordingCaptureEngine.HARDWARE_SCREEN
-                    } else {
-                        com.example.data.RecordingCaptureEngine.DIRECT_STREAM
-                    }
-                    SettingsRepository.updateRecordingCaptureEngine(nextEngine)
+                    val modes = com.example.data.CellularOptimizationMode.entries
+                    val nextIndex = (modes.indexOf(config.cellularMode) + 1) % modes.size
+                    SettingsRepository.updateCellularMode(modes[nextIndex])
                 }
-                .testTag("ribbon_capture_engine_chip"),
+                .testTag("ribbon_graphics_mode_chip"),
             shape = RoundedCornerShape(8.dp),
-            color = if (isDirectStreamRec) XboxNeonGreen.copy(alpha = 0.12f) else XboxSurfaceVariant,
+            color = XboxNeonGreen.copy(alpha = 0.12f),
             border = androidx.compose.foundation.BorderStroke(
                 0.7.dp,
-                if (isDirectStreamRec) XboxNeonGreen.copy(alpha = 0.45f) else XboxCardBorder
+                XboxNeonGreen.copy(alpha = 0.48f)
             )
         ) {
             Row(
@@ -597,10 +592,10 @@ private fun ConsoleLiveTelemetryRibbon(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(text = if (isDirectStreamRec) "🔴" else "🎞️", fontSize = 9.sp)
+                Text(text = "✨", fontSize = 9.sp)
                 Text(
-                    text = recLabel,
-                    color = if (isDirectStreamRec) XboxNeonGreen else TextPrimary,
+                    text = if (isEn) "Quality: $graphicsLabel" else "Đồ họa: $graphicsLabel",
+                    color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -614,7 +609,8 @@ private fun ConsoleLiveTelemetryRibbon(
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(8.dp))
-                .clickable { onOpenSettings() },
+                .clickable { onOpenSettings() }
+                .testTag("ribbon_fps_input_chip"),
             shape = RoundedCornerShape(8.dp),
             color = XboxSurfaceVariant.copy(alpha = 0.75f),
             border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder)
@@ -781,4 +777,20 @@ private fun ConsoleFloatingNavigationDock(
         }
     }
 }
+
+/**
+ * Architectural Note:
+ * ConsoleLiveTelemetryRibbon and Dashboard HUD are strictly dedicated to core real-time
+ * telemetry metrics:
+ *  1. Graphics Mode & Cellular Optimization Profile (Auto / Low / Balanced / High / Ultra).
+ *  2. Anti-squish Aspect Ratio (16:9 Fit, 18:9, Zoom, Full Stretch) for true visual proportion.
+ *  3. Live Ping (ms) & Packet Jitter across cloud server endpoints.
+ *  4. 60 FPS Target & Controller Connection Status (Xbox Gamepad / Virtual Touch).
+ *
+ * Secondary features such as screen recording, clip export, and local media captures have been
+ * intentionally decoupled from the top HUD and Home screen. They reside exclusively in their
+ * own dedicated, secondary section in Settings (Nhóm 5: Tính năng phụ) to guarantee a zero-distraction,
+ * maximum-performance gameplay experience.
+ */
+
 

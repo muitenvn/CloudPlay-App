@@ -337,7 +337,7 @@ private fun HeroConsolePlayDeck(
                             }
                         }
 
-                        // Badge báo chống bóp hình & quay trực tiếp
+                        // Badge báo chống bóp dẹt hình & chuẩn 60 FPS
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = Color(0xD907130E),
@@ -347,7 +347,7 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Text(
-                                text = if (isEn) "16:9 HDR • 0% LAG" else "CHỐNG BÓP HÌNH • 0% LAG",
+                                text = if (isEn) "16:9 ANTI-SQUISH • 60 FPS" else "CHỐNG BÓP HÌNH • 60 FPS",
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.sp,
@@ -880,7 +880,7 @@ private fun FeaturedGamesSection(
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = "• 16:9 STREAM",
+                                    text = if (isEn) "• 16:9 60FPS" else "• 16:9 CHUẨN 60FPS",
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.5.sp,

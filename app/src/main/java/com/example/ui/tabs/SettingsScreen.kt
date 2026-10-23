@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -97,11 +98,12 @@ fun SettingsScreen(
     }
     var showTermsDialog by remember { mutableStateOf(false) }
 
-    // 4 nhóm gập/mở (mặc định gập, chỉ nhóm đầu mở)
+    // 5 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
     var expandNetwork by rememberSaveable { mutableStateOf(false) }
     var expandControls by rememberSaveable { mutableStateOf(false) }
     var expandAdvanced by rememberSaveable { mutableStateOf(false) }
+    var expandRecording by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val resolvedSystemLocale = remember { SettingsRepository.resolveSystemXboxLocale() }
@@ -450,32 +452,32 @@ fun SettingsScreen(
                     )
                 }
 
-                // 1.4 Quay màn hình không lag & Cơ chế lấy thẳng luồng Video Streaming
-                SettingsCard(title = if (isEn) "Zero-Lag Direct Stream Recording" else "Quay video không lag (Lấy thẳng luồng Stream)") {
+                // 1.4 Tỷ lệ khung hình & Màn hình hiển thị chống bóp dẹt (Aspect Ratio & Anti-Squish)
+                SettingsCard(title = if (isEn) "Screen Aspect Ratio & Anti-Squish Display" else "Tỷ lệ khung hình & Chống bóp méo hình") {
                     Text(
                         text = if (isEn) {
-                            "Clones the inbound WebRTC video stream directly into your Gallery (Movies/XboxCloudPlay) with 0% extra network usage, 0% screen-capture GPU lag, and native 16:9 aspect ratio (no squishing)."
+                            "Xbox Cloud games stream in native 16:9 aspect ratio. On modern tall smartphone screens (19.5:9 or 20:9), choose how video is displayed so characters and HUD are never squished or stretched."
                         } else {
-                            "Lấy thẳng luồng hình ảnh WebRTC từ máy chủ Xbox lưu vào Bộ sưu tập (Movies/XboxCloudPlay): 0% tốn thêm data mạng, 0% lag chụp màn hình, giữ chuẩn tỉ lệ 16:9 gốc không bị bóp hình."
+                            "Game Xbox Cloud phát luồng ở tỉ lệ chuẩn 16:9 gốc. Trên điện thoại màn hình dài (19.5:9, 20:9), bạn có thể chọn chế độ hiển thị phù hợp để nhân vật và nút bấm không bị bóp dẹt hay kéo méo."
                         },
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
 
-                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
-                        val isSelected = config.recordingCaptureEngine == engine
+                    com.example.data.VideoAspectRatioMode.entries.forEach { mode ->
+                        val isSelected = config.videoAspectRatioMode == mode
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .border(
                                     1.dp,
-                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    if (isSelected) DirectCyan else XboxCardBorder,
                                     RoundedCornerShape(10.dp)
                                 )
-                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) }
-                                .testTag("settings_capture_engine_${engine.id}"),
-                            color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                                .clickable { SettingsRepository.updateVideoAspectRatioMode(mode) }
+                                .testTag("settings_aspect_ratio_${mode.id}"),
+                            color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
                         ) {
                             Row(
                                 modifier = Modifier.padding(10.dp),
@@ -484,78 +486,51 @@ fun SettingsScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = engine.localizedTitle(isEn),
-                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        text = mode.localizedTitle(isEn),
+                                        color = if (isSelected) DirectCyan else TextPrimary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
                                     Text(
-                                        text = engine.localizedDesc(isEn),
+                                        text = mode.localizedDesc(isEn),
                                         color = TextSecondary,
                                         fontSize = 10.sp
                                     )
                                 }
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        com.example.data.ScreenRecordQuality.entries.forEach { recQuality ->
-                            val isSelected = config.screenRecordQuality == recQuality
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) DirectCyan else XboxCardBorder,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateScreenRecordQuality(recQuality) }
-                                    .testTag("settings_record_quality_${recQuality.id}"),
-                                color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = recQuality.localizedTitle(isEn),
-                                        color = if (isSelected) DirectCyan else TextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Text(
-                                        text = recQuality.localizedDesc(isEn),
-                                        color = TextSecondary,
-                                        fontSize = 9.sp,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 2
-                                    )
-                                }
-                            }
+                    if (config.videoAspectRatioMode == com.example.data.VideoAspectRatioMode.CUSTOM_SCALE) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.35f))
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            LabeledSlider(
+                                label = if (isEn) "Scale X (Width)" else "Độ giãn ngang (Scale X)",
+                                valueText = "${(config.videoScaleX * 100).toInt()}%",
+                                value = config.videoScaleX,
+                                onValueChange = { SettingsRepository.updateVideoScaleX(it) },
+                                valueRange = 0.70f..1.40f,
+                                accentColor = DirectCyan
+                            )
+                            LabeledSlider(
+                                label = if (isEn) "Scale Y (Height)" else "Độ giãn dọc (Scale Y)",
+                                valueText = "${(config.videoScaleY * 100).toInt()}%",
+                                value = config.videoScaleY,
+                                onValueChange = { SettingsRepository.updateVideoScaleY(it) },
+                                valueRange = 0.70f..1.40f,
+                                accentColor = XboxNeonGreen
+                            )
                         }
                     }
-
-                    SettingToggleRow(
-                        title = if (isEn) "Auto-Reduce GPU Load While Recording" else "Tự giảm tải đồ họa khi đang quay",
-                        subtitle = if (isEn) {
-                            "Automatically enables lightweight GPU mode during screen recording to keep frame rate locked"
-                        } else {
-                            "Tự động bật chế độ nhẹ tải GPU trong lúc quay video để giữ khung hình luôn mượt"
-                        },
-                        checked = config.autoReduceLoadWhenRecording,
-                        onCheckedChange = { SettingsRepository.updateAutoReduceLoadWhenRecording(it) },
-                        activeColor = XboxNeonGreen
-                    )
                 }
             }
         }
@@ -1180,73 +1155,27 @@ fun SettingsScreen(
                         )
                     }
 
-                    Text(
-                        text = if (isEn) "2. Direct Stream Recording Engine & Side-Effect Analysis" else "2. Cơ chế Lấy thẳng luồng Video Streaming & Phân tích tác dụng phụ",
-                        color = XboxNeonGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
-                        val isSelected = config.recordingCaptureEngine == engine
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(
-                                    1.dp,
-                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) },
-                            color = if (isSelected) Color(0xFF13241A) else Color(0xFF0E1712)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = engine.localizedTitle(isEn),
-                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                    Text(
-                                        text = engine.localizedDesc(isEn),
-                                        color = TextSecondary,
-                                        fontSize = 10.sp
-                                    )
-                                }
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
-                    }
-
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         color = Color(0xFF0C1A14),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f))
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
                     ) {
                         Column(
                             modifier = Modifier.padding(10.dp),
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Text(
-                                text = if (isEn) "ℹ️ Does Direct Stream Capture have any side effects?" else "ℹ️ Lấy thẳng luồng Video Streaming có tác dụng phụ không?",
-                                color = XboxNeonGreen,
+                                text = if (isEn) "ℹ️ How does CloudPlay Anti-Squish Display work?" else "ℹ️ Cơ chế chống bóp dẹt hình của CloudPlay hoạt động ra sao?",
+                                color = DirectCyan,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = if (isEn) {
-                                    "• 0% extra 4G/Wi-Fi data: Clones the already-received WebRTC track in RAM.\n• 0% GPU screen-capture lag: Does not screenshot the UI or stretch 20:9 screens.\n• Note: Only records the pure 16:9 game video + audio (floating HUD buttons are not drawn onto the video)."
+                                    "• Auto Aspect Fitting: Centers the 16:9 WebRTC canvas and prevents browsers from horizontally compressing it.\n• Direct Hardware Canvas: Applies hardware GPU transform matrix for smooth 60 FPS scaling without extra latency.\n• Custom Aspect Stretch: Use the horizontal and vertical sliders above if you prefer edge-to-edge full screen."
                                 } else {
-                                    "• Không tốn thêm 4G/Wi-Fi: Nhân bản luồng WebRTC (Track Clone) đã tải sẵn trong bộ đệm.\n• Không gây tụt FPS & Không bị bóp hình: Không chụp lại màn hình điện thoại nên giữ nguyên khung hình 16:9 chuẩn gốc của Xbox.\n• Lưu ý nhỏ duy nhất: File video thu được là hình ảnh + âm thanh nguyên bản của game (không dính các nút tay cầm ảo hay nút HUD nổi trên màn hình)."
+                                    "• Khóa tỉ lệ 16:9 gốc: Canh giữa khung hình WebRTC chuẩn của Xbox, ngăn trình duyệt tự bóp ép bề ngang trên các dòng máy màn hình dài (19:9, 20:9).\n• Tăng tốc phần cứng GPU: Áp ma trận biến đổi trực tiếp trên bộ giải mã phần cứng, giữ nguyên 60 FPS mượt mà không làm tăng độ trễ.\n• Tùy biến linh hoạt: Nếu muốn tràn viền hoặc kéo giãn theo ý thích, bạn có thể chỉnh nhanh thanh trượt Scale X và Scale Y ở trên."
                                 },
                                 color = TextSecondary,
                                 fontSize = 10.sp
@@ -1334,6 +1263,155 @@ fun SettingsScreen(
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // NHÓM 5: TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH & LƯU CLIP (Mặc định gập)
+        // =========================================================================
+        item {
+            CollapsibleSettingsGroup(
+                title = if (isEn) "Screen Recording (Secondary Feature)" else "Quay video màn hình (Tính năng phụ)",
+                subtitle = if (isEn) "Capture engine, video quality, storage location" else "Cơ chế quay luồng stream & chất lượng video",
+                icon = Icons.Default.Videocam,
+                expanded = expandRecording,
+                onToggle = { expandRecording = !expandRecording },
+                testTag = "settings_group_recording"
+            ) {
+                SettingsCard(title = if (isEn) "Video Capture Engine (Direct Stream vs Hardware)" else "Cơ chế quay video (Lấy luồng Stream vs Phần cứng)") {
+                    Text(
+                        text = if (isEn) {
+                            "Secondary utility for recording gameplay clips to Gallery (Movies/XboxCloudPlay). Direct stream capture clones WebRTC stream with 0% extra data and locked 16:9 ratio."
+                        } else {
+                            "Tính năng phụ hỗ trợ lưu clip vào Bộ sưu tập (Movies/XboxCloudPlay): Lấy thẳng luồng hình ảnh WebRTC từ máy chủ Xbox không tốn thêm data mạng, không lag và giữ chuẩn 16:9 không bị bóp hình."
+                        },
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
+                        val isSelected = config.recordingCaptureEngine == engine
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) }
+                                .testTag("settings_capture_engine_${engine.id}"),
+                            color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = engine.localizedTitle(isEn),
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = engine.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.data.ScreenRecordQuality.entries.forEach { recQuality ->
+                            val isSelected = config.screenRecordQuality == recQuality
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) DirectCyan else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateScreenRecordQuality(recQuality) }
+                                    .testTag("settings_record_quality_${recQuality.id}"),
+                                color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = recQuality.localizedTitle(isEn),
+                                        color = if (isSelected) DirectCyan else TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = recQuality.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 9.sp,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingToggleRow(
+                        title = if (isEn) "Auto-Reduce GPU Load While Recording" else "Tự giảm tải đồ họa khi đang quay",
+                        subtitle = if (isEn) {
+                            "Automatically enables lightweight GPU mode during screen recording to keep frame rate locked"
+                        } else {
+                            "Tự động bật chế độ nhẹ tải GPU trong lúc quay video để giữ khung hình luôn mượt"
+                        },
+                        checked = config.autoReduceLoadWhenRecording,
+                        onCheckedChange = { SettingsRepository.updateAutoReduceLoadWhenRecording(it) },
+                        activeColor = XboxNeonGreen
+                    )
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF0C1A14),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) "ℹ️ Does Direct Stream Capture have any side effects?" else "ℹ️ Lấy thẳng luồng Video Streaming có tác dụng phụ không?",
+                                color = XboxNeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isEn) {
+                                    "• 0% extra 4G/Wi-Fi data: Clones the already-received WebRTC track in RAM.\n• 0% GPU screen-capture lag: Does not screenshot the UI or stretch 20:9 screens.\n• Note: Only records the pure 16:9 game video + audio (floating HUD buttons are not drawn onto the video).\n• Storage folder: Internal Storage > Movies > XboxCloudPlay"
+                                } else {
+                                    "• Không tốn thêm 4G/Wi-Fi: Nhân bản luồng WebRTC (Track Clone) đã tải sẵn trong bộ đệm.\n• Không gây tụt FPS & Không bị bóp hình: Không chụp lại màn hình điện thoại nên giữ nguyên khung hình 16:9 chuẩn gốc của Xbox.\n• Lưu ý nhỏ duy nhất: File video thu được là hình ảnh + âm thanh nguyên bản của game (không dính các nút tay cầm ảo hay nút HUD nổi trên màn hình).\n• Vị trí lưu clip: Bộ nhớ trong > Thư mục Movies > XboxCloudPlay"
+                                },
+                                color = TextSecondary,
+                                fontSize = 10.sp
                             )
                         }
                     }

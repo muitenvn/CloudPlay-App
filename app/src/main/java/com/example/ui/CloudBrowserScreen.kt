@@ -55,6 +55,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,7 @@ import com.example.ui.components.FloatingHud
 import com.example.ui.components.VirtualGamepadOverlay
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
@@ -114,6 +116,7 @@ fun CloudBrowserScreen(
     var isPageLoading by remember { mutableStateOf(true) }
     var showQuickSettingsDialog by remember { mutableStateOf(false) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
+    var expandInGameRecording by rememberSaveable { mutableStateOf(false) }
     var lastXboxUrl by remember { mutableStateOf(initialUrl) }
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
@@ -1016,129 +1019,11 @@ fun CloudBrowserScreen(
                         }
 
                         // ========================================================
-                        // PHẦN 2: CHẾ ĐỘ THU LUỒNG VIDEO TRỰC TIẾP (DIRECT STREAM VS HARDWARE)
+                        // PHẦN 2: CHẤT LƯỢNG LUỒNG STREAM & TỐI ƯU MẠNG 4G / WI-FI
                         // ========================================================
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF101F16),
-                            border = BorderStroke(0.9.dp, XboxNeonGreen.copy(alpha = 0.6f))
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = if (isEn) "🎥 Recording Capture Engine (Zero-Lag)" else "🎥 Cơ chế thu Video (Lấy thẳng luồng Stream vs Ghi màn hình)",
-                                    color = XboxNeonGreen,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-
-                                com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
-                                    val selected = config.recordingCaptureEngine == engine
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else Color(0xFF0C1510),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (selected) XboxNeonGreen else XboxCardBorder
-                                        )
-                                    ) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            Text(
-                                                text = engine.localizedTitle(isEn),
-                                                color = if (selected) XboxNeonGreen else TextPrimary,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = engine.localizedDesc(isEn),
-                                                color = Color(0xFFB0C4B8),
-                                                fontSize = 9.sp
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Chọn độ phân giải quay
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    com.example.data.ScreenRecordQuality.entries.forEach { q ->
-                                        val selected = config.screenRecordQuality == q
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .clickable { SettingsRepository.updateScreenRecordQuality(q) },
-                                            shape = RoundedCornerShape(7.dp),
-                                            color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF0C1510),
-                                            border = BorderStroke(1.dp, if (selected) DirectCyan else XboxCardBorder)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier.padding(vertical = 5.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = q.localizedShort(isEn),
-                                                    color = if (selected) DirectCyan else TextPrimary,
-                                                    fontSize = 9.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Nút Bắt đầu / Dừng quay
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .clickable {
-                                            com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
-                                        }
-                                        .testTag("quick_settings_record_button"),
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else XboxNeonGreen.copy(alpha = 0.22f),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen
-                                    )
-                                ) {
-                                    Box(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = if (recorderState.isRecording) {
-                                                val mins = recorderState.elapsedSeconds / 60
-                                                val secs = recorderState.elapsedSeconds % 60
-                                                if (isEn) "🔴 Recording %02d:%02d — Tap to Stop & Save".format(mins, secs)
-                                                else "🔴 Đang thu %02d:%02d — Chạm để Lưu video".format(mins, secs)
-                                            } else {
-                                                if (isEn) "🎬 Start Recording Now (${config.recordingCaptureEngine.localizedShort(true)})"
-                                                else "🎬 Bắt đầu thu Video ngay (${config.recordingCaptureEngine.localizedShort(false)})"
-                                            },
-                                            color = if (recorderState.isRecording) Color(0xFFFF6B6B) else Color.White,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // 1. Mức chất lượng mạng
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             Text(
-                                text = if (isEn) "Stream Bitrate Preset" else "Mức chất lượng luồng",
+                                text = if (isEn) "Stream Bitrate Preset (4G / Wi-Fi)" else "Mức chất lượng luồng (4G / Wi-Fi)",
                                 color = XboxNeonGreen,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -1341,6 +1226,151 @@ fun CloudBrowserScreen(
                                     checkedTrackColor = XboxNeonGreen
                                 )
                             )
+                        }
+
+                        // ========================================================
+                        // PHẦN 5: TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH & LƯU CLIP
+                        // (Mặc định: Quay Full Màn Hình • Xếp ở cuối cùng để ưu tiên 100% cho đồ họa)
+                        // ========================================================
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF0D1611),
+                            border = BorderStroke(0.9.dp, if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0x33808080))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { expandInGameRecording = !expandInGameRecording },
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isEn) "🎥 Secondary: Screen Recording & Clip" else "🎥 Tính năng phụ: Quay Video Clip",
+                                            color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = if (isEn) "Default: Full Screen Recording • Stored in Gallery" else "Mặc định: Quay Full Toàn Màn Hình • Lưu trong Thư viện",
+                                            color = Color(0xFF7E9488),
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                    Text(
+                                        text = if (expandInGameRecording || recorderState.isRecording) "▲ Thu gọn" else "▼ Mở rộng",
+                                        color = if (recorderState.isRecording) Color(0xFFFF5252) else DirectCyan,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                if (expandInGameRecording || recorderState.isRecording) {
+                                    // Chọn cơ chế thu
+                                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
+                                        val selected = config.recordingCaptureEngine == engine
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (selected) DirectCyan.copy(alpha = 0.15f) else Color(0xFF0C1510),
+                                            border = BorderStroke(
+                                                1.dp,
+                                                if (selected) DirectCyan else XboxCardBorder
+                                            )
+                                        ) {
+                                            Column(modifier = Modifier.padding(8.dp)) {
+                                                Text(
+                                                    text = engine.localizedTitle(isEn),
+                                                    color = if (selected) DirectCyan else TextPrimary,
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = engine.localizedDesc(isEn),
+                                                    color = Color(0xFFB0C4B8),
+                                                    fontSize = 9.sp
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Chọn độ phân giải quay
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        com.example.data.ScreenRecordQuality.entries.forEach { q ->
+                                            val selected = config.screenRecordQuality == q
+                                            Surface(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(7.dp))
+                                                    .clickable { SettingsRepository.updateScreenRecordQuality(q) },
+                                                shape = RoundedCornerShape(7.dp),
+                                                color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF0C1510),
+                                                border = BorderStroke(1.dp, if (selected) DirectCyan else XboxCardBorder)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(vertical = 5.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = q.localizedShort(isEn),
+                                                        color = if (selected) DirectCyan else TextPrimary,
+                                                        fontSize = 9.5.sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // Nút Bắt đầu / Dừng quay
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .clickable {
+                                                com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
+                                            }
+                                            .testTag("quick_settings_record_button"),
+                                        shape = RoundedCornerShape(9.dp),
+                                        color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0x2200E676),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen.copy(alpha = 0.6f)
+                                        )
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (recorderState.isRecording) {
+                                                    val mins = recorderState.elapsedSeconds / 60
+                                                    val secs = recorderState.elapsedSeconds % 60
+                                                    if (isEn) "🔴 Recording %02d:%02d — Tap to Stop & Save".format(mins, secs)
+                                                    else "🔴 Đang thu %02d:%02d — Chạm để Lưu video".format(mins, secs)
+                                                } else {
+                                                    if (isEn) "🎬 Start Recording (${config.recordingCaptureEngine.localizedShort(true)})"
+                                                    else "🎬 Bắt đầu quay Clip (${config.recordingCaptureEngine.localizedShort(false)})"
+                                                },
+                                                color = if (recorderState.isRecording) Color(0xFFFF6B6B) else Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

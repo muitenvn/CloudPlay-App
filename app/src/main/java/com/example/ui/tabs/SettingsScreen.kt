@@ -1285,9 +1285,9 @@ fun SettingsScreen(
                 SettingsCard(title = if (isEn) "Video Capture Engine (Direct Stream vs Hardware)" else "Cơ chế quay video (Lấy luồng Stream vs Phần cứng)") {
                     Text(
                         text = if (isEn) {
-                            "Secondary utility for recording gameplay clips to Gallery (Movies/XboxCloudPlay). Direct stream capture clones WebRTC stream with 0% extra data and locked 16:9 ratio."
+                            "Secondary utility for recording gameplay clips to Gallery (Movies/XboxCloudPlay). Default: Full Screen device recording via hardware encoder. Optional: Direct WebRTC stream clone for 16:9 game-only capture."
                         } else {
-                            "Tính năng phụ hỗ trợ lưu clip vào Bộ sưu tập (Movies/XboxCloudPlay): Lấy thẳng luồng hình ảnh WebRTC từ máy chủ Xbox không tốn thêm data mạng, không lag và giữ chuẩn 16:9 không bị bóp hình."
+                            "Tính năng phụ hỗ trợ lưu clip vào Thư viện (Movies/XboxCloudPlay): Mặc định quay Full Toàn Màn Hình thiết bị bằng bộ mã hóa phần cứng. Tùy chọn lấy luồng WebRTC trực tiếp dành cho người dùng muốn chỉ thu khung hình game 16:9 gốc."
                         },
                         color = TextSecondary,
                         fontSize = 11.sp

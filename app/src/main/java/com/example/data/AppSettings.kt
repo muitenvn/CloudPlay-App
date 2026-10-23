@@ -528,24 +528,25 @@ enum class RecordingCaptureEngine(
     val descVi: String,
     val descEn: String
 ) {
-    DIRECT_STREAM(
-        id = "DIRECT_STREAM",
-        titleVi = "Lấy Thẳng Luồng Video Streaming (0% Lag • Chuẩn 16:9)",
-        titleEn = "Direct WebRTC Stream Capture (0% Lag • Native 16:9)",
-        shortVi = "Luồng Stream Trực Tiếp",
-        shortEn = "Direct Stream",
-        descVi = "Bắt trực tiếp gói hình ảnh WebRTC từ máy chủ Xbox (nhân bản luồng đọc): Không quay màn hình, 0% tốn thêm 4G/Wi-Fi, không tụt FPS và không bao giờ bị bóp tỉ lệ màn hình",
-        descEn = "Clones inbound WebRTC media stream directly: Zero screen-capture lag, 0% extra data usage, and native 16:9 aspect ratio"
-    ),
     HARDWARE_SCREEN(
         id = "HARDWARE_SCREEN",
-        titleVi = "Ghi Màn Hình Phần Cứng (Đã Khóa Tỉ Lệ Chống Bóp Hình)",
-        titleEn = "Hardware Surface Recorder (Aspect-Ratio Locked)",
-        shortVi = "Ghi Màn Hình (Khóa 16:9)",
-        shortEn = "Hardware Surface",
-        descVi = "Dùng bộ mã hóa H.264 phần cứng của máy có tự động căn khung Letterbox chuẩn 16:9 chống méo hình",
-        descEn = "Uses device hardware H.264 encoder with automatic 16:9 letterboxing to prevent squished video"
+        titleVi = "Quay Full Màn Hình (Mặc định • Ghi toàn màn hình thiết bị)",
+        titleEn = "Full Screen Recording (Default • Entire Device Screen)",
+        shortVi = "Quay Full Màn Hình (Mặc định)",
+        shortEn = "Full Screen (Default)",
+        descVi = "Ghi toàn bộ màn hình khi đang chơi game bằng bộ mã hóa phần cứng của máy, lưu trực tiếp vào Thư viện video",
+        descEn = "Records entire device display during gameplay using hardware encoder, saved to Gallery"
+    ),
+    DIRECT_STREAM(
+        id = "DIRECT_STREAM",
+        titleVi = "Lấy Thẳng Luồng Video Stream (Chỉ lấy game 16:9 • 0% Lag)",
+        titleEn = "Direct WebRTC Stream (16:9 Game Only • Zero-Lag)",
+        shortVi = "Luồng Stream 16:9",
+        shortEn = "Direct Stream 16:9",
+        descVi = "Bắt trực tiếp gói hình ảnh WebRTC từ máy chủ Xbox: Không tốn thêm 4G/Wi-Fi, không quay giao diện nổi và giữ nguyên 16:9 gốc",
+        descEn = "Captures inbound WebRTC game video track directly with zero extra data and locked 16:9 frame"
     );
+
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
     fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
@@ -605,7 +606,7 @@ data class AppConfig(
     val gpuLoadReductionEnabled: Boolean = true,
     val screenRecordQuality: ScreenRecordQuality = ScreenRecordQuality.BALANCED_720P_30,
     val autoReduceLoadWhenRecording: Boolean = true,
-    val recordingCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.DIRECT_STREAM,
+    val recordingCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.HARDWARE_SCREEN,
     // Cài đặt Tỉ lệ khung hình & Hiển thị Video (Chống bóp méo hình)
     val videoAspectRatioMode: VideoAspectRatioMode = VideoAspectRatioMode.FIT_16_9,
     val videoScaleX: Float = 1.0f, // 0.70f .. 1.40f
@@ -725,10 +726,10 @@ object SettingsRepository {
             autoReduceLoadWhenRecording = sp.getBoolean("auto_reduce_load_recording", true),
             recordingCaptureEngine = try {
                 RecordingCaptureEngine.valueOf(
-                    sp.getString("recording_capture_engine", RecordingCaptureEngine.DIRECT_STREAM.name)
-                        ?: RecordingCaptureEngine.DIRECT_STREAM.name
+                    sp.getString("recording_capture_engine", RecordingCaptureEngine.HARDWARE_SCREEN.name)
+                        ?: RecordingCaptureEngine.HARDWARE_SCREEN.name
                 )
-            } catch (_: Exception) { RecordingCaptureEngine.DIRECT_STREAM },
+            } catch (_: Exception) { RecordingCaptureEngine.HARDWARE_SCREEN },
             videoAspectRatioMode = try {
                 VideoAspectRatioMode.valueOf(
                     sp.getString("video_aspect_ratio_mode", VideoAspectRatioMode.FIT_16_9.name)

@@ -772,47 +772,44 @@ fun FloatingHud(
                             }
                         }
 
-                        // 4.5. Zero-Lag Screen Record Toggle (1-Tap REC / Timer)
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (recorderState.isRecording) Color(0x44FF3B30) else Color(0x33233A2D),
-                            border = if (recorderState.isRecording) {
-                                androidx.compose.foundation.BorderStroke(0.9.dp, Color(0xFFFF3B30))
-                            } else null,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    onToggleRecording()
-                                }
-                                .testTag("hud_record_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                        // 4.5. Recording Status Pill (Only displayed when actively recording so secondary feature does not clutter primary gameplay bar)
+                        if (recorderState.isRecording) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0x44FF3B30),
+                                border = androidx.compose.foundation.BorderStroke(0.9.dp, Color(0xFFFF3B30)),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        lastInteractionTime = System.currentTimeMillis()
+                                        isInteracting = true
+                                        onToggleRecording()
+                                    }
+                                    .testTag("hud_record_button")
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.5.dp)
-                                        .clip(CircleShape)
-                                        .background(if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0xFFFF5252))
-                                )
-                                Text(
-                                    text = if (recorderState.isRecording) {
-                                        val mins = recorderState.elapsedSeconds / 60
-                                        val secs = recorderState.elapsedSeconds % 60
-                                        "%02d:%02d".format(mins, secs)
-                                    } else {
-                                        "REC"
-                                    },
-                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextPrimary,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.5.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF3B30))
+                                    )
+                                    val mins = recorderState.elapsedSeconds / 60
+                                    val secs = recorderState.elapsedSeconds % 60
+                                    Text(
+                                        text = "%02d:%02d".format(mins, secs),
+                                        color = Color(0xFFFF8A80),
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
                             }
                         }
+
 
                         // 5. Expand Game Bar Menu Button
                         Surface(
@@ -932,88 +929,57 @@ fun FloatingHud(
                                     .verticalScroll(scrollState),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                // B.5: Thẻ tối ưu độc quyền cho Fortnite (Chuyển nhanh Cảm ứng Epic vs Tay cầm FPS Pro + 8ms Zero-Delay)
-                                if (gameProfile?.gameId == "fortnite") {
-                                    FortniteExclusiveHudCard(
-                                        isEn = isEn,
-                                        virtualControllerEnabled = virtualControllerEnabled,
-                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
-                                            markUserInteraction()
-                                            onSelectFortniteControlMode(useVirtualFpsPro)
-                                        }
-                                    )
-                                }
-
-                                // B.5b: Nút Quay Màn Hình Không Lag + Tỷ lệ Đồ Họa Nhanh
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(7.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onToggleRecording()
-                                        }
-                                        .testTag("hud_expanded_record_card"),
-                                    shape = RoundedCornerShape(7.dp),
-                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0xFF101D15),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        0.8.dp,
-                                        if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen.copy(alpha = 0.45f)
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(7.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen)
-                                            )
-                                            Column {
-                                                Text(
-                                                    text = if (recorderState.isRecording) {
-                                                        val mins = recorderState.elapsedSeconds / 60
-                                                        val secs = recorderState.elapsedSeconds % 60
-                                                        if (isEn) "Recording %02d:%02d (Tap to Save)".format(mins, secs)
-                                                        else "Đang quay %02d:%02d (Chạm để lưu)".format(mins, secs)
-                                                    } else {
-                                                        if (isEn) "Zero-Lag Screen Record" else "Quay màn hình không lag"
-                                                    },
-                                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextPrimary,
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    text = if (isEn) {
-                                                        "${config.recordingCaptureEngine.localizedShort(true)} • ${config.videoAspectRatioMode.localizedShort(true)}"
-                                                    } else {
-                                                        "${config.recordingCaptureEngine.localizedShort(false)} • ${config.videoAspectRatioMode.localizedShort(false)}"
-                                                    },
-                                                    color = DirectCyan,
-                                                    fontSize = 7.5.sp,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = if (recorderState.isRecording) "STOP" else "REC",
-                                            color = if (recorderState.isRecording) Color(0xFFFF5252) else XboxNeonGreen,
-                                            fontSize = 8.5.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
+                                // ========================================================
+                                // 1. BẢNG THÔNG SỐ CỐT LÕI (Ping, Jitter, FPS, Decode, Tay cầm, Nhiệt độ & Pin)
+                                // ========================================================
+                                DenseCoreTelemetrySection(
+                                    vpnState = vpnState,
+                                    telemetry = telemetry,
+                                    compactRawPing = compactRawPing,
+                                    compactHasValidPing = compactHasValidPing,
+                                    physicalControllerConnected = physicalControllerConnected,
+                                    virtualControllerEnabled = virtualControllerEnabled,
+                                    controllerName = controllerName,
+                                    batteryPercent = batteryPercent,
+                                    isBatteryCharging = isBatteryCharging,
+                                    isThermalSupported = isThermalSupported,
+                                    thermalIcon = thermalIcon,
+                                    thermalLabel = thermalLabel,
+                                    thermalColor = thermalColor,
+                                    onToggleNetwork = {
+                                        markUserInteraction()
+                                        onToggleNetwork()
+                                    },
+                                    onToggleVirtualController = {
+                                        markUserInteraction()
+                                        onToggleVirtualController()
                                     }
-                                }
+                                )
 
-                                // B.5c: Nút Cài Đặt Video & Chỉnh Tỉ Lệ Màn Hình Chống Bóp Hình (Thay cho nút hướng dẫn khi đang chơi)
+                                // ========================================================
+                                // 2. CHẤT LƯỢNG LUỒNG STREAM & TỐI ƯU MẠNG 4G / WI-FI (Bitrate 5M/9M/14M/20M)
+                                // ========================================================
+                                DenseQualityModeSection(
+                                    networkStatus = networkStatus,
+                                    adaptiveQualityState = adaptiveQualityState,
+                                    telemetry = telemetry,
+                                    onSelectCellularMode = { mode ->
+                                        markUserInteraction()
+                                        onSelectCellularMode(mode)
+                                    },
+                                    onToggleAutoAdapting = { enabled ->
+                                        markUserInteraction()
+                                        onToggleAutoAdapting(enabled)
+                                    },
+                                    onToggleWifiSpeedFirst = { enabled ->
+                                        markUserInteraction()
+                                        onToggleWifiSpeedFirst(enabled)
+                                    }
+                                )
+
+                                // ========================================================
+                                // 3. CÀI ĐẶT VIDEO & CHỈNH TỈ LỆ MÀN HÌNH CHỐNG BÓP DẸT (16:9 Fit, Scale X/Y)
+                                // ========================================================
                                 Surface(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1066,51 +1032,23 @@ fun FloatingHud(
                                     }
                                 }
 
-                                // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm, Pin & Nhiệt độ)
-                                DenseCoreTelemetrySection(
-                                    vpnState = vpnState,
-                                    telemetry = telemetry,
-                                    compactRawPing = compactRawPing,
-                                    compactHasValidPing = compactHasValidPing,
-                                    physicalControllerConnected = physicalControllerConnected,
-                                    virtualControllerEnabled = virtualControllerEnabled,
-                                    controllerName = controllerName,
-                                    batteryPercent = batteryPercent,
-                                    isBatteryCharging = isBatteryCharging,
-                                    isThermalSupported = isThermalSupported,
-                                    thermalIcon = thermalIcon,
-                                    thermalLabel = thermalLabel,
-                                    thermalColor = thermalColor,
-                                    onToggleNetwork = {
-                                        markUserInteraction()
-                                        onToggleNetwork()
-                                    },
-                                    onToggleVirtualController = {
-                                        markUserInteraction()
-                                        onToggleVirtualController()
-                                    }
-                                )
+                                // ========================================================
+                                // 4. TỐI ƯU THEO TRÒ CHƠI (FORTNITE PRO TOUCH / VIRTUAL CONTROLLER)
+                                // ========================================================
+                                if (gameProfile?.gameId == "fortnite") {
+                                    FortniteExclusiveHudCard(
+                                        isEn = isEn,
+                                        virtualControllerEnabled = virtualControllerEnabled,
+                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
+                                            markUserInteraction()
+                                            onSelectFortniteControlMode(useVirtualFpsPro)
+                                        }
+                                    )
+                                }
 
-                                // B.6: Chế độ chất lượng gọn & dày (không còn ô lớn chiếm hết chiều cao)
-                                DenseQualityModeSection(
-                                    networkStatus = networkStatus,
-                                    adaptiveQualityState = adaptiveQualityState,
-                                    telemetry = telemetry,
-                                    onSelectCellularMode = { mode ->
-                                        markUserInteraction()
-                                        onSelectCellularMode(mode)
-                                    },
-                                    onToggleAutoAdapting = { enabled ->
-                                        markUserInteraction()
-                                        onToggleAutoAdapting(enabled)
-                                    },
-                                    onToggleWifiSpeedFirst = { enabled ->
-                                        markUserInteraction()
-                                        onToggleWifiSpeedFirst(enabled)
-                                    }
-                                )
-
-                                // Hàng nút bật/tắt nhanh: Làm nét, Ẩn bảng kỹ thuật, Dịch tự động, Cài đặt Video
+                                // ========================================================
+                                // 5. CÔNG TẮC TÍNH NĂNG (Làm nét Clarity Boost, Ẩn bảng kỹ thuật, Dịch tiếng Việt)
+                                // ========================================================
                                 DenseFeatureTogglesSection(
                                     clarityBoostActive = clarityBoostActive,
                                     hideStreamStats = hideStreamStats,
@@ -1134,7 +1072,9 @@ fun FloatingHud(
                                     }
                                 )
 
-                                // Hàng tác vụ nhanh: Tải lại trang, Xoay màn hình, Cài đặt, Trang chủ
+                                // ========================================================
+                                // 6. TÁC VỤ HỆ THỐNG (Tải lại trang, Xoay ngang màn hình, Cài đặt, Thoát về Trang chủ)
+                                // ========================================================
                                 DenseBottomActionsSection(
                                     onReloadPage = {
                                         markUserInteraction()
@@ -1153,6 +1093,78 @@ fun FloatingHud(
                                         showExitConfirmDialog = true
                                     }
                                 )
+
+                                // ========================================================
+                                // 7. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (ĐƯA XUỐNG DƯỚI CÙNG - MẶC ĐỊNH FULL MÀN HÌNH)
+                                // ========================================================
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            onToggleRecording()
+                                        }
+                                        .testTag("hud_expanded_record_card"),
+                                    shape = RoundedCornerShape(7.dp),
+                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0xFF0F1813),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.8.dp,
+                                        if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0x40808080)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0xFF888888))
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = if (recorderState.isRecording) {
+                                                        val mins = recorderState.elapsedSeconds / 60
+                                                        val secs = recorderState.elapsedSeconds % 60
+                                                        if (isEn) "🔴 Recording %02d:%02d (Tap to Save Clip)".format(mins, secs)
+                                                        else "🔴 Đang quay %02d:%02d (Chạm để lưu clip)".format(mins, secs)
+                                                    } else {
+                                                        if (isEn) "🎥 Secondary: Record Gameplay Clip" else "🎥 Tính năng phụ: Quay Video Clip"
+                                                    },
+                                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
+                                                    fontSize = 8.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = if (isEn) {
+                                                        "${config.recordingCaptureEngine.localizedShort(true)} (Default Full Screen)"
+                                                    } else {
+                                                        "${config.recordingCaptureEngine.localizedShort(false)}"
+                                                    },
+                                                    color = Color(0xFF7E9488),
+                                                    fontSize = 7.5.sp,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = if (recorderState.isRecording) "STOP" else "REC",
+                                            color = if (recorderState.isRecording) Color(0xFFFF5252) else Color(0xFF90A4AE),
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+                                }
+
                             }
                         }
                     }

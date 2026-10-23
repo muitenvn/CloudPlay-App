@@ -420,12 +420,12 @@ enum class ScreenRecordQuality(
         heightPx = 540,
         fps = 30,
         bitrateBps = 2_800_000,
-        titleVi = "Siêu Nhẹ 540p • 30FPS (0% Lag)",
-        titleEn = "Ultra Light 540p • 30FPS (Zero Lag)",
+        titleVi = "Nhẹ 540p • 30FPS (Dành cho máy yếu)",
+        titleEn = "Light 540p • 30FPS (For Low-End Devices)",
         shortVi = "540p • 30F",
         shortEn = "540p • 30F",
-        descVi = "Thu trực tiếp luồng hình ảnh với tải CPU/GPU gần bằng 0, không tụt FPS",
-        descEn = "Direct stream capture with near-zero CPU/GPU overhead and zero frame drops"
+        descVi = "Video gọn nhẹ, tiết kiệm bộ nhớ và giữ máy mát khi vừa chơi vừa quay",
+        descEn = "Compact video size that saves storage and keeps your phone cool while recording"
     ),
     BALANCED_720P_30(
         id = "720p30",
@@ -434,11 +434,11 @@ enum class ScreenRecordQuality(
         fps = 30,
         bitrateBps = 4_500_000,
         titleVi = "Chuẩn HD 720p • 30FPS (Khuyên dùng)",
-        titleEn = "Balanced HD 720p • 30FPS (Recommended)",
+        titleEn = "Standard HD 720p • 30FPS (Recommended)",
         shortVi = "720p • 30F",
         shortEn = "720p • 30F",
-        descVi = "Video HD rõ nét, dung lượng gọn nhẹ và giữ game mượt ổn định",
-        descEn = "Crisp HD video with compact file size and smooth gameplay"
+        descVi = "Video HD rõ nét, thu đủ tiếng game và giữ tốc độ chơi mượt ổn định",
+        descEn = "Crisp HD video with full game audio and smooth gameplay"
     ),
     SMOOTH_720P_60(
         id = "720p60",
@@ -446,11 +446,11 @@ enum class ScreenRecordQuality(
         heightPx = 720,
         fps = 60,
         bitrateBps = 7_000_000,
-        titleVi = "Mượt Cao 720p • 60FPS (Máy khỏe)",
+        titleVi = "Siêu mượt 720p • 60FPS (Máy khỏe)",
         titleEn = "High Smooth 720p • 60FPS (Fast Device)",
         shortVi = "720p • 60F",
         shortEn = "720p • 60F",
-        descVi = "Quay 60 khung hình/giây siêu mượt cho các pha highlight bắn súng/đua xe",
+        descVi = "Quay 60 khung hình/giây mượt mà cho các pha bắn súng, đua xe tốc độ cao",
         descEn = "Silky-smooth 60 FPS recording for shooter and racing highlights"
     );
 
@@ -470,48 +470,48 @@ enum class VideoAspectRatioMode(
 ) {
     FIT_16_9(
         id = "fit_16_9",
-        titleVi = "Chuẩn 16:9 Gốc (Không bóp hình)",
-        titleEn = "Native 16:9 Fit (No Squish)",
-        shortVi = "16:9 Chuẩn",
-        shortEn = "16:9 Fit",
-        descVi = "Giữ đúng tỉ lệ 16:9 chuẩn của Xbox Cloud, chống bóp méo hình trên mọi màn hình 20:9 / 21:9",
-        descEn = "Preserves exact 16:9 Xbox Cloud aspect ratio without squishing on 20:9 / 21:9 displays"
+        titleVi = "Chuẩn 16:9 gốc (Giữ nguyên khung Xbox)",
+        titleEn = "Original 16:9 (Native Xbox Frame)",
+        shortVi = "16:9 Gốc",
+        shortEn = "16:9 Original",
+        descVi = "Hiển thị đúng khung 16:9 gốc của game, có viền đen 2 bên trên màn hình dài, không méo hình",
+        descEn = "Shows the original 16:9 game frame with side black bars on wide phones, zero distortion"
     ),
     CINEMA_18_9(
         id = "cinema_18_9",
-        titleVi = "Mở Rộng 18:9 (Cân đối • Giảm viền đen)",
-        titleEn = "Balanced 18:9 (Reduced Black Bars)",
-        shortVi = "18:9 Cân đối",
+        titleVi = "Mở rộng 18:9 (Giảm bớt viền đen 2 bên)",
+        titleEn = "Wider 18:9 (Smaller Side Black Bars)",
+        shortVi = "Rộng 18:9",
         shortEn = "18:9 Wide",
-        descVi = "Mở rộng nhẹ khung hình sang 18:9, giảm viền đen hai bên mà nhân vật vẫn cân đối",
-        descEn = "Expands frame to 18:9 to reduce side bars while keeping characters natural"
+        descVi = "Mở rộng nhẹ chiều ngang thêm 12% để nhìn rộng hơn mà nhân vật vẫn cân đối",
+        descEn = "Slightly widens the frame to 18:9 to reduce side bars while keeping characters natural"
     ),
     ZOOM_COVER(
         id = "zoom_cover",
-        titleVi = "Tràn Viền Tự Nhiên (Zoom Cover • Không méo)",
-        titleEn = "Full Screen Zoom Cover (No Distortion)",
-        shortVi = "Tràn viền Zoom",
-        shortEn = "Zoom Cover",
-        descVi = "Phóng lấp đầy màn hình giữ nguyên tỉ lệ gốc (không bóp dẹt hình, cắt nhẹ mép trên/dưới)",
-        descEn = "Fills the entire screen while keeping native proportions (crops top/bottom slightly)"
+        titleVi = "Phóng đầy màn hình (Không méo hình)",
+        titleEn = "Zoom to Fill Screen (No Distortion)",
+        shortVi = "Phóng đầy màn",
+        shortEn = "Zoom Fill",
+        descVi = "Phóng đều khung hình ra sát mép điện thoại, giữ đúng tỉ lệ nhân vật (cắt nhẹ mép trên/dưới)",
+        descEn = "Zooms evenly to fill the entire screen without stretching characters (slightly trims top/bottom)"
     ),
     STRETCH_FULL(
         id = "stretch_full",
-        titleVi = "Kéo Giãn Toàn Màn (Full Stretch)",
-        titleEn = "Full Screen Stretch",
-        shortVi = "Kéo giãn Full",
+        titleVi = "Kéo giãn kín toàn bộ màn hình",
+        titleEn = "Stretch to Fill Entire Screen",
+        shortVi = "Kéo giãn kín màn",
         shortEn = "Full Stretch",
-        descVi = "Kéo giãn lấp kín 100% diện tích màn hình thiết bị mà không cắt bất kỳ chi tiết nào",
-        descEn = "Stretches video to fill 100% of device screen without cropping any HUD elements"
+        descVi = "Kéo khung hình lấp kín 100% màn hình điện thoại (không mất chi tiết nào, hình hơi bè ngang)",
+        descEn = "Stretches the game frame to cover 100% of your phone screen without cropping any HUD details"
     ),
     CUSTOM_SCALE(
         id = "custom_scale",
-        titleVi = "Tùy Chỉnh Tỉ Lệ Ngang / Dọc (Scale X/Y)",
-        titleEn = "Custom Horizontal / Vertical Scale (X/Y)",
-        shortVi = "Tùy chỉnh X/Y",
-        shortEn = "Custom X/Y",
-        descVi = "Tự tay kéo thanh trượt độ rộng ngang (Scale X) và độ cao dọc (Scale Y) theo đúng mắt nhìn",
-        descEn = "Manually adjust horizontal width (Scale X) and vertical height (Scale Y) sliders"
+        titleVi = "Tự chỉnh độ rộng Ngang & Dọc theo ý muốn",
+        titleEn = "Custom Horizontal & Vertical Size",
+        shortVi = "Tự chỉnh Ngang/Dọc",
+        shortEn = "Custom Size",
+        descVi = "Dùng 2 thanh trượt Ngang và Dọc bên dưới để tự căn vừa khít màn hình máy bạn",
+        descEn = "Use the Horizontal and Vertical sliders below to fit your screen however you like"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
@@ -530,21 +530,21 @@ enum class RecordingCaptureEngine(
 ) {
     HARDWARE_SCREEN(
         id = "HARDWARE_SCREEN",
-        titleVi = "Quay Full Screen Toàn Màn Hình (Mặc định • Chuẩn .MP4 + Âm thanh)",
-        titleEn = "Full Screen Recording (Default • Entire Display .MP4 + Audio)",
-        shortVi = "Full Screen (Mặc định)",
-        shortEn = "Full Screen (Default)",
-        descVi = "Quay đúng 100% toàn bộ màn hình thực tế của máy (không bó hẹp 16:9), thu đầy đủ âm thanh Stereo vào file .MP4 và tuyệt đối không đổi tỉ lệ màn hình khi đang chơi",
-        descEn = "Records 100% of the device's full screen with stereo game audio to .MP4 without altering live gameplay display"
+        titleVi = "Full màn hình (Giống hệt lúc đang chơi • Mặc định)",
+        titleEn = "Full Screen (Exact Gameplay Ratio • Default)",
+        shortVi = "Full màn hình (Như lúc chơi)",
+        shortEn = "Full Screen (As Played)",
+        descVi = "Màn hình đang hiển thị thế nào thì video .MP4 xuất ra đúng tỉ lệ đó (20:9, tràn viền...), thu đủ tiếng game",
+        descEn = "Outputs .MP4 video with the exact same aspect ratio as your screen while playing, with stereo game audio"
     ),
     DIRECT_STREAM(
         id = "DIRECT_STREAM",
-        titleVi = "Quay 16:9 Chuẩn Quốc Tế (Xuất .MP4 16:9 + Âm thanh • 0% Lag)",
-        titleEn = "16:9 International Standard (.MP4 + Audio • Zero-Lag)",
-        shortVi = "Chuẩn Quốc Tế 16:9",
-        shortEn = "Standard 16:9",
-        descVi = "Xuất video .MP4 theo đúng chuẩn tỉ lệ quốc tế 16:9 (1280x720) kèm âm thanh Stereo của game, xử lý ngầm hoàn toàn không làm thay đổi màn hình đang chơi",
-        descEn = "Outputs standard 16:9 (1280x720) .MP4 video with stereo game audio in the background without changing live screen ratio"
+        titleVi = "Khung ngang 16:9 (Chuẩn YouTube / TV)",
+        titleEn = "16:9 Widescreen Frame (YouTube / TV Standard)",
+        shortVi = "Khung ngang 16:9",
+        shortEn = "16:9 Frame",
+        descVi = "Xuất video .MP4 theo khung ngang 16:9 cố định (1280×720), thu đủ tiếng game và không đổi màn hình đang chơi",
+        descEn = "Outputs standard 16:9 (1280×720) .MP4 video with stereo game audio without changing your live screen"
     );
 
 
@@ -726,7 +726,7 @@ object SettingsRepository {
             autoReduceLoadWhenRecording = sp.getBoolean("auto_reduce_load_recording", true),
             recordingCaptureEngine = try {
                 RecordingCaptureEngine.valueOf(
-                    sp.getString("recording_capture_engine", RecordingCaptureEngine.HARDWARE_SCREEN.name)
+                    sp.getString("recording_capture_engine_v3", RecordingCaptureEngine.HARDWARE_SCREEN.name)
                         ?: RecordingCaptureEngine.HARDWARE_SCREEN.name
                 )
             } catch (_: Exception) { RecordingCaptureEngine.HARDWARE_SCREEN },
@@ -792,6 +792,7 @@ object SettingsRepository {
             putBoolean("gpu_load_reduction_enabled", c.gpuLoadReductionEnabled)
             putString("screen_record_quality", c.screenRecordQuality.name)
             putBoolean("auto_reduce_load_recording", c.autoReduceLoadWhenRecording)
+            putString("recording_capture_engine_v3", c.recordingCaptureEngine.name)
             putString("recording_capture_engine", c.recordingCaptureEngine.name)
             putString("video_aspect_ratio_mode", c.videoAspectRatioMode.name)
             putFloat("video_scale_x", c.videoScaleX)

@@ -337,7 +337,7 @@ private fun HeroConsolePlayDeck(
                             }
                         }
 
-                        // Badge báo chống bóp dẹt hình & chuẩn 60 FPS
+                        // Nhãn hiển thị độ phân giải & tốc độ khung hình chuẩn
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = Color(0xD907130E),
@@ -347,7 +347,11 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Text(
-                                text = if (isEn) "16:9 ANTI-SQUISH • 60 FPS" else "CHỐNG BÓP HÌNH • 60 FPS",
+                                text = if (isEn) {
+                                    "${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps} FPS"
+                                } else {
+                                    "${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps} FPS MƯỢT"
+                                },
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.sp,

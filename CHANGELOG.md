@@ -1,6 +1,16 @@
 # Nhật ký cập nhật / Update Changelog (CloudPlay Xbox)
 
-Tài liệu này ghi nhận chi tiết các thay đổi thực tế của từng bản cập nhật và được hệ thống xuất APK tự động trích xuất vào trang phát hành (GitHub Releases).
+Tài liệu này ghi nhận chi tiết các thay đổi thực tế của từng bản cập nhật và được hệ thống xuất APK tự động đối chiếu cùng `git diff` khi tạo trang phát hành (GitHub Releases).
+
+## [v1.4.0] - Sửa lỗi Quay Video .MP4 Có Tiếng, Chống Giật Khung Hình & Tối Ưu Thứ Tự Ưu Tiên Toàn Hệ Thống
+### 🛠️ Sửa lỗi hệ thống & Tối ưu độ mượt khi chơi (Core Stability & Anti-Stutter)
+- **Giữ nguyên màn hình chơi game 100% chống giật khung hình:** Loại bỏ hoàn toàn việc can thiệp lại CSS `transform` / `contain` trên phần tử `<video>` khi luồng game đang phát hoặc khi bấm quay clip, chấm dứt hiện tượng khựng hình do trình duyệt tính toán lại bố cục.
+- **Khắc phục lỗi Clarity Boost & Giảm tải luồng WebView:** Sửa lỗi bộ lọc làm nét tự bật lại khi chuyển trang, ngăn việc nạp lặp lại script 70KB trong `onPageFinished` và loại bỏ thao tác ghi đĩa giữa trận trong `AdaptiveQualityManager`.
+- **Sắp xếp lại thứ tự ưu tiên hợp lý trên toàn ứng dụng:** Đưa các tính năng cốt lõi (Đồ họa, Mức chất lượng 4G/Wi-Fi, Khung hình 60/120 FPS, Giảm tải GPU) lên vị trí ưu tiên số 1; gom gọn cài đặt Tỉ lệ màn hình & Màu sắc vào nhóm Hình ảnh (xóa bỏ thẻ trùng lặp ở mục Nâng cao) và xếp Quay Video vào nhóm tính năng phụ thu gọn ở cuối.
+- **Sửa lỗi lưu video `.webm` và mất tiếng:** Thu trực tiếp âm thanh nổi Stereo 48kHz từ WebRTC / AudioContext qua bộ mã hóa phần cứng AAC-LC & H.264, đóng gói chuẩn `.MP4` quốc tế (`ftyp` ISO) có đầy đủ tiếng ở cả chế độ Quay Full Screen toàn màn hình (Mặc định) và Quay 16:9 chuẩn quốc tế.
+- **Nâng cấp AI tạo mô tả bản phát hành theo Git Diff thực tế:** Phân tích trực tiếp các dòng code thay đổi (`git diff prev_tag..HEAD`) để viết mô tả bản cập nhật chính xác, không lặp lại mô tả của các phiên bản cũ.
+
+---
 
 ## [v1.3.0] - Tối ưu Độc quyền Fortnite Arena & Hệ thống Tay cầm Cảm ứng Pro
 ### ⚡ Tối ưu Độc quyền Fortnite (Fortnite Arena Mode)

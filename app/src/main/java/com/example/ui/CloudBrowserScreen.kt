@@ -1180,14 +1180,14 @@ fun CloudBrowserScreen(
                                     }
                                 }
 
-                                // Thanh trượt tinh chỉnh Độ rộng Ngang (Scale X) & Độ cao Dọc (Scale Y) trực tiếp
+                                // Thanh trượt tinh chỉnh Độ rộng chiều Ngang & Độ cao chiều Dọc trực tiếp
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = if (isEn) "Horizontal Stretch (Scale X)" else "Kéo giãn chiều Ngang (Scale X)",
+                                            text = if (isEn) "Horizontal Width" else "Độ rộng chiều Ngang",
                                             color = TextPrimary,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold
@@ -1216,7 +1216,7 @@ fun CloudBrowserScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = if (isEn) "Vertical Height (Scale Y)" else "Kéo giãn chiều Dọc (Scale Y)",
+                                            text = if (isEn) "Vertical Height" else "Độ cao chiều Dọc",
                                             color = TextPrimary,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold
@@ -1242,7 +1242,7 @@ fun CloudBrowserScreen(
                         }
 
                         // ========================================================
-                        // PHẦN 3 (TÍNH NĂNG PHỤ - XẾP CUỐI CÙNG, THU GỌN): QUAY VIDEO CLIP (.MP4 CÓ ÂM THANH)
+                        // PHẦN 3 (TÍNH NĂNG PHỤ - XẾP CUỐI CÙNG, THU GỌN): QUAY VIDEO CLIP (.MP4 CÓ TIẾNG GAME)
                         // ========================================================
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -1263,13 +1263,13 @@ fun CloudBrowserScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isEn) "🎥 3. Secondary: Record Clip (.MP4 + Audio)" else "🎥 3. Tính năng phụ: Quay Video Clip (.MP4 có tiếng)",
+                                            text = if (isEn) "🎥 3. Secondary: Record Video (.MP4 + Audio)" else "🎥 3. Tính năng phụ: Quay video màn hình (.MP4 có tiếng)",
                                             color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = if (isEn) "Default: Full Screen (.MP4 + Stereo Game Audio)" else "Mặc định: Quay Full Màn Hình (Lưu chuẩn .MP4 có âm thanh game)",
+                                            text = if (isEn) "Default: Records exact screen ratio as played (.MP4 + Audio)" else "Mặc định: Màn hình đang chơi thế nào thì video xuất ra đúng tỉ lệ đó",
                                             color = Color(0xFF7E9488),
                                             fontSize = 9.sp
                                         )
@@ -1283,7 +1283,7 @@ fun CloudBrowserScreen(
                                 }
 
                                 if (expandInGameRecording || recorderState.isRecording) {
-                                    // Chọn cơ chế thu
+                                    // Chọn kiểu khung hình video xuất ra
                                     com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
                                         val selected = config.recordingCaptureEngine == engine
                                         Surface(
@@ -1314,7 +1314,7 @@ fun CloudBrowserScreen(
                                         }
                                     }
 
-                                    // Chọn độ phân giải quay
+                                    // Chọn độ nét video khi quay
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -1345,12 +1345,16 @@ fun CloudBrowserScreen(
                                         }
                                     }
 
-                                    // Nút Bắt đầu / Dừng quay
+                                    // Nút Bắt đầu / Dừng quay (Tự đóng bảng cài đặt khi bắt đầu quay để không che màn hình game)
                                     Surface(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(9.dp))
                                             .clickable {
+                                                val wasRecording = recorderState.isRecording
+                                                if (!wasRecording) {
+                                                    showQuickSettingsDialog = false
+                                                }
                                                 com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
                                             }
                                             .testTag("quick_settings_record_button"),
@@ -1370,10 +1374,10 @@ fun CloudBrowserScreen(
                                                     val mins = recorderState.elapsedSeconds / 60
                                                     val secs = recorderState.elapsedSeconds % 60
                                                     if (isEn) "🔴 Recording %02d:%02d — Tap to Save .MP4".format(mins, secs)
-                                                    else "🔴 Đang thu %02d:%02d — Chạm để Lưu .MP4 có tiếng".format(mins, secs)
+                                                    else "🔴 Đang quay %02d:%02d — Chạm để Lưu video .MP4".format(mins, secs)
                                                 } else {
-                                                    if (isEn) "🎬 Start Recording .MP4 + Audio (${config.recordingCaptureEngine.localizedShort(true)})"
-                                                    else "🎬 Bắt đầu quay .MP4 có tiếng (${config.recordingCaptureEngine.localizedShort(false)})"
+                                                    if (isEn) "🎬 Start Recording (${config.recordingCaptureEngine.localizedShort(true)})"
+                                                    else "🎬 Bắt đầu quay (${config.recordingCaptureEngine.localizedShort(false)})"
                                                 },
                                                 color = if (recorderState.isRecording) Color(0xFFFF6B6B) else Color.White,
                                                 fontSize = 11.sp,

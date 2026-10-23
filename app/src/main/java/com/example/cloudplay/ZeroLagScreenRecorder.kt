@@ -90,6 +90,7 @@ object ZeroLagScreenRecorder {
     private var streamMimeType: String = "video/mp4"
     private var usingNativeHardwareFallback: Boolean = true
     private var activeCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.HARDWARE_SCREEN
+    private val hasSavedCurrentSession = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // Native Hardware MediaCodec (H.264 Video + AAC Stereo Audio) + MediaMuxer (.mp4) state
     private var encoderThread: HandlerThread? = null
@@ -107,8 +108,10 @@ object ZeroLagScreenRecorder {
     private var muxerStarted: Boolean = false
     private var nativeTempFile: File? = null
     private var encodingStartTimeNs: Long = 0L
-    private var lastVideoPtsUs: Long = 0L
-    private var lastAudioPtsUs: Long = 0L
+    private var firstMuxedVideoPtsNs: Long = 0L
+    private var encodedVideoFrameCount: Int = 0
+    private var lastVideoPtsUs: Long = -1L
+    private var lastAudioPtsUs: Long = -1L
     private var submittedAudioFrames: Long = 0L
     private val pcmQueue = ConcurrentLinkedQueue<ByteArray>()
 
@@ -132,99 +135,62 @@ object ZeroLagScreenRecorder {
         val autoReduceLoad = config.autoReduceLoadWhenRecording
         val captureEngine = config.recordingCaptureEngine
         activeCaptureEngine = captureEngine
+        hasSavedCurrentSession.set(false)
         pcmQueue.clear()
+
+        val isFullScreenCapture = (captureEngine == RecordingCaptureEngine.HARDWARE_SCREEN)
 
         _state.value = _state.value.copy(
             isRecording = true,
             elapsedSeconds = 0,
             activeQuality = quality,
             autoLowLoadActive = autoReduceLoad,
-            modeLabel = if (captureEngine == RecordingCaptureEngine.DIRECT_STREAM) {
-                if (isEn) "Direct Stream 16:9 (.MP4 + Audio)" else "Luồng Stream 16:9 (.MP4 + Âm thanh)"
+            modeLabel = if (isFullScreenCapture) {
+                if (isEn) "Full Screen (As Played • .MP4)" else "Full màn hình (Giống lúc chơi • .MP4)"
             } else {
-                if (isEn) "Full Screen (.MP4 + Audio)" else "Quay Full Màn Hình (.MP4 + Âm thanh)"
+                if (isEn) "Standard 16:9 Frame (.MP4)" else "Khung chuẩn 16:9 (.MP4)"
             }
         )
 
         startElapsedTimer()
 
-        // Always start the hardware MP4 (H.264 + AAC Audio) encoder:
-        // - In HARDWARE_SCREEN (Default): records full screen + live game audio directly to standard .mp4
-        // - In DIRECT_STREAM: acts as simultaneous guaranteed .mp4 + AAC audio source so we NEVER save .webm or silent clips
-        val isFullScreenCapture = (captureEngine == RecordingCaptureEngine.HARDWARE_SCREEN)
-        usingNativeHardwareFallback = isFullScreenCapture
+        // Always use the Native Hardware MediaCodec (H.264 + AAC Stereo) + PixelCopy pipeline:
+        // - In HARDWARE_SCREEN (Default): records the exact full phone screen aspect ratio (e.g. 20:9, 19.5:9) as seen on screen.
+        // - In DIRECT_STREAM (16:9): records clean 16:9 (1280x720 / 960x540) hardware H.264 + AAC without WebRTC keyframe freeze or WebM issues.
+        usingNativeHardwareFallback = true
         startNativeHardwareSurfaceRecorder(context, webView, quality, isFullScreenCapture)
 
-        if (webView != null && captureEngine == RecordingCaptureEngine.DIRECT_STREAM) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val dir = File(appCtx.cacheDir, "recordings").apply { mkdirs() }
-                    val tmp = File(dir, "active_clip_${System.currentTimeMillis()}.tmp")
-                    streamTempFile = tmp
-                    streamOutputStream = BufferedOutputStream(FileOutputStream(tmp), 64 * 1024)
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not prepare stream temp file", e)
-                }
-            }
-
-            val js = """
-                (function() {
-                    if (window.__setRecordingPerformanceMode) {
-                        window.__setRecordingPerformanceMode(${autoReduceLoad});
-                    }
-                    if (window.__startLiveAudioPcmTap) {
-                        window.__startLiveAudioPcmTap();
-                    }
-                    if (window.__startZeroLagStreamRecorder) {
-                        return window.__startZeroLagStreamRecorder(${quality.widthPx}, ${quality.heightPx}, ${quality.fps}, ${quality.bitrateBps}, '${captureEngine.id}');
-                    }
-                    return "FALLBACK_NATIVE";
-                })();
-            """.trimIndent()
-
+        if (webView != null) {
             webView.post {
                 try {
-                    webView.evaluateJavascript(js) { result ->
-                        val cleanRes = result?.trim()?.removeSurrounding("\"") ?: "FALLBACK_NATIVE"
-                        if (cleanRes.startsWith("DIRECT_STREAM")) {
-                            usingNativeHardwareFallback = false
-                            _state.value = _state.value.copy(
-                                modeLabel = if (isEn) "Direct Stream 16:9 (.MP4 + Audio)" else "Luồng Stream 16:9 (.MP4 + Âm thanh)"
-                            )
-                        } else {
-                            usingNativeHardwareFallback = true
-                            _state.value = _state.value.copy(
-                                modeLabel = if (isEn) "Hardware 16:9 (.MP4 + Audio)" else "Phần Cứng 16:9 (.MP4 + Âm thanh)"
-                            )
-                        }
-                    }
+                    webView.evaluateJavascript(
+                        """
+                        (function() {
+                            if (window.__setRecordingPerformanceMode) {
+                                window.__setRecordingPerformanceMode(${autoReduceLoad});
+                            }
+                            if (window.__startLiveAudioPcmTap) {
+                                window.__startLiveAudioPcmTap();
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
                 } catch (e: Exception) {
-                    usingNativeHardwareFallback = true
-                }
-            }
-        } else {
-            // Default HARDWARE_SCREEN mode: activate performance mode & live WebAudio stereo PCM tap for AAC audio encoding
-            if (webView != null) {
-                webView.post {
-                    try {
-                        webView.evaluateJavascript(
-                            """
-                            (function() {
-                                if (window.__setRecordingPerformanceMode) window.__setRecordingPerformanceMode(${autoReduceLoad});
-                                if (window.__startLiveAudioPcmTap) window.__startLiveAudioPcmTap();
-                            })();
-                            """.trimIndent(),
-                            null
-                        )
-                    } catch (_: Exception) {}
+                    Log.w(TAG, "Could not start WebAudio PCM tap", e)
                 }
             }
         }
 
-        val toastMsg = if (isEn) {
-            "🔴 Recording started (${quality.localizedShort(true)} • Standard .MP4 with Audio)"
+        val ratioNote = if (isFullScreenCapture) {
+            if (isEn) "Full Screen Ratio" else "Đúng tỉ lệ màn hình đang chơi"
         } else {
-            "🔴 Đã bắt đầu quay (${quality.localizedShort(false)} • Chuẩn .MP4 có âm thanh)"
+            if (isEn) "16:9 Ratio" else "Khung hình 16:9"
+        }
+        val toastMsg = if (isEn) {
+            "🔴 Recording ($ratioNote • ${quality.localizedShort(true)} .MP4 + Audio)"
+        } else {
+            "🔴 Đang quay ($ratioNote • ${quality.localizedShort(false)} .MP4 có tiếng)"
         }
         Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
     }
@@ -255,23 +221,14 @@ object ZeroLagScreenRecorder {
             }
         }
 
-        if (usingNativeHardwareFallback) {
-            // Clean up any unused stream temp file
-            try {
-                streamOutputStream?.close()
-            } catch (_: Exception) {}
-            streamOutputStream = null
-            streamTempFile?.delete()
-            streamTempFile = null
-            stopNativeHardwareSurfaceRecorder(ctx, saveDirectly = true)
-        } else {
-            // Stop hardware companion encoder first, then finalize direct stream with guaranteed MP4 + AAC fallback
-            stopNativeHardwareSurfaceRecorder(ctx, saveDirectly = false)
-            scope.launch(Dispatchers.IO) {
-                delay(480)
-                finalizeDirectStreamFile(ctx)
-            }
-        }
+        // Clean up any legacy stream temp file and finalize the Native Hardware MP4 + AAC encoder once
+        try {
+            streamOutputStream?.close()
+        } catch (_: Exception) {}
+        streamOutputStream = null
+        streamTempFile?.delete()
+        streamTempFile = null
+        stopNativeHardwareSurfaceRecorder(ctx, saveDirectly = true)
 
         _state.value = _state.value.copy(
             isRecording = false,
@@ -279,7 +236,11 @@ object ZeroLagScreenRecorder {
         )
 
         if (ctx != null) {
-            val stoppingMsg = if (isEn) "⏹️ Saving .MP4 video with audio to Gallery (Movies/XboxCloudPlay)..." else "⏹️ Đang lưu video .MP4 có âm thanh vào Thư viện (Movies/XboxCloudPlay)..."
+            val stoppingMsg = if (isEn) {
+                "⏹️ Saving .MP4 video with audio to Gallery (Movies/XboxCloudPlay)..."
+            } else {
+                "⏹️ Đang lưu video .MP4 có tiếng vào Thư viện (Movies/XboxCloudPlay)..."
+            }
             Toast.makeText(ctx, stoppingMsg, Toast.LENGTH_SHORT).show()
         }
     }
@@ -559,8 +520,12 @@ object ZeroLagScreenRecorder {
         quality: ScreenRecordQuality,
         isFullScreenMode: Boolean
     ) {
-        val activity = findActivity(webView?.context ?: context)
+        val activity = findActivity(context) ?: findActivity(webView?.context)
         val appCtx = context.applicationContext
+        val displayMetrics = appCtx.resources.displayMetrics
+        val fallbackScreenW = maxOf(displayMetrics.widthPixels, displayMetrics.heightPixels)
+        val fallbackScreenH = minOf(displayMetrics.widthPixels, displayMetrics.heightPixels)
+
         val thread = HandlerThread("ZeroLagHardwareEncoder").apply { start() }
         val handler = Handler(thread.looper)
         encoderThread = thread
@@ -574,28 +539,26 @@ object ZeroLagScreenRecorder {
                 nativeTempFile = outFile
 
                 // Determine output dimensions:
-                // - In Full Screen mode (default): match the device window's true full-screen aspect ratio (aligned to 16px)
-                // - In 16:9 Stream mode: lock to 16:9 (1280x720 or 960x540)
+                // - In Full Screen mode (default): match the device window's true full-screen aspect ratio (e.g. 20:9, 19.5:9, aligned to 16px)
+                //   so the recorded MP4 has the exact same aspect ratio as what the user sees while playing.
+                // - In 16:9 Frame mode: lock to standard 16:9 (1280x720 or 960x540).
                 val decor = activity?.window?.peekDecorView()
-                val winW = decor?.width ?: 0
-                val winH = decor?.height ?: 0
+                val rawWinW = decor?.width?.takeIf { it > 128 } ?: webView?.width?.takeIf { it > 128 } ?: fallbackScreenW
+                val rawWinH = decor?.height?.takeIf { it > 128 } ?: webView?.height?.takeIf { it > 128 } ?: fallbackScreenH
+                val winW = maxOf(rawWinW, rawWinH)
+                val winH = minOf(rawWinW, rawWinH)
+
                 val (width, height) = if (isFullScreenMode && winW > 128 && winH > 128) {
                     val winAspect = winW.toFloat() / winH.toFloat()
                     val baseShortSide = quality.heightPx.coerceAtLeast(540)
-                    if (winW >= winH) {
-                        val calcW = ((baseShortSide * winAspect).toInt() / 16) * 16
-                        val calcH = (baseShortSide / 16) * 16
-                        Pair(calcW.coerceIn(640, 2560), calcH.coerceIn(360, 1440))
-                    } else {
-                        val calcW = (baseShortSide / 16) * 16
-                        val calcH = ((baseShortSide / winAspect).toInt() / 16) * 16
-                        Pair(calcW.coerceIn(360, 1440), calcH.coerceIn(640, 2560))
-                    }
+                    val calcW = (((baseShortSide * winAspect).toInt() + 8) / 16) * 16
+                    val calcH = ((baseShortSide + 8) / 16) * 16
+                    Pair(calcW.coerceIn(640, 2560), calcH.coerceIn(360, 1440))
                 } else {
                     Pair((quality.widthPx / 16) * 16, (quality.heightPx / 16) * 16)
                 }
 
-                // 1. Configure Hardware H.264 Video Encoder
+                // 1. Configure Hardware H.264 Video Encoder with 1-second IDR Keyframe interval (zero initial freeze)
                 val videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
                     setInteger(
                         MediaFormat.KEY_COLOR_FORMAT,
@@ -603,7 +566,11 @@ object ZeroLagScreenRecorder {
                     )
                     setInteger(MediaFormat.KEY_BIT_RATE, quality.bitrateBps)
                     setInteger(MediaFormat.KEY_FRAME_RATE, quality.fps)
-                    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+                    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        setInteger(MediaFormat.KEY_OPERATING_RATE, quality.fps)
+                        setInteger(MediaFormat.KEY_PRIORITY, 0)
+                    }
                 }
 
                 val vCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -644,13 +611,22 @@ object ZeroLagScreenRecorder {
                 audioTrackIndex = -1
                 muxerStarted = false
                 encodingStartTimeNs = System.nanoTime()
-                lastVideoPtsUs = 0L
-                lastAudioPtsUs = 0L
+                firstMuxedVideoPtsNs = 0L
+                encodedVideoFrameCount = 0
+                lastVideoPtsUs = -1L
+                lastAudioPtsUs = -1L
                 submittedAudioFrames = 0L
 
-                // Prime AAC encoder with an initial silent frame so its output MediaFormat (csd-0) is ready immediately
-                feedSilentAudioFrames(1024)
-                drainAudioCodec(false)
+                // CRITICAL: Prime AAC encoder in a short loop BEFORE capturing the first video frame
+                // so pendingAudioFormat (csd-0) is ready immediately and Frame #0 (the first H.264 IDR keyframe) is never dropped!
+                for (primeStep in 0 until 12) {
+                    if (pendingAudioFormat != null || audioCodec == null) break
+                    feedSilentAudioFrames(1024)
+                    drainAudioCodec(false)
+                    if (pendingAudioFormat == null) {
+                        try { Thread.sleep(6) } catch (_: Exception) {}
+                    }
+                }
 
                 val frameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val paint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -661,14 +637,23 @@ object ZeroLagScreenRecorder {
                     override fun run() {
                         if (!isNativeEncoding) return
                         val tickStart = System.currentTimeMillis()
-                        val window = activity?.window
+                        val currentActivity = activity ?: findActivity(context) ?: findActivity(webView?.context)
+                        val window = currentActivity?.window
                         val decorView = window?.peekDecorView()
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && window != null && decorView != null) {
+
+                        fun scheduleNextCaptureTick() {
+                            if (!isNativeEncoding) return
+                            val elapsed = System.currentTimeMillis() - tickStart
+                            val nextDelay = (frameIntervalMs - elapsed).coerceAtLeast(8L)
+                            handler.postDelayed(this, nextDelay)
+                        }
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && window != null && decorView != null && decorView.width > 0 && decorView.height > 0) {
                             try {
                                 val curWinW = decorView.width
                                 val curWinH = decorView.height
                                 // In Full Screen mode (isFullScreenMode == true), capture the ENTIRE screen without cropping!
-                                // Only crop to 16:9 when in DIRECT_STREAM 16:9 lock mode.
+                                // Only crop to 16:9 when the user explicitly selects the 16:9 Frame mode.
                                 val srcRect: Rect? = if (!isFullScreenMode && curWinW > 64 && curWinH > 64) {
                                     val winAspect = curWinW.toFloat() / curWinH.toFloat()
                                     if (winAspect > targetAspect + 0.02f) {
@@ -686,46 +671,43 @@ object ZeroLagScreenRecorder {
                                     null
                                 }
 
+                                val copyListener = PixelCopy.OnPixelCopyFinishedListener { copyResult ->
+                                    try {
+                                        if (isNativeEncoding) {
+                                            if (copyResult == PixelCopy.SUCCESS) {
+                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                                            } else if (encodedVideoFrameCount > 0) {
+                                                // Re-submit previous valid bitmap frame so timeline stays smooth at 0 stutter
+                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                                            }
+                                            feedAndDrainAudioEncoder(false)
+                                            drainVideoEncoder(false)
+                                        }
+                                    } finally {
+                                        scheduleNextCaptureTick()
+                                    }
+                                }
+
                                 if (srcRect != null) {
-                                    PixelCopy.request(
-                                        window,
-                                        srcRect,
-                                        frameBitmap,
-                                        { copyResult ->
-                                            if (copyResult == PixelCopy.SUCCESS && isNativeEncoding) {
-                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
-                                                feedAndDrainAudioEncoder(false)
-                                                drainVideoEncoder(false)
-                                            }
-                                        },
-                                        handler
-                                    )
+                                    PixelCopy.request(window, srcRect, frameBitmap, copyListener, handler)
                                 } else {
-                                    PixelCopy.request(
-                                        window,
-                                        frameBitmap,
-                                        { copyResult ->
-                                            if (copyResult == PixelCopy.SUCCESS && isNativeEncoding) {
-                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
-                                                feedAndDrainAudioEncoder(false)
-                                                drainVideoEncoder(false)
-                                            }
-                                        },
-                                        handler
-                                    )
+                                    PixelCopy.request(window, frameBitmap, copyListener, handler)
                                 }
                             } catch (_: Exception) {
+                                if (encodedVideoFrameCount > 0) {
+                                    drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                                }
                                 feedAndDrainAudioEncoder(false)
                                 drainVideoEncoder(false)
+                                scheduleNextCaptureTick()
                             }
                         } else {
+                            if (encodedVideoFrameCount > 0) {
+                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                            }
                             feedAndDrainAudioEncoder(false)
                             drainVideoEncoder(false)
-                        }
-                        val elapsed = System.currentTimeMillis() - tickStart
-                        val nextDelay = (frameIntervalMs - elapsed).coerceAtLeast(8L)
-                        if (isNativeEncoding) {
-                            handler.postDelayed(this, nextDelay)
+                            scheduleNextCaptureTick()
                         }
                     }
                 }
@@ -737,13 +719,30 @@ object ZeroLagScreenRecorder {
         }
     }
 
-    private fun tryStartMuxerIfReady() {
+    private fun requestImmediateVideoKeyframe() {
+        val vCodec = mediaCodec ?: return
+        try {
+            val params = android.os.Bundle().apply {
+                putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0)
+            }
+            vCodec.setParameters(params)
+        } catch (_: Exception) {}
+    }
+
+    private fun tryStartMuxerIfReady(forceStartIfVideoReady: Boolean = false) {
         if (muxerStarted) return
         val muxer = mediaMuxer ?: return
         val vFmt = pendingVideoFormat ?: return
-        val aFmt = pendingAudioFormat
-        // Start muxer as soon as video format and (if audioCodec is active) audio format are ready
-        if (audioCodec != null && aFmt == null) return
+        var aFmt = pendingAudioFormat
+
+        // If video format is ready first, try draining audio once more so both tracks are added together
+        if (audioCodec != null && aFmt == null) {
+            feedSilentAudioFrames(1024)
+            drainAudioCodecInternal()
+            aFmt = pendingAudioFormat
+        }
+        if (audioCodec != null && aFmt == null && !forceStartIfVideoReady) return
+
         try {
             videoTrackIndex = muxer.addTrack(vFmt)
             if (aFmt != null) {
@@ -751,6 +750,9 @@ object ZeroLagScreenRecorder {
             }
             muxer.start()
             muxerStarted = true
+            encodingStartTimeNs = System.nanoTime()
+            firstMuxedVideoPtsNs = encodingStartTimeNs
+            requestImmediateVideoKeyframe()
         } catch (e: Exception) {
             Log.w(TAG, "Error starting MediaMuxer", e)
         }
@@ -798,8 +800,8 @@ object ZeroLagScreenRecorder {
             // 2. If no live WebRTC audio arrived recently (e.g. menu or brief gap), keep AAC stream continuous
             val elapsedUs = ((System.nanoTime() - encodingStartTimeNs) / 1000L).coerceAtLeast(0L)
             val audioPtsUs = (submittedAudioFrames * 1_000_000L) / AUDIO_SAMPLE_RATE
-            if (!fedAny && !endOfStream && elapsedUs - audioPtsUs > 140_000L) {
-                feedSilentAudioFrames(2048)
+            if (!fedAny && !endOfStream && elapsedUs - audioPtsUs > 90_000L) {
+                feedSilentAudioFrames(1024)
             }
 
             if (endOfStream) {
@@ -816,6 +818,24 @@ object ZeroLagScreenRecorder {
         }
     }
 
+    private fun drainAudioCodecInternal() {
+        val aCodec = audioCodec ?: return
+        try {
+            val bufferInfo = MediaCodec.BufferInfo()
+            for (i in 0 until 6) {
+                val outIdx = aCodec.dequeueOutputBuffer(bufferInfo, 2_000L)
+                if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                    break
+                } else if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    pendingAudioFormat = aCodec.outputFormat
+                    break
+                } else if (outIdx >= 0) {
+                    aCodec.releaseOutputBuffer(outIdx, false)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
     private fun drainAudioCodec(endOfStream: Boolean) {
         val aCodec = audioCodec ?: return
         val muxer = mediaMuxer ?: return
@@ -829,7 +849,7 @@ object ZeroLagScreenRecorder {
                     if (!endOfStream) break
                 } else if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     pendingAudioFormat = aCodec.outputFormat
-                    tryStartMuxerIfReady()
+                    tryStartMuxerIfReady(forceStartIfVideoReady = false)
                 } else if (outIdx >= 0) {
                     val encodedData = aCodec.getOutputBuffer(outIdx)
                     if (encodedData != null) {
@@ -839,10 +859,13 @@ object ZeroLagScreenRecorder {
                         if (bufferInfo.size > 0 && muxerStarted && audioTrackIndex >= 0) {
                             encodedData.position(bufferInfo.offset)
                             encodedData.limit(bufferInfo.offset + bufferInfo.size)
-                            val safePts = if (bufferInfo.presentationTimeUs <= lastAudioPtsUs) {
-                                lastAudioPtsUs + 1000L
+                            val rawPts = bufferInfo.presentationTimeUs.coerceAtLeast(0L)
+                            val safePts = if (lastAudioPtsUs < 0L) {
+                                0L
+                            } else if (rawPts <= lastAudioPtsUs) {
+                                lastAudioPtsUs + 21_333L
                             } else {
-                                bufferInfo.presentationTimeUs
+                                rawPts
                             }
                             lastAudioPtsUs = safePts
                             bufferInfo.presentationTimeUs = safePts
@@ -879,6 +902,10 @@ object ZeroLagScreenRecorder {
             } finally {
                 surface.unlockCanvasAndPost(canvas)
             }
+            encodedVideoFrameCount++
+            if (encodedVideoFrameCount == 1 || encodedVideoFrameCount == 15) {
+                requestImmediateVideoKeyframe()
+            }
         } catch (_: Exception) {}
     }
 
@@ -898,8 +925,11 @@ object ZeroLagScreenRecorder {
                     if (!endOfStream) break
                 } else if (outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     pendingVideoFormat = codec.outputFormat
-                    tryStartMuxerIfReady()
+                    tryStartMuxerIfReady(forceStartIfVideoReady = true)
                 } else if (outputIndex >= 0) {
+                    if (!muxerStarted && pendingVideoFormat != null) {
+                        tryStartMuxerIfReady(forceStartIfVideoReady = true)
+                    }
                     val encodedData = codec.getOutputBuffer(outputIndex)
                     if (encodedData != null) {
                         if ((bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) {
@@ -908,8 +938,18 @@ object ZeroLagScreenRecorder {
                         if (bufferInfo.size > 0 && muxerStarted && videoTrackIndex >= 0) {
                             encodedData.position(bufferInfo.offset)
                             encodedData.limit(bufferInfo.offset + bufferInfo.size)
-                            val rawPts = ((System.nanoTime() - encodingStartTimeNs) / 1000L).coerceAtLeast(0L)
-                            val safePts = if (rawPts <= lastVideoPtsUs) lastVideoPtsUs + 1000L else rawPts
+                            val nowNs = System.nanoTime()
+                            if (firstMuxedVideoPtsNs <= 0L) {
+                                firstMuxedVideoPtsNs = nowNs
+                            }
+                            val rawPts = ((nowNs - firstMuxedVideoPtsNs) / 1000L).coerceAtLeast(0L)
+                            val safePts = if (lastVideoPtsUs < 0L) {
+                                0L
+                            } else if (rawPts <= lastVideoPtsUs) {
+                                lastVideoPtsUs + 16_666L
+                            } else {
+                                rawPts
+                            }
                             lastVideoPtsUs = safePts
                             bufferInfo.presentationTimeUs = safePts
                             muxer.writeSampleData(videoTrackIndex, encodedData, bufferInfo)
@@ -965,7 +1005,7 @@ object ZeroLagScreenRecorder {
                 muxerStarted = false
                 pcmQueue.clear()
 
-                if (saveDirectly) {
+                if (saveDirectly && hasSavedCurrentSession.compareAndSet(false, true)) {
                     val outFile = nativeTempFile
                     nativeTempFile = null
                     if (outFile != null && isGenuineMp4File(outFile)) {

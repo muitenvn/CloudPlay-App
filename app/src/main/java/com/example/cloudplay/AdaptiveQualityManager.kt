@@ -331,7 +331,8 @@ object AdaptiveQualityManager {
                     }
                     if (savedNextSessionMbps != nextLowerMbps) {
                         savedNextSessionMbps = nextLowerMbps
-                        SettingsRepository.updateMaxBitrate(nextLowerMbps)
+                        // Không gọi SettingsRepository.updateMaxBitrate(nextLowerMbps) ngay giữa lúc đang chơi
+                        // để tránh kích hoạt Compose Recomposition toàn màn hình gây khựng hình (stutter).
                         steppedDownForNextSession = true
                     }
                 } else {

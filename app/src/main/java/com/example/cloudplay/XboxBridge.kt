@@ -158,8 +158,8 @@ class XboxBridge(
                 (function() {
                     if (window.__cloudPlayInjected) {
                         if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale" });
+                        if (window.__setClarityPreset) window.__setClarityPreset($clarityBoost ? "$clarityPreset" : "OFF");
                         if (window.__toggleClarityBoost) window.__toggleClarityBoost($clarityBoost);
-                        if (window.__setClarityPreset) window.__setClarityPreset("$clarityPreset");
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
                         if (window.__setXCloudTranslationConfig) window.__setXCloudTranslationConfig({ preserveTitles: $preserveTitles, bilingual: $bilingualMode, hideStats: $hideStreamStats });
                         if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay($hideStreamStats);
@@ -1064,8 +1064,6 @@ class XboxBridge(
                             video.style.touchAction = 'none';
                             video.style.userSelect = 'none';
                             video.style.webkitUserSelect = 'none';
-                            video.style.willChange = 'transform';
-                            video.style.contain = 'layout style paint';
                             ensureFortniteMultiTouchClawCss();
                         } catch(e) {}
                     }
@@ -1472,9 +1470,32 @@ class XboxBridge(
                     let activeAudioTapProcessor = null;
                     let activeAudioTapGain = null;
                     let activeAudioTapClone = null;
+                    let activeAudioTapHelperEl = null;
                     let activeAudioTapRetryTimer = null;
 
-                    // Hook HTMLMediaElement.prototype.play & AudioContext to capture detached <audio> or WebAudio streams
+                    // Pre-unlock a shared 48kHz AudioContext on any DOM user touch/click so recording triggered
+                    // from the native Android HUD button never starts in a 'suspended' AudioContext state.
+                    function ensureUnlockedSharedAudioContext() {
+                        try {
+                            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioCtxClass) return null;
+                            if (!window.__sharedRecordAudioCtx || window.__sharedRecordAudioCtx.state === 'closed') {
+                                window.__sharedRecordAudioCtx = new AudioCtxClass({ sampleRate: 48000 });
+                            }
+                            if (window.__sharedRecordAudioCtx.state === 'suspended' && typeof window.__sharedRecordAudioCtx.resume === 'function') {
+                                window.__sharedRecordAudioCtx.resume();
+                            }
+                            return window.__sharedRecordAudioCtx;
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+                    document.addEventListener('touchstart', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
+                    document.addEventListener('pointerdown', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
+                    document.addEventListener('click', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
+
+                    // Hook HTMLMediaElement.prototype.play, AudioContext.createMediaStreamSource & AudioNode.prototype.connect
+                    // to capture detached <audio>, WebRTC MediaStream tracks, and direct WebAudio destination nodes
                     try {
                         if (typeof HTMLMediaElement !== 'undefined' && HTMLMediaElement.prototype && !HTMLMediaElement.prototype.__audioHooked) {
                             HTMLMediaElement.prototype.__audioHooked = true;
@@ -1508,6 +1529,19 @@ class XboxBridge(
                                     }
                                 } catch (e) {}
                                 return origCreateMss.apply(this, arguments);
+                            };
+                        }
+                        if (typeof AudioNode !== 'undefined' && AudioNode.prototype && AudioNode.prototype.connect && !AudioNode.prototype.__cpConnectHooked) {
+                            AudioNode.prototype.__cpConnectHooked = true;
+                            const origConnect = AudioNode.prototype.connect;
+                            AudioNode.prototype.connect = function(destinationNode, ...rest) {
+                                try {
+                                    if (destinationNode && this.context && destinationNode === this.context.destination && !this.__isCloudPlayTapNode) {
+                                        window.__lastConnectedGameAudioNode = this;
+                                        window.__lastConnectedGameAudioCtx = this.context;
+                                    }
+                                } catch (e) {}
+                                return origConnect.apply(this, [destinationNode, ...rest]);
                             };
                         }
                     } catch (e) {}
@@ -1586,84 +1620,130 @@ class XboxBridge(
                             }
                         } catch (e) {}
                         try {
-                            if (activeAudioTapSource) activeAudioTapSource.disconnect();
+                            if (activeAudioTapSource && !activeAudioTapSource.__isExistingGameNode) {
+                                activeAudioTapSource.disconnect();
+                            }
                         } catch (e) {}
                         try {
                             if (activeAudioTapGain) activeAudioTapGain.disconnect();
                         } catch (e) {}
                         try {
-                            if (activeAudioTapClone) activeAudioTapClone.stop();
+                            if (activeAudioTapHelperEl) {
+                                activeAudioTapHelperEl.pause();
+                                activeAudioTapHelperEl.srcObject = null;
+                                activeAudioTapHelperEl.remove();
+                            }
                         } catch (e) {}
                         try {
-                            if (activeAudioTapCtx && activeAudioTapCtx.state !== 'closed') {
-                                activeAudioTapCtx.close();
-                            }
+                            if (activeAudioTapClone) activeAudioTapClone.stop();
                         } catch (e) {}
                         activeAudioTapProcessor = null;
                         activeAudioTapSource = null;
                         activeAudioTapGain = null;
                         activeAudioTapClone = null;
+                        activeAudioTapHelperEl = null;
                         activeAudioTapCtx = null;
                     };
 
                     window.__startLiveAudioPcmTap = function() {
                         window.__stopLiveAudioPcmTap();
+                        function buildPcmProcessor(ctx) {
+                            const processor = ctx.createScriptProcessor(4096, 2, 2);
+                            processor.__isCloudPlayTapNode = true;
+                            const zeroGain = ctx.createGain();
+                            zeroGain.__isCloudPlayTapNode = true;
+                            zeroGain.gain.value = 0.0;
+
+                            processor.onaudioprocess = function(audioEvt) {
+                                try {
+                                    if (!window.CloudPlayBridge || !window.CloudPlayBridge.onScreenRecordAudioPcm) return;
+                                    const inBuf = audioEvt.inputBuffer;
+                                    const chCount = inBuf.numberOfChannels || 1;
+                                    const left = inBuf.getChannelData(0);
+                                    const right = chCount > 1 ? inBuf.getChannelData(1) : left;
+                                    const frames = left.length;
+                                    const pcm16 = new Int16Array(frames * 2);
+                                    for (let i = 0, j = 0; i < frames; i++) {
+                                        let sL = left[i];
+                                        let sR = right[i];
+                                        sL = sL < -1.0 ? -1.0 : (sL > 1.0 ? 1.0 : sL);
+                                        sR = sR < -1.0 ? -1.0 : (sR > 1.0 ? 1.0 : sR);
+                                        pcm16[j++] = sL < 0 ? (sL * 0x8000) : (sL * 0x7FFF);
+                                        pcm16[j++] = sR < 0 ? (sR * 0x8000) : (sR * 0x7FFF);
+                                    }
+                                    const bytes = new Uint8Array(pcm16.buffer);
+                                    let binary = '';
+                                    const chunkLen = 8192;
+                                    for (let offset = 0; offset < bytes.length; offset += chunkLen) {
+                                        const slice = bytes.subarray(offset, Math.min(offset + chunkLen, bytes.length));
+                                        binary += String.fromCharCode.apply(null, slice);
+                                    }
+                                    const b64 = window.btoa(binary);
+                                    window.CloudPlayBridge.onScreenRecordAudioPcm(b64, ctx.sampleRate || 48000, 2);
+                                } catch (pcmErr) {}
+                            };
+                            processor.connect(zeroGain);
+                            zeroGain.connect(ctx.destination);
+                            return { processor: processor, zeroGain: zeroGain };
+                        }
+
                         function tryAttachAudioTap() {
                             if (activeAudioTapProcessor) return true;
+                            // Path A: Tap xCloud's own running WebAudio destination node directly if present
+                            if (window.__lastConnectedGameAudioNode && window.__lastConnectedGameAudioCtx && window.__lastConnectedGameAudioCtx.state !== 'closed') {
+                                try {
+                                    const gameCtx = window.__lastConnectedGameAudioCtx;
+                                    if (gameCtx.state === 'suspended' && typeof gameCtx.resume === 'function') gameCtx.resume();
+                                    const nodes = buildPcmProcessor(gameCtx);
+                                    window.__lastConnectedGameAudioNode.__isExistingGameNode = true;
+                                    window.__lastConnectedGameAudioNode.connect(nodes.processor);
+                                    activeAudioTapCtx = gameCtx;
+                                    activeAudioTapSource = window.__lastConnectedGameAudioNode;
+                                    activeAudioTapProcessor = nodes.processor;
+                                    activeAudioTapGain = nodes.zeroGain;
+                                    return true;
+                                } catch (e) {}
+                            }
+
+                            // Path B: Tap WebRTC live audio MediaStreamTrack + helper <audio> pump (fixes Chromium crbug.com/933677)
                             const liveTrack = window.__findLiveGameAudioTrack();
                             if (!liveTrack) return false;
-                            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-                            if (!AudioCtxClass) return false;
+                            const ctx = ensureUnlockedSharedAudioContext();
+                            if (!ctx) return false;
                             try {
-                                const ctx = new AudioCtxClass({ sampleRate: 48000 });
                                 if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
                                     ctx.resume();
                                 }
                                 const cloned = (typeof liveTrack.clone === 'function') ? liveTrack.clone() : liveTrack;
                                 if (cloned !== liveTrack) activeAudioTapClone = cloned;
                                 const mediaStream = new MediaStream([cloned]);
+
+                                // Chromium WebRTC WebAudio workaround (crbug.com/933677):
+                                // Attach mediaStream to a playing near-zero-volume <audio> element so Chromium decodes & pumps PCM samples
+                                try {
+                                    const helperAudio = document.createElement('audio');
+                                    helperAudio.srcObject = mediaStream;
+                                    helperAudio.muted = false;
+                                    helperAudio.volume = 0.001;
+                                    helperAudio.autoplay = true;
+                                    helperAudio.playsInline = true;
+                                    helperAudio.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;';
+                                    if (document.body) document.body.appendChild(helperAudio);
+                                    const playPromise = helperAudio.play();
+                                    if (playPromise && typeof playPromise.catch === 'function') {
+                                        playPromise.catch(function() {});
+                                    }
+                                    activeAudioTapHelperEl = helperAudio;
+                                } catch (helperErr) {}
+
                                 const source = ctx.createMediaStreamSource(mediaStream);
-                                const processor = ctx.createScriptProcessor(4096, 2, 2);
-                                const zeroGain = ctx.createGain();
-                                zeroGain.gain.value = 0.0;
-
-                                processor.onaudioprocess = function(audioEvt) {
-                                    try {
-                                        if (!window.CloudPlayBridge || !window.CloudPlayBridge.onScreenRecordAudioPcm) return;
-                                        const inBuf = audioEvt.inputBuffer;
-                                        const chCount = inBuf.numberOfChannels || 1;
-                                        const left = inBuf.getChannelData(0);
-                                        const right = chCount > 1 ? inBuf.getChannelData(1) : left;
-                                        const frames = left.length;
-                                        const pcm16 = new Int16Array(frames * 2);
-                                        for (let i = 0, j = 0; i < frames; i++) {
-                                            let sL = left[i];
-                                            let sR = right[i];
-                                            sL = sL < -1.0 ? -1.0 : (sL > 1.0 ? 1.0 : sL);
-                                            sR = sR < -1.0 ? -1.0 : (sR > 1.0 ? 1.0 : sR);
-                                            pcm16[j++] = sL < 0 ? (sL * 0x8000) : (sL * 0x7FFF);
-                                            pcm16[j++] = sR < 0 ? (sR * 0x8000) : (sR * 0x7FFF);
-                                        }
-                                        const bytes = new Uint8Array(pcm16.buffer);
-                                        let binary = '';
-                                        const chunkLen = 8192;
-                                        for (let offset = 0; offset < bytes.length; offset += chunkLen) {
-                                            const slice = bytes.subarray(offset, Math.min(offset + chunkLen, bytes.length));
-                                            binary += String.fromCharCode.apply(null, slice);
-                                        }
-                                        const b64 = window.btoa(binary);
-                                        window.CloudPlayBridge.onScreenRecordAudioPcm(b64, ctx.sampleRate || 48000, 2);
-                                    } catch (pcmErr) {}
-                                };
-
-                                source.connect(processor);
-                                processor.connect(zeroGain);
-                                zeroGain.connect(ctx.destination);
+                                const nodes = buildPcmProcessor(ctx);
+                                source.connect(nodes.processor);
 
                                 activeAudioTapCtx = ctx;
                                 activeAudioTapSource = source;
-                                activeAudioTapProcessor = processor;
-                                activeAudioTapGain = zeroGain;
+                                activeAudioTapProcessor = nodes.processor;
+                                activeAudioTapGain = nodes.zeroGain;
                                 return true;
                             } catch (e) {
                                 return false;
@@ -1676,7 +1756,7 @@ class XboxBridge(
                                     clearInterval(activeAudioTapRetryTimer);
                                     activeAudioTapRetryTimer = null;
                                 }
-                            }, 900);
+                            }, 800);
                         }
                     };
 

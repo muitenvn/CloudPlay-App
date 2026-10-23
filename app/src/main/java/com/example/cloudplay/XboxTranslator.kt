@@ -497,25 +497,49 @@ object XboxTranslator {
                     'INPUT', 'TEXTAREA', 'SELECT', 'CODE', 'PRE', 'SVG', 'PATH'
                 ]);
 
-                // Auto-suppress intrusive on-screen stream stats & decode profile overlay
+                // Auto-suppress intrusive on-screen stream stats & red "Decode Performance" pill overlay
                 const statsScrubberStyle = document.createElement('style');
                 statsScrubberStyle.id = 'cloudplay-stats-scrubber-style';
+                function scrubDecodePerformanceDomBadges(hide) {
+                    try {
+                        const candidates = document.querySelectorAll(
+                            '[data-testid*="decode" i], [data-testid*="stats" i], [class*="DecodePerformance" i], [class*="StreamStats" i], [aria-label*="Decode" i]'
+                        );
+                        for (let i = 0; i < candidates.length; i++) {
+                            const el = candidates[i];
+                            if (el && el.style) {
+                                el.style.display = hide ? 'none' : '';
+                            }
+                        }
+                    } catch (e) {}
+                }
                 function updateStatsScrubber(hide) {
                     if (hide) {
                         statsScrubberStyle.textContent = `
                             #bx-stream-stats, .bx-stream-stats, [data-bx-stream-stats],
                             .stream-statistics-overlay,
-                            [data-testid*="stream-stats-overlay"] {
-                                opacity: 0.85 !important;
+                            [data-testid*="stream-stats" i],
+                            [data-testid*="decode-performance" i],
+                            [data-testid*="PerformanceOverlay" i],
+                            [class*="DecodePerformance" i],
+                            [class*="StreamStats" i],
+                            [aria-label*="Decode Performance" i],
+                            [aria-label*="Stream statistics" i] {
+                                display: none !important;
+                                visibility: hidden !important;
+                                opacity: 0 !important;
+                                pointer-events: none !important;
                             }
                         `;
-                        if (!document.head.contains(statsScrubberStyle)) {
+                        if (document.head && !document.head.contains(statsScrubberStyle)) {
                             document.head.appendChild(statsScrubberStyle);
                         }
+                        scrubDecodePerformanceDomBadges(true);
                     } else {
-                        if (document.head.contains(statsScrubberStyle)) {
+                        if (document.head && document.head.contains(statsScrubberStyle)) {
                             statsScrubberStyle.textContent = '';
                         }
+                        scrubDecodePerformanceDomBadges(false);
                     }
                 }
                 updateStatsScrubber(hideStreamStats);

@@ -514,7 +514,7 @@ fun SettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             LabeledSlider(
-                                label = if (isEn) "Scale X (Width)" else "Độ giãn ngang (Scale X)",
+                                label = if (isEn) "Horizontal Width" else "Độ rộng chiều Ngang",
                                 valueText = "${(config.videoScaleX * 100).toInt()}%",
                                 value = config.videoScaleX,
                                 onValueChange = { SettingsRepository.updateVideoScaleX(it) },
@@ -522,7 +522,7 @@ fun SettingsScreen(
                                 accentColor = DirectCyan
                             )
                             LabeledSlider(
-                                label = if (isEn) "Scale Y (Height)" else "Độ giãn dọc (Scale Y)",
+                                label = if (isEn) "Vertical Height" else "Độ cao chiều Dọc",
                                 valueText = "${(config.videoScaleY * 100).toInt()}%",
                                 value = config.videoScaleY,
                                 onValueChange = { SettingsRepository.updateVideoScaleY(it) },
@@ -1012,29 +1012,29 @@ fun SettingsScreen(
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Advanced & Full Video Parameters" else "Nâng cao & Thông số Video đầy đủ",
-                subtitle = if (isEn) "Aspect Ratio, Scale X/Y, Direct Stream Capture, Color & Cache" else "Chỉnh tỉ lệ màn hình chống bóp video, Luồng Stream 0% lag, Màu sắc & Bộ nhớ đệm",
+                title = if (isEn) "Advanced & Color Calibration" else "Nâng cao, Màu sắc Hình ảnh & Ngôn ngữ",
+                subtitle = if (isEn) "Screen Ratio, Color Sliders, Language & Cache" else "Tỉ lệ màn hình khi chơi, Độ tươi màu, Độ sáng, Ngôn ngữ & Bộ nhớ đệm",
                 icon = Icons.Default.Tune,
                 expanded = expandAdvanced,
                 onToggle = { expandAdvanced = !expandAdvanced },
                 testTag = "settings_group_advanced"
             ) {
-                // 4.0 Menu Cài Đặt Video, Tỉ Lệ Khung Hình & Luồng Ghi Hình Chuyên Sâu
+                // 4.0 Cân chỉnh Màu sắc, Độ sáng & Khung hình hiển thị
                 SettingsCard(
-                    title = if (isEn) "🎬 Advanced Video Aspect Ratio & Direct Stream Parameters" else "🎬 Menu Cài đặt Video, Tỉ lệ Màn hình & Luồng Ghi hình Chuyên sâu"
+                    title = if (isEn) "🎬 Screen Ratio & Image Color Adjustment" else "🎬 Chỉnh Màu sắc Hình ảnh & Tỉ lệ Màn hình khi chơi"
                 ) {
                     Text(
                         text = if (isEn) {
-                            "Fine-tune video aspect ratio to prevent squished image on 20:9 / 21:9 screens, adjust horizontal/vertical scaling, color calibration, and configure direct WebRTC stream capture."
+                            "Adjust how the game fits your phone screen while playing, customize width/height, and fine-tune contrast, color saturation, and brightness."
                         } else {
-                            "Tinh chỉnh đầy đủ thông số tỉ lệ khung hình chống bóp dẹt video trên màn hình dài 20:9 / 21:9, kéo giãn Ngang/Dọc (Scale X/Y), cân chỉnh màu sắc và chọn cơ chế lấy thẳng luồng Video Streaming."
+                            "Chọn cách khung hình game hiển thị trên màn hình điện thoại của bạn, tự chỉnh độ rộng Ngang/Dọc theo ý thích, hoặc tăng độ tươi màu và độ sáng để nhìn rõ chi tiết trong tối."
                         },
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
 
                     Text(
-                        text = if (isEn) "1. Screen Aspect Ratio Mode (Anti-Squish)" else "1. Chế độ tỉ lệ màn hình (Khắc phục lỗi video bị bóp lại)",
+                        text = if (isEn) "1. In-Game Screen Ratio" else "1. Tỉ lệ màn hình lúc đang chơi game",
                         color = DirectCyan,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -1092,7 +1092,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         LabeledSlider(
-                            label = if (isEn) "Horizontal Width Scale (Scale X)" else "Tỉ lệ kéo giãn Ngang (Scale X)",
+                            label = if (isEn) "Horizontal Width" else "Độ rộng chiều Ngang",
                             valueText = "${(config.videoScaleX * 100).toInt()}%",
                             value = config.videoScaleX,
                             onValueChange = { SettingsRepository.updateVideoScaleX(it) },
@@ -1100,7 +1100,7 @@ fun SettingsScreen(
                             accentColor = XboxNeonGreen
                         )
                         LabeledSlider(
-                            label = if (isEn) "Vertical Height Scale (Scale Y)" else "Tỉ lệ kéo giãn Dọc (Scale Y)",
+                            label = if (isEn) "Vertical Height" else "Độ cao chiều Dọc",
                             valueText = "${(config.videoScaleY * 100).toInt()}%",
                             value = config.videoScaleY,
                             onValueChange = { SettingsRepository.updateVideoScaleY(it) },
@@ -1108,7 +1108,7 @@ fun SettingsScreen(
                             accentColor = DirectCyan
                         )
                         LabeledSlider(
-                            label = if (isEn) "Video Contrast" else "Độ tương phản Video (Contrast)",
+                            label = if (isEn) "Image Contrast" else "Độ tương phản hình ảnh",
                             valueText = "${config.videoContrast}%",
                             value = config.videoContrast.toFloat(),
                             onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
@@ -1116,7 +1116,7 @@ fun SettingsScreen(
                             accentColor = XboxNeonGreen
                         )
                         LabeledSlider(
-                            label = if (isEn) "Color Saturation" else "Độ rực màu (Saturation)",
+                            label = if (isEn) "Color Vividity" else "Độ tươi màu",
                             valueText = "${config.videoSaturation}%",
                             value = config.videoSaturation.toFloat(),
                             onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
@@ -1124,7 +1124,7 @@ fun SettingsScreen(
                             accentColor = DirectCyan
                         )
                         LabeledSlider(
-                            label = if (isEn) "Video Brightness" else "Độ sáng khung hình (Brightness)",
+                            label = if (isEn) "Screen Brightness" else "Độ sáng hình ảnh",
                             valueText = "${config.videoBrightness}%",
                             value = config.videoBrightness.toFloat(),
                             onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
@@ -1138,7 +1138,7 @@ fun SettingsScreen(
                             SettingsRepository.resetVideoDisplayDefaults()
                             Toast.makeText(
                                 context,
-                                if (isEn) "Reset video aspect ratio & color to 16:9 default" else "Đã đặt lại tỉ lệ màn hình 16:9 & màu sắc chuẩn gốc",
+                                if (isEn) "Reset screen ratio & colors to default" else "Đã đặt lại tỉ lệ màn hình và màu sắc về mặc định",
                                 Toast.LENGTH_SHORT
                             ).show()
                         },
@@ -1148,7 +1148,7 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
-                            text = if (isEn) "Reset Video Aspect Ratio & Color to 16:9 Default" else "Khôi phục Tỉ lệ 16:9 Chuẩn & Màu sắc Mặc định",
+                            text = if (isEn) "Reset Screen Ratio & Colors to Default" else "Đặt lại Tỉ lệ màn hình & Màu sắc về Mặc định",
                             color = DirectCyan,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
@@ -1166,16 +1166,16 @@ fun SettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Text(
-                                text = if (isEn) "ℹ️ How does CloudPlay Anti-Squish Display work?" else "ℹ️ Cơ chế chống bóp dẹt hình của CloudPlay hoạt động ra sao?",
+                                text = if (isEn) "ℹ️ Clear Guide on Screen Ratio & Video Recording" else "ℹ️ Giải thích rõ về Tỉ lệ màn hình & Quay video (.MP4)",
                                 color = DirectCyan,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = if (isEn) {
-                                    "• Auto Aspect Fitting: Centers the 16:9 WebRTC canvas and prevents browsers from horizontally compressing it.\n• Direct Hardware Canvas: Applies hardware GPU transform matrix for smooth 60 FPS scaling without extra latency.\n• Custom Aspect Stretch: Use the horizontal and vertical sliders above if you prefer edge-to-edge full screen."
+                                    "• Full-Screen Recording (Default): Whatever screen ratio you play on (full phone screen 20:9 or 16:9), the recorded .MP4 video keeps that exact same screen ratio with stereo game audio.\n• In-Game Screen Ratio: Lets you play in standard 16:9, full-screen stretch, or custom width/height without ever resizing mid-game.\n• Saved Location: All recorded clips are saved directly to Gallery / Movies / CloudPlayXbox as .MP4 files."
                                 } else {
-                                    "• Khóa tỉ lệ 16:9 gốc: Canh giữa khung hình WebRTC chuẩn của Xbox, ngăn trình duyệt tự bóp ép bề ngang trên các dòng máy màn hình dài (19:9, 20:9).\n• Tăng tốc phần cứng GPU: Áp ma trận biến đổi trực tiếp trên bộ giải mã phần cứng, giữ nguyên 60 FPS mượt mà không làm tăng độ trễ.\n• Tùy biến linh hoạt: Nếu muốn tràn viền hoặc kéo giãn theo ý thích, bạn có thể chỉnh nhanh thanh trượt Scale X và Scale Y ở trên."
+                                    "• Quay Full màn hình (Mặc định): Bạn đang chơi trên màn hình điện thoại như thế nào (tràn viền 20:9 hay 16:9), video .MP4 xuất ra sẽ giữ nguyên đúng tỉ lệ màn hình đó và có đầy đủ tiếng game.\n• Không tự đổi tỉ lệ khi đang chơi: Tuyệt đối giữ cố định khung hình trong suốt trận đấu, không tự co giãn gây giật hình.\n• Nơi lưu video: Mọi video quay xong đều lưu chuẩn đuôi .MP4 vào Bộ sưu tập ảnh (Thư mục Movies/CloudPlayXbox)."
                                 },
                                 color = TextSecondary,
                                 fontSize = 10.sp

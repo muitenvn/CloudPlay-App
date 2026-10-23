@@ -1074,7 +1074,7 @@ fun FloatingHud(
                                 }
 
                                 // ========================================================
-                                // 6. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (.MP4 CÓ ÂM THANH - MẶC ĐỊNH FULL MÀN)
+                                // 6. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (.MP4 CÓ TIẾNG - MẶC ĐỊNH GIỐNG HỆT LÚC CHƠI)
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1082,6 +1082,10 @@ fun FloatingHud(
                                         .clip(RoundedCornerShape(7.dp))
                                         .clickable {
                                             markUserInteraction()
+                                            if (!recorderState.isRecording) {
+                                                // Tự thu gọn bảng HUD ngay khi bấm Quay để bảng không che màn hình trong video
+                                                hudMode = HudMode.COMPACT
+                                            }
                                             onToggleRecording()
                                         }
                                         .testTag("hud_expanded_record_card"),
@@ -1113,10 +1117,10 @@ fun FloatingHud(
                                                     text = if (recorderState.isRecording) {
                                                         val mins = recorderState.elapsedSeconds / 60
                                                         val secs = recorderState.elapsedSeconds % 60
-                                                        if (isEn) "🔴 Recording %02d:%02d (.MP4 + Audio)".format(mins, secs)
-                                                        else "🔴 Đang quay %02d:%02d (.MP4 có tiếng)".format(mins, secs)
+                                                        if (isEn) "🔴 Recording %02d:%02d — Tap to Save".format(mins, secs)
+                                                        else "🔴 Đang quay %02d:%02d — Chạm để Lưu".format(mins, secs)
                                                     } else {
-                                                        if (isEn) "🎥 Secondary: Record Clip (.MP4 + Audio)" else "🎥 Tính năng phụ: Quay Video (.MP4 + Âm thanh)"
+                                                        if (isEn) "🎥 Secondary: Record Screen (.MP4 + Audio)" else "🎥 Tính năng phụ: Quay màn hình (.MP4 có tiếng)"
                                                     },
                                                     color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
                                                     fontSize = 8.5.sp,
@@ -1125,9 +1129,9 @@ fun FloatingHud(
                                                 )
                                                 Text(
                                                     text = if (isEn) {
-                                                        "${config.recordingCaptureEngine.localizedShort(true)} • Stereo AAC Audio"
+                                                        "${config.recordingCaptureEngine.localizedShort(true)} • Game Audio"
                                                     } else {
-                                                        "${config.recordingCaptureEngine.localizedShort(false)} • Có thu tiếng game"
+                                                        "${config.recordingCaptureEngine.localizedShort(false)} • Có tiếng game"
                                                     },
                                                     color = Color(0xFF7E9488),
                                                     fontSize = 7.5.sp,
@@ -1136,7 +1140,7 @@ fun FloatingHud(
                                             }
                                         }
                                         Text(
-                                            text = if (recorderState.isRecording) "STOP" else "REC",
+                                            text = if (recorderState.isRecording) "LƯU" else "QUAY",
                                             color = if (recorderState.isRecording) Color(0xFFFF5252) else Color(0xFF90A4AE),
                                             fontSize = 8.sp,
                                             fontWeight = FontWeight.ExtraBold
@@ -1877,9 +1881,9 @@ private fun DenseFeatureTogglesSection(
     ) {
         DenseQuickTogglePill(
             label = if (hideStreamStats) {
-                if (isEn) "Hide Stats: ON" else "Ẩn bảng: Bật"
+                if (isEn) "Hide Red Tag: ON" else "Ẩn chữ đỏ: Bật"
             } else {
-                if (isEn) "Hide Stats: OFF" else "Ẩn bảng: Tắt"
+                if (isEn) "Hide Red Tag: OFF" else "Ẩn chữ đỏ: Tắt"
             },
             active = hideStreamStats,
             activeColor = DirectCyan,

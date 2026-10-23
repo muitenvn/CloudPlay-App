@@ -66,7 +66,7 @@ data class GameBookmark(
     } else badge
 }
 
-// Kho game để trống hoàn toàn trước khi quét để chỉ hiển thị ảnh bìa thật từ máy chủ Xbox (kể cả Fortnite)
+// Kho game để trống hoàn toàn trước khi quét; chỉ tải thông tin (metadata) từ Xbox Cloud, không tải ảnh để tiết kiệm dữ liệu
 val INITIAL_XBOX_GAMES: List<GameBookmark> = emptyList()
 private const val FORTNITE_PRODUCT_ID = "BT5P2X999VH2"
 
@@ -154,11 +154,12 @@ object GameLibraryRepository {
 
             val lastSyncMs = sharedPrefs.getLong(KEY_LAST_CATALOG_SYNC_MS, 0L)
             val savedGamertag = sharedPrefs.getString(KEY_XBOX_GAMERTAG, null)?.takeIf { it.isNotBlank() }
-            val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
             val savedTier = sharedPrefs.getString(KEY_XBOX_SUB_TIER, null)?.takeIf { it.isNotBlank() }
             val savedTotalCloud = sharedPrefs.getInt(KEY_XBOX_TOTAL_CLOUD, 0)
             val savedJumpBackRaw = sharedPrefs.getString(KEY_XBOX_JUMP_BACK_IDS, "") ?: ""
             val savedJumpBack = savedJumpBackRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+
+            val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
 
             _xboxStatus.value = XboxCloudSyncStatus(
                 gamertag = savedGamertag,
@@ -172,12 +173,14 @@ object GameLibraryRepository {
             )
 
             val now = System.currentTimeMillis()
+            val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
             val needsAutoFullScan = syncedList.isEmpty() ||
+                missingCoverArt ||
                 (savedTotalCloud > 0 && syncedList.size < (savedTotalCloud - 20)) ||
                 syncedList.size < 120 ||
                 (now - lastSyncMs) > 6 * 3600 * 1000L
             if (needsAutoFullScan) {
-                syncLiveXboxCatalog(force = false)
+                syncLiveXboxCatalog(force = missingCoverArt)
             }
         }
     }
@@ -194,8 +197,6 @@ object GameLibraryRepository {
             val idKey = item.id.lowercase(Locale.ROOT)
             val pid = extractProductId(item.playUrl)
             val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
-            // Chỉ giữ game đã có ảnh thật từ máy chủ Xbox (kể cả Fortnite) hoặc game do người dùng tự thêm
-            if (!item.id.startsWith("custom_") && item.imageUrl.isNullOrBlank()) return
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
@@ -203,7 +204,7 @@ object GameLibraryRepository {
             val finalItem = if (isFortnite) {
                 item.copy(id = "fortnite", drawableResId = null)
             } else {
-                item
+                item.copy(drawableResId = null)
             }
             merged.add(finalItem)
         }
@@ -265,22 +266,6 @@ object GameLibraryRepository {
             .ifBlank { "Xbox Cloud Game" }
     }
 
-    private fun normalizeImageUrl(rawImg: String?, width: Int = 360, height: Int = 540): String? {
-        val trimmed = rawImg?.trim().orEmpty()
-        if (trimmed.isBlank() || trimmed.startsWith("data:")) return null
-        val httpsUrl = when {
-            trimmed.startsWith("//") -> "https:$trimmed"
-            trimmed.startsWith("http://") -> "https://${trimmed.removePrefix("http://")}"
-            trimmed.startsWith("https://") -> trimmed
-            else -> return null
-        }
-        return if (httpsUrl.contains("store-images.s-microsoft.com") && !httpsUrl.contains("?")) {
-            "$httpsUrl?w=$width&h=$height&format=jpg"
-        } else {
-            httpsUrl
-        }
-    }
-
     fun toggleFavorite(gameId: String) {
         val current = _favoriteIds.value.toMutableSet()
         if (!current.add(gameId)) {
@@ -323,10 +308,10 @@ object GameLibraryRepository {
                 !it.equals("Xbox", ignoreCase = true) &&
                 it.length in 2..28
         } ?: return
-        val cleanAvatar = normalizeImageUrl(avatarUrl, width = 160, height = 160)
+        val cleanAvatar = normalizeImageUrl(avatarUrl, widthPx = 120, quality = 70)
         val cleanTier = subscriptionTier?.trim()?.takeIf { it.isNotBlank() } ?: "Xbox Cloud Gaming"
         val current = _xboxStatus.value
-        if (current.gamertag == cleanTag && current.avatarUrl == (cleanAvatar ?: current.avatarUrl)) return
+        if (current.gamertag == cleanTag && current.avatarUrl == cleanAvatar && current.subscriptionTier == cleanTier) return
 
         val updated = current.copy(
             gamertag = cleanTag,
@@ -355,7 +340,7 @@ object GameLibraryRepository {
                     val obj = arr.optJSONObject(i) ?: continue
                     val rawUrl = obj.optString("url", "").trim()
                     val rawTitle = obj.optString("title", "").trim()
-                    val rawImg = obj.optString("imageUrl", "").trim()
+                    val rawImg = obj.optString("imageUrl", "").trim().takeIf { it.isNotBlank() }
                     if (rawUrl.isBlank()) continue
                     val bookmark = onWebGamePlayedOrDiscovered(
                         rawTitle = rawTitle,
@@ -379,7 +364,7 @@ object GameLibraryRepository {
 
     /**
      * Automatically detects any game opened or launched inside the Xbox Cloud WebView,
-     * matches or adds it to GameLibraryRepository, and records it as the last played game
+     * matches or adds its metadata to GameLibraryRepository, and records it as the last played game
      * so "Chơi tiếp / Continue" on HomeScreen always shows the exact game played on the web.
      */
     fun onWebGamePlayedOrDiscovered(
@@ -405,9 +390,9 @@ object GameLibraryRepository {
             !cleanedTitle.equals("Xbox Game", ignoreCase = true) &&
             !cleanedTitle.equals("Fortnite | Xbox Cloud Gaming", ignoreCase = true)
 
+        val validImg = normalizeImageUrl(imageUrl, widthPx = 260, quality = 70)
         val productId = extractProductId(cleanUrl)
         val slug = extractSlug(cleanUrl)
-        val normImage = normalizeImageUrl(imageUrl)
 
         val currentList = _games.value
         val matched = currentList.firstOrNull { item ->
@@ -423,8 +408,8 @@ object GameLibraryRepository {
 
         if (matched != null) {
             var updatedItem = matched
-            if (normImage != null && matched.imageUrl.isNullOrBlank()) {
-                updatedItem = updatedItem.copy(imageUrl = normImage)
+            if (validImg != null && matched.imageUrl.isNullOrBlank()) {
+                updatedItem = updatedItem.copy(imageUrl = validImg)
             }
             if (hasValidTitle && matched.title.startsWith("Xbox ", ignoreCase = true)) {
                 updatedItem = updatedItem.copy(title = cleanedTitle)
@@ -475,7 +460,8 @@ object GameLibraryRepository {
             badge = "Xbox Cloud",
             badgeEn = "Xbox Cloud",
             rating = "4.8",
-            imageUrl = normImage
+            imageUrl = validImg,
+            heroImageUrl = validImg
         )
 
         val updatedList = currentList + newBookmark
@@ -506,7 +492,7 @@ object GameLibraryRepository {
     }
 
     /**
-     * Ingests a batch of game cards scraped live from the Xbox Cloud web DOM.
+     * Ingests a batch of game cards scraped live from the Xbox Cloud web DOM (metadata only, no image downloads).
      */
     fun ingestDiscoveredWebGames(jsonArrayStr: String) {
         if (jsonArrayStr.isBlank()) return
@@ -521,7 +507,7 @@ object GameLibraryRepository {
                     val obj = arr.optJSONObject(i) ?: continue
                     val rawUrl = obj.optString("url", "").trim()
                     val rawTitle = obj.optString("title", "").trim()
-                    val rawImg = obj.optString("imageUrl", "").trim()
+                    val rawImg = normalizeImageUrl(obj.optString("imageUrl", ""), widthPx = 260, quality = 70)
                     val touch = obj.optBoolean("supportsTouch", false)
                     if (rawUrl.isBlank()) continue
 
@@ -529,7 +515,6 @@ object GameLibraryRepository {
                     val slug = extractSlug(rawUrl)
                     if (pid.isBlank() && slug.isBlank()) continue
 
-                    val normImg = normalizeImageUrl(rawImg)
                     val existingIdx = currentList.indexOfFirst { item ->
                         val itemPid = extractProductId(item.playUrl)
                         val itemSlug = extractSlug(item.playUrl)
@@ -539,11 +524,11 @@ object GameLibraryRepository {
 
                     if (existingIdx >= 0) {
                         val existing = currentList[existingIdx]
-                        if (existing.imageUrl.isNullOrBlank() && normImg != null) {
-                            currentList[existingIdx] = existing.copy(imageUrl = normImg)
+                        if (rawImg != null && existing.imageUrl.isNullOrBlank()) {
+                            currentList[existingIdx] = existing.copy(imageUrl = rawImg)
                             changed = true
                         }
-                    } else {
+                    } else if (rawImg != null) {
                         val cleanTitle = rawTitle
                             .replace(Regex("\\s*[•|\\-–—]\\s*Xbox.*", RegexOption.IGNORE_CASE), "")
                             .trim()
@@ -570,7 +555,8 @@ object GameLibraryRepository {
                                 badge = if (touch) "Cảm ứng • Cloud" else "Game Pass",
                                 badgeEn = if (touch) "Touch • Cloud" else "Game Pass",
                                 rating = "4.8",
-                                imageUrl = normImg
+                                imageUrl = rawImg,
+                                heroImageUrl = rawImg
                             )
                         )
                         changed = true
@@ -587,12 +573,21 @@ object GameLibraryRepository {
         }
     }
 
+    @Volatile
+    private var isStreamActive: Boolean = false
+
+    fun setStreamActive(active: Boolean) {
+        isStreamActive = active
+    }
+
     /**
      * Tự động quét toàn bộ kho game Xbox Cloud theo từng lô (streaming batches)
-     * và lấy ảnh bìa thật từ máy chủ Microsoft mà không cần người dùng bấm nút +40.
+     * và chỉ lấy thông tin game (tên, thể loại, nhà phát hành, mô tả, link chơi),
+     * hoàn toàn không tải ảnh bìa để tiết kiệm dữ liệu mạng.
+     * Tự động tạm dừng ngay khi người dùng đang trong luồng chơi game để nhường 100% băng thông cho 4G/Wi-Fi.
      */
     fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 500) {
-        if (_isSyncingCatalog.value && !force) return
+        if ((_isSyncingCatalog.value && !force) || isStreamActive) return
         ioScope.launch {
             _isSyncingCatalog.value = true
             val startPingMs = System.currentTimeMillis()
@@ -637,8 +632,8 @@ object GameLibraryRepository {
                     loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
                 } else emptyList()
 
-                val existingPids = existingSynced
-                    .filter { !it.imageUrl.isNullOrBlank() }
+                val existingWithImages = existingSynced.filter { !it.imageUrl.isNullOrBlank() }
+                val existingPids = existingWithImages
                     .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
                     .toSet()
 
@@ -648,8 +643,9 @@ object GameLibraryRepository {
                     prioritizedCloudIds.filter { it !in existingPids }
                 }
 
-                val runningSynced = existingSynced.toMutableList()
-                idsToFetch.chunked(25).forEach { batch ->
+                val runningSynced = existingWithImages.toMutableList()
+                for (batch in idsToFetch.chunked(40)) {
+                    if (isStreamActive) break
                     val batchResults = fetchDisplayCatalogProducts(
                         bigIds = batch,
                         touchIds = cachedTouchIds,
@@ -658,7 +654,9 @@ object GameLibraryRepository {
                     )
                     if (batchResults.isNotEmpty()) {
                         runningSynced.addAll(batchResults)
-                        val deduped = runningSynced.distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                        val deduped = runningSynced
+                            .filter { !it.imageUrl.isNullOrBlank() }
+                            .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
                         rebuildMergedGames(customList, deduped)
                         _xboxStatus.value = _xboxStatus.value.copy(
                             cloudServiceOnline = true,
@@ -747,7 +745,7 @@ object GameLibraryRepository {
     }
 
     /**
-     * Searches Microsoft's live DisplayCatalog API by keyword, resolves full cover art & metadata,
+     * Searches Microsoft's live DisplayCatalog API by keyword, resolves lightweight game metadata (no images),
      * adds discovered Xbox games to the local library, and returns matching results via callback.
      */
     fun searchMicrosoftXboxCatalog(
@@ -931,27 +929,33 @@ object GameLibraryRepository {
                     .ifBlank { locProps.optString("DeveloperName", "").trim() }
                     .takeIf { it.isNotBlank() }
 
-                // Pick best cover image: Poster -> BoxArt -> TitledHeroArt -> SuperHeroArt
                 val imagesArr = locProps.optJSONArray("Images")
-                var posterUri: String? = null
-                var boxArtUri: String? = null
-                var heroUri: String? = null
+                var posterUrl: String? = null
+                var superHeroUrl: String? = null
+                var boxArtUrl: String? = null
+                var fallbackImgUrl: String? = null
+
                 if (imagesArr != null) {
                     for (j in 0 until imagesArr.length()) {
                         val imgObj = imagesArr.optJSONObject(j) ?: continue
                         val purpose = imgObj.optString("ImagePurpose", "")
-                        val uri = imgObj.optString("Uri", "")
-                        if (uri.isBlank()) continue
+                        val uri = normalizeImageUrl(
+                            imgObj.optString("Uri", ""),
+                            widthPx = if (purpose.equals("SuperHeroArt", ignoreCase = true)) 520 else 260,
+                            quality = 70
+                        ) ?: continue
                         when (purpose) {
-                            "Poster" -> if (posterUri == null) posterUri = uri
-                            "BoxArt" -> if (boxArtUri == null) boxArtUri = uri
-                            "SuperHeroArt", "TitledHeroArt", "FeaturePromotionalSquareArt" ->
-                                if (heroUri == null) heroUri = uri
+                            "Poster" -> if (posterUrl == null) posterUrl = uri
+                            "BoxArt" -> if (boxArtUrl == null) boxArtUrl = uri
+                            "SuperHeroArt", "TitledHeroArt" -> if (superHeroUrl == null) superHeroUrl = uri
+                            "Tile", "FeaturePromotionalSquareArt" -> if (fallbackImgUrl == null) fallbackImgUrl = uri
                         }
                     }
                 }
-                val bestImageUrl = normalizeImageUrl(posterUri ?: boxArtUri ?: heroUri, width = 360, height = 540)
-                val bestHeroUrl = normalizeImageUrl(heroUri ?: boxArtUri ?: posterUri, width = 720, height = 405)
+
+                val bestCoverUrl = posterUrl ?: boxArtUrl ?: superHeroUrl ?: fallbackImgUrl
+                val bestHeroUrl = superHeroUrl ?: posterUrl ?: boxArtUrl ?: fallbackImgUrl
+                if (bestCoverUrl.isNullOrBlank()) continue
 
                 val props = prod.optJSONObject("Properties")
                 val rawCat = props?.optString("Category", "")?.takeIf { it.isNotBlank() }
@@ -976,9 +980,6 @@ object GameLibraryRepository {
 
                 val isFortnite = productId.equals(FORTNITE_PRODUCT_ID, ignoreCase = true) ||
                     cleanTitle.equals("Fortnite", ignoreCase = true)
-                // Bỏ qua mọi game (kể cả Fortnite) nếu chưa lấy được ảnh thật từ máy chủ Xbox
-                if (bestImageUrl.isNullOrBlank()) continue
-
                 val isTouch = productId in touchIds || isFortnite
                 val isPop = productId in popularIds || isFortnite
                 val isRecent = productId in recentIds
@@ -1015,7 +1016,7 @@ object GameLibraryRepository {
                         badgeEn = badgeEn,
                         drawableResId = null,
                         rating = ratingStr,
-                        imageUrl = bestImageUrl,
+                        imageUrl = bestCoverUrl,
                         heroImageUrl = bestHeroUrl,
                         description = shortDesc,
                         publisher = publisherName,
@@ -1027,6 +1028,22 @@ object GameLibraryRepository {
             results
         } finally {
             conn.disconnect()
+        }
+    }
+
+    private fun normalizeImageUrl(raw: String?, widthPx: Int = 260, quality: Int = 70): String? {
+        val trimmed = raw?.trim().orEmpty()
+        if (trimmed.isBlank()) return null
+        val httpsUrl = when {
+            trimmed.startsWith("//") -> "https:$trimmed"
+            trimmed.startsWith("http://", ignoreCase = true) -> "https://" + trimmed.removePrefix("http://")
+            trimmed.startsWith("https://", ignoreCase = true) -> trimmed
+            else -> return null
+        }
+        return if (httpsUrl.contains("store-images.s-microsoft.com", ignoreCase = true) && !httpsUrl.contains("?")) {
+            "$httpsUrl?w=$widthPx&q=$quality"
+        } else {
+            httpsUrl
         }
     }
 
@@ -1059,6 +1076,8 @@ object GameLibraryRepository {
                 val isFortnite = id == "fortnite" || extractProductId(playUrl).equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
                 val cat = obj.optString("category", "Xbox Cloud Game Pass")
                 val badge = obj.optString("badge", "").takeIf { it.isNotBlank() }
+                val imgUrl = normalizeImageUrl(obj.optString("imageUrl", ""), widthPx = 260, quality = 70)
+                val heroUrl = normalizeImageUrl(obj.optString("heroImageUrl", ""), widthPx = 520, quality = 70) ?: imgUrl
                 list.add(
                     GameBookmark(
                         id = if (isFortnite) "fortnite" else id,
@@ -1073,8 +1092,8 @@ object GameLibraryRepository {
                         badgeEn = obj.optString("badgeEn", badge ?: "").takeIf { it.isNotBlank() },
                         drawableResId = null,
                         rating = obj.optString("rating", "4.8"),
-                        imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() },
-                        heroImageUrl = obj.optString("heroImageUrl", "").takeIf { it.isNotBlank() },
+                        imageUrl = imgUrl,
+                        heroImageUrl = heroUrl,
                         description = obj.optString("description", "").takeIf { it.isNotBlank() },
                         publisher = obj.optString("publisher", "").takeIf { it.isNotBlank() },
                         isPopular = obj.optBoolean("isPopular", false),

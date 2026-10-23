@@ -565,7 +565,8 @@ private fun SessionHistoryItemCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Ảnh bìa game hoặc biểu tượng mặc định
+            // Ảnh bìa game (tạm dừng tải trong lúc đang nhập kho game để không nghẽn mạng)
+            val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -573,46 +574,43 @@ private fun SessionHistoryItemCard(
                     .border(0.8.dp, Color(accentColorHex).copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                if (coverDrawableResId != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(accentColorHex).copy(alpha = 0.7f), XboxDark)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Gamepad,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                if (!isImportingCatalog && !coverImageUrl.isNullOrBlank()) {
+                    val context = LocalContext.current
+                    AsyncImage(
+                        model = remember(coverImageUrl) {
+                            ImageRequest.Builder(context)
+                                .data(coverImageUrl)
+                                .crossfade(true)
+                                .build()
+                        },
+                        contentDescription = session.gameTitle,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (coverDrawableResId != null) {
                     Image(
                         painter = painterResource(id = coverDrawableResId),
                         contentDescription = session.gameTitle,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(Color(accentColorHex).copy(alpha = 0.7f), XboxDark)
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Gamepad,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        if (!coverImageUrl.isNullOrBlank()) {
-                            val context = LocalContext.current
-                            val request = remember(coverImageUrl) {
-                                ImageRequest.Builder(context)
-                                    .data(coverImageUrl)
-                                    .crossfade(false)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = request,
-                                contentDescription = session.gameTitle,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
                 }
             }
 

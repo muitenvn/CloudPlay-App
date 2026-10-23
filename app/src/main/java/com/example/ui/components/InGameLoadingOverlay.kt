@@ -518,15 +518,7 @@ private fun GameHeroBannerCard(
     modifier: Modifier = Modifier
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
-    val games by com.example.data.GameLibraryRepository.games.collectAsState()
     val isEn = config.isEnglishUI()
-    val syncedCoverUrl = remember(games, gameProfile.gameId, gameProfile.title) {
-        val matched = games.firstOrNull {
-            it.id.equals(gameProfile.gameId, ignoreCase = true) ||
-                it.title.equals(gameProfile.title, ignoreCase = true)
-        }
-        matched?.heroImageUrl ?: matched?.imageUrl
-    }
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -544,21 +536,12 @@ private fun GameHeroBannerCard(
         shadowElevation = 12.dp
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (!syncedCoverUrl.isNullOrBlank()) {
-                coil.compose.AsyncImage(
-                    model = syncedCoverUrl,
-                    contentDescription = gameProfile.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Image(
-                    painter = painterResource(id = gameProfile.bannerResId),
-                    contentDescription = gameProfile.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            Image(
+                painter = painterResource(id = gameProfile.bannerResId),
+                contentDescription = gameProfile.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
 
             Box(
                 modifier = Modifier

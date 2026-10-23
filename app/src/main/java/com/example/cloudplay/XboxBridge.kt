@@ -210,7 +210,7 @@ class XboxBridge(
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(8.0, Math.min(24.0, parseFloat(bufferHintMs) || 12.0));
+                        const bufMs = Math.max(6.0, Math.min(45.0, parseFloat(bufferHintMs) || 14.0));
                         const targetSec = bufMs / 1000.0;
 
                         if (window.__networkProfile) {
@@ -506,21 +506,21 @@ class XboxBridge(
                                             }
 
                                             if (isLowSaver) {
-                                                // MỨC THẤP / CHẾ ĐỘ MÁY YẾU (5 Mbps cố định): H.264 Baseline Level 3.1 nhẹ trong SDP, ưu tiên 60 FPS, giải mã <4ms
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=5000;x-google-min-bitrate=2500;x-google-start-bitrate=4500\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '96000;cbr=1;useinbandfec=1' : '48000') + '\r\n');
+                                                // MỨC THẤP / 4G ANTI-BUFFERBLOAT / MÁY YẾU: H.264 Constrained Baseline Zero-B-Frame (42e01f), start-bitrate 2200kbps tránh nghẽn 4G đầu phiên
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + Math.max(3500, targetKbps) + ';x-google-min-bitrate=1200;x-google-start-bitrate=2200\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;usedtx=1;maxaveragebitrate=' + (isFortnite ? '64000' : '48000') + '\r\n');
                                             } else if (isMedium) {
-                                                // MỨC TRUNG BÌNH (CÂN BẰNG): H.264 Constrained/Main nhẹ nhàng cho GPU tầm trung, chống nóng máy khi chơi lâu
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;x-google-max-bitrate=' + (isFortnite ? '10000' : '9000') + ';x-google-min-bitrate=' + (isFortnite ? '5000' : '4000') + ';x-google-start-bitrate=8000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '128000;cbr=1;useinbandfec=1' : '64000') + '\r\n');
+                                                // MỨC TRUNG BÌNH (4G TỐC ĐỘ CAO / WI-FI CÂN BẰNG): Zero-B-Frame Constrained Baseline (42e020) khử độ trễ sắp xếp khung hình 16-33ms
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + (isFortnite ? '9500' : '8500') + ';x-google-min-bitrate=1800;x-google-start-bitrate=3000\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;usedtx=1;maxaveragebitrate=' + (isFortnite ? '96000' : '64000') + '\r\n');
                                             } else if (isHigh) {
-                                                // MỨC CAO (SẮC NÉT 1080P): 14 Mbps chuẩn Full HD 60/120fps
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=' + (isFortnite ? '16000' : '14000') + ';x-google-min-bitrate=6000;x-google-start-bitrate=12000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;maxaveragebitrate=' + (isFortnite ? '128000;cbr=1;useinbandfec=1;maxplaybackrate=48000' : '96000') + '\r\n');
+                                                // MỨC CAO (SẮC NÉT 1080P WI-FI): Zero-B-Frame + khởi động êm 3500kbps tránh dội bộ đệm router Wi-Fi
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + (isFortnite ? '15000' : '14000') + ';x-google-min-bitrate=2500;x-google-start-bitrate=3500\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=' + (isFortnite ? '128000;maxplaybackrate=48000' : '96000') + '\r\n');
                                             } else {
-                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA): 20 Mbps max visual quality (hỗ trợ 120 FPS)
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 x-google-max-bitrate=20000;x-google-min-bitrate=8000;x-google-start-bitrate=15000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=128000;maxplaybackrate=48000\r\n');
+                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA WI-FI 5GHz): 20 Mbps max visual quality (hỗ trợ 120 FPS)
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=20000;x-google-min-bitrate=3000;x-google-start-bitrate=4500\r\n');
+                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=128000;maxplaybackrate=48000\r\n');
                                             }
                                             desc = new RTCSessionDescription({ type: desc.type, sdp: sdp });
                                         } catch(sdpErr) {}
@@ -528,15 +528,17 @@ class XboxBridge(
                                     return origSetRemote(desc);
                                 };
 
-                                // Hardware Decoder Stabilization: 8ms Arena Zero-Delay for Fortnite, 12-16ms for standard games
+                                // Hardware Decoder Stabilization: adaptive initial target (respects 4G HARQ burst cushion vs Wi-Fi arena zero-delay)
                                 pc.addEventListener('track', function(evt) {
                                     try {
                                         if (evt.receiver) {
                                             const isFortnite = isFortniteSession();
                                             const isFast = !!(window.__networkProfile && (window.__networkProfile.speedFirst || window.__networkProfile.lowEndDeviceMode));
-                                            const videoDelaySec = isFortnite ? 0.008 : (isFast ? 0.012 : 0.016);
+                                            const baseVideoSec = typeof window.__targetBufferSec === 'number'
+                                                ? window.__targetBufferSec
+                                                : (isFortnite ? 0.010 : (isFast ? 0.014 : 0.018));
                                             const isAudioTrack = evt.track && evt.track.kind === 'audio';
-                                            const delaySec = isAudioTrack ? Math.max(0.006, videoDelaySec - 0.002) : videoDelaySec;
+                                            const delaySec = isAudioTrack ? Math.max(0.008, baseVideoSec - 0.002) : baseVideoSec;
                                             if ('playoutDelayHint' in evt.receiver) {
                                                 evt.receiver.playoutDelayHint = delaySec;
                                             }
@@ -679,6 +681,25 @@ class XboxBridge(
                                         if ((framesDecoded > 0 || currentBytes > 15000) && !notifiedStreamConnection) {
                                             notifiedStreamConnection = true;
                                             notify('onStreamConnected', 'webrtc_frames_active');
+                                        }
+
+                                        // Live-Edge Video Catch-Up Pacer: eliminates accumulated input lag after 4G/Wi-Fi jitter spikes
+                                        const vEl = findActiveStreamVideo();
+                                        if (vEl && !vEl.paused && vEl.readyState >= 2) {
+                                            try {
+                                                if (vEl.buffered && vEl.buffered.length > 0) {
+                                                    const bufEnd = vEl.buffered.end(vEl.buffered.length - 1);
+                                                    const lagSec = bufEnd - vEl.currentTime;
+                                                    if (lagSec > 0.22) {
+                                                        vEl.currentTime = Math.max(vEl.currentTime, bufEnd - 0.035);
+                                                        vEl.playbackRate = 1.0;
+                                                    } else if (lagSec > 0.085) {
+                                                        vEl.playbackRate = 1.04;
+                                                    } else if (vEl.playbackRate !== 1.0) {
+                                                        vEl.playbackRate = 1.0;
+                                                    }
+                                                }
+                                            } catch(pacerErr) {}
                                         }
 
                                         notify('onStreamTelemetry', JSON.stringify({
@@ -1511,7 +1532,8 @@ class XboxBridge(
     @JavascriptInterface
     fun onStreamConnected(detail: String?) {
         if (!isCallerTrusted()) return
-        Log.d(TAG, "Stream established: $detail — pausing DOM translator")
+        Log.d(TAG, "Stream established: $detail — activating low-latency lock & pausing DOM translator")
+        NetworkOptimizer.setStreamActive(true)
         controller.onStreamConnected()
         scope.launch(Dispatchers.Main) {
             webViewRef?.get()?.evaluateJavascript(
@@ -1524,7 +1546,8 @@ class XboxBridge(
     @JavascriptInterface
     fun onStreamDisconnected(detail: String?) {
         if (!isCallerTrusted()) return
-        Log.d(TAG, "Stream ended: $detail — resuming DOM translator if allowed")
+        Log.d(TAG, "Stream ended: $detail — releasing low-latency lock & resuming DOM translator if allowed")
+        NetworkOptimizer.setStreamActive(false)
         controller.onStreamDisconnected()
         scope.launch(Dispatchers.Main) {
             val cfg = com.example.data.SettingsRepository.config.value

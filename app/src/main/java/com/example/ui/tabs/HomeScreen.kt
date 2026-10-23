@@ -778,9 +778,9 @@ private fun FeaturedGamesSection(
                     )
                     Text(
                         text = if (isEn) {
-                            "Auto-scanning real games & cover art from Xbox Cloud..."
+                            "Auto-fetching game info from Xbox Cloud (0 MB image data)..."
                         } else {
-                            "Đang tự động quét game và lấy ảnh bìa thật từ Xbox Cloud..."
+                            "Đang tự động tải thông tin game từ Xbox Cloud (không tải ảnh, tiết kiệm 4G/Wi-Fi)..."
                         },
                         color = TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,
@@ -815,9 +815,17 @@ private fun FeaturedGameCard(
     onLaunch: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
+    val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
     val isEn = config.isEnglishUI()
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
+    val monogram = remember(game.title) {
+        game.title.split(" ")
+            .filter { it.isNotBlank() && it.first().isLetterOrDigit() }
+            .take(2)
+            .joinToString("") { it.first().uppercaseChar().toString() }
+            .ifBlank { "XB" }
+    }
     Card(
         modifier = Modifier
             .width(184.dp)
@@ -840,46 +848,80 @@ private fun FeaturedGameCard(
                     .fillMaxWidth()
                     .height(124.dp)
             ) {
-                if (game.drawableResId != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    Color(game.accentColorHex).copy(alpha = 0.45f),
+                                    XboxSurfaceVariant.copy(alpha = 0.9f),
+                                    XboxDark
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isImportingCatalog || game.imageUrl.isNullOrBlank()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0x88060B08),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    Color(game.accentColorHex).copy(alpha = 0.75f)
+                                ),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = monogram,
+                                        color = Color.White,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            }
+                            if (!game.publisher.isNullOrBlank()) {
+                                Text(
+                                    text = game.publisher,
+                                    color = DirectCyan.copy(alpha = 0.9f),
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
+                    val context = LocalContext.current
+                    AsyncImage(
+                        model = remember(game.imageUrl) {
+                            ImageRequest.Builder(context)
+                                .data(game.imageUrl)
+                                .crossfade(true)
+                                .build()
+                        },
+                        contentDescription = game.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (game.drawableResId != null) {
                     Image(
                         painter = painterResource(id = game.drawableResId),
                         contentDescription = game.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(game.accentColorHex), XboxDark)
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Gamepad,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(38.dp)
-                        )
-                        if (!game.imageUrl.isNullOrBlank()) {
-                            val context = LocalContext.current
-                            val request = remember(game.imageUrl, config.lowEndDeviceMode) {
-                                ImageRequest.Builder(context)
-                                    .data(game.imageUrl)
-                                    .crossfade(!config.lowEndDeviceMode)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = request,
-                                contentDescription = game.title,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
                 }
 
                 Box(

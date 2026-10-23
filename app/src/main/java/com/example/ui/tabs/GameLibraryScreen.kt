@@ -245,11 +245,11 @@ fun GameLibraryScreen(
                             val totalCloud = xboxStatus.totalCloudCatalogCount.coerceAtLeast(games.size)
                             Text(
                                 text = if (isSyncingCatalog) {
-                                    if (isEn) "Auto-scanning Xbox Cloud (${games.size}/$totalCloud)..."
-                                    else "Đang tự động quét kho Xbox (${games.size}/$totalCloud)..."
+                                    if (isEn) "Auto-fetching game info (${games.size}/$totalCloud • No images)..."
+                                    else "Đang tự động tải thông tin game (${games.size}/$totalCloud • Không tải ảnh)..."
                                 } else {
-                                    if (isEn) "${games.size}/$totalCloud Cloud • $freeCount Free • $touchCount Touch"
-                                    else "${games.size}/$totalCloud game Cloud • $freeCount Free • $touchCount Cảm ứng"
+                                    if (isEn) "${games.size}/$totalCloud Info Only • $freeCount Free • $touchCount Touch"
+                                    else "${games.size}/$totalCloud game (Chỉ thông tin) • $freeCount Free • $touchCount Cảm ứng"
                                 },
                                 color = if (isSyncingCatalog) DirectCyan else TextSecondary,
                                 fontSize = 10.5.sp,
@@ -288,7 +288,7 @@ fun GameLibraryScreen(
                                         text = if (isSyncingCatalog) {
                                             "..."
                                         } else {
-                                            if (isEn) "Sync" else "Tải kho"
+                                            if (isEn) "Sync Info" else "Quét TT"
                                         },
                                         color = DirectCyan,
                                         fontFamily = SpaceGroteskFontFamily,
@@ -447,11 +447,11 @@ fun GameLibraryScreen(
                                 )
                                 Text(
                                     text = if (isSearchingLiveXbox) {
-                                        if (isEn) "Searching Microsoft Xbox Store for \"$searchQuery\"..."
-                                        else "Đang tìm \"$searchQuery\" trực tiếp trên máy chủ Microsoft Xbox..."
+                                        if (isEn) "Fetching game info for \"$searchQuery\" (no images)..."
+                                        else "Đang tải thông tin game \"$searchQuery\" (không tải ảnh)..."
                                     } else {
-                                        if (isEn) "Tap to search & import \"$searchQuery\" live from Xbox Store"
-                                        else "Chạm để tìm & tự động nhập \"$searchQuery\" từ máy chủ Xbox"
+                                        if (isEn) "Tap to import \"$searchQuery\" info from Xbox Store (0 MB images)"
+                                        else "Chạm để nhập thông tin \"$searchQuery\" từ Xbox (chỉ tải thông tin, 0 tốn dung lượng ảnh)"
                                     },
                                     color = DirectCyan,
                                     fontFamily = SpaceGroteskFontFamily,
@@ -485,8 +485,8 @@ fun GameLibraryScreen(
                             )
                             Text(
                                 text = if (isSyncingCatalog && games.isEmpty()) {
-                                    if (isEn) "Scanning Xbox Cloud games & real cover art..."
-                                    else "Đang tự động quét game và lấy ảnh bìa thật từ Xbox Cloud..."
+                                    if (isEn) "Auto-fetching game info from Xbox Cloud (saving mobile data)..."
+                                    else "Đang tự động tải thông tin game từ Xbox Cloud (không tải ảnh để tiết kiệm 4G/Wi-Fi)..."
                                 } else {
                                     if (isEn) "No matching games found in local vault"
                                     else "Chưa có game này trong kho đã tải"
@@ -507,7 +507,7 @@ fun GameLibraryScreen(
                                         text = if (isSearchingLiveXbox) {
                                             if (isEn) "Searching Xbox..." else "Đang tìm trên Xbox..."
                                         } else {
-                                            if (isEn) "Search \"$searchQuery\" on Xbox Cloud" else "Tìm \"$searchQuery\" trên Xbox Cloud"
+                                            if (isEn) "Import \"$searchQuery\" Info from Xbox" else "Nhập thông tin \"$searchQuery\" từ Xbox"
                                         },
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold,
@@ -529,6 +529,7 @@ fun GameLibraryScreen(
                             LibraryGameCard(
                                 game = game,
                                 isFavorite = game.id in favoriteIds,
+                                isImportingCatalog = isSyncingCatalog,
                                 onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
                                 onShowDetail = { selectedDetailGame = game },
                                 onPlay = {
@@ -580,6 +581,7 @@ fun GameLibraryScreen(
             XboxGameDetailDialog(
                 game = detailGame,
                 isFavorite = detailGame.id in favoriteIds,
+                isImportingCatalog = isSyncingCatalog,
                 onToggleFavorite = { GameLibraryRepository.toggleFavorite(detailGame.id) },
                 onDismiss = { selectedDetailGame = null },
                 onPlay = {
@@ -596,6 +598,7 @@ fun GameLibraryScreen(
 private fun LibraryGameCard(
     game: GameBookmark,
     isFavorite: Boolean,
+    isImportingCatalog: Boolean = false,
     onToggleFavorite: () -> Unit,
     onShowDetail: () -> Unit,
     onPlay: () -> Unit,
@@ -605,6 +608,13 @@ private fun LibraryGameCard(
     val isEn = config.isEnglishUI()
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
+    val monogram = remember(game.title) {
+        game.title.split(" ")
+            .filter { it.isNotBlank() && it.first().isLetterOrDigit() }
+            .take(2)
+            .joinToString("") { it.first().uppercaseChar().toString() }
+            .ifBlank { "XB" }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -622,46 +632,83 @@ private fun LibraryGameCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (game.drawableResId != null) {
+            // Base Gradient + Monogram surface (shown during catalog import so 0 image bytes are downloaded while importing)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color(game.accentColorHex).copy(alpha = 0.42f),
+                                XboxSurfaceVariant.copy(alpha = 0.85f),
+                                XboxDark
+                            )
+                        )
+                    )
+            ) {
+                if (isImportingCatalog || game.imageUrl.isNullOrBlank()) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 12.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0x88060B08),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                Color(game.accentColorHex).copy(alpha = 0.75f)
+                            ),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = monogram,
+                                    color = Color.White,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+                        if (!game.publisher.isNullOrBlank()) {
+                            Text(
+                                text = game.publisher,
+                                color = DirectCyan.copy(alpha = 0.9f),
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Cover Art: only loaded AFTER catalog import finishes (!isImportingCatalog) so importing only downloads game info
+            if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
+                val context = LocalContext.current
+                AsyncImage(
+                    model = remember(game.imageUrl) {
+                        ImageRequest.Builder(context)
+                            .data(game.imageUrl)
+                            .crossfade(true)
+                            .build()
+                    },
+                    contentDescription = game.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (game.drawableResId != null) {
                 Image(
                     painter = painterResource(id = game.drawableResId),
                     contentDescription = game.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(game.accentColorHex), XboxDark)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Gamepad,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.size(52.dp)
-                    )
-                    if (!game.imageUrl.isNullOrBlank()) {
-                        val context = LocalContext.current
-                        val request = remember(game.imageUrl, config.lowEndDeviceMode) {
-                            ImageRequest.Builder(context)
-                                .data(game.imageUrl)
-                                .crossfade(!config.lowEndDeviceMode)
-                                .build()
-                        }
-                        AsyncImage(
-                            model = request,
-                            contentDescription = game.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
             }
 
             // High-Contrast Console Vignette Scrim
@@ -878,14 +925,15 @@ private fun LibraryGameCard(
 private fun XboxGameDetailDialog(
     game: GameBookmark,
     isFavorite: Boolean,
+    isImportingCatalog: Boolean = false,
     onToggleFavorite: () -> Unit,
     onDismiss: () -> Unit,
     onPlay: () -> Unit
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val bannerUrl = game.heroImageUrl ?: game.imageUrl
     val productId = remember(game.playUrl) { GameLibraryRepository.extractProductId(game.playUrl) }
+    val heroUrl = game.heroImageUrl ?: game.imageUrl
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -918,33 +966,44 @@ private fun XboxGameDetailDialog(
                         .clip(RoundedCornerShape(14.dp))
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(game.accentColorHex), XboxDark)
+                                listOf(Color(game.accentColorHex).copy(alpha = 0.55f), XboxDark)
                             )
                         )
-                        .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
+                        .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp))
                 ) {
-                    if (game.drawableResId != null) {
-                        Image(
-                            painter = painterResource(id = game.drawableResId),
-                            contentDescription = game.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else if (!bannerUrl.isNullOrBlank()) {
+                    if (!isImportingCatalog && !heroUrl.isNullOrBlank()) {
+                        val context = LocalContext.current
                         AsyncImage(
-                            model = bannerUrl,
+                            model = remember(heroUrl) {
+                                ImageRequest.Builder(context)
+                                    .data(heroUrl)
+                                    .crossfade(true)
+                                    .build()
+                            },
                             contentDescription = game.title,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.Gamepad,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(44.dp)
-                        )
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Gamepad,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(30.dp)
+                            )
+                            Text(
+                                text = game.localizedBadge(isEn) ?: "Xbox Cloud Gaming",
+                                color = Color.White,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     }
                 }
 
@@ -1074,9 +1133,9 @@ private fun AddGameDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (isEn) {
-                        "Type any game name to search Microsoft Xbox Store automatically (with cover art & link), or paste a custom URL."
+                        "Type any game name to fetch game info & link from Microsoft Xbox Store (metadata only, no image downloads to save 4G/Wi-Fi data)."
                     } else {
-                        "Gõ tên game bất kỳ rồi bấm 'Tìm trên Xbox' để tự động lấy ảnh bìa, thông tin và link chuẩn từ Microsoft, hoặc tự dán link."
+                        "Gõ tên game bất kỳ rồi bấm 'Tìm Xbox' để tự động lấy thông tin và link chuẩn từ Microsoft (chỉ tải thông tin game, không tải ảnh để tiết kiệm 4G/Wi-Fi)."
                     },
                     color = TextSecondary,
                     fontSize = 11.5.sp

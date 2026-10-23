@@ -180,18 +180,21 @@ object AdaptiveQualityManager {
         }
 
         if (cellularMode == CellularOptimizationMode.AUTO) {
+            val isCellular = status.isCellular || (!isWifi && status.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
             val networkDefaultMbps = when {
                 isWifi && status.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 15.0
                 isWifi && status.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 12.0
                 isWifi -> 10.0
+                isCellular -> 6.0
                 else -> 8.0
             }
             val initialSeedMbps = savedNextSessionMbps?.toDouble() ?: networkDefaultMbps
             val initialBufMs = when {
-                current.isAutoAdapting && emaDecodeMs > 0.0 -> current.smoothBufferMs.coerceIn(8.0, 24.0)
-                initialSeedMbps >= 14.0 -> 12.0
-                initialSeedMbps >= 10.0 -> 14.0
-                else -> 16.0
+                current.isAutoAdapting && emaDecodeMs > 0.0 -> current.smoothBufferMs.coerceIn(6.0, 42.0)
+                isCellular -> 18.0
+                initialSeedMbps >= 14.0 -> 10.0
+                initialSeedMbps >= 10.0 -> 12.0
+                else -> 14.0
             }
 
             val roundedMbps = formatOneDecimal(initialSeedMbps)
@@ -202,7 +205,7 @@ object AdaptiveQualityManager {
                 targetBitrateMbps = roundedMbps,
                 bufferHintMs = initialBufMs.roundToInt(),
                 title = if (isEn) "Auto • ${roundedMbps.toInt()} Mbps" else "Tự Động • ${roundedMbps.toInt()} Mbps (${tier.title})",
-                description = if (isEn) "Smoothly adjusts buffer delay (8–24ms)" else "Tự chỉnh mượt độ trễ bộ đệm (8–24ms)"
+                description = if (isEn) "Smoothly adjusts 4G/Wi-Fi buffer delay (6–42ms)" else "Tự chỉnh mượt bộ đệm 4G/Wi-Fi chống giật & giảm trễ (6–42ms)"
             )
 
             _state.value = current.copy(
@@ -227,10 +230,10 @@ object AdaptiveQualityManager {
             val fixedMbps = cellularMode.bitrateMbps.toDouble()
             val fixedBuf = when (cellularMode) {
                 CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> 18.0
-                CellularOptimizationMode.MEDIUM -> 15.0
-                CellularOptimizationMode.HIGH -> 12.0
-                CellularOptimizationMode.MAX_SPEED_UNCAPPED -> 10.0
-                CellularOptimizationMode.AUTO -> 14.0
+                CellularOptimizationMode.MEDIUM -> 14.0
+                CellularOptimizationMode.HIGH -> 10.0
+                CellularOptimizationMode.MAX_SPEED_UNCAPPED -> 8.0
+                CellularOptimizationMode.AUTO -> 12.0
             }
             val tier = tierForMbps(fixedMbps)
             val fixedStep = BitrateLadderStep(
@@ -264,8 +267,9 @@ object AdaptiveQualityManager {
     }
 
     /**
-     * Đánh giá thông số luồng thực tế: giữ nguyên mức bitrate đã đàm phán lúc bắt đầu phiên,
-     * chỉ điều chỉnh mượt độ trễ bộ đệm (smoothBufferMs từ 8ms..24ms) để giảm tải CPU và chống giật.
+     * Đánh giá thông số luồng thực tế trên cả 4G và Wi-Fi:
+     * - Khi sóng 4G có xung nhiễu HARQ (jitter > 14ms hoặc loss > 0.5%): tự nâng nhẹ bộ đệm (lên tới 42ms) để hứng trọn gói tin trễ, tránh vứt bỏ khung hình và ngăn bão I-Frame gây đứng hình.
+     * - Khi mạng Wi-Fi / 4G sạch (jitter <= 5ms, loss <= 0.1%): tự thu nhỏ bộ đệm xuống 6ms–10ms giúp triệt tiêu độ trễ tay cầm/cảm ứng.
      */
     fun evaluateTelemetry(telemetry: StreamTelemetry) {
         val current = _state.value
@@ -282,7 +286,7 @@ object AdaptiveQualityManager {
             emaRttMs = if (emaRttMs == 0.0) rtt else (emaRttMs * 0.65 + rtt * 0.35)
         }
         if (jitter >= 0.0) {
-            emaJitterMs = if (emaJitterMs == 0.0) jitter else (emaJitterMs * 0.60 + jitter * 0.40)
+            emaJitterMs = if (emaJitterMs == 0.0) jitter else (emaJitterMs * 0.55 + jitter * 0.45)
         }
         emaLossPercent = emaLossPercent * 0.55 + loss * 0.45
 
@@ -302,28 +306,28 @@ object AdaptiveQualityManager {
         val nextSessionNote = if (isEn) "New level takes effect next session" else "Mức mới có tác dụng ở lần chơi sau"
 
         val grade = when {
-            loss > 2.0 || effectiveDecode > 11.5 -> if (isEn) "Buffering Smoothly" else "Đang Tăng Đệm Chống Giật"
+            loss > 2.0 || effectiveDecode > 11.5 || effectiveJitter > 22.0 -> if (isEn) "4G Burst Cushion" else "Đang Hứng Sóng 4G Chống Giật"
             effectiveDecode > 7.8 || decodeTrendDelta >= 1.0 || effectiveJitter > 9.0 || effectiveRtt > 92.0 -> if (isEn) "Steady Buffer" else "Ổn Định Bộ Đệm"
-            effectiveDecode in 0.1..6.5 && loss <= 0.2 && effectiveRtt in 1.0..65.0 -> if (isEn) "Ultra Smooth" else "Siêu Mượt"
+            effectiveDecode in 0.1..6.5 && loss <= 0.2 && effectiveRtt in 1.0..65.0 && effectiveJitter <= 6.0 -> if (isEn) "Ultra Low-Latency" else "Siêu Mượt • Trễ Cực Thấp"
             else -> if (isEn) "Stable" else "Ổn Định"
         }
 
-        // Theo dõi thời gian giải mã trung bình > 12ms liên tục 10 giây (hoặc >= 7 mẫu liên tiếp):
-        // Chỉ tự lưu mức thấp hơn (15 -> 12 -> 10 -> 8) khi đang bật Tự động (isAutoAdapting == true).
-        // Nếu người dùng chọn mức cố định thì không tự đổi mức của họ, chỉ hiện ghi chú gợi ý.
+        // Theo dõi thời gian giải mã trung bình > 12ms hoặc mất gói 4G liên tục:
+        // Chỉ tự lưu mức thấp hơn (15 -> 12 -> 9 -> 6 -> 5) khi đang bật Tự động (isAutoAdapting == true).
         var steppedDownForNextSession = false
         var fixedDecodeSlowHint = false
-        if (effectiveDecode > 12.0) {
+        if (effectiveDecode > 12.0 || emaLossPercent > 2.5) {
             val now = System.currentTimeMillis()
             if (highDecodeStartMs == 0L) highDecodeStartMs = now
             highDecodeTicks++
             if (now - highDecodeStartMs >= 10_000L || highDecodeTicks >= 7) {
                 if (current.isAutoAdapting) {
-                    val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(8)
+                    val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(5)
                     val nextLowerMbps = when {
                         baseMbps >= 15 -> 12
-                        baseMbps >= 12 -> 10
-                        else -> 8
+                        baseMbps >= 12 -> 9
+                        baseMbps >= 9 -> 6
+                        else -> 5
                     }
                     if (savedNextSessionMbps != nextLowerMbps) {
                         savedNextSessionMbps = nextLowerMbps
@@ -342,43 +346,53 @@ object AdaptiveQualityManager {
         }
 
         if (current.isAutoAdapting) {
+            val isCellular = NetworkOptimizer.status.value.isCellular
+            val minBufMs = if (isCellular) 10.0 else 6.0
+            val maxBufMs = if (isCellular) 42.0 else 32.0
+
+            // Tính toán mức đệm lý tưởng dựa theo độ dao động sóng (jitter) thực tế của 4G hoặc Wi-Fi
+            val jitterMatchedTargetMs = (effectiveJitter * 1.45 + emaLossPercent * 3.5 + (effectiveDecode * 0.4)).coerceIn(minBufMs, maxBufMs)
             var deltaBufferMs = 0.0
             var actionNote: String? = null
-
-            val isEarlyWarmup = (effectiveDecode in 7.6..10.0) ||
-                (decodeTime >= 7.0 && decodeTrendDelta >= 0.9) ||
-                (effectiveJitter in 8.0..14.0) ||
-                (jitterTrendDelta >= 3.5 && jitter >= 7.5) ||
-                (effectiveRtt in 82.0..115.0 && rttTrendDelta >= 8.0) ||
-                (emaLossPercent in 0.3..1.0)
 
             val isHeavyPressure = effectiveDecode > 10.0 ||
                 decodeTime > 11.0 ||
                 emaLossPercent > 1.0 ||
                 loss > 1.4 ||
-                effectiveRtt > 115.0 ||
-                effectiveJitter > 14.0 ||
+                effectiveRtt > 120.0 ||
+                effectiveJitter > 15.0 ||
                 (fps in 1..48 && loss > 0.4)
 
+            val isEarlyWarmup = (effectiveDecode in 7.6..10.0) ||
+                (decodeTime >= 7.0 && decodeTrendDelta >= 0.9) ||
+                (effectiveJitter in 8.0..15.0) ||
+                (jitterTrendDelta >= 3.5 && jitter >= 7.5) ||
+                (effectiveRtt in 85.0..120.0 && rttTrendDelta >= 8.0) ||
+                (emaLossPercent in 0.3..1.0)
+
             if (isHeavyPressure) {
-                deltaBufferMs = +1.0
-                actionNote = if (isEn) "Buffer +1ms for smooth frames" else "Tăng nhẹ bộ đệm chống giật"
+                deltaBufferMs = if (jitterMatchedTargetMs > current.smoothBufferMs) {
+                    (jitterMatchedTargetMs - current.smoothBufferMs).coerceIn(1.5, 4.5)
+                } else {
+                    +1.5
+                }
+                actionNote = if (isEn) "Absorbing 4G/Wi-Fi burst" else "Co giãn đệm chống giật 4G/Wi-Fi"
             } else if (isEarlyWarmup) {
-                deltaBufferMs = +0.5
-                actionNote = if (isEn) "Steady buffer" else "Ổn định bộ đệm"
+                deltaBufferMs = +0.8
+                actionNote = if (isEn) "Steady anti-jitter buffer" else "Ổn định bộ đệm chống trễ"
             } else if (
-                emaLossPercent <= 0.2 &&
+                emaLossPercent <= 0.15 &&
                 (effectiveDecode in 0.1..6.8 || effectiveDecode == 0.0) &&
                 decodeTrendDelta <= 0.4 &&
-                (effectiveRtt in 1.0..75.0 || effectiveRtt == 0.0) &&
-                effectiveJitter <= 7.0
+                (effectiveRtt in 1.0..80.0 || effectiveRtt == 0.0) &&
+                effectiveJitter <= 6.5
             ) {
-                deltaBufferMs = -0.5
-                actionNote = if (isEn) "Lower buffer delay" else "Giảm độ trễ bộ đệm"
+                deltaBufferMs = -0.8
+                actionNote = if (isEn) "Tightening live latency" else "Siết bộ đệm giảm độ trễ"
             }
 
             val nextBufMs = formatOneDecimal(
-                (current.smoothBufferMs + deltaBufferMs).coerceIn(8.0, 24.0)
+                (current.smoothBufferMs + deltaBufferMs).coerceIn(minBufMs, maxBufMs)
             )
             val bufferChanged = abs(nextBufMs - current.smoothBufferMs) >= 0.3
             val gradeChanged = current.qualityGrade != grade

@@ -71,6 +71,7 @@ object NetworkOptimizer {
 
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var wifiLowLatencyLock: WifiManager.WifiLock? = null
     private var isInitialized = false
 
     // Telemetry tracking for estimated data savings using actual elapsed time
@@ -83,11 +84,24 @@ object NetworkOptimizer {
         isInitialized = true
 
         try {
-            connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val appCtx = context.applicationContext
+            connectivityManager = appCtx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val wifiMgr = appCtx.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wifiMgr != null) {
+                @Suppress("DEPRECATION")
+                val lockMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                } else {
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF
+                }
+                wifiLowLatencyLock = wifiMgr.createWifiLock(lockMode, "CloudPlay:UltraLowLatencyWifiLock")?.apply {
+                    setReferenceCounted(false)
+                }
+            }
             val cm = connectivityManager ?: return
 
             // Initial evaluation
-            evaluateCurrentNetwork(context, cm.activeNetwork)
+            evaluateCurrentNetwork(appCtx, cm.activeNetwork)
 
             // Register reactive network callback
             val request = NetworkRequest.Builder()
@@ -96,15 +110,15 @@ object NetworkOptimizer {
 
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    evaluateCurrentNetwork(context, network)
+                    evaluateCurrentNetwork(appCtx, network)
                 }
 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                    evaluateCurrentNetwork(context, network)
+                    evaluateCurrentNetwork(appCtx, network)
                 }
 
                 override fun onLost(network: Network) {
-                    evaluateCurrentNetwork(context, null)
+                    evaluateCurrentNetwork(appCtx, null)
                 }
             }
 
@@ -118,6 +132,32 @@ object NetworkOptimizer {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize NetworkOptimizer", e)
+        }
+    }
+
+    /**
+     * Activates hardware WIFI_MODE_FULL_LOW_LATENCY lock when streaming on Wi-Fi (prevents DTIM radio sleep spikes)
+     * and pauses background catalog requests on both 4G and Wi-Fi so 100% of bandwidth serves the game stream.
+     */
+    fun setStreamActive(active: Boolean) {
+        com.example.data.GameLibraryRepository.setStreamActive(active)
+        try {
+            val lock = wifiLowLatencyLock
+            if (lock != null) {
+                if (active && _status.value.isWifi) {
+                    if (!lock.isHeld) lock.acquire()
+                } else {
+                    if (lock.isHeld) lock.release()
+                }
+            }
+            if (active && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val cm = connectivityManager
+                val net = cm?.activeNetwork
+                if (cm != null && net != null) {
+                    cm.reportNetworkConnectivity(net, true)
+                }
+            }
+        } catch (_: Exception) {
         }
     }
 
@@ -203,9 +243,9 @@ object NetworkOptimizer {
         val badge: String
 
         if (config.lowEndDeviceMode) {
-            profileName = "Chế Độ Máy Yếu (5 Mbps • Ưu Tiên 60FPS)"
+            profileName = "Chế Độ Máy Yếu & 4G Siêu Mượt (5 Mbps • 60FPS)"
             bitrate = 5
-            summary = "Đang bật Chế độ máy yếu: Khóa 5 Mbps nhẹ máy, ưu tiên 60 FPS và tự dừng dịch khi chơi."
+            summary = "Đang bật Chế độ máy yếu: Khóa 5 Mbps Zero-B-Frame chống nghẽn 4G & giảm trễ Wi-Fi."
             badge = "🛡️ Máy Yếu (5M)"
         } else when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
@@ -213,24 +253,32 @@ object NetworkOptimizer {
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 14
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 12
                     isWifi -> 10
-                    isCellular -> 8
-                    else -> 10
+                    isCellular -> 6
+                    else -> 9
                 }
-                profileName = "Đồ Họa: Tự Động (${autoMbps}M)"
+                profileName = if (isCellular) {
+                    "Tự Động 4G Chống Giật (${autoMbps}M • Zero-B-Frame)"
+                } else {
+                    "Tự Động Giảm Trễ Wi-Fi (${autoMbps}M • Low-Latency)"
+                }
                 bitrate = autoMbps
-                summary = "Tự động chọn mức đồ họa theo mạng và chỉnh mượt bộ đệm chống giật khi đang chơi."
-                badge = "⚡ Tự Động (${autoMbps}M)"
+                summary = if (isCellular) {
+                    "Chống nghẽn sóng 4G (Anti-Bufferbloat 6M), tự co giãn đệm chống đứt hình & tự xả độ trễ tích tụ."
+                } else {
+                    "Khóa chip Wi-Fi Low-Latency chống ngủ ngầm, tự siết đệm 6–12ms giảm độ trễ điều khiển tối đa."
+                }
+                badge = if (isCellular) "📶 4G Mượt (${autoMbps}M)" else "⚡ Tự Động (${autoMbps}M)"
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
-                profileName = "Đồ Họa: Thấp (Cố Định • 5M)"
+                profileName = "Đồ Họa: Thấp / 4G Siêu Ổn Định (5M)"
                 bitrate = 5
-                summary = "Khóa cố định mức 5 Mbps, tiết kiệm dữ liệu di động và giúp máy luôn mát."
-                badge = "❄️ Cố Định (5M)"
+                summary = "Khóa 5 Mbps Zero-B-Frame, cực mượt khi sóng 4G yếu hoặc Wi-Fi xa router, máy luôn mát."
+                badge = "❄️ 4G/Nhẹ (5M)"
             }
             CellularOptimizationMode.MEDIUM -> {
                 profileName = "Đồ Họa: Trung Bình (Cố Định • 9M)"
                 bitrate = 9
-                summary = "Khóa cố định mức 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và nhiệt độ máy."
+                summary = "Khóa cố định mức 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và chống trễ khung hình."
                 badge = "🌿 Cố Định (9M)"
             }
             CellularOptimizationMode.HIGH -> {

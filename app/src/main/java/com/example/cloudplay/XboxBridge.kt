@@ -1319,7 +1319,7 @@ class XboxBridge(
                     };
 
                     // ==========================================
-                    // 7B. Graphics Render Scale, Aspect Ratio Anti-Squish & Zero-Lag Direct Stream Recorder
+                    // 7B. Graphics Render Scale, Color Filter & Direct Stream Recorder
                     // ==========================================
                     let gpuLoadStyleEl = null;
                     let videoAspectStyleEl = null;
@@ -1330,27 +1330,20 @@ class XboxBridge(
                         try {
                             if (!videoAspectStyleEl) {
                                 videoAspectStyleEl = document.createElement('style');
-                                videoAspectStyleEl.id = 'cloudplay-video-aspect-controller';
+                                videoAspectStyleEl.id = 'cloudplay-video-color-controller';
                                 (document.head || document.documentElement).appendChild(videoAspectStyleEl);
                             }
                             const vc = window.__videoDisplayConfig || {};
-                            const mode = vc.aspectMode || 'FIT_16_9';
-                            const userScaleX = (typeof vc.scaleX === 'number' && !isNaN(vc.scaleX)) ? vc.scaleX : 1.0;
-                            const userScaleY = (typeof vc.scaleY === 'number' && !isNaN(vc.scaleY)) ? vc.scaleY : 1.0;
                             const contrast = (typeof vc.contrast === 'number') ? (vc.contrast / 100.0) : 1.05;
                             const saturation = (typeof vc.saturation === 'number') ? (vc.saturation / 100.0) : 1.08;
                             const brightness = (typeof vc.brightness === 'number') ? (vc.brightness / 100.0) : 1.00;
 
-                            const isDefaultFit = (mode === 'FIT_16_9') &&
-                                Math.abs(userScaleX - 1.0) < 0.01 &&
-                                Math.abs(userScaleY - 1.0) < 0.01;
                             const isDefaultColor = Math.abs(contrast - 1.05) < 0.02 &&
                                 Math.abs(saturation - 1.08) < 0.02 &&
                                 Math.abs(brightness - 1.00) < 0.02;
 
-                            // CRITICAL: When in default 16:9 mode with no custom stretch, do NOT override Xbox's native video layout!
-                            // This prevents ResizeObserver loops and eliminates screen stutters during gameplay.
-                            if (isDefaultFit && isDefaultColor) {
+                            // Giữ nguyên 100% tỉ lệ màn hình gốc của Fortnite & Xbox Cloud, chỉ áp bộ lọc màu khi người dùng tự chỉnh
+                            if (isDefaultColor) {
                                 if (lastAppliedVideoAspectCss !== '') {
                                     videoAspectStyleEl.textContent = '';
                                     lastAppliedVideoAspectCss = '';
@@ -1358,37 +1351,9 @@ class XboxBridge(
                                 return;
                             }
 
-                            let objectFitRule = 'contain';
-                            let effScaleX = userScaleX;
-                            let effScaleY = userScaleY;
-
-                            if (mode === 'FIT_16_9') {
-                                objectFitRule = 'contain';
-                            } else if (mode === 'CINEMA_18_9') {
-                                objectFitRule = 'contain';
-                                effScaleX = parseFloat((userScaleX * 1.125).toFixed(4));
-                            } else if (mode === 'ZOOM_COVER') {
-                                objectFitRule = 'cover';
-                            } else if (mode === 'STRETCH_FULL') {
-                                objectFitRule = 'fill';
-                            } else if (mode === 'CUSTOM_SCALE') {
-                                objectFitRule = 'contain';
-                            }
-
-                            const hasColorTuning = !isDefaultColor &&
-                                (Math.abs(contrast - 1.0) > 0.01 || Math.abs(saturation - 1.0) > 0.01 || Math.abs(brightness - 1.0) > 0.01);
-                            const filterRule = hasColorTuning
-                                ? ('filter: contrast(' + contrast.toFixed(2) + ') saturate(' + saturation.toFixed(2) + ') brightness(' + brightness.toFixed(2) + ') !important;')
-                                : '';
-
                             const nextCss = `
                                 video#stream-video, video[data-testid="stream-video"], #segmented-video video {
-                                    object-fit: ` + objectFitRule + ` !important;
-                                    object-position: center center !important;
-                                    transform-origin: center center !important;
-                                    transform: scale(` + effScaleX + `, ` + effScaleY + `) translateZ(0) !important;
-                                    backface-visibility: hidden !important;
-                                    ` + filterRule + `
+                                    filter: contrast(` + contrast.toFixed(2) + `) saturate(` + saturation.toFixed(2) + `) brightness(` + brightness.toFixed(2) + `) !important;
                                 }
                             `;
                             if (nextCss !== lastAppliedVideoAspectCss) {

@@ -118,19 +118,19 @@ fun SettingsScreen(
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
         // =========================================================================
-        // NHÓM 1: HÌNH ẢNH & HIỆU NĂNG (Mặc định mở)
+        // NHÓM 1: ĐỒ HỌA & KHUNG HÌNH (FPS) (Mặc định mở)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Graphics & Performance" else "Hình ảnh & Hiệu năng",
-                subtitle = config.cellularMode.localizedTitle(isEn),
+                title = if (isEn) "Graphics & Frame Rate" else "Đồ họa & Khung hình (FPS)",
+                subtitle = "${config.cellularMode.localizedTitle(isEn)} • ${config.streamFpsCap.fps} FPS",
                 icon = Icons.Default.Speed,
                 expanded = expandGraphics,
                 onToggle = { expandGraphics = !expandGraphics },
                 testTag = "settings_group_graphics"
             ) {
-                // 1.1 Đồ họa & hiệu năng máy + Chế độ máy yếu
-                SettingsCard(title = if (isEn) "Graphics & Device Performance" else "Đồ họa & hiệu năng máy") {
+                // 1.1 Mức đồ họa & Tốc độ khung hình (FPS)
+                SettingsCard(title = if (isEn) "Graphics Quality & FPS" else "Chất lượng đồ họa & FPS") {
                     val selectedMode = config.cellularMode
                     val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
 
@@ -171,7 +171,7 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = if (isEn) "Adjusts to network and keeps phone cool" else "Tự điều chỉnh theo mạng và giữ máy mát",
+                                        text = if (isEn) "Auto-adjusts to network & keeps device cool" else "Tự chỉnh theo mạng, giữ máy mát",
                                         color = TextSecondary,
                                         fontSize = 10.5.sp
                                     )
@@ -256,142 +256,8 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Ưu tiên phản hồi mượt
-                    SettingToggleRow(
-                        title = if (isEn) "Prioritize Smooth Response" else "Ưu tiên phản hồi mượt",
-                        subtitle = if (isEn) "Reduces delay when network signal drops" else "Giảm trễ thao tác khi sóng yếu",
-                        checked = config.wifiSpeedFirstPriority,
-                        onCheckedChange = { SettingsRepository.updateWifiSpeedFirstPriority(it) },
-                        activeColor = DirectCyan
-                    )
-
-                    // Chế độ máy yếu
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (config.lowEndDeviceMode) Color(0xFF13241A) else Color(0xFF141D17))
-                            .border(
-                                0.8.dp,
-                                if (config.lowEndDeviceMode) XboxNeonGreen.copy(alpha = 0.6f) else XboxCardBorder,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
-                                    color = if (config.lowEndDeviceMode) XboxNeonGreen else TextPrimary,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = if (isEn) {
-                                        "Uses light graphics, keeps 60 FPS, turns off animations and pauses translator."
-                                    } else {
-                                        "Dùng đồ họa nhẹ, giữ 60 FPS, tắt hiệu ứng động và tạm dừng bộ dịch."
-                                    },
-                                    color = TextSecondary,
-                                    fontSize = 10.5.sp
-                                )
-                            }
-                            Switch(
-                                checked = config.lowEndDeviceMode,
-                                onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = XboxNeonGreen
-                                ),
-                                modifier = Modifier.testTag("settings_low_end_device_mode_switch")
-                            )
-                        }
-                        Text(
-                            text = if (isEn) "💡 Exit and relaunch the game to apply" else "💡 Thoát game và vào lại để áp dụng",
-                            color = if (config.lowEndDeviceMode) XboxNeonGreen else DirectCyan,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                // 1.2 Chất lượng hình ảnh & điều khiển
-                SettingsCard(title = if (isEn) "Image Quality & Controls" else "Chất lượng hình ảnh & điều khiển") {
-                    SettingToggleRow(
-                        title = if (isEn) "1080p Full HD Resolution" else "Độ phân giải 1080p Full HD",
-                        subtitle = if (isEn) "Displays sharp 1080p image instead of 720p" else "Hiển thị hình ảnh 1080p sắc nét thay vì 720p",
-                        checked = config.forceDesktopUserAgent,
-                        onCheckedChange = { SettingsRepository.updateDesktopUserAgent(it) }
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Clarity Boost (Sharpening)" else "Bộ lọc làm nét (Clarity Boost)",
-                        subtitle = if (isEn) "Sharpens game details and contrast" else "Tăng độ sắc nét và độ tương phản trong game",
-                        checked = config.clarityBoostEnabled,
-                        onCheckedChange = { SettingsRepository.updateClarityBoost(it) }
-                    )
-                }
-
-                // 1.3 Điều chỉnh đồ họa sâu & Giảm gánh nặng phần cứng
-                SettingsCard(title = if (isEn) "Graphics Scaling & Hardware Load Reduction" else "Điều chỉnh đồ họa & Giảm tải phần cứng") {
                     Text(
-                        text = if (isEn) "Render Resolution Scale" else "Tỷ lệ độ phân giải dựng hình (Giảm nóng & chống tụt FPS)",
-                        color = XboxNeonGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        com.example.data.StreamRenderScale.entries.chunked(2).forEach { rowScales ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowScales.forEach { scale ->
-                                    val isSelected = config.streamRenderScale == scale
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) DirectCyan else XboxCardBorder,
-                                                RoundedCornerShape(10.dp)
-                                            )
-                                            .clickable { SettingsRepository.updateStreamRenderScale(scale) }
-                                            .testTag("settings_render_scale_${scale.id}"),
-                                        color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(
-                                                text = scale.localizedTitle(isEn),
-                                                color = if (isSelected) DirectCyan else TextPrimary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = scale.localizedDesc(isEn),
-                                                color = TextSecondary,
-                                                fontSize = 9.5.sp,
-                                                maxLines = 2
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = if (isEn) "Frame Rate Cap (FPS)" else "Giới hạn nhịp khung hình (FPS)",
+                        text = if (isEn) "Frame Rate (FPS)" else "Nhịp khung hình (FPS)",
                         color = XboxNeonGreen,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -432,116 +298,167 @@ fun SettingsScreen(
                                         color = TextSecondary,
                                         fontSize = 9.sp,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 2
+                                        maxLines = 1
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 1.2 Độ phân giải dựng hình & Giảm tải phần cứng
+                SettingsCard(title = if (isEn) "Render Scale & Hardware Offload" else "Độ phân giải dựng hình & Giảm tải máy") {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        com.example.data.StreamRenderScale.entries.chunked(2).forEach { rowScales ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowScales.forEach { scale ->
+                                    val isSelected = config.streamRenderScale == scale
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) DirectCyan else XboxCardBorder,
+                                                RoundedCornerShape(10.dp)
+                                            )
+                                            .clickable { SettingsRepository.updateStreamRenderScale(scale) }
+                                            .testTag("settings_render_scale_${scale.id}"),
+                                        color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = scale.localizedTitle(isEn),
+                                                color = if (isSelected) DirectCyan else TextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = scale.localizedDesc(isEn),
+                                                color = TextSecondary,
+                                                fontSize = 9.5.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
 
                     SettingToggleRow(
-                        title = if (isEn) "Hardware GPU Offload & Anti-Lag" else "Giảm tải GPU & Tắt hiệu ứng nền nặng",
-                        subtitle = if (isEn) {
-                            "Removes web blur, shadows and background animations so GPU focuses 100% on decoding video"
-                        } else {
-                            "Tắt làm mờ, đổ bóng và hoạt ảnh trang web để GPU tập trung 100% giải mã luồng game mượt nhất"
-                        },
+                        title = if (isEn) "Prioritize Smooth Input" else "Ưu tiên phản hồi mượt",
+                        subtitle = if (isEn) "Reduces delay on unstable connections" else "Giảm trễ thao tác khi sóng yếu",
+                        checked = config.wifiSpeedFirstPriority,
+                        onCheckedChange = { SettingsRepository.updateWifiSpeedFirstPriority(it) },
+                        activeColor = DirectCyan
+                    )
+
+                    SettingToggleRow(
+                        title = if (isEn) "Reduce GPU Load" else "Giảm tải GPU",
+                        subtitle = if (isEn) "Disables heavy web blur & shadows" else "Tắt hiệu ứng nền nặng để chống giật",
                         checked = config.gpuLoadReductionEnabled,
                         onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
                         activeColor = DirectCyan
                     )
+
+                    SettingToggleRow(
+                        title = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
+                        subtitle = if (isEn) "5 Mbps light stream, cool 60 FPS" else "Đồ họa nhẹ 5 Mbps, giữ máy mát",
+                        checked = config.lowEndDeviceMode,
+                        onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
+                        switchTestTag = "settings_low_end_device_mode_switch"
+                    )
                 }
 
-                // 1.4 Tỷ lệ khung hình & Màn hình hiển thị chống bóp dẹt (Aspect Ratio & Anti-Squish)
-                SettingsCard(title = if (isEn) "Screen Aspect Ratio & Anti-Squish Display" else "Tỷ lệ khung hình & Chống bóp méo hình") {
-                    Text(
-                        text = if (isEn) {
-                            "Xbox Cloud games stream in native 16:9 aspect ratio. On modern tall smartphone screens (19.5:9 or 20:9), choose how video is displayed so characters and HUD are never squished or stretched."
-                        } else {
-                            "Game Xbox Cloud phát luồng ở tỉ lệ chuẩn 16:9 gốc. Trên điện thoại màn hình dài (19.5:9, 20:9), bạn có thể chọn chế độ hiển thị phù hợp để nhân vật và nút bấm không bị bóp dẹt hay kéo méo."
-                        },
-                        color = TextSecondary,
-                        fontSize = 11.sp
+                // 1.3 Độ nét & Màu sắc hình ảnh
+                SettingsCard(title = if (isEn) "Sharpness & Image Colors" else "Độ nét & Màu sắc hình ảnh") {
+                    SettingToggleRow(
+                        title = if (isEn) "1080p Full HD Stream" else "Độ phân giải 1080p Full HD",
+                        subtitle = if (isEn) "Requests sharp 1080p stream" else "Ưu tiên luồng 1080p sắc nét",
+                        checked = config.forceDesktopUserAgent,
+                        onCheckedChange = { SettingsRepository.updateDesktopUserAgent(it) }
                     )
 
-                    com.example.data.VideoAspectRatioMode.entries.forEach { mode ->
-                        val isSelected = config.videoAspectRatioMode == mode
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(
-                                    1.dp,
-                                    if (isSelected) DirectCyan else XboxCardBorder,
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { SettingsRepository.updateVideoAspectRatioMode(mode) }
-                                .testTag("settings_aspect_ratio_${mode.id}"),
-                            color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = mode.localizedTitle(isEn),
-                                        color = if (isSelected) DirectCyan else TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                    Text(
-                                        text = mode.localizedDesc(isEn),
-                                        color = TextSecondary,
-                                        fontSize = 10.sp
-                                    )
-                                }
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        }
+                    SettingToggleRow(
+                        title = if (isEn) "Clarity Boost" else "Làm nét hình ảnh (Clarity Boost)",
+                        subtitle = if (isEn) "Sharpens edges and details" else "Tăng độ nét chi tiết trong game",
+                        checked = config.clarityBoostEnabled,
+                        onCheckedChange = { SettingsRepository.updateClarityBoost(it) }
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        LabeledSlider(
+                            label = if (isEn) "Contrast" else "Độ tương phản",
+                            valueText = "${config.videoContrast}%",
+                            value = config.videoContrast.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
+                            valueRange = 80f..140f,
+                            accentColor = XboxNeonGreen
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Color Saturation" else "Độ tươi màu",
+                            valueText = "${config.videoSaturation}%",
+                            value = config.videoSaturation.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
+                            valueRange = 80f..150f,
+                            accentColor = DirectCyan
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Brightness" else "Độ sáng",
+                            valueText = "${config.videoBrightness}%",
+                            value = config.videoBrightness.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
+                            valueRange = 80f..130f,
+                            accentColor = XboxNeonGreen
+                        )
                     }
 
-                    if (config.videoAspectRatioMode == com.example.data.VideoAspectRatioMode.CUSTOM_SCALE) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.Black.copy(alpha = 0.35f))
-                                .padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            LabeledSlider(
-                                label = if (isEn) "Horizontal Width" else "Độ rộng chiều Ngang",
-                                valueText = "${(config.videoScaleX * 100).toInt()}%",
-                                value = config.videoScaleX,
-                                onValueChange = { SettingsRepository.updateVideoScaleX(it) },
-                                valueRange = 0.70f..1.40f,
-                                accentColor = DirectCyan
-                            )
-                            LabeledSlider(
-                                label = if (isEn) "Vertical Height" else "Độ cao chiều Dọc",
-                                valueText = "${(config.videoScaleY * 100).toInt()}%",
-                                value = config.videoScaleY,
-                                onValueChange = { SettingsRepository.updateVideoScaleY(it) },
-                                valueRange = 0.70f..1.40f,
-                                accentColor = XboxNeonGreen
-                            )
-                        }
+                    OutlinedButton(
+                        onClick = {
+                            SettingsRepository.resetVideoDisplayDefaults()
+                            Toast.makeText(
+                                context,
+                                if (isEn) "Reset colors to default" else "Đã đặt lại màu sắc mặc định",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("advanced_reset_video_defaults_btn"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định",
+                            color = DirectCyan,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
         }
 
         // =========================================================================
-        // NHÓM 2: MẠNG, MÁY CHỦ & DỊCH (Mặc định gập)
+        // NHÓM 2: MẠNG & MỞ KHÓA VÙNG (Mặc định gập)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Network, Server & Translation" else "Mạng, Máy chủ & Dịch",
-                subtitle = if (isEn) "Smart VPN, Region, Translator" else "VPN thông minh, Vượt rào, Dịch",
+                title = if (isEn) "Network & Region Unlock" else "Mạng & Mở khóa vùng",
+                subtitle = if (isEn) "Smart VPN, Low Ping Bypass" else "VPN thông minh, vào game không lag",
                 icon = Icons.Default.Public,
                 expanded = expandNetwork,
                 onToggle = { expandNetwork = !expandNetwork },
@@ -550,16 +467,16 @@ fun SettingsScreen(
                 // 2.1 VPN thông minh
                 SettingsCard(title = if (isEn) "Smart VPN" else "VPN thông minh") {
                     SettingToggleRow(
-                        title = if (isEn) "Enable Smart VPN (Auto On/Off)" else "Bật VPN thông minh (Tự bật/tắt)",
-                        subtitle = if (isEn) "Turns on VPN to open game, turns off once inside" else "Tự bật VPN khi mở game, tự tắt khi đã vào trận",
+                        title = if (isEn) "Smart VPN (Auto On/Off)" else "VPN thông minh (Tự bật/tắt)",
+                        subtitle = if (isEn) "Auto connects to open game, disconnects inside" else "Tự bật khi mở game, tự tắt khi vào trận",
                         checked = config.smartVpnEnabled,
                         onCheckedChange = { SettingsRepository.updateSmartVpnEnabled(it) },
                         switchTestTag = "settings_switch_smart_vpn"
                     )
 
                     SettingToggleRow(
-                        title = if (isEn) "Auto turn off VPN in game" else "Tự tắt VPN khi vào game",
-                        subtitle = if (isEn) "Switches to direct network for low ping" else "Chuyển về mạng trực tiếp để giảm ping",
+                        title = if (isEn) "Auto disconnect VPN in game" else "Tự tắt VPN khi vào game",
+                        subtitle = if (isEn) "Uses direct network for lowest ping" else "Dùng mạng trực tiếp để giảm ping",
                         checked = config.autoBypassEnabled,
                         onCheckedChange = { SettingsRepository.updateAutoBypass(it) },
                         switchTestTag = "settings_switch_auto_bypass"
@@ -575,7 +492,7 @@ fun SettingsScreen(
                         ) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Text(
-                                    text = if (isEn) "Delay before turning off VPN" else "Thời gian chờ trước khi tắt VPN",
+                                    text = if (isEn) "VPN disconnect delay" else "Thời gian chờ tắt VPN",
                                     color = TextSecondary,
                                     fontSize = 11.sp
                                 )
@@ -601,23 +518,23 @@ fun SettingsScreen(
                     }
                 }
 
-                // 2.2 Chế độ vượt rào
-                SettingsCard(title = if (isEn) "Region Unlock Mode" else "Chế độ vượt rào") {
+                // 2.2 Chế độ mở khóa vùng
+                SettingsCard(title = if (isEn) "Region Unlock Mode" else "Chế độ mở khóa vùng") {
                     listOf(
                         Triple(
                             VpnEngine.SMART_BYPASS,
                             if (isEn) "Smart Unlock 🇯🇵 (Recommended)" else "Mở khóa thông minh 🇯🇵 (Khuyên dùng)",
-                            if (isEn) "Fastest direct region unlock without extra delay" else "Vào game trực tiếp cực nhanh, không tăng ping"
+                            if (isEn) "Direct unlock without extra ping" else "Vào thẳng cực nhanh, không tăng ping"
                         ),
                         Triple(
                             VpnEngine.PROXY_TUNNEL,
                             if (isEn) "Proxy Server 🌐" else "Máy chủ trung gian 🌐",
-                            if (isEn) "Connects through regional servers with backup switching" else "Kết nối qua danh sách máy chủ Nhật/Hàn/Mỹ"
+                            if (isEn) "Routes via JP/KR/US servers" else "Kết nối qua máy chủ Nhật / Hàn / Mỹ"
                         ),
                         Triple(
                             VpnEngine.EXTERNAL_VPN,
                             if (isEn) "External VPN App" else "Ứng dụng VPN ngoài",
-                            if (isEn) "Use with your own separate VPN app" else "Dành cho người dùng bật app VPN riêng"
+                            if (isEn) "Use with your own VPN app" else "Dùng kèm app VPN riêng của bạn"
                         )
                     ).forEach { (engine, title, desc) ->
                         val isSelected = vpnState.engine == engine
@@ -645,194 +562,36 @@ fun SettingsScreen(
                         }
                     }
                 }
-
-                // 2.3 Bộ dịch & bộ lọc
-                SettingsCard(title = if (isEn) "Translator & Filter" else "Bộ dịch & bộ lọc") {
-                    SettingToggleRow(
-                        title = if (isEn) "Auto-translate to Vietnamese" else "Tự động dịch sang Tiếng Việt",
-                        subtitle = if (isEn) "Translates menus and descriptions on Xbox pages" else "Dịch menu, danh mục game và thông báo",
-                        checked = config.xcloudTranslateEnabled,
-                        onCheckedChange = { SettingsRepository.updateXcloudTranslate(it) },
-                        switchTestTag = "settings_switch_xcloud_translate"
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Keep original game titles" else "Giữ nguyên tên game gốc",
-                        subtitle = if (isEn) "Do not translate names like Fortnite, Forza, Halo" else "Không dịch tên riêng của game (Fortnite, Forza, Halo...)",
-                        checked = config.preserveGameTitles,
-                        onCheckedChange = { SettingsRepository.updatePreserveGameTitles(it) }
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Bilingual mode (VI - EN)" else "Chế độ song ngữ (Việt - Anh)",
-                        subtitle = if (isEn) "Shows original English in parentheses" else "Hiện kèm từ tiếng Anh gốc trong ngoặc",
-                        checked = config.bilingualMode,
-                        onCheckedChange = { SettingsRepository.updateBilingualMode(it) }
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Hide stream stats overlay" else "Ẩn bảng thông số đè màn hình",
-                        subtitle = if (isEn) "Hides technical stats box during gameplay" else "Tự ẩn bảng thông số che tầm nhìn khi đang chơi",
-                        checked = config.hideStreamStatsOverlay,
-                        onCheckedChange = { SettingsRepository.updateHideStreamStatsOverlay(it) },
-                        activeColor = DirectCyan,
-                        switchTestTag = "settings_switch_hide_decode_profile"
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Extended gaming dictionary" else "Từ điển thuật ngữ game mở rộng",
-                        subtitle = if (isEn) "Translates common gaming terms accurately" else "Dịch chuẩn các từ ngữ thông dụng trong game",
-                        checked = config.githubDictionaryEnabled,
-                        onCheckedChange = { SettingsRepository.updateGithubDictionaryEnabled(it) }
-                    )
-                }
-
-                // 2.4 Ngôn ngữ trang Xbox
-                SettingsCard(title = if (isEn) "Xbox Page Language" else "Ngôn ngữ trang Xbox") {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(
-                                1.dp,
-                                if (config.useSystemLanguage) XboxNeonGreen else XboxCardBorder,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable { SettingsRepository.updateUseSystemLanguage(true) },
-                        color = if (config.useSystemLanguage) XboxSurfaceVariant else Color.Transparent
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isEn) "Follow Device Language ($resolvedSystemLocale)" else "Theo ngôn ngữ máy ($resolvedSystemLocale)",
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    text = if (isEn) "Defaults to English (en-US) for easy reading" else "Tự chọn tiếng Anh (en-US) để không bị tiếng Nhật",
-                                    color = TextSecondary,
-                                    fontSize = 10.sp
-                                )
-                            }
-                            if (config.useSystemLanguage) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        POPULAR_XBOX_LANGUAGES.take(6).forEach { lang ->
-                            val isSelected = !config.useSystemLanguage && config.customLocale.equals(lang.code, ignoreCase = true)
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.5f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateCustomLocale(lang.code) },
-                                color = if (isSelected) XboxSurfaceVariant else Color.Black.copy(alpha = 0.2f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(text = lang.flag, fontSize = 15.sp)
-                                        Text(
-                                            text = "${lang.localizedName(isEn)} (${lang.code})",
-                                            color = TextPrimary,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = customInputText,
-                        onValueChange = { customInputText = it },
-                        label = { Text(if (isEn) "Custom code or Xbox link" else "Mã ngôn ngữ hoặc link Xbox") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = XboxNeonGreen,
-                            unfocusedBorderColor = XboxCardBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("custom_language_input")
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { SettingsRepository.updateCustomLocale(customInputText) },
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(if (isEn) "Apply" else "Áp dụng", fontSize = 11.sp)
-                        }
-                        OutlinedButton(
-                            onClick = {
-                                customInputText = "xbox.com/en-US"
-                                SettingsRepository.updateCustomLocale("en-US")
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(if (isEn) "Set en-US 🇺🇸" else "Đặt en-US 🇺🇸", color = DirectCyan, fontSize = 11.sp)
-                        }
-                    }
-                }
             }
         }
 
         // =========================================================================
-        // NHÓM 3: ĐIỀU KHIỂN (Mặc định gập)
+        // NHÓM 3: TAY CẦM & CẢM ỨNG (Mặc định gập)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Controls" else "Điều khiển",
+                title = if (isEn) "Gamepad & Touch Controls" else "Tay cầm & Cảm ứng",
                 subtitle = if (config.showVirtualController) {
-                    if (isEn) "Touch Gamepad ON" else "Tay cầm cảm ứng: Bật"
+                    if (isEn) "Virtual Gamepad: ON" else "Tay cầm ảo: Đang bật"
                 } else {
-                    if (isEn) "Touch Gamepad OFF" else "Tay cầm cảm ứng: Tắt"
+                    if (isEn) "Virtual Gamepad: OFF" else "Tay cầm ảo: Đang tắt"
                 },
                 icon = Icons.Default.Gamepad,
                 expanded = expandControls,
                 onToggle = { expandControls = !expandControls },
                 testTag = "settings_group_controls"
             ) {
-                SettingsCard(title = if (isEn) "Touch Gamepad System" else "Hệ thống tay cầm cảm ứng") {
+                SettingsCard(title = if (isEn) "Touch Gamepad" else "Tay cầm ảo trên màn hình") {
                     SettingToggleRow(
-                        title = if (isEn) "On-Screen Touch Controller" else "Tay cầm cảm ứng trên màn hình",
-                        subtitle = if (isEn) "Virtual buttons, thumbsticks, gyro & drag layout" else "Cần xoay, cụm nút bấm, ngắm nghiêng máy & kéo thả vị trí",
+                        title = if (isEn) "Show Virtual Gamepad" else "Bật tay cầm ảo",
+                        subtitle = if (isEn) "On-screen sticks, triggers & custom drag layout" else "Cần xoay, nút bấm và kéo thả vị trí tự do",
                         checked = config.showVirtualController,
                         onCheckedChange = { SettingsRepository.updateShowVirtualController(it) },
                         switchTestTag = "settings_switch_virtual_controller"
                     )
 
                     Text(
-                        text = if (isEn) "Layout Preset" else "Bố cục nút bấm",
+                        text = if (isEn) "Button Layout" else "Bố cục nút bấm",
                         color = TextPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -878,7 +637,6 @@ fun SettingsScreen(
                         }
                     }
 
-                    // 4 Thanh trượt: Kích thước, Độ mờ, Độ nhạy, Vùng chết
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -896,7 +654,7 @@ fun SettingsScreen(
                             accentColor = XboxNeonGreen
                         )
                         LabeledSlider(
-                            label = if (isEn) "Button Opacity" else "Độ đậm mờ",
+                            label = if (isEn) "Opacity" else "Độ đậm mờ",
                             valueText = "${(config.gamepadOpacity * 100).toInt()}%",
                             value = config.gamepadOpacity,
                             onValueChange = { SettingsRepository.updateGamepadOpacity(it) },
@@ -912,7 +670,7 @@ fun SettingsScreen(
                             accentColor = XboxNeonGreen
                         )
                         LabeledSlider(
-                            label = if (isEn) "Stick Deadzone" else "Vùng chết tâm cần",
+                            label = if (isEn) "Deadzone" else "Vùng chết tâm cần",
                             valueText = "${(config.gamepadDeadzone * 100).toInt()}%",
                             value = config.gamepadDeadzone,
                             onValueChange = { SettingsRepository.updateGamepadDeadzone(it) },
@@ -922,7 +680,7 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = if (isEn) "Vibration Strength" else "Độ rung khi bấm nút",
+                        text = if (isEn) "Vibration" else "Độ rung khi bấm",
                         color = TextPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -957,8 +715,8 @@ fun SettingsScreen(
                     }
 
                     SettingToggleRow(
-                        title = if (isEn) "🎯 Motion Aiming (Gyro)" else "🎯 Ngắm bằng nghiêng máy (Gyro)",
-                        subtitle = if (isEn) "Tilt phone to fine-tune right stick aim" else "Nghiêng điện thoại để chỉnh tâm ngắm cần phải",
+                        title = if (isEn) "🎯 Gyro Aiming" else "🎯 Ngắm nghiêng máy (Gyro)",
+                        subtitle = if (isEn) "Tilt phone to aim right stick" else "Nghiêng máy để chỉnh tâm ngắm",
                         checked = config.gamepadGyroEnabled,
                         onCheckedChange = { SettingsRepository.updateGamepadGyroEnabled(it) },
                         activeColor = DirectCyan
@@ -966,7 +724,7 @@ fun SettingsScreen(
 
                     if (config.gamepadGyroEnabled) {
                         LabeledSlider(
-                            label = if (isEn) "Gyro Sensitivity" else "Độ nhạy nghiêng máy",
+                            label = if (isEn) "Gyro Sensitivity" else "Độ nhạy Gyro",
                             valueText = "${(config.gamepadGyroSensitivity * 100).toInt()}%",
                             value = config.gamepadGyroSensitivity,
                             onValueChange = { SettingsRepository.updateGamepadGyroSensitivity(it) },
@@ -976,8 +734,8 @@ fun SettingsScreen(
                     }
 
                     SettingToggleRow(
-                        title = if (isEn) "🏃 Push Left Stick to Auto-Sprint" else "🏃 Đẩy kịch cần trái để tự chạy nhanh",
-                        subtitle = if (isEn) "Pushing left stick fully forward triggers sprint" else "Đẩy cần di chuyển hết cỡ về trước sẽ tự chạy nhanh",
+                        title = if (isEn) "🏃 Auto-Sprint" else "🏃 Đẩy kịch cần trái để chạy nhanh",
+                        subtitle = if (isEn) "Push left stick forward to sprint" else "Tự kích hoạt chạy nhanh khi đẩy hết cỡ",
                         checked = config.gamepadSprintLockEnabled,
                         onCheckedChange = { SettingsRepository.updateGamepadSprintLockEnabled(it) }
                     )
@@ -988,7 +746,7 @@ fun SettingsScreen(
                                 SettingsRepository.resetGamepadCustomOffsets()
                                 Toast.makeText(
                                     context,
-                                    if (isEn) "Reset button positions to default" else "Đã đặt lại vị trí nút về mặc định",
+                                    if (isEn) "Reset button positions" else "Đã đặt lại vị trí nút",
                                     Toast.LENGTH_SHORT
                                 ).show()
                             },
@@ -996,7 +754,7 @@ fun SettingsScreen(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = if (isEn) "Reset Button Positions" else "Đặt lại vị trí nút về mặc định",
+                                text = if (isEn) "Reset Button Positions" else "Đặt lại vị trí nút mặc định",
                                 color = DirectCyan,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -1008,183 +766,52 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 4: NÂNG CAO (Đầy đủ thông số Video, Tỉ lệ màn hình, Luồng Stream, Ngôn ngữ & Bộ nhớ đệm)
+        // NHÓM 4: DỊCH TIẾNG VIỆT & HỆ THỐNG (Mặc định gập)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Advanced & Color Calibration" else "Nâng cao, Màu sắc Hình ảnh & Ngôn ngữ",
-                subtitle = if (isEn) "Screen Ratio, Color Sliders, Language & Cache" else "Tỉ lệ màn hình khi chơi, Độ tươi màu, Độ sáng, Ngôn ngữ & Bộ nhớ đệm",
+                title = if (isEn) "Translation, Language & System" else "Dịch Tiếng Việt & Hệ thống",
+                subtitle = if (isEn) "Translator, App Language, Account" else "Bộ dịch, Ngôn ngữ, Tài khoản & Bản quyền",
                 icon = Icons.Default.Tune,
                 expanded = expandAdvanced,
                 onToggle = { expandAdvanced = !expandAdvanced },
                 testTag = "settings_group_advanced"
             ) {
-                // 4.0 Cân chỉnh Màu sắc, Độ sáng & Khung hình hiển thị
-                SettingsCard(
-                    title = if (isEn) "🎬 Screen Ratio & Image Color Adjustment" else "🎬 Chỉnh Màu sắc Hình ảnh & Tỉ lệ Màn hình khi chơi"
-                ) {
-                    Text(
-                        text = if (isEn) {
-                            "Adjust how the game fits your phone screen while playing, customize width/height, and fine-tune contrast, color saturation, and brightness."
-                        } else {
-                            "Chọn cách khung hình game hiển thị trên màn hình điện thoại của bạn, tự chỉnh độ rộng Ngang/Dọc theo ý thích, hoặc tăng độ tươi màu và độ sáng để nhìn rõ chi tiết trong tối."
-                        },
-                        color = TextSecondary,
-                        fontSize = 11.sp
+                // 4.1 Bộ dịch & hiển thị
+                SettingsCard(title = if (isEn) "Vietnamese Translator & HUD" else "Bộ dịch Tiếng Việt & Màn hình") {
+                    SettingToggleRow(
+                        title = if (isEn) "Auto-translate to Vietnamese" else "Tự động dịch Tiếng Việt",
+                        subtitle = if (isEn) "Translates Xbox menus and notifications" else "Dịch giao diện và thông báo trên trang Xbox",
+                        checked = config.xcloudTranslateEnabled,
+                        onCheckedChange = { SettingsRepository.updateXcloudTranslate(it) },
+                        switchTestTag = "settings_switch_xcloud_translate"
                     )
 
-                    Text(
-                        text = if (isEn) "1. In-Game Screen Ratio" else "1. Tỉ lệ màn hình lúc đang chơi game",
-                        color = DirectCyan,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                    SettingToggleRow(
+                        title = if (isEn) "Keep original game titles" else "Giữ nguyên tên game gốc",
+                        subtitle = if (isEn) "Do not translate Fortnite, Forza, Halo..." else "Không dịch tên riêng (Fortnite, Forza, Halo...)",
+                        checked = config.preserveGameTitles,
+                        onCheckedChange = { SettingsRepository.updatePreserveGameTitles(it) }
                     )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        com.example.data.VideoAspectRatioMode.entries.forEach { aspectMode ->
-                            val isSelected = config.videoAspectRatioMode == aspectMode
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) DirectCyan else XboxCardBorder,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateVideoAspectRatioMode(aspectMode) }
-                                    .testTag("advanced_video_aspect_${aspectMode.id}"),
-                                color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0E1712)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = aspectMode.localizedTitle(isEn),
-                                            color = if (isSelected) DirectCyan else TextPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        )
-                                        Text(
-                                            text = aspectMode.localizedDesc(isEn),
-                                            color = TextSecondary,
-                                            fontSize = 10.sp
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    SettingToggleRow(
+                        title = if (isEn) "Bilingual mode (VI - EN)" else "Chế độ song ngữ (Việt - Anh)",
+                        subtitle = if (isEn) "Shows original English in parentheses" else "Hiện kèm tiếng Anh gốc trong ngoặc",
+                        checked = config.bilingualMode,
+                        onCheckedChange = { SettingsRepository.updateBilingualMode(it) }
+                    )
 
-                    // Hộp thanh trượt tinh chỉnh thông số Ngang/Dọc & Màu sắc chi tiết
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(alpha = 0.35f))
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        LabeledSlider(
-                            label = if (isEn) "Horizontal Width" else "Độ rộng chiều Ngang",
-                            valueText = "${(config.videoScaleX * 100).toInt()}%",
-                            value = config.videoScaleX,
-                            onValueChange = { SettingsRepository.updateVideoScaleX(it) },
-                            valueRange = 0.70f..1.40f,
-                            accentColor = XboxNeonGreen
-                        )
-                        LabeledSlider(
-                            label = if (isEn) "Vertical Height" else "Độ cao chiều Dọc",
-                            valueText = "${(config.videoScaleY * 100).toInt()}%",
-                            value = config.videoScaleY,
-                            onValueChange = { SettingsRepository.updateVideoScaleY(it) },
-                            valueRange = 0.70f..1.40f,
-                            accentColor = DirectCyan
-                        )
-                        LabeledSlider(
-                            label = if (isEn) "Image Contrast" else "Độ tương phản hình ảnh",
-                            valueText = "${config.videoContrast}%",
-                            value = config.videoContrast.toFloat(),
-                            onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
-                            valueRange = 80f..140f,
-                            accentColor = XboxNeonGreen
-                        )
-                        LabeledSlider(
-                            label = if (isEn) "Color Vividity" else "Độ tươi màu",
-                            valueText = "${config.videoSaturation}%",
-                            value = config.videoSaturation.toFloat(),
-                            onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
-                            valueRange = 80f..150f,
-                            accentColor = DirectCyan
-                        )
-                        LabeledSlider(
-                            label = if (isEn) "Screen Brightness" else "Độ sáng hình ảnh",
-                            valueText = "${config.videoBrightness}%",
-                            value = config.videoBrightness.toFloat(),
-                            onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
-                            valueRange = 80f..130f,
-                            accentColor = XboxNeonGreen
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            SettingsRepository.resetVideoDisplayDefaults()
-                            Toast.makeText(
-                                context,
-                                if (isEn) "Reset screen ratio & colors to default" else "Đã đặt lại tỉ lệ màn hình và màu sắc về mặc định",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("advanced_reset_video_defaults_btn"),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Text(
-                            text = if (isEn) "Reset Screen Ratio & Colors to Default" else "Đặt lại Tỉ lệ màn hình & Màu sắc về Mặc định",
-                            color = DirectCyan,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF0C1A14),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "ℹ️ Clear Guide on Screen Ratio & Video Recording" else "ℹ️ Giải thích rõ về Tỉ lệ màn hình & Quay video (.MP4)",
-                                color = DirectCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isEn) {
-                                    "• Full-Screen Recording (Default): Whatever screen ratio you play on (full phone screen 20:9 or 16:9), the recorded .MP4 video keeps that exact same screen ratio with stereo game audio.\n• In-Game Screen Ratio: Lets you play in standard 16:9, full-screen stretch, or custom width/height without ever resizing mid-game.\n• Saved Location: All recorded clips are saved directly to Gallery / Movies / CloudPlayXbox as .MP4 files."
-                                } else {
-                                    "• Quay Full màn hình (Mặc định): Bạn đang chơi trên màn hình điện thoại như thế nào (tràn viền 20:9 hay 16:9), video .MP4 xuất ra sẽ giữ nguyên đúng tỉ lệ màn hình đó và có đầy đủ tiếng game.\n• Không tự đổi tỉ lệ khi đang chơi: Tuyệt đối giữ cố định khung hình trong suốt trận đấu, không tự co giãn gây giật hình.\n• Nơi lưu video: Mọi video quay xong đều lưu chuẩn đuôi .MP4 vào Bộ sưu tập ảnh (Thư mục Movies/CloudPlayXbox)."
-                                },
-                                color = TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
+                    SettingToggleRow(
+                        title = if (isEn) "Hide technical stats overlay" else "Ẩn thông số kỹ thuật đè màn hình",
+                        subtitle = if (isEn) "Keeps gameplay screen clean" else "Giữ màn hình chơi game thoáng sạch",
+                        checked = config.hideStreamStatsOverlay,
+                        onCheckedChange = { SettingsRepository.updateHideStreamStatsOverlay(it) },
+                        activeColor = DirectCyan,
+                        switchTestTag = "settings_switch_hide_decode_profile"
+                    )
                 }
 
-                // 4.1 Ngôn ngữ ứng dụng
+                // 4.2 Ngôn ngữ ứng dụng
                 SettingsCard(title = if (isEn) "App Language" else "Ngôn ngữ ứng dụng") {
                     listOf(
                         Triple(AppLanguage.SYSTEM, "🌐 " + stringResource(R.string.lang_system_default), "app_lang_system_button"),
@@ -1220,8 +847,125 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4.2 Bộ nhớ đệm & tài khoản
-                SettingsCard(title = if (isEn) "Cache & Account" else "Bộ nhớ đệm & tài khoản") {
+                // 4.3 Ngôn ngữ vùng trang Xbox
+                SettingsCard(title = if (isEn) "Xbox Store Region" else "Vùng ngôn ngữ trang Xbox") {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (config.useSystemLanguage) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateUseSystemLanguage(true) },
+                        color = if (config.useSystemLanguage) XboxSurfaceVariant else Color.Transparent
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEn) "Auto Default ($resolvedSystemLocale)" else "Mặc định chuẩn ($resolvedSystemLocale)",
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = if (isEn) "Uses English (en-US) to avoid Japanese text" else "Ưu tiên tiếng Anh (en-US) để tránh chữ Nhật",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            if (config.useSystemLanguage) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        POPULAR_XBOX_LANGUAGES.take(5).forEach { lang ->
+                            val isSelected = !config.useSystemLanguage && config.customLocale.equals(lang.code, ignoreCase = true)
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.5f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateCustomLocale(lang.code) },
+                                color = if (isSelected) XboxSurfaceVariant else Color.Black.copy(alpha = 0.2f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(text = lang.flag, fontSize = 15.sp)
+                                        Text(
+                                            text = "${lang.localizedName(isEn)} (${lang.code})",
+                                            color = TextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = customInputText,
+                        onValueChange = { customInputText = it },
+                        label = { Text(if (isEn) "Custom locale or Xbox URL" else "Mã vùng hoặc link Xbox") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = XboxNeonGreen,
+                            unfocusedBorderColor = XboxCardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("custom_language_input")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { SettingsRepository.updateCustomLocale(customInputText) },
+                            colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isEn) "Apply" else "Áp dụng", fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                customInputText = "xbox.com/en-US"
+                                SettingsRepository.updateCustomLocale("en-US")
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isEn) "Reset en-US 🇺🇸" else "Đặt en-US 🇺🇸", color = DirectCyan, fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                // 4.4 Tài khoản & Bản quyền
+                SettingsCard(title = if (isEn) "Account & License" else "Tài khoản & Bản quyền") {
                     Button(
                         onClick = onClearCookies,
                         modifier = Modifier.fillMaxWidth(),
@@ -1231,25 +975,13 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Delete, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                             Text(
-                                text = if (isEn) "Clear Cookies & Re-login to Xbox" else "Xóa Cookie & Đăng nhập lại Xbox",
+                                text = if (isEn) "Clear Cookies & Re-login" else "Xóa phiên & Đăng nhập lại Xbox",
                                 color = TextPrimary,
                                 fontSize = 12.sp
                             )
                         }
                     }
-                }
 
-                // 4.3 Điều khoản, bảo mật & bản quyền
-                SettingsCard(title = if (isEn) "Terms, Security & License" else "Điều khoản, bảo mật & bản quyền") {
-                    Text(
-                        text = if (isEn) {
-                            "Independent app • Fair Play (no macro/cheats) • 100% local data • Open-source MIT License (Better-xCloud)."
-                        } else {
-                            "Ứng dụng độc lập • Chơi công bằng (không macro/gian lận) • Dữ liệu lưu cục bộ 100% • Giấy phép nguồn mở MIT (Better-xCloud)."
-                        },
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
                     Button(
                         onClick = { showTermsDialog = true },
                         modifier = Modifier.fillMaxWidth(),
@@ -1259,7 +991,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                             Text(
-                                text = if (isEn) "View Terms, Security & MIT License" else "Xem điều khoản, bảo mật & giấy phép MIT",
+                                text = if (isEn) "Terms & Open-Source License (MIT)" else "Điều khoản & Bản quyền nguồn mở (MIT)",
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -1271,28 +1003,18 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 5: TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH & LƯU CLIP (Mặc định gập)
+        // NHÓM 5: QUAY MÀN HÌNH (TÙY CHỌN PHỤ) (Mặc định gập)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Screen Recording (Secondary Feature)" else "Quay video màn hình (Tính năng phụ)",
-                subtitle = if (isEn) "Capture engine, video quality, storage location" else "Cơ chế quay luồng stream & chất lượng video",
+                title = if (isEn) "Screen Recording (Optional)" else "Quay màn hình (Tùy chọn phụ)",
+                subtitle = config.screenRecordQuality.localizedShort(isEn),
                 icon = Icons.Default.Videocam,
                 expanded = expandRecording,
                 onToggle = { expandRecording = !expandRecording },
                 testTag = "settings_group_recording"
             ) {
-                SettingsCard(title = if (isEn) "Video Capture Engine (Direct Stream vs Hardware)" else "Cơ chế quay video (Lấy luồng Stream vs Phần cứng)") {
-                    Text(
-                        text = if (isEn) {
-                            "Secondary utility for recording gameplay clips to Gallery (Movies/XboxCloudPlay). Default: Full Screen device recording via hardware encoder. Optional: Direct WebRTC stream clone for 16:9 game-only capture."
-                        } else {
-                            "Tính năng phụ hỗ trợ lưu clip vào Thư viện (Movies/XboxCloudPlay): Mặc định quay Full Toàn Màn Hình thiết bị bằng bộ mã hóa phần cứng. Tùy chọn lấy luồng WebRTC trực tiếp dành cho người dùng muốn chỉ thu khung hình game 16:9 gốc."
-                        },
-                        color = TextSecondary,
-                        fontSize = 11.sp
-                    )
-
+                SettingsCard(title = if (isEn) "Recording Mode & Quality" else "Chế độ & Độ nét video (.MP4)") {
                     com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
                         val isSelected = config.recordingCaptureEngine == engine
                         Surface(
@@ -1369,7 +1091,7 @@ fun SettingsScreen(
                                         color = TextSecondary,
                                         fontSize = 9.sp,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 2
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -1377,44 +1099,12 @@ fun SettingsScreen(
                     }
 
                     SettingToggleRow(
-                        title = if (isEn) "Auto-Reduce GPU Load While Recording" else "Tự giảm tải đồ họa khi đang quay",
-                        subtitle = if (isEn) {
-                            "Automatically enables lightweight GPU mode during screen recording to keep frame rate locked"
-                        } else {
-                            "Tự động bật chế độ nhẹ tải GPU trong lúc quay video để giữ khung hình luôn mượt"
-                        },
+                        title = if (isEn) "Reduce GPU load while recording" else "Giảm tải GPU khi đang quay",
+                        subtitle = if (isEn) "Keeps gameplay smooth while recording" else "Giữ khung hình ổn định trong lúc ghi hình",
                         checked = config.autoReduceLoadWhenRecording,
                         onCheckedChange = { SettingsRepository.updateAutoReduceLoadWhenRecording(it) },
                         activeColor = XboxNeonGreen
                     )
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF0C1A14),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "ℹ️ Does Direct Stream Capture have any side effects?" else "ℹ️ Lấy thẳng luồng Video Streaming có tác dụng phụ không?",
-                                color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (isEn) {
-                                    "• 0% extra 4G/Wi-Fi data: Clones the already-received WebRTC track in RAM.\n• 0% GPU screen-capture lag: Does not screenshot the UI or stretch 20:9 screens.\n• Note: Only records the pure 16:9 game video + audio (floating HUD buttons are not drawn onto the video).\n• Storage folder: Internal Storage > Movies > XboxCloudPlay"
-                                } else {
-                                    "• Không tốn thêm 4G/Wi-Fi: Nhân bản luồng WebRTC (Track Clone) đã tải sẵn trong bộ đệm.\n• Không gây tụt FPS & Không bị bóp hình: Không chụp lại màn hình điện thoại nên giữ nguyên khung hình 16:9 chuẩn gốc của Xbox.\n• Lưu ý nhỏ duy nhất: File video thu được là hình ảnh + âm thanh nguyên bản của game (không dính các nút tay cầm ảo hay nút HUD nổi trên màn hình).\n• Vị trí lưu clip: Bộ nhớ trong > Thư mục Movies > XboxCloudPlay"
-                                },
-                                color = TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
                 }
             }
         }

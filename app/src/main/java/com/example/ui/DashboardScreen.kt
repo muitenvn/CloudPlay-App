@@ -516,18 +516,9 @@ private fun ConsoleLiveTelemetryRibbon(
     onOpenSettings: () -> Unit
 ) {
     val isEn = config.isEnglishUI()
-    val aspectLabel = when (config.videoAspectRatioMode) {
-        com.example.data.VideoAspectRatioMode.FIT_16_9 -> if (isEn) "16:9 Fit" else "16:9 Chuẩn"
-        com.example.data.VideoAspectRatioMode.CINEMA_18_9 -> if (isEn) "18:9 Wide" else "18:9 Rộng"
-        com.example.data.VideoAspectRatioMode.ZOOM_COVER -> if (isEn) "Zoom Cover" else "Tràn viền"
-        com.example.data.VideoAspectRatioMode.STRETCH_FULL -> if (isEn) "Full Stretch" else "Kéo giãn"
-        com.example.data.VideoAspectRatioMode.CUSTOM_SCALE ->
-            "${(config.videoScaleX * 100).toInt()}x${(config.videoScaleY * 100).toInt()}%"
-    }
     val graphicsLabel = if (isEn) config.cellularMode.shortLabelEn else config.cellularMode.shortLabel
     val fpsCapLabel = "${config.streamFpsCap.fps} FPS"
 
-    // Next-Gen Live Console Telemetry Ribbon (Core Graphics, Aspect Ratio & 60FPS Input)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -536,41 +527,7 @@ private fun ConsoleLiveTelemetryRibbon(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // 1. Interactive 1-tap Aspect Ratio cycler pill (16:9 Chuẩn / 18:9 Rộng / Tràn viền / Kéo giãn)
-        Surface(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
-                    val modes = com.example.data.VideoAspectRatioMode.entries
-                    val nextIndex = (modes.indexOf(config.videoAspectRatioMode) + 1) % modes.size
-                    SettingsRepository.updateVideoAspectRatioMode(modes[nextIndex])
-                }
-                .testTag("ribbon_aspect_ratio_chip"),
-            shape = RoundedCornerShape(8.dp),
-            color = DirectCyan.copy(alpha = 0.12f),
-            border = androidx.compose.foundation.BorderStroke(
-                0.7.dp,
-                DirectCyan.copy(alpha = 0.45f)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(text = "🎬", fontSize = 9.sp)
-                Text(
-                    text = aspectLabel,
-                    color = DirectCyan,
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1
-                )
-            }
-        }
-
-        // 2. Interactive 1-tap Core Graphics & Bitrate mode toggle pill (Tự động / Thấp / Vừa / Cao / Rất cao)
+        // 1. Ưu tiên 1: Chế độ Đồ họa (1 chạm để chuyển Tự động / Thấp / Vừa / Cao / Rất cao)
         Surface(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
@@ -588,13 +545,13 @@ private fun ConsoleLiveTelemetryRibbon(
             )
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(text = "✨", fontSize = 9.sp)
                 Text(
-                    text = if (isEn) "Quality: $graphicsLabel" else "Đồ họa: $graphicsLabel",
+                    text = if (isEn) "Graphics: $graphicsLabel" else "Đồ họa: $graphicsLabel",
                     color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
                     fontSize = 9.5.sp,
@@ -604,7 +561,41 @@ private fun ConsoleLiveTelemetryRibbon(
             }
         }
 
-        // 3. FPS & Input Mode pill (opens Settings on tap)
+        // 2. Ưu tiên 2: Nhịp khung hình (1 chạm để đổi 30 / 60 / 120 FPS)
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    val caps = com.example.data.StreamFpsCap.entries
+                    val nextIndex = (caps.indexOf(config.streamFpsCap) + 1) % caps.size
+                    SettingsRepository.updateStreamFpsCap(caps[nextIndex])
+                }
+                .testTag("ribbon_fps_cap_chip"),
+            shape = RoundedCornerShape(8.dp),
+            color = DirectCyan.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(
+                0.7.dp,
+                DirectCyan.copy(alpha = 0.45f)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(text = "⚡", fontSize = 9.sp)
+                Text(
+                    text = fpsCapLabel,
+                    color = DirectCyan,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1
+                )
+            }
+        }
+
+        // 3. Ưu tiên 3: Chế độ điều khiển (chạm mở Cài đặt)
         Surface(
             modifier = Modifier
                 .weight(1f)
@@ -621,7 +612,11 @@ private fun ConsoleLiveTelemetryRibbon(
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = if (hasPhysicalController) "🎮 $fpsCapLabel • Tay cầm" else "⚡ $fpsCapLabel • Cảm ứng",
+                    text = if (hasPhysicalController) {
+                        if (isEn) "🎮 Controller Ready" else "🎮 Tay cầm sẵn sàng"
+                    } else {
+                        if (isEn) "👆 Touch Controls" else "👆 Cảm ứng"
+                    },
                     color = TextSecondary,
                     fontFamily = JetBrainsMonoFontFamily,
                     fontSize = 9.sp,

@@ -435,7 +435,7 @@ private fun HeroConsolePlayDeck(
                                 maxLines = 1
                             )
                             Text(
-                                text = if (isEn) "60FPS • 16:9 Ready" else "60FPS • Chuẩn 16:9",
+                                text = if (isEn) "Full HD • Smooth 60FPS" else "Full HD • Mượt 60FPS",
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.5.sp,
@@ -474,7 +474,7 @@ private fun HeroConsolePlayDeck(
                                 maxLines = 1
                             )
                             Text(
-                                text = if (isEn) "Free • No Pass Needed" else "Miễn phí • Vào ngay",
+                                text = if (isEn) "Free • Instant Play" else "Miễn phí • Vào ngay",
                                 color = GoldStar.copy(alpha = 0.95f),
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.5.sp,
@@ -485,22 +485,14 @@ private fun HeroConsolePlayDeck(
                     }
                 }
 
-                // Thanh chỉnh nhanh tương tác (1 chạm để đổi Tỉ lệ Video, Đồ họa 4G/Wi-Fi, hoặc mở Cài đặt Video)
+                // Thanh chỉnh nhanh theo thứ tự ưu tiên: Đồ họa -> Nhịp FPS -> Điều khiển/Cài đặt
                 val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
                 val graphicsShort = when (config.cellularMode) {
                     com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
                     com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
-                    com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Medium" else "Vừa"
+                    com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
                     com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
                     com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
-                }
-                val aspectShort = when (config.videoAspectRatioMode) {
-                    com.example.data.VideoAspectRatioMode.FIT_16_9 -> "16:9"
-                    com.example.data.VideoAspectRatioMode.CINEMA_18_9 -> "18:9"
-                    com.example.data.VideoAspectRatioMode.ZOOM_COVER -> if (isEn) "Fill" else "Đầy"
-                    com.example.data.VideoAspectRatioMode.STRETCH_FULL -> if (isEn) "Full" else "Giãn"
-                    com.example.data.VideoAspectRatioMode.CUSTOM_SCALE ->
-                        "${(config.videoScaleX * 100).toInt()}%"
                 }
 
                 Row(
@@ -508,19 +500,8 @@ private fun HeroConsolePlayDeck(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     HeroCapabilityChip(
-                        icon = "🎬",
-                        label = if (isEn) "Ratio: $aspectShort" else "Tỉ lệ: $aspectShort",
-                        accentColor = DirectCyan,
-                        onClick = {
-                            val modes = com.example.data.VideoAspectRatioMode.entries
-                            val nextIdx = (modes.indexOf(config.videoAspectRatioMode) + 1) % modes.size
-                            SettingsRepository.updateVideoAspectRatioMode(modes[nextIdx])
-                        },
-                        modifier = Modifier.weight(1.05f)
-                    )
-                    HeroCapabilityChip(
                         icon = "✨",
-                        label = if (isEn) "Quality: $graphicsShort" else "Đồ họa: $graphicsShort",
+                        label = if (isEn) "Graphics: $graphicsShort" else "Đồ họa: $graphicsShort",
                         accentColor = XboxNeonGreen,
                         onClick = {
                             val modes = com.example.data.CellularOptimizationMode.entries
@@ -530,11 +511,22 @@ private fun HeroConsolePlayDeck(
                         modifier = Modifier.weight(1.15f)
                     )
                     HeroCapabilityChip(
+                        icon = "⚡",
+                        label = "${config.streamFpsCap.fps} FPS",
+                        accentColor = DirectCyan,
+                        onClick = {
+                            val caps = com.example.data.StreamFpsCap.entries
+                            val nextIdx = (caps.indexOf(config.streamFpsCap) + 1) % caps.size
+                            SettingsRepository.updateStreamFpsCap(caps[nextIdx])
+                        },
+                        modifier = Modifier.weight(0.95f)
+                    )
+                    HeroCapabilityChip(
                         icon = if (gamepadStatus.hasPhysicalController) "🎮" else "⚙️",
                         label = if (gamepadStatus.hasPhysicalController) {
                             if (isEn) "Gamepad" else "Tay cầm"
                         } else {
-                            if (isEn) "Video ($regionCode)" else "Video ($regionCode)"
+                            if (isEn) "Region: $regionCode" else "Vùng: $regionCode"
                         },
                         accentColor = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else GoldStar,
                         onClick = onNavigateToSettings,
@@ -884,7 +876,7 @@ private fun FeaturedGamesSection(
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = if (isEn) "• 16:9 60FPS" else "• 16:9 CHUẨN 60FPS",
+                                    text = if (isEn) "• SMOOTH 60FPS" else "• MƯỢT 60FPS",
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.5.sp,

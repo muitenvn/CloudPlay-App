@@ -313,45 +313,45 @@ enum class StreamRenderScale(
         id = "100",
         scaleFactor = 1.0f,
         targetHeightPx = 1080,
-        titleVi = "100% Chuẩn Gốc (1080p)",
-        titleEn = "100% Native (1080p)",
+        titleVi = "100% (1080p Chuẩn)",
+        titleEn = "100% (1080p Native)",
         shortVi = "100%",
         shortEn = "100%",
-        descVi = "Độ nét tối đa theo luồng gốc của máy chủ",
-        descEn = "Full native resolution from cloud server"
+        descVi = "Sắc nét tối đa",
+        descEn = "Maximum sharpness"
     ),
     BALANCED_85(
         id = "85",
         scaleFactor = 0.85f,
         targetHeightPx = 900,
-        titleVi = "85% Cân Bằng (900p • -25% tải GPU)",
-        titleEn = "85% Balanced (900p • -25% GPU load)",
+        titleVi = "85% (900p Cân bằng)",
+        titleEn = "85% (900p Balanced)",
         shortVi = "85%",
         shortEn = "85%",
-        descVi = "Giảm 25% gánh nặng dựng hình mà vẫn giữ chữ & tâm ngắm sắc nét",
-        descEn = "Cuts GPU rendering load by 25% while keeping text & crosshair sharp"
+        descVi = "Giảm 25% tải GPU, vẫn rõ nét",
+        descEn = "-25% GPU load, stays sharp"
     ),
     PERFORMANCE_75(
         id = "75",
         scaleFactor = 0.75f,
         targetHeightPx = 720,
-        titleVi = "75% Siêu Mượt (720p • -45% tải GPU)",
-        titleEn = "75% Ultra Smooth (720p • -45% GPU load)",
+        titleVi = "75% (720p Mượt)",
+        titleEn = "75% (720p Smooth)",
         shortVi = "75%",
         shortEn = "75%",
-        descVi = "Giảm gần một nửa tải GPU/CPU, chống tụt khung hình khi combat",
-        descEn = "Halves GPU/CPU load to eliminate frame drops in heavy combat"
+        descVi = "Giảm 45% tải GPU, chống tụt FPS",
+        descEn = "-45% GPU load, prevents frame drops"
     ),
     ULTRA_LIGHT_60(
         id = "60",
         scaleFactor = 0.60f,
         targetHeightPx = 540,
-        titleVi = "60% Siêu Nhẹ (540p • Máy yếu / Quay mượt)",
-        titleEn = "60% Ultra Light (540p • Low-End / Recording)",
+        titleVi = "60% (540p Siêu nhẹ)",
+        titleEn = "60% (540p Ultra Light)",
         shortVi = "60%",
         shortEn = "60%",
-        descVi = "Nhẹ máy tối đa, lý tưởng cho máy yếu hoặc khi vừa chơi vừa quay màn hình",
-        descEn = "Minimum hardware load, ideal for low-end phones or lag-free recording"
+        descVi = "Dành cho máy yếu, siêu mát",
+        descEn = "For low-end devices, runs cool"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
@@ -370,30 +370,30 @@ enum class StreamFpsCap(
 ) {
     FPS_30(
         fps = 30,
-        titleVi = "30 FPS (Siêu mát • Giảm 50% tải máy)",
-        titleEn = "30 FPS (Ultra Cool • -50% Device Load)",
+        titleVi = "30 FPS",
+        titleEn = "30 FPS",
         shortVi = "30 FPS",
         shortEn = "30 FPS",
-        descVi = "Khóa 30 khung hình ổn định, máy cực mát và tiết kiệm pin gấp đôi",
-        descEn = "Locks stable 30 FPS to keep device cool and double battery life"
+        descVi = "Mát máy, tiết kiệm pin",
+        descEn = "Cool & battery saving"
     ),
     FPS_60(
         fps = 60,
-        titleVi = "60 FPS (Mượt tiêu chuẩn)",
-        titleEn = "60 FPS (Standard Smooth)",
+        titleVi = "60 FPS",
+        titleEn = "60 FPS",
         shortVi = "60 FPS",
         shortEn = "60 FPS",
-        descVi = "Chuẩn 60 FPS mượt mà cho mọi tựa game hành động, đua xe, bắn súng",
-        descEn = "Smooth 60 FPS standard for action, racing, and shooter titles"
+        descVi = "Mượt tiêu chuẩn",
+        descEn = "Standard smooth"
     ),
     FPS_120(
         fps = 120,
-        titleVi = "120 FPS (Màn hình tần số cao)",
-        titleEn = "120 FPS (High Refresh Display)",
+        titleVi = "120 FPS",
+        titleEn = "120 FPS",
         shortVi = "120 FPS",
         shortEn = "120 FPS",
-        descVi = "Mở khóa thương lượng 120Hz cho màn hình 90Hz/120Hz (Fortnite / Series X)",
-        descEn = "Unlocks 120Hz stream negotiation for 90Hz/120Hz displays"
+        descVi = "Màn hình 90Hz/120Hz",
+        descEn = "90Hz/120Hz displays"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
@@ -420,12 +420,12 @@ enum class ScreenRecordQuality(
         heightPx = 540,
         fps = 30,
         bitrateBps = 2_800_000,
-        titleVi = "Nhẹ 540p • 30FPS (Dành cho máy yếu)",
-        titleEn = "Light 540p • 30FPS (For Low-End Devices)",
+        titleVi = "540p • 30FPS",
+        titleEn = "540p • 30FPS",
         shortVi = "540p • 30F",
         shortEn = "540p • 30F",
-        descVi = "Video gọn nhẹ, tiết kiệm bộ nhớ và giữ máy mát khi vừa chơi vừa quay",
-        descEn = "Compact video size that saves storage and keeps your phone cool while recording"
+        descVi = "Nhẹ máy, tốn ít bộ nhớ",
+        descEn = "Light & compact"
     ),
     BALANCED_720P_30(
         id = "720p30",
@@ -433,12 +433,12 @@ enum class ScreenRecordQuality(
         heightPx = 720,
         fps = 30,
         bitrateBps = 4_500_000,
-        titleVi = "Chuẩn HD 720p • 30FPS (Khuyên dùng)",
-        titleEn = "Standard HD 720p • 30FPS (Recommended)",
+        titleVi = "720p • 30FPS",
+        titleEn = "720p • 30FPS",
         shortVi = "720p • 30F",
         shortEn = "720p • 30F",
-        descVi = "Video HD rõ nét, thu đủ tiếng game và giữ tốc độ chơi mượt ổn định",
-        descEn = "Crisp HD video with full game audio and smooth gameplay"
+        descVi = "Rõ nét, ổn định (Khuyên dùng)",
+        descEn = "Crisp & stable (Recommended)"
     ),
     SMOOTH_720P_60(
         id = "720p60",
@@ -446,72 +446,12 @@ enum class ScreenRecordQuality(
         heightPx = 720,
         fps = 60,
         bitrateBps = 7_000_000,
-        titleVi = "Siêu mượt 720p • 60FPS (Máy khỏe)",
-        titleEn = "High Smooth 720p • 60FPS (Fast Device)",
+        titleVi = "720p • 60FPS",
+        titleEn = "720p • 60FPS",
         shortVi = "720p • 60F",
         shortEn = "720p • 60F",
-        descVi = "Quay 60 khung hình/giây mượt mà cho các pha bắn súng, đua xe tốc độ cao",
-        descEn = "Silky-smooth 60 FPS recording for shooter and racing highlights"
-    );
-
-    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
-    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
-    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
-}
-
-enum class VideoAspectRatioMode(
-    val id: String,
-    val titleVi: String,
-    val titleEn: String,
-    val shortVi: String,
-    val shortEn: String,
-    val descVi: String,
-    val descEn: String
-) {
-    FIT_16_9(
-        id = "fit_16_9",
-        titleVi = "Chuẩn 16:9 gốc (Giữ nguyên khung Xbox)",
-        titleEn = "Original 16:9 (Native Xbox Frame)",
-        shortVi = "16:9 Gốc",
-        shortEn = "16:9 Original",
-        descVi = "Hiển thị đúng khung 16:9 gốc của game, có viền đen 2 bên trên màn hình dài, không méo hình",
-        descEn = "Shows the original 16:9 game frame with side black bars on wide phones, zero distortion"
-    ),
-    CINEMA_18_9(
-        id = "cinema_18_9",
-        titleVi = "Mở rộng 18:9 (Giảm bớt viền đen 2 bên)",
-        titleEn = "Wider 18:9 (Smaller Side Black Bars)",
-        shortVi = "Rộng 18:9",
-        shortEn = "18:9 Wide",
-        descVi = "Mở rộng nhẹ chiều ngang thêm 12% để nhìn rộng hơn mà nhân vật vẫn cân đối",
-        descEn = "Slightly widens the frame to 18:9 to reduce side bars while keeping characters natural"
-    ),
-    ZOOM_COVER(
-        id = "zoom_cover",
-        titleVi = "Phóng đầy màn hình (Không méo hình)",
-        titleEn = "Zoom to Fill Screen (No Distortion)",
-        shortVi = "Phóng đầy màn",
-        shortEn = "Zoom Fill",
-        descVi = "Phóng đều khung hình ra sát mép điện thoại, giữ đúng tỉ lệ nhân vật (cắt nhẹ mép trên/dưới)",
-        descEn = "Zooms evenly to fill the entire screen without stretching characters (slightly trims top/bottom)"
-    ),
-    STRETCH_FULL(
-        id = "stretch_full",
-        titleVi = "Kéo giãn kín toàn bộ màn hình",
-        titleEn = "Stretch to Fill Entire Screen",
-        shortVi = "Kéo giãn kín màn",
-        shortEn = "Full Stretch",
-        descVi = "Kéo khung hình lấp kín 100% màn hình điện thoại (không mất chi tiết nào, hình hơi bè ngang)",
-        descEn = "Stretches the game frame to cover 100% of your phone screen without cropping any HUD details"
-    ),
-    CUSTOM_SCALE(
-        id = "custom_scale",
-        titleVi = "Tự chỉnh độ rộng Ngang & Dọc theo ý muốn",
-        titleEn = "Custom Horizontal & Vertical Size",
-        shortVi = "Tự chỉnh Ngang/Dọc",
-        shortEn = "Custom Size",
-        descVi = "Dùng 2 thanh trượt Ngang và Dọc bên dưới để tự căn vừa khít màn hình máy bạn",
-        descEn = "Use the Horizontal and Vertical sliders below to fit your screen however you like"
+        descVi = "Siêu mượt cho máy khỏe",
+        descEn = "60 FPS for fast devices"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
@@ -530,23 +470,22 @@ enum class RecordingCaptureEngine(
 ) {
     HARDWARE_SCREEN(
         id = "HARDWARE_SCREEN",
-        titleVi = "Full màn hình (Giống hệt lúc đang chơi • Mặc định)",
-        titleEn = "Full Screen (Exact Gameplay Ratio • Default)",
-        shortVi = "Full màn hình (Như lúc chơi)",
-        shortEn = "Full Screen (As Played)",
-        descVi = "Màn hình đang hiển thị thế nào thì video .MP4 xuất ra đúng tỉ lệ đó (20:9, tràn viền...), thu đủ tiếng game",
-        descEn = "Outputs .MP4 video with the exact same aspect ratio as your screen while playing, with stereo game audio"
+        titleVi = "Quay theo màn hình đang chơi (Mặc định)",
+        titleEn = "Record Screen Ratio as Played (Default)",
+        shortVi = "Theo màn hình",
+        shortEn = "Screen Ratio",
+        descVi = "Ghi hình .MP4 đúng tỉ lệ màn hình máy kèm tiếng game",
+        descEn = "Records .MP4 matching your display ratio with game audio"
     ),
     DIRECT_STREAM(
         id = "DIRECT_STREAM",
-        titleVi = "Khung ngang 16:9 (Chuẩn YouTube / TV)",
-        titleEn = "16:9 Widescreen Frame (YouTube / TV Standard)",
-        shortVi = "Khung ngang 16:9",
-        shortEn = "16:9 Frame",
-        descVi = "Xuất video .MP4 theo khung ngang 16:9 cố định (1280×720), thu đủ tiếng game và không đổi màn hình đang chơi",
-        descEn = "Outputs standard 16:9 (1280×720) .MP4 video with stereo game audio without changing your live screen"
+        titleVi = "Quay luồng 16:9 gốc",
+        titleEn = "Direct 16:9 Stream",
+        shortVi = "Luồng 16:9",
+        shortEn = "16:9 Stream",
+        descVi = "Chỉ ghi khung hình 16:9 của game kèm tiếng",
+        descEn = "Records pure 16:9 game stream with audio"
     );
-
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
     fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
@@ -554,17 +493,17 @@ enum class RecordingCaptureEngine(
 }
 
 data class AppConfig(
-    val appLanguage: AppLanguage = AppLanguage.SYSTEM, // Tự động chọn tiếng Việt / tiếng Anh theo hệ thống
-    val smartVpnEnabled: Boolean = true, // Tự động kiểm tra IP & điều khiển bật/tắt thông minh
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
+    val smartVpnEnabled: Boolean = true,
     val autoBypassEnabled: Boolean = true,
     val autoBypassDelaySeconds: Int = 2,
     val autoReconnectOnMenu: Boolean = true,
     val forceDesktopUserAgent: Boolean = true,
     val clarityBoostEnabled: Boolean = true,
     val clarityPreset: ClarityPreset = ClarityPreset.BALANCED,
-    val maxBitrateMbps: Int = 15, // 1080p high bitrate stream
-    val antiAfkKeepAlive: Boolean = true, // Chống bị ngắt phiên AFK 15 phút
-    val inputPollingBoost: Boolean = true, // Tăng tần số lấy mẫu tay cầm 120Hz/240Hz
+    val maxBitrateMbps: Int = 15,
+    val antiAfkKeepAlive: Boolean = true,
+    val inputPollingBoost: Boolean = true,
     val showFloatingHud: Boolean = true,
     val showVirtualController: Boolean = false,
     val gamepadScale: Float = 1.0f, // 0.75f .. 1.35f
@@ -580,41 +519,30 @@ data class AppConfig(
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
-    // Cuộc Cách Mạng Hệ Thống 1.0 (System Revolution 1.0)
     val systemRevolutionEnabled: Boolean = true,
     val stealthHeadersEnabled: Boolean = true,
     val autoHealingProxyMesh: Boolean = true,
     val sdpBitrateBoostEnabled: Boolean = true,
     val zeroDelayDirectHandshake: Boolean = true,
     val antiJapaneseEnforcer: Boolean = true,
-    // Bộ Dịch Tiếng Việt Tối Ưu Riêng Cho Xbox Cloud (Native xCloud Translator)
     val xcloudTranslateEnabled: Boolean = true,
     val preserveGameTitles: Boolean = true,
     val bilingualMode: Boolean = false,
     val githubDictionaryEnabled: Boolean = true,
-    // Ẩn lớp phủ bảng thông số kỹ thuật đè màn hình (Decode Profile / Stream Stats HUD)
     val hideStreamStatsOverlay: Boolean = true,
-    // Chế độ Đồ Họa & Hiệu Năng Máy (Mặc định: Tự Động theo điều kiện mạng & máy)
     val cellularMode: CellularOptimizationMode = CellularOptimizationMode.AUTO,
     val networkTuningMode: NetworkTuningMode = NetworkTuningMode.AUTO,
     val wifiSpeedFirstPriority: Boolean = true,
-    // Chế độ máy yếu (tùy chọn do người dùng bật, không tự áp cho mọi máy)
     val lowEndDeviceMode: Boolean = false,
-    // Điều chỉnh đồ họa chuyên sâu & Quay màn hình không lag
     val streamRenderScale: StreamRenderScale = StreamRenderScale.NATIVE_100,
     val streamFpsCap: StreamFpsCap = StreamFpsCap.FPS_60,
     val gpuLoadReductionEnabled: Boolean = true,
     val screenRecordQuality: ScreenRecordQuality = ScreenRecordQuality.BALANCED_720P_30,
     val autoReduceLoadWhenRecording: Boolean = true,
     val recordingCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.HARDWARE_SCREEN,
-    // Cài đặt Tỉ lệ khung hình & Hiển thị Video (Chống bóp méo hình)
-    val videoAspectRatioMode: VideoAspectRatioMode = VideoAspectRatioMode.FIT_16_9,
-    val videoScaleX: Float = 1.0f, // 0.70f .. 1.40f
-    val videoScaleY: Float = 1.0f, // 0.70f .. 1.40f
     val videoContrast: Int = 105, // 80 .. 140 (%)
     val videoSaturation: Int = 108, // 80 .. 150 (%)
     val videoBrightness: Int = 100, // 80 .. 130 (%)
-    // Điều khoản người dùng & Tuyên bố bản quyền nguồn mở GitHub (Better-xCloud MIT)
     val userAcceptedTerms: Boolean = false
 ) {
     val targetRegionUrl: String
@@ -730,14 +658,6 @@ object SettingsRepository {
                         ?: RecordingCaptureEngine.HARDWARE_SCREEN.name
                 )
             } catch (_: Exception) { RecordingCaptureEngine.HARDWARE_SCREEN },
-            videoAspectRatioMode = try {
-                VideoAspectRatioMode.valueOf(
-                    sp.getString("video_aspect_ratio_mode", VideoAspectRatioMode.FIT_16_9.name)
-                        ?: VideoAspectRatioMode.FIT_16_9.name
-                )
-            } catch (_: Exception) { VideoAspectRatioMode.FIT_16_9 },
-            videoScaleX = sp.getFloat("video_scale_x", 1.0f).coerceIn(0.70f, 1.40f),
-            videoScaleY = sp.getFloat("video_scale_y", 1.0f).coerceIn(0.70f, 1.40f),
             videoContrast = sp.getInt("video_contrast", 105).coerceIn(80, 140),
             videoSaturation = sp.getInt("video_saturation", 108).coerceIn(80, 150),
             videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
@@ -794,9 +714,6 @@ object SettingsRepository {
             putBoolean("auto_reduce_load_recording", c.autoReduceLoadWhenRecording)
             putString("recording_capture_engine_v3", c.recordingCaptureEngine.name)
             putString("recording_capture_engine", c.recordingCaptureEngine.name)
-            putString("video_aspect_ratio_mode", c.videoAspectRatioMode.name)
-            putFloat("video_scale_x", c.videoScaleX)
-            putFloat("video_scale_y", c.videoScaleY)
             putInt("video_contrast", c.videoContrast)
             putInt("video_saturation", c.videoSaturation)
             putInt("video_brightness", c.videoBrightness)
@@ -1192,21 +1109,6 @@ object SettingsRepository {
         persist(_config.value)
     }
 
-    fun updateVideoAspectRatioMode(mode: VideoAspectRatioMode) {
-        _config.update { it.copy(videoAspectRatioMode = mode) }
-        persist(_config.value)
-    }
-
-    fun updateVideoScaleX(scaleX: Float) {
-        _config.update { it.copy(videoScaleX = scaleX.coerceIn(0.70f, 1.40f)) }
-        persist(_config.value)
-    }
-
-    fun updateVideoScaleY(scaleY: Float) {
-        _config.update { it.copy(videoScaleY = scaleY.coerceIn(0.70f, 1.40f)) }
-        persist(_config.value)
-    }
-
     fun updateVideoContrast(contrast: Int) {
         _config.update { it.copy(videoContrast = contrast.coerceIn(80, 140)) }
         persist(_config.value)
@@ -1225,9 +1127,6 @@ object SettingsRepository {
     fun resetVideoDisplayDefaults() {
         _config.update {
             it.copy(
-                videoAspectRatioMode = VideoAspectRatioMode.FIT_16_9,
-                videoScaleX = 1.0f,
-                videoScaleY = 1.0f,
                 videoContrast = 105,
                 videoSaturation = 108,
                 videoBrightness = 100

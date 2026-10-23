@@ -1019,7 +1019,7 @@ fun FloatingHud(
                                 )
 
                                 // ========================================================
-                                // 5. TÙY CHỈNH SÂU ĐỒ HỌA, KHUNG HÌNH 60 FPS & TỈ LỆ MÀN HÌNH
+                                // 5. TÙY CHỈNH SÂU ĐỒ HỌA, FPS & MÀU SẮC
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1041,7 +1041,7 @@ fun FloatingHud(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = if (isEn) "⚙️ Graphics, 60 FPS & Aspect Ratio" else "⚙️ Đồ họa, 60 FPS & Tỉ lệ màn hình",
+                                                text = if (isEn) "⚙️ Graphics, FPS & Colors" else "⚙️ Đồ họa, FPS & Màu sắc",
                                                 color = DirectCyan,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.ExtraBold,
@@ -1049,9 +1049,9 @@ fun FloatingHud(
                                             )
                                             Text(
                                                 text = if (isEn) {
-                                                    "Scale: ${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps}FPS • ${config.videoAspectRatioMode.localizedShort(true)}"
+                                                    "Scale: ${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
                                                 } else {
-                                                    "Đồ họa: ${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps}FPS • ${config.videoAspectRatioMode.localizedShort(false)}"
+                                                    "Độ nét: ${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
                                                 },
                                                 color = TextSecondary,
                                                 fontSize = 7.5.sp,
@@ -1063,7 +1063,7 @@ fun FloatingHud(
                                             color = DirectCyan.copy(alpha = 0.22f)
                                         ) {
                                             Text(
-                                                text = if (isEn) "TUNE" else "TÙY CHỈNH",
+                                                text = if (isEn) "TUNE" else "MỞ",
                                                 color = Color.White,
                                                 fontSize = 7.5.sp,
                                                 fontWeight = FontWeight.ExtraBold,
@@ -1074,7 +1074,7 @@ fun FloatingHud(
                                 }
 
                                 // ========================================================
-                                // 6. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (.MP4 CÓ TIẾNG - MẶC ĐỊNH GIỐNG HỆT LÚC CHƠI)
+                                // 6. TÍNH NĂNG PHỤ: QUAY MÀN HÌNH (.MP4)
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1083,7 +1083,6 @@ fun FloatingHud(
                                         .clickable {
                                             markUserInteraction()
                                             if (!recorderState.isRecording) {
-                                                // Tự thu gọn bảng HUD ngay khi bấm Quay để bảng không che màn hình trong video
                                                 hudMode = HudMode.COMPACT
                                             }
                                             onToggleRecording()
@@ -1120,7 +1119,7 @@ fun FloatingHud(
                                                         if (isEn) "🔴 Recording %02d:%02d — Tap to Save".format(mins, secs)
                                                         else "🔴 Đang quay %02d:%02d — Chạm để Lưu".format(mins, secs)
                                                     } else {
-                                                        if (isEn) "🎥 Secondary: Record Screen (.MP4 + Audio)" else "🎥 Tính năng phụ: Quay màn hình (.MP4 có tiếng)"
+                                                        if (isEn) "🎥 Record Screen (.MP4)" else "🎥 Quay màn hình (.MP4)"
                                                     },
                                                     color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
                                                     fontSize = 8.5.sp,
@@ -1129,9 +1128,9 @@ fun FloatingHud(
                                                 )
                                                 Text(
                                                     text = if (isEn) {
-                                                        "${config.recordingCaptureEngine.localizedShort(true)} • Game Audio"
+                                                        "${config.screenRecordQuality.shortEn} • Game Audio"
                                                     } else {
-                                                        "${config.recordingCaptureEngine.localizedShort(false)} • Có tiếng game"
+                                                        "${config.screenRecordQuality.shortVi} • Có tiếng game"
                                                     },
                                                     color = Color(0xFF7E9488),
                                                     fontSize = 7.5.sp,

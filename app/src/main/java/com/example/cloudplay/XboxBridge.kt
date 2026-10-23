@@ -534,9 +534,16 @@ class XboxBridge(
                                         if (evt.track) {
                                             window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
                                             window.__activeWebRtcTracks[evt.track.kind] = evt.track;
+                                            if (evt.track.kind === 'audio') {
+                                                window.__capturedGameAudioTrack = evt.track;
+                                            }
                                         }
                                         if (evt.streams && evt.streams[0]) {
                                             window.__activeWebRtcMediaStream = evt.streams[0];
+                                            const aTr = evt.streams[0].getAudioTracks ? evt.streams[0].getAudioTracks() : [];
+                                            if (aTr && aTr.length > 0 && aTr[0].readyState === 'live') {
+                                                window.__capturedGameAudioTrack = aTr[0];
+                                            }
                                         }
                                         if (evt.receiver) {
                                             const isFortnite = isFortniteSession();
@@ -1496,11 +1503,74 @@ class XboxBridge(
                             const clonedVideoTrack = (typeof vTracks[0].clone === 'function') ? vTracks[0].clone() : vTracks[0];
                             if (clonedVideoTrack !== vTracks[0]) activeClonedTracks.push(clonedVideoTrack);
 
-                            const aTracks = rawSourceStream.getAudioTracks ? rawSourceStream.getAudioTracks() : [];
+                            // Comprehensive Live Game Audio Track Finder:
+                            let rawAudioTrack = null;
+
+                            // A. Check actively captured WebRTC audio track from RTCPeerConnection.ontrack
+                            if (window.__capturedGameAudioTrack && window.__capturedGameAudioTrack.readyState === 'live') {
+                                rawAudioTrack = window.__capturedGameAudioTrack;
+                            }
+
+                            // B. Check intercepted tracks dictionary
+                            if (!rawAudioTrack && window.__activeWebRtcTracks && window.__activeWebRtcTracks.audio && window.__activeWebRtcTracks.audio.readyState === 'live') {
+                                rawAudioTrack = window.__activeWebRtcTracks.audio;
+                            }
+
+                            // C. Check RTCPeerConnection active receivers
+                            if (!rawAudioTrack && window.__activePeerConnection && typeof window.__activePeerConnection.getReceivers === 'function') {
+                                try {
+                                    const recs = window.__activePeerConnection.getReceivers();
+                                    for (let r = 0; r < recs.length; r++) {
+                                        const t = recs[r].track;
+                                        if (t && t.kind === 'audio' && t.readyState === 'live') {
+                                            rawAudioTrack = t;
+                                            window.__capturedGameAudioTrack = t;
+                                            break;
+                                        }
+                                    }
+                                } catch(e) {}
+                            }
+
+                            // D. Check any <audio> elements in DOM
+                            if (!rawAudioTrack) {
+                                const audios = document.querySelectorAll('audio');
+                                for (let a = 0; a < audios.length; a++) {
+                                    const aEl = audios[a];
+                                    if (aEl.srcObject && typeof aEl.srcObject.getAudioTracks === 'function') {
+                                        const at = aEl.srcObject.getAudioTracks();
+                                        if (at && at.length > 0 && at[0].readyState === 'live') {
+                                            rawAudioTrack = at[0];
+                                            window.__capturedGameAudioTrack = at[0];
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // E. Check rawSourceStream for audio
+                            if (!rawAudioTrack && rawSourceStream.getAudioTracks) {
+                                const aTracks = rawSourceStream.getAudioTracks();
+                                if (aTracks && aTracks.length > 0 && aTracks[0].readyState === 'live') {
+                                    rawAudioTrack = aTracks[0];
+                                }
+                            }
+
+                            // F. Check video element srcObject for audio
+                            if (!rawAudioTrack && video && video.srcObject && typeof video.srcObject.getAudioTracks === 'function') {
+                                const vAudio = video.srcObject.getAudioTracks();
+                                if (vAudio && vAudio.length > 0 && vAudio[0].readyState === 'live') {
+                                    rawAudioTrack = vAudio[0];
+                                }
+                            }
+
                             let clonedAudioTrack = null;
-                            if (aTracks && aTracks.length > 0) {
-                                clonedAudioTrack = (typeof aTracks[0].clone === 'function') ? aTracks[0].clone() : aTracks[0];
-                                if (clonedAudioTrack !== aTracks[0]) activeClonedTracks.push(clonedAudioTrack);
+                            if (rawAudioTrack) {
+                                try {
+                                    clonedAudioTrack = (typeof rawAudioTrack.clone === 'function') ? rawAudioTrack.clone() : rawAudioTrack;
+                                    if (clonedAudioTrack !== rawAudioTrack) activeClonedTracks.push(clonedAudioTrack);
+                                } catch(e) {
+                                    clonedAudioTrack = rawAudioTrack;
+                                }
                             }
 
                             const streamWithAudio = clonedAudioTrack
@@ -1508,22 +1578,24 @@ class XboxBridge(
                                 : new MediaStream([clonedVideoTrack]);
                             const streamVideoOnly = new MediaStream([clonedVideoTrack]);
 
-                            // Try combinations in priority order inside try/catch so Android 15 WebView never fails on avc1+opus mismatch
+                            // Prioritize MP4 container & codecs so users always get standard playable .mp4 clips
                             const mimeCandidates = [
+                                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                                'video/mp4;codecs=avc1,mp4a.40.2',
+                                'video/mp4;codecs=avc1',
+                                'video/mp4;codecs=h264,aac',
+                                'video/mp4',
                                 'video/webm;codecs=h264,opus',
                                 'video/webm;codecs=h264',
-                                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-                                'video/mp4;codecs=avc1.42E01E',
-                                'video/mp4;codecs=avc1',
-                                'video/mp4',
                                 'video/webm;codecs=vp8,opus',
+                                'video/webm;codecs=vp9,opus',
                                 'video/webm',
                                 ''
                             ];
 
                             const streamCandidates = clonedAudioTrack ? [streamWithAudio, streamVideoOnly] : [streamVideoOnly];
                             let recorder = null;
-                            let actualMime = 'video/webm';
+                            let actualMime = 'video/mp4';
 
                             outerLoop:
                             for (let sIdx = 0; sIdx < streamCandidates.length; sIdx++) {

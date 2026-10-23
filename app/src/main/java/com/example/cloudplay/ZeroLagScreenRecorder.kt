@@ -10,8 +10,10 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import java.nio.ByteBuffer
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
@@ -283,16 +285,97 @@ object ZeroLagScreenRecorder {
             return
         }
 
-        val isMp4 = streamMimeType.contains("mp4", ignoreCase = true)
-        val ext = if (isMp4) "mp4" else "webm"
-        val resolvedMime = if (isMp4) "video/mp4" else "video/webm"
-        val savedName = saveVideoFileToMediaStore(ctx, tmpFile, ext, resolvedMime)
-        tmpFile.delete()
+        // Remux into a standard, clean MP4 container with full video + audio track preservation
+        val parentDir = tmpFile.parentFile ?: File(ctx?.cacheDir ?: appContext?.cacheDir, "recordings")
+        val cleanMp4File = File(parentDir, "clean_clip_${System.currentTimeMillis()}.mp4")
+        val remuxSuccess = remuxOrConvertToStandardMp4(tmpFile, cleanMp4File)
+        val fileToSave = if (remuxSuccess && cleanMp4File.exists() && cleanMp4File.length() > 512L) {
+            tmpFile.delete()
+            cleanMp4File
+        } else {
+            cleanMp4File.delete()
+            tmpFile
+        }
+
+        // Always save as standard .mp4 with video/mp4 MIME type so Android Gallery, players and social apps play it seamlessly
+        val savedName = saveVideoFileToMediaStore(ctx, fileToSave, "mp4", "video/mp4")
+        fileToSave.delete()
 
         if (savedName != null) {
             notifyClipSavedOnMain(ctx, savedName)
         }
     }
+
+    /**
+     * Remuxes any incoming video stream (WebM or fragmented MP4) into a standard, clean MPEG-4 (.mp4)
+     * container preserving video (H.264/AVC) and audio tracks using native Android MediaExtractor + MediaMuxer.
+     */
+    private fun remuxOrConvertToStandardMp4(inputFile: File, outputFile: File): Boolean {
+        var extractor: MediaExtractor? = null
+        var muxer: MediaMuxer? = null
+        try {
+            extractor = MediaExtractor().apply { setDataSource(inputFile.absolutePath) }
+            val trackCount = extractor.trackCount
+            if (trackCount == 0) return false
+
+            muxer = MediaMuxer(outputFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val trackMap = mutableMapOf<Int, Int>()
+            var maxBufSize = 512 * 1024
+
+            for (i in 0 until trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                    val dstIndex = try {
+                        muxer.addTrack(format)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Muxer could not directly accept track format: $mime", e)
+                        -1
+                    }
+                    if (dstIndex >= 0) {
+                        extractor.selectTrack(i)
+                        trackMap[i] = dstIndex
+                        if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+                            val size = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE)
+                            if (size > maxBufSize) maxBufSize = size
+                        }
+                    }
+                }
+            }
+
+            if (trackMap.isEmpty()) return false
+
+            muxer.start()
+            val buffer = ByteBuffer.allocateDirect(maxBufSize)
+            val bufferInfo = MediaCodec.BufferInfo()
+
+            while (true) {
+                val srcIndex = extractor.sampleTrackIndex
+                if (srcIndex < 0) break
+                val dstIndex = trackMap[srcIndex]
+                if (dstIndex != null) {
+                    bufferInfo.offset = 0
+                    bufferInfo.size = extractor.readSampleData(buffer, 0)
+                    if (bufferInfo.size > 0) {
+                        bufferInfo.presentationTimeUs = extractor.sampleTime
+                        bufferInfo.flags = extractor.sampleFlags
+                        muxer.writeSampleData(dstIndex, buffer, bufferInfo)
+                    }
+                }
+                extractor.advance()
+            }
+
+            muxer.stop()
+            return outputFile.exists() && outputFile.length() > 512L
+        } catch (e: Exception) {
+            Log.w(TAG, "Remux to MP4 note: fallback to direct stream", e)
+            return false
+        } finally {
+            try { extractor?.release() } catch (_: Exception) {}
+            try { muxer?.release() } catch (_: Exception) {}
+        }
+    }
+
 
     private fun startNativeHardwareSurfaceRecorder(
         context: Context,

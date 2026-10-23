@@ -1879,14 +1879,14 @@ private fun DenseFeatureTogglesSection(
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         DenseQuickTogglePill(
-            label = if (hideStreamStats) {
-                if (isEn) "Hide Red Tag: ON" else "Ẩn chữ đỏ: Bật"
+            label = if (config.lowEndDeviceMode) {
+                if (isEn) "Decode Fix: ON" else "Giảm Decode: Bật"
             } else {
-                if (isEn) "Hide Red Tag: OFF" else "Ẩn chữ đỏ: Tắt"
+                if (isEn) "Decode Fix: OFF" else "Giảm Decode: Tắt"
             },
-            active = hideStreamStats,
+            active = config.lowEndDeviceMode,
             activeColor = DirectCyan,
-            onClick = { onToggleHideStreamStats(!hideStreamStats) },
+            onClick = { com.example.data.SettingsRepository.updateLowEndDeviceMode(!config.lowEndDeviceMode) },
             modifier = Modifier.weight(1f)
         )
         DenseQuickTogglePill(

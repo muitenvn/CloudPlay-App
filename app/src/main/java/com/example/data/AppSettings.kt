@@ -499,7 +499,7 @@ data class AppConfig(
     val autoBypassDelaySeconds: Int = 2,
     val autoReconnectOnMenu: Boolean = true,
     val forceDesktopUserAgent: Boolean = true,
-    val clarityBoostEnabled: Boolean = true,
+    val clarityBoostEnabled: Boolean = false,
     val clarityPreset: ClarityPreset = ClarityPreset.BALANCED,
     val maxBitrateMbps: Int = 15,
     val antiAfkKeepAlive: Boolean = true,
@@ -540,8 +540,8 @@ data class AppConfig(
     val screenRecordQuality: ScreenRecordQuality = ScreenRecordQuality.BALANCED_720P_30,
     val autoReduceLoadWhenRecording: Boolean = true,
     val recordingCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.HARDWARE_SCREEN,
-    val videoContrast: Int = 105, // 80 .. 140 (%)
-    val videoSaturation: Int = 108, // 80 .. 150 (%)
+    val videoContrast: Int = 100, // 80 .. 140 (%)
+    val videoSaturation: Int = 100, // 80 .. 150 (%)
     val videoBrightness: Int = 100, // 80 .. 130 (%)
     val userAcceptedTerms: Boolean = false
 ) {
@@ -588,7 +588,7 @@ object SettingsRepository {
             autoBypassEnabled = sp.getBoolean("auto_bypass_enabled", true),
             autoBypassDelaySeconds = sp.getInt("auto_bypass_delay", 2),
             forceDesktopUserAgent = sp.getBoolean("force_desktop_ua", true),
-            clarityBoostEnabled = sp.getBoolean("clarity_boost_enabled", true),
+            clarityBoostEnabled = sp.getBoolean("clarity_boost_enabled_v2", false),
             clarityPreset = try {
                 ClarityPreset.valueOf(sp.getString("clarity_preset", ClarityPreset.BALANCED.name) ?: ClarityPreset.BALANCED.name)
             } catch (_: Exception) { ClarityPreset.BALANCED },
@@ -658,8 +658,8 @@ object SettingsRepository {
                         ?: RecordingCaptureEngine.HARDWARE_SCREEN.name
                 )
             } catch (_: Exception) { RecordingCaptureEngine.HARDWARE_SCREEN },
-            videoContrast = sp.getInt("video_contrast", 105).coerceIn(80, 140),
-            videoSaturation = sp.getInt("video_saturation", 108).coerceIn(80, 150),
+            videoContrast = sp.getInt("video_contrast_v2", 100).coerceIn(80, 140),
+            videoSaturation = sp.getInt("video_saturation_v2", 100).coerceIn(80, 150),
             videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
@@ -675,6 +675,7 @@ object SettingsRepository {
             putBoolean("auto_bypass_enabled", c.autoBypassEnabled)
             putInt("auto_bypass_delay", c.autoBypassDelaySeconds)
             putBoolean("force_desktop_ua", c.forceDesktopUserAgent)
+            putBoolean("clarity_boost_enabled_v2", c.clarityBoostEnabled)
             putBoolean("clarity_boost_enabled", c.clarityBoostEnabled)
             putString("clarity_preset", c.clarityPreset.name)
             putInt("max_bitrate", c.maxBitrateMbps)
@@ -714,6 +715,8 @@ object SettingsRepository {
             putBoolean("auto_reduce_load_recording", c.autoReduceLoadWhenRecording)
             putString("recording_capture_engine_v3", c.recordingCaptureEngine.name)
             putString("recording_capture_engine", c.recordingCaptureEngine.name)
+            putInt("video_contrast_v2", c.videoContrast)
+            putInt("video_saturation_v2", c.videoSaturation)
             putInt("video_contrast", c.videoContrast)
             putInt("video_saturation", c.videoSaturation)
             putInt("video_brightness", c.videoBrightness)
@@ -1127,8 +1130,8 @@ object SettingsRepository {
     fun resetVideoDisplayDefaults() {
         _config.update {
             it.copy(
-                videoContrast = 105,
-                videoSaturation = 108,
+                videoContrast = 100,
+                videoSaturation = 100,
                 videoBrightness = 100
             )
         }

@@ -379,8 +379,12 @@ fun CloudBrowserScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
 
-                    // Hardware Acceleration for Zero-Lag WebRTC Video Decoding
+                    // Hardware Acceleration & High Renderer Priority for Zero-Lag WebRTC Video Decoding
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                    keepScreenOn = true
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
+                    }
 
                     settings.apply {
                         javaScriptEnabled = true

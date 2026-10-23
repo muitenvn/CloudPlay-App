@@ -800,15 +800,6 @@ fun SettingsScreen(
                         checked = config.bilingualMode,
                         onCheckedChange = { SettingsRepository.updateBilingualMode(it) }
                     )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Hide technical stats overlay" else "Ẩn thông số kỹ thuật đè màn hình",
-                        subtitle = if (isEn) "Keeps gameplay screen clean" else "Giữ màn hình chơi game thoáng sạch",
-                        checked = config.hideStreamStatsOverlay,
-                        onCheckedChange = { SettingsRepository.updateHideStreamStatsOverlay(it) },
-                        activeColor = DirectCyan,
-                        switchTestTag = "settings_switch_hide_decode_profile"
-                    )
                 }
 
                 // 4.2 Ngôn ngữ ứng dụng

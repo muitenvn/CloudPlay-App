@@ -233,7 +233,7 @@ class XboxBridge(
                                             if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
                                             if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal * 1000.0;
                                         } else if (r.track.kind === 'audio') {
-                                            const audioSec = Math.max(0.008, secVal - 0.002);
+                                            const audioSec = Math.max(0.006, secVal - 0.002);
                                             if ('playoutDelayHint' in r) r.playoutDelayHint = audioSec;
                                             if ('jitterBufferTarget' in r) r.jitterBufferTarget = audioSec * 1000.0;
                                         }
@@ -242,27 +242,10 @@ class XboxBridge(
                             } catch(e) {}
                         }
 
-                        // Smooth micro-interpolation (0.35ms per 90ms tick) so WebRTC hardware decoder never stutters when changing quality
-                        if (smoothGlide === false) {
+                        // Apply receiver playout delay only when changed by >= 2ms so Chromium VCMTiming never stutters
+                        if (smoothGlide === false || Math.abs(targetSec - window.__currentBufferSec) >= 0.002) {
                             window.__currentBufferSec = targetSec;
                             applyBufferToReceivers(targetSec);
-                            return;
-                        }
-
-                        if (!window.__bufferGlideTimer) {
-                            window.__bufferGlideTimer = setInterval(function() {
-                                const diff = window.__targetBufferSec - window.__currentBufferSec;
-                                if (Math.abs(diff) <= 0.0004) {
-                                    window.__currentBufferSec = window.__targetBufferSec;
-                                    applyBufferToReceivers(window.__currentBufferSec);
-                                    clearInterval(window.__bufferGlideTimer);
-                                    window.__bufferGlideTimer = null;
-                                } else {
-                                    const step = diff > 0 ? Math.min(diff, 0.00035) : Math.max(diff, -0.00035);
-                                    window.__currentBufferSec = parseFloat((window.__currentBufferSec + step).toFixed(5));
-                                    applyBufferToReceivers(window.__currentBufferSec);
-                                }
-                            }, 90);
                         }
                     };
 
@@ -465,8 +448,169 @@ class XboxBridge(
                     }, 1500);
 
                     // ==========================================
-                    // 4. Hook RTCPeerConnection for Stream Detect, SDP Munging & Realtime Telemetry
+                    // 4. Hook MediaCapabilities & RTCPeerConnection for Hardware Decode Priority, SDP Munging & Telemetry
                     // ==========================================
+                    try {
+                        if (navigator.mediaCapabilities && typeof navigator.mediaCapabilities.decodingInfo === 'function') {
+                            const origDecodingInfo = navigator.mediaCapabilities.decodingInfo.bind(navigator.mediaCapabilities);
+                            navigator.mediaCapabilities.decodingInfo = async function(config) {
+                                try {
+                                    if (config && config.video && config.video.contentType) {
+                                        const ct = config.video.contentType.toLowerCase();
+                                        // Prioritize H.264 Baseline/Constrained Baseline (avc1.42) & Main (avc1.4d) for zero-B-frame hardware MediaCodec
+                                        if (ct.indexOf('avc1.42') !== -1 || ct.indexOf('avc1.4d') !== -1 || ct.indexOf('h264') !== -1) {
+                                            return { supported: true, smooth: true, powerEfficient: true };
+                                        }
+                                        // Deprioritize heavy High Profile CABAC (avc1.64), VP9, and AV1 when Low-End or reduced render scale is active
+                                        const gt = window.__graphicsTuning || {};
+                                        const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                                        if ((isLowEnd || (parseFloat(gt.renderScale) || 1.0) < 0.90) &&
+                                            (ct.indexOf('avc1.64') !== -1 || ct.indexOf('vp9') !== -1 || ct.indexOf('av01') !== -1)) {
+                                            return { supported: true, smooth: false, powerEfficient: false };
+                                        }
+                                    }
+                                } catch(mcErr) {}
+                                return origDecodingInfo(config);
+                            };
+                        }
+                    } catch(e) {}
+
+                    function prioritizeHardwareH264Codecs(pc) {
+                        try {
+                            if (!window.RTCRtpReceiver || typeof RTCRtpReceiver.getCapabilities !== 'function') return;
+                            const caps = RTCRtpReceiver.getCapabilities('video');
+                            if (!caps || !Array.isArray(caps.codecs) || caps.codecs.length === 0) return;
+
+                            const sortedCodecs = caps.codecs.slice().sort(function(a, b) {
+                                function scoreCodec(c) {
+                                    const mime = (c.mimeType || '').toLowerCase();
+                                    const fmtp = (c.sdpFmtpLine || '').toLowerCase();
+                                    if (mime === 'video/h264') {
+                                        // Highest priority: Constrained Baseline (42e0 / 4200) -> Zero B-frames, fastest hardware decode
+                                        if (fmtp.indexOf('42e0') !== -1 || fmtp.indexOf('4200') !== -1) return 100;
+                                        // Second priority: Main Profile (4d)
+                                        if (fmtp.indexOf('4d') !== -1) return 85;
+                                        // Other H.264 profiles
+                                        return 70;
+                                    }
+                                    if (mime === 'video/rtx' || mime === 'video/red' || mime === 'video/ulpfec') return 60;
+                                    return 10;
+                                }
+                                return scoreCodec(b) - scoreCodec(a);
+                            });
+
+                            const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+                            for (let i = 0; i < transceivers.length; i++) {
+                                const t = transceivers[i];
+                                if (t && typeof t.setCodecPreferences === 'function') {
+                                    const receiverKind = t.receiver && t.receiver.track ? t.receiver.track.kind : '';
+                                    const senderKind = t.sender && t.sender.track ? t.sender.track.kind : '';
+                                    if (receiverKind === 'video' || senderKind === 'video' || (!receiverKind && !senderKind)) {
+                                        try { t.setCodecPreferences(sortedCodecs); } catch( prefErr ) {}
+                                    }
+                                }
+                            }
+                        } catch(e) {}
+                    }
+
+                    function mungeSdpForLowLatencyHardwareDecode(rawSdp) {
+                        if (!rawSdp || typeof rawSdp !== 'string') return rawSdp;
+                        try {
+                            let sdp = rawSdp;
+                            const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                            const gt = window.__graphicsTuning || {};
+                            const renderScale = parseFloat(gt.renderScale) || 1.0;
+                            const configuredFpsCap = parseInt(gt.fpsCap, 10) || 60;
+                            const isFortnite = isFortniteSession();
+                            const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
+                            const scaleBitrateFactor = renderScale < 0.70 ? 0.60 : (renderScale < 0.80 ? 0.75 : (renderScale < 0.92 ? 0.86 : 1.0));
+                            const activeMbps = Math.max(3, Math.round(rawMbps * scaleBitrateFactor));
+                            const isLowSaver = isLowEndMode || activeMbps <= 6 || renderScale <= 0.65;
+                            const isMedium = !isLowSaver && (activeMbps <= 10 || renderScale <= 0.78);
+                            const isHigh = !isLowSaver && !isMedium && activeMbps <= 15;
+                            const targetKbps = isLowEndMode ? 4500 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 5000 : 3200), 20000);
+                            // Strictly honor user's FPS cap so 60Hz devices never get overloaded by 120fps decode
+                            const negotiatedFps = isLowEndMode ? Math.min(configuredFpsCap, 60) : (configuredFpsCap <= 30 ? 30 : (configuredFpsCap >= 120 ? 120 : 60));
+
+                            // 1. Video bandwidth & framerate negotiation (avoid duplicate b=AS / a=framerate lines)
+                            if (sdp.indexOf('m=video ') !== -1) {
+                                sdp = sdp.replace(/b=AS:\d+\r\n/g, '');
+                                sdp = sdp.replace(/a=framerate:\d+\r\n/g, '');
+                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + negotiatedFps + '\r\n');
+                            }
+
+                            if (isLowEndMode && window.__pauseTranslator) {
+                                window.__pauseTranslator();
+                            }
+
+                            // 2. Determine target H.264 Constrained Baseline profile (Zero B-Frames = lowest MediaCodec decodeTimeMs)
+                            const targetProfileId = isLowSaver ? '42e01f' : '42e020';
+                            const maxBitrateKbps = isLowSaver
+                                ? Math.max(3500, targetKbps)
+                                : (isMedium ? (isFortnite ? 9000 : 8000) : (isHigh ? (isFortnite ? 14500 : 13500) : 20000));
+                            const minBitrateKbps = isLowSaver ? 1200 : (isMedium ? 1600 : (isHigh ? 2200 : 2800));
+                            const startBitrateKbps = isLowSaver ? 2000 : (isMedium ? 2800 : (isHigh ? 3400 : 4200));
+                            // Constrain macroblocks to 720p60 when user selects Low-End Mode or 60%/75% Render Scale so Xbox Server sends 720p stream
+                            const fsConstraint = (isLowSaver || renderScale <= 0.78)
+                                ? ';max-fs=3600;max-mbps=216000'
+                                : '';
+                            const extraH264Params = 'x-google-max-bitrate=' + maxBitrateKbps +
+                                ';x-google-min-bitrate=' + minBitrateKbps +
+                                ';x-google-start-bitrate=' + startBitrateKbps + fsConstraint;
+
+                            // Find all H264 payload types and update their existing a=fmtp:<pt> line IN-PLACE
+                            const h264Pts = [];
+                            sdp.replace(/a=rtpmap:(\d+) H264\/\d+/gi, function(_, pt) {
+                                h264Pts.push(pt);
+                                return _;
+                            });
+                            for (let i = 0; i < h264Pts.length; i++) {
+                                const pt = h264Pts[i];
+                                const fmtpRegex = new RegExp('a=fmtp:' + pt + ' ([^\\r\\n]+)\\r\\n', 'g');
+                                if (fmtpRegex.test(sdp)) {
+                                    sdp = sdp.replace(fmtpRegex, function(_, params) {
+                                        let updated = params;
+                                        if (/profile-level-id=[0-9a-fA-F]+/i.test(updated)) {
+                                            updated = updated.replace(/profile-level-id=[0-9a-fA-F]+/i, 'profile-level-id=' + targetProfileId);
+                                        } else {
+                                            updated += ';profile-level-id=' + targetProfileId;
+                                        }
+                                        if (updated.indexOf('x-google-max-bitrate') === -1) {
+                                            updated += ';' + extraH264Params;
+                                        }
+                                        return 'a=fmtp:' + pt + ' ' + updated + '\r\n';
+                                    });
+                                } else {
+                                    const rtpmapRegex = new RegExp('(a=rtpmap:' + pt + ' H264\\/[^\\r\\n]+\\r\\n)', 'i');
+                                    sdp = sdp.replace(rtpmapRegex, '$1a=fmtp:' + pt + ' level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=' + targetProfileId + ';' + extraH264Params + '\r\n');
+                                }
+                            }
+
+                            // 3. Update Opus audio fmtp IN-PLACE for 10ms low-latency framing & FEC
+                            const opusBitrate = isLowSaver ? (isFortnite ? 64000 : 48000) : (isMedium ? (isFortnite ? 96000 : 64000) : 128000);
+                            const opusPts = [];
+                            sdp.replace(/a=rtpmap:(\d+) opus\/\d+/gi, function(_, pt) {
+                                opusPts.push(pt);
+                                return _;
+                            });
+                            for (let j = 0; j < opusPts.length; j++) {
+                                const pt = opusPts[j];
+                                const opusFmtpRegex = new RegExp('a=fmtp:' + pt + ' ([^\\r\\n]+)\\r\\n', 'g');
+                                const opusTuning = 'minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=' + opusBitrate;
+                                if (opusFmtpRegex.test(sdp)) {
+                                    sdp = sdp.replace(opusFmtpRegex, 'a=fmtp:' + pt + ' ' + opusTuning + '\r\n');
+                                } else {
+                                    const opusRtpmapRegex = new RegExp('(a=rtpmap:' + pt + ' opus\\/[^\\r\\n]+\\r\\n)', 'i');
+                                    sdp = sdp.replace(opusRtpmapRegex, '$1a=fmtp:' + pt + ' ' + opusTuning + '\r\n');
+                                }
+                            }
+
+                            return sdp;
+                        } catch(e) {
+                            return rawSdp;
+                        }
+                    }
+
                     try {
                         const OrigPeerConnection = window.RTCPeerConnection;
                         if (OrigPeerConnection) {
@@ -485,55 +629,46 @@ class XboxBridge(
                                     window.__allPeerConnections.shift();
                                 }
 
-                                // SDP Munging optimized for Android Hardware MediaCodec Decoder (Better-xCloud method)
+                                // Hook setRemoteDescription (Server Offer), createAnswer & setLocalDescription (Client Answer)
                                 const origSetRemote = pc.setRemoteDescription.bind(pc);
                                 pc.setRemoteDescription = function(desc) {
+                                    prioritizeHardwareH264Codecs(pc);
                                     if (desc && desc.sdp) {
                                         try {
-                                            let sdp = desc.sdp;
-                                            const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
-                                            const gt = window.__graphicsTuning || {};
-                                            const renderScale = parseFloat(gt.renderScale) || 1.0;
-                                            const configuredFpsCap = parseInt(gt.fpsCap, 10) || 60;
-                                            const isFortnite = isFortniteSession();
-                                            const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
-                                            // Scale target bitrate proportionally when user lowers render resolution (e.g. 60% / 75% / 85%) to save GPU decode overhead
-                                            const scaleBitrateFactor = renderScale < 0.70 ? 0.65 : (renderScale < 0.80 ? 0.78 : (renderScale < 0.92 ? 0.88 : 1.0));
-                                            const activeMbps = Math.max(3, Math.round(rawMbps * scaleBitrateFactor));
-                                            const isLowSaver = isLowEndMode || activeMbps <= 6 || renderScale <= 0.65;
-                                            const isMedium = !isLowSaver && activeMbps <= 10;
-                                            const isHigh = !isLowSaver && activeMbps > 10 && activeMbps <= 15;
-                                            const targetKbps = isLowEndMode ? 4500 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 5500 : 3200), 20000);
-                                            const negotiatedFps = configuredFpsCap <= 30 ? 30 : ((configuredFpsCap >= 120 || (isFortnite && activeMbps >= 14 && !isLowEndMode)) ? 120 : 60);
-
-                                            // Video bandwidth & framerate negotiation based on user's Graphics & FPS Cap settings
-                                            sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + negotiatedFps + '\r\n');
-                                            if (isLowEndMode && window.__pauseTranslator) {
-                                                window.__pauseTranslator();
-                                            }
-
-                                            if (isLowSaver) {
-                                                // MỨC THẤP / 4G ANTI-BUFFERBLOAT / MÁY YẾU: H.264 Constrained Baseline Zero-B-Frame (42e01f), start-bitrate 2200kbps tránh nghẽn 4G đầu phiên
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e01f;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + Math.max(3500, targetKbps) + ';x-google-min-bitrate=1200;x-google-start-bitrate=2200\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;usedtx=1;maxaveragebitrate=' + (isFortnite ? '64000' : '48000') + '\r\n');
-                                            } else if (isMedium) {
-                                                // MỨC TRUNG BÌNH (4G TỐC ĐỘ CAO / WI-FI CÂN BẰNG): Zero-B-Frame Constrained Baseline (42e020) khử độ trễ sắp xếp khung hình 16-33ms
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + (isFortnite ? '9500' : '8500') + ';x-google-min-bitrate=1800;x-google-start-bitrate=3000\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;usedtx=1;maxaveragebitrate=' + (isFortnite ? '96000' : '64000') + '\r\n');
-                                            } else if (isHigh) {
-                                                // MỨC CAO (SẮC NÉT 1080P WI-FI): Zero-B-Frame + khởi động êm 3500kbps tránh dội bộ đệm router Wi-Fi
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=' + (isFortnite ? '15000' : '14000') + ';x-google-min-bitrate=2500;x-google-start-bitrate=3500\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=' + (isFortnite ? '128000;maxplaybackrate=48000' : '96000') + '\r\n');
-                                            } else {
-                                                // MỨC RẤT CAO (ĐỒ HỌA TỐI ĐA WI-FI 5GHz): 20 Mbps max visual quality (hỗ trợ 120 FPS)
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) H264\/(.*)\r\n/g, 'a=rtpmap:$1 H264/$2\r\na=fmtp:$1 profile-level-id=42e020;level-asymmetry-allowed=1;packetization-mode=1;x-google-max-bitrate=20000;x-google-min-bitrate=3000;x-google-start-bitrate=4500\r\n');
-                                                sdp = sdp.replace(/a=rtpmap:(\d+) opus\/(.*)\r\n/g, 'a=rtpmap:$1 opus/$2\r\na=fmtp:$1 minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=128000;maxplaybackrate=48000\r\n');
-                                            }
-                                            desc = new RTCSessionDescription({ type: desc.type, sdp: sdp });
+                                            const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
+                                            desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
                                         } catch(sdpErr) {}
                                     }
                                     return origSetRemote(desc);
                                 };
+
+                                if (typeof pc.createAnswer === 'function') {
+                                    const origCreateAnswer = pc.createAnswer.bind(pc);
+                                    pc.createAnswer = async function(...ansArgs) {
+                                        prioritizeHardwareH264Codecs(pc);
+                                        const answer = await origCreateAnswer(...ansArgs);
+                                        if (answer && answer.sdp) {
+                                            try {
+                                                const munged = mungeSdpForLowLatencyHardwareDecode(answer.sdp);
+                                                return new RTCSessionDescription({ type: answer.type || 'answer', sdp: munged });
+                                            } catch(ansErr) {}
+                                        }
+                                        return answer;
+                                    };
+                                }
+
+                                if (typeof pc.setLocalDescription === 'function') {
+                                    const origSetLocal = pc.setLocalDescription.bind(pc);
+                                    pc.setLocalDescription = function(desc) {
+                                        if (desc && desc.sdp) {
+                                            try {
+                                                const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
+                                                desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
+                                            } catch(locErr) {}
+                                        }
+                                        return origSetLocal(desc);
+                                    };
+                                }
 
                                 // Hardware Decoder Stabilization: adaptive initial target (respects 4G HARQ burst cushion vs Wi-Fi arena zero-delay)
                                 pc.addEventListener('track', function(evt) {
@@ -704,20 +839,18 @@ class XboxBridge(
                                             notify('onStreamConnected', 'webrtc_frames_active');
                                         }
 
-                                        // Live-Edge Video Catch-Up Pacer: eliminates accumulated input lag after 4G/Wi-Fi jitter spikes
+                                        // Live-Edge Stall Recovery (never mutate playbackRate on WebRTC stream to preserve hardware MediaCodec cadence)
                                         const vEl = findActiveStreamVideo();
                                         if (vEl && !vEl.paused && vEl.readyState >= 2) {
                                             try {
+                                                if (vEl.playbackRate !== 1.0) {
+                                                    vEl.playbackRate = 1.0;
+                                                }
                                                 if (vEl.buffered && vEl.buffered.length > 0) {
                                                     const bufEnd = vEl.buffered.end(vEl.buffered.length - 1);
                                                     const lagSec = bufEnd - vEl.currentTime;
-                                                    if (lagSec > 0.22) {
-                                                        vEl.currentTime = Math.max(vEl.currentTime, bufEnd - 0.035);
-                                                        vEl.playbackRate = 1.0;
-                                                    } else if (lagSec > 0.085) {
-                                                        vEl.playbackRate = 1.04;
-                                                    } else if (vEl.playbackRate !== 1.0) {
-                                                        vEl.playbackRate = 1.0;
+                                                    if (lagSec > 0.30) {
+                                                        vEl.currentTime = Math.max(vEl.currentTime, bufEnd - 0.025);
                                                     }
                                                 }
                                             } catch(pacerErr) {}
@@ -1333,17 +1466,19 @@ class XboxBridge(
                                 videoAspectStyleEl.id = 'cloudplay-video-color-controller';
                                 (document.head || document.documentElement).appendChild(videoAspectStyleEl);
                             }
+                            const gt = window.__graphicsTuning || {};
+                            const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
                             const vc = window.__videoDisplayConfig || {};
-                            const contrast = (typeof vc.contrast === 'number') ? (vc.contrast / 100.0) : 1.05;
-                            const saturation = (typeof vc.saturation === 'number') ? (vc.saturation / 100.0) : 1.08;
+                            const contrast = (typeof vc.contrast === 'number') ? (vc.contrast / 100.0) : 1.00;
+                            const saturation = (typeof vc.saturation === 'number') ? (vc.saturation / 100.0) : 1.00;
                             const brightness = (typeof vc.brightness === 'number') ? (vc.brightness / 100.0) : 1.00;
 
-                            const isDefaultColor = Math.abs(contrast - 1.05) < 0.02 &&
-                                Math.abs(saturation - 1.08) < 0.02 &&
-                                Math.abs(brightness - 1.00) < 0.02;
+                            const isDefaultColor = Math.abs(contrast - 1.00) < 0.015 &&
+                                Math.abs(saturation - 1.00) < 0.015 &&
+                                Math.abs(brightness - 1.00) < 0.015;
 
-                            // Giữ nguyên 100% tỉ lệ màn hình gốc của Fortnite & Xbox Cloud, chỉ áp bộ lọc màu khi người dùng tự chỉnh
-                            if (isDefaultColor) {
+                            // Preserve Android zero-copy SurfaceControl Hardware Overlay by keeping <video> free of CSS filters by default or in Low-End mode
+                            if (isDefaultColor || isLowEnd) {
                                 if (lastAppliedVideoAspectCss !== '') {
                                     videoAspectStyleEl.textContent = '';
                                     lastAppliedVideoAspectCss = '';

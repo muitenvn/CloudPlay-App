@@ -881,38 +881,6 @@ private fun SettingsSection(
             }
         }
 
-        // Toggle 4: Ẩn thông số đè màn hình
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = Color(0xFF121F17),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .padding(12.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(if (isEn) "Hide Decode Profile & Stream Stats" else "Ẩn Bảng Decode Profile & Stream Stats", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        if (isEn) "Automatically remove distracting web overlay stats during gameplay" else "Tự động xóa bảng thông số web gây rối mắt khi chơi game",
-                        color = TextSecondary,
-                        fontSize = 10.sp
-                    )
-                }
-                Switch(
-                    checked = hideStats,
-                    onCheckedChange = onToggleHideStats,
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = DirectCyan,
-                        checkedTrackColor = DirectCyan.copy(alpha = 0.3f)
-                    )
-                )
-            }
-        }
-
         Spacer(modifier = Modifier.height(6.dp))
 
         // Force Translate Entire Page Action

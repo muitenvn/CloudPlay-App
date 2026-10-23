@@ -978,7 +978,48 @@ fun FloatingHud(
                                 )
 
                                 // ========================================================
-                                // 3. CÀI ĐẶT VIDEO & CHỈNH TỈ LỆ MÀN HÌNH CHỐNG BÓP DẸT (16:9 Fit, Scale X/Y)
+                                // 3. TỐI ƯU THEO TRÒ CHƠI (FORTNITE PRO TOUCH / VIRTUAL CONTROLLER)
+                                // ========================================================
+                                if (gameProfile?.gameId == "fortnite") {
+                                    FortniteExclusiveHudCard(
+                                        isEn = isEn,
+                                        virtualControllerEnabled = virtualControllerEnabled,
+                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
+                                            markUserInteraction()
+                                            onSelectFortniteControlMode(useVirtualFpsPro)
+                                        }
+                                    )
+                                }
+
+                                // ========================================================
+                                // 4. CÔNG TẮC NHANH (Làm nét, Giảm tải GPU chống nóng, Ẩn bảng, Dịch VI)
+                                // ========================================================
+                                DenseFeatureTogglesSection(
+                                    clarityBoostActive = clarityBoostActive,
+                                    hideStreamStats = hideStreamStats,
+                                    translationActive = translationActive,
+                                    translatedCount = translatedCount,
+                                    onToggleClarityBoost = { enabled ->
+                                        markUserInteraction()
+                                        onToggleClarityBoost(enabled)
+                                    },
+                                    onToggleHideStreamStats = { enabled ->
+                                        markUserInteraction()
+                                        onToggleHideStreamStats(enabled)
+                                    },
+                                    onToggleTranslation = { enabled ->
+                                        markUserInteraction()
+                                        onToggleTranslation(enabled)
+                                    },
+                                    onToggleGpuLoadReduction = {
+                                        markUserInteraction()
+                                        val nextState = !config.gpuLoadReductionEnabled
+                                        com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
+                                    }
+                                )
+
+                                // ========================================================
+                                // 5. TÙY CHỈNH SÂU ĐỒ HỌA, KHUNG HÌNH 60 FPS & TỈ LỆ MÀN HÌNH
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1000,7 +1041,7 @@ fun FloatingHud(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = if (isEn) "🎬 Video & Aspect Ratio Settings" else "🎬 Cài đặt Video & Tỉ lệ màn hình",
+                                                text = if (isEn) "⚙️ Graphics, 60 FPS & Aspect Ratio" else "⚙️ Đồ họa, 60 FPS & Tỉ lệ màn hình",
                                                 color = DirectCyan,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.ExtraBold,
@@ -1008,9 +1049,9 @@ fun FloatingHud(
                                             )
                                             Text(
                                                 text = if (isEn) {
-                                                    "Ratio: ${config.videoAspectRatioMode.localizedShort(true)} (${(config.videoScaleX * 100).toInt()}%x${(config.videoScaleY * 100).toInt()}%) • Fix Squish"
+                                                    "Scale: ${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps}FPS • ${config.videoAspectRatioMode.localizedShort(true)}"
                                                 } else {
-                                                    "Tỉ lệ: ${config.videoAspectRatioMode.localizedShort(false)} (${(config.videoScaleX * 100).toInt()}%x${(config.videoScaleY * 100).toInt()}%) • Chống bóp hình"
+                                                    "Đồ họa: ${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps}FPS • ${config.videoAspectRatioMode.localizedShort(false)}"
                                                 },
                                                 color = TextSecondary,
                                                 fontSize = 7.5.sp,
@@ -1022,7 +1063,7 @@ fun FloatingHud(
                                             color = DirectCyan.copy(alpha = 0.22f)
                                         ) {
                                             Text(
-                                                text = if (isEn) "OPEN" else "MỞ MENU",
+                                                text = if (isEn) "TUNE" else "TÙY CHỈNH",
                                                 color = Color.White,
                                                 fontSize = 7.5.sp,
                                                 fontWeight = FontWeight.ExtraBold,
@@ -1033,69 +1074,7 @@ fun FloatingHud(
                                 }
 
                                 // ========================================================
-                                // 4. TỐI ƯU THEO TRÒ CHƠI (FORTNITE PRO TOUCH / VIRTUAL CONTROLLER)
-                                // ========================================================
-                                if (gameProfile?.gameId == "fortnite") {
-                                    FortniteExclusiveHudCard(
-                                        isEn = isEn,
-                                        virtualControllerEnabled = virtualControllerEnabled,
-                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
-                                            markUserInteraction()
-                                            onSelectFortniteControlMode(useVirtualFpsPro)
-                                        }
-                                    )
-                                }
-
-                                // ========================================================
-                                // 5. CÔNG TẮC TÍNH NĂNG (Làm nét Clarity Boost, Ẩn bảng kỹ thuật, Dịch tiếng Việt)
-                                // ========================================================
-                                DenseFeatureTogglesSection(
-                                    clarityBoostActive = clarityBoostActive,
-                                    hideStreamStats = hideStreamStats,
-                                    translationActive = translationActive,
-                                    translatedCount = translatedCount,
-                                    onToggleClarityBoost = { enabled ->
-                                        markUserInteraction()
-                                        onToggleClarityBoost(enabled)
-                                    },
-                                    onToggleHideStreamStats = { enabled ->
-                                        markUserInteraction()
-                                        onToggleHideStreamStats(enabled)
-                                    },
-                                    onToggleTranslation = { enabled ->
-                                        markUserInteraction()
-                                        onToggleTranslation(enabled)
-                                    },
-                                    onOpenVideoSettings = {
-                                        markUserInteraction()
-                                        onOpenSettings()
-                                    }
-                                )
-
-                                // ========================================================
-                                // 6. TÁC VỤ HỆ THỐNG (Tải lại trang, Xoay ngang màn hình, Cài đặt, Thoát về Trang chủ)
-                                // ========================================================
-                                DenseBottomActionsSection(
-                                    onReloadPage = {
-                                        markUserInteraction()
-                                        onReloadPage()
-                                    },
-                                    onToggleOrientation = {
-                                        markUserInteraction()
-                                        onToggleOrientation()
-                                    },
-                                    onOpenSettings = {
-                                        markUserInteraction()
-                                        onOpenSettings()
-                                    },
-                                    onRequestExitHome = {
-                                        markUserInteraction()
-                                        showExitConfirmDialog = true
-                                    }
-                                )
-
-                                // ========================================================
-                                // 7. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (ĐƯA XUỐNG DƯỚI CÙNG - MẶC ĐỊNH FULL MÀN HÌNH)
+                                // 6. TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH (.MP4 CÓ ÂM THANH - MẶC ĐỊNH FULL MÀN)
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1134,10 +1113,10 @@ fun FloatingHud(
                                                     text = if (recorderState.isRecording) {
                                                         val mins = recorderState.elapsedSeconds / 60
                                                         val secs = recorderState.elapsedSeconds % 60
-                                                        if (isEn) "🔴 Recording %02d:%02d (Tap to Save Clip)".format(mins, secs)
-                                                        else "🔴 Đang quay %02d:%02d (Chạm để lưu clip)".format(mins, secs)
+                                                        if (isEn) "🔴 Recording %02d:%02d (.MP4 + Audio)".format(mins, secs)
+                                                        else "🔴 Đang quay %02d:%02d (.MP4 có tiếng)".format(mins, secs)
                                                     } else {
-                                                        if (isEn) "🎥 Secondary: Record Gameplay Clip" else "🎥 Tính năng phụ: Quay Video Clip"
+                                                        if (isEn) "🎥 Secondary: Record Clip (.MP4 + Audio)" else "🎥 Tính năng phụ: Quay Video (.MP4 + Âm thanh)"
                                                     },
                                                     color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
                                                     fontSize = 8.5.sp,
@@ -1146,9 +1125,9 @@ fun FloatingHud(
                                                 )
                                                 Text(
                                                     text = if (isEn) {
-                                                        "${config.recordingCaptureEngine.localizedShort(true)} (Default Full Screen)"
+                                                        "${config.recordingCaptureEngine.localizedShort(true)} • Stereo AAC Audio"
                                                     } else {
-                                                        "${config.recordingCaptureEngine.localizedShort(false)}"
+                                                        "${config.recordingCaptureEngine.localizedShort(false)} • Có thu tiếng game"
                                                     },
                                                     color = Color(0xFF7E9488),
                                                     fontSize = 7.5.sp,
@@ -1165,6 +1144,27 @@ fun FloatingHud(
                                     }
                                 }
 
+                                // ========================================================
+                                // 7. THANH TÁC VỤ HỆ THỐNG DƯỚI CÙNG (Tải lại, Xoay ngang, Cài đặt, Thoát)
+                                // ========================================================
+                                DenseBottomActionsSection(
+                                    onReloadPage = {
+                                        markUserInteraction()
+                                        onReloadPage()
+                                    },
+                                    onToggleOrientation = {
+                                        markUserInteraction()
+                                        onToggleOrientation()
+                                    },
+                                    onOpenSettings = {
+                                        markUserInteraction()
+                                        onOpenSettings()
+                                    },
+                                    onRequestExitHome = {
+                                        markUserInteraction()
+                                        showExitConfirmDialog = true
+                                    }
+                                )
                             }
                         }
                     }
@@ -1828,7 +1828,7 @@ private fun DenseQualityPresetChip(
 }
 
 /**
- * B.7: Hàng nút bật/tắt gọn cho Làm nét, Ẩn thông số web, Dịch tiếng Việt và Công cụ dịch.
+ * B.7: Hàng nút bật/tắt gọn cho Làm nét, Giảm tải GPU chống giật/nóng, Ẩn thông số web và Dịch tiếng Việt.
  */
 @Composable
 private fun DenseFeatureTogglesSection(
@@ -1839,7 +1839,7 @@ private fun DenseFeatureTogglesSection(
     onToggleClarityBoost: (Boolean) -> Unit,
     onToggleHideStreamStats: (Boolean) -> Unit,
     onToggleTranslation: (Boolean) -> Unit,
-    onOpenVideoSettings: () -> Unit
+    onToggleGpuLoadReduction: () -> Unit
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
@@ -1859,6 +1859,23 @@ private fun DenseFeatureTogglesSection(
             modifier = Modifier.weight(1f)
         )
         DenseQuickTogglePill(
+            label = if (config.gpuLoadReductionEnabled) {
+                if (isEn) "⚡ Low GPU: ON" else "⚡ Giảm GPU: Bật"
+            } else {
+                if (isEn) "⚡ Low GPU: OFF" else "⚡ Giảm GPU: Tắt"
+            },
+            active = config.gpuLoadReductionEnabled,
+            activeColor = DirectCyan,
+            onClick = onToggleGpuLoadReduction,
+            modifier = Modifier.weight(1f)
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        DenseQuickTogglePill(
             label = if (hideStreamStats) {
                 if (isEn) "Hide Stats: ON" else "Ẩn bảng: Bật"
             } else {
@@ -1869,12 +1886,6 @@ private fun DenseFeatureTogglesSection(
             onClick = { onToggleHideStreamStats(!hideStreamStats) },
             modifier = Modifier.weight(1f)
         )
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
         DenseQuickTogglePill(
             label = if (translationActive) {
                 if (isEn) {
@@ -1888,13 +1899,6 @@ private fun DenseFeatureTogglesSection(
             active = translationActive,
             activeColor = XboxNeonGreen,
             onClick = { onToggleTranslation(!translationActive) },
-            modifier = Modifier.weight(1f)
-        )
-        DenseQuickTogglePill(
-            label = if (isEn) "🎬 Video Setup" else "🎬 Cài đặt Video",
-            active = true,
-            activeColor = DirectCyan,
-            onClick = onOpenVideoSettings,
             modifier = Modifier.weight(1f)
         )
     }
@@ -1935,7 +1939,7 @@ private fun DenseQuickTogglePill(
 }
 
 /**
- * B.7: Hàng nút tác vụ dưới cùng: Tải lại trang, Xoay màn hình, Cài đặt Video, Trang chủ.
+ * B.7: Hàng nút tác vụ dưới cùng: Tải lại trang, Xoay màn hình, Tùy chỉnh Đồ họa, Thoát về Trang chủ.
  */
 @Composable
 private fun DenseBottomActionsSection(
@@ -1968,10 +1972,10 @@ private fun DenseBottomActionsSection(
         )
         DenseBottomActionChip(
             icon = Icons.Default.Settings,
-            label = if (isEn) "Video" else "Cài đặt Video",
+            label = if (isEn) "Graphics" else "Đồ họa",
             tint = DirectCyan,
             onClick = onOpenSettings,
-            modifier = Modifier.weight(1.25f),
+            modifier = Modifier.weight(1.1f),
             testTag = "hud_expanded_settings_button"
         )
         DenseBottomActionChip(
@@ -1979,7 +1983,7 @@ private fun DenseBottomActionsSection(
             label = if (isEn) "Exit" else "Thoát",
             tint = JapanRed,
             onClick = onRequestExitHome,
-            modifier = Modifier.weight(0.9f),
+            modifier = Modifier.weight(0.95f),
             testTag = "hud_expanded_home_button"
         )
     }

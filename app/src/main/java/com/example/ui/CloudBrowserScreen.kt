@@ -844,13 +844,13 @@ fun CloudBrowserScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isEn) "🎬 Video & Stream Settings" else "🎬 Cài đặt Video & Tỉ lệ màn hình",
+                                    text = if (isEn) "⚡ Graphics, 60 FPS & Display" else "⚡ Đồ họa, 60 FPS & Tỉ lệ màn hình",
                                     color = TextPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = if (isEn) "Fix squished aspect ratio & direct WebRTC stream capture" else "Chống bóp méo video & lấy thẳng luồng Video Streaming 0% lag",
+                                    text = if (isEn) "Prioritize smooth 4G/Wi-Fi bitrate, GPU load & aspect ratio" else "Ưu tiên độ mượt 4G/Wi-Fi, giảm tải GPU & chống bóp méo khung hình",
                                     color = DirectCyan,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -875,7 +875,230 @@ fun CloudBrowserScreen(
                         }
 
                         // ========================================================
-                        // PHẦN 1: TỈ LỆ MÀN HÌNH & CHỐNG BÓP MÉO VIDEO (ASPECT RATIO & SCALE X/Y)
+                        // PHẦN 1 (ƯU TIÊN SỐ 1): ĐỒ HỌA, CHẤT LƯỢNG LUỒNG 4G/WI-FI & KHUNG HÌNH 60/120 FPS
+                        // ========================================================
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF0E1B14),
+                            border = BorderStroke(0.9.dp, XboxNeonGreen.copy(alpha = 0.55f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // 1.1 Mức chất lượng luồng (4G / Wi-Fi)
+                                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(
+                                        text = if (isEn) "🔥 1. Stream Quality & Bitrate (4G / Wi-Fi)" else "🔥 1. Mức chất lượng luồng & Đồ họa (4G / Wi-Fi)",
+                                        color = XboxNeonGreen,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        com.example.data.CellularOptimizationMode.entries.forEach { mode ->
+                                            val selected = config.cellularMode == mode
+                                            val shortTitle = when (mode) {
+                                                com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
+                                                com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
+                                                com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
+                                                com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
+                                                com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
+                                            }
+                                            Surface(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { SettingsRepository.updateCellularMode(mode) },
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (selected) XboxNeonGreen else XboxCardBorder
+                                                )
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = shortTitle,
+                                                        color = if (selected) XboxNeonGreen else TextPrimary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 1.2 Tỷ lệ dựng hình đồ họa (Render Scale) & Giới hạn FPS
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1.25f),
+                                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Render Scale (GPU Load)" else "Độ phân giải dựng hình",
+                                            color = DirectCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            com.example.data.StreamRenderScale.entries.forEach { scale ->
+                                                val selected = config.streamRenderScale == scale
+                                                val label = when (scale) {
+                                                    com.example.data.StreamRenderScale.NATIVE_100 -> "100%"
+                                                    com.example.data.StreamRenderScale.BALANCED_85 -> "85%"
+                                                    com.example.data.StreamRenderScale.PERFORMANCE_75 -> "75%"
+                                                    com.example.data.StreamRenderScale.ULTRA_LIGHT_60 -> "60%"
+                                                }
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(7.dp))
+                                                        .clickable { SettingsRepository.updateStreamRenderScale(scale) },
+                                                    shape = RoundedCornerShape(7.dp),
+                                                    color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF101A14),
+                                                    border = BorderStroke(
+                                                        1.dp,
+                                                        if (selected) DirectCyan else XboxCardBorder
+                                                    )
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.padding(vertical = 6.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = label,
+                                                            color = if (selected) DirectCyan else TextPrimary,
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Target FPS" else "Khung hình (FPS)",
+                                            color = XboxNeonGreen,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            com.example.data.StreamFpsCap.entries.forEach { cap ->
+                                                val selected = config.streamFpsCap == cap
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .clip(RoundedCornerShape(7.dp))
+                                                        .clickable { SettingsRepository.updateStreamFpsCap(cap) },
+                                                    shape = RoundedCornerShape(7.dp),
+                                                    color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
+                                                    border = BorderStroke(
+                                                        1.dp,
+                                                        if (selected) XboxNeonGreen else XboxCardBorder
+                                                    )
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.padding(vertical = 6.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "${cap.fps}",
+                                                            color = if (selected) XboxNeonGreen else TextPrimary,
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 1.3 Giảm tải phần cứng GPU
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isEn) "Reduce Hardware & GPU Load" else "Giảm gánh nặng phần cứng & GPU",
+                                            color = TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (isEn) "Strips heavy web blurs, shadows & background effects" else "Tắt làm mờ, đổ bóng và hiệu ứng nền nặng để chống giật lag",
+                                            color = Color(0xFFB0C4B8),
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                    androidx.compose.material3.Switch(
+                                        checked = config.gpuLoadReductionEnabled,
+                                        onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
+                                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = DirectCyan
+                                        )
+                                    )
+                                }
+
+                                // 1.4 Chế độ máy yếu
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu toàn diện",
+                                            color = TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (isEn) "Light graphics, cool 60 FPS & pauses background tasks" else "Đồ họa nhẹ 5 Mbps, giữ máy mát và giảm tối đa RAM/CPU",
+                                            color = Color(0xFFB0C4B8),
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                    androidx.compose.material3.Switch(
+                                        checked = config.lowEndDeviceMode,
+                                        onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
+                                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                                            checkedThumbColor = Color.Black,
+                                            checkedTrackColor = XboxNeonGreen
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // ========================================================
+                        // PHẦN 2 (ƯU TIÊN SỐ 2): TỈ LỆ MÀN HÌNH & CHỐNG BÓP MÉO VIDEO (ASPECT RATIO & SCALE X/Y)
                         // ========================================================
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -893,7 +1116,7 @@ fun CloudBrowserScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = if (isEn) "📐 Aspect Ratio (Fix Squished Video)" else "📐 Tỉ lệ màn hình (Sửa lỗi video bị bóp lại)",
+                                        text = if (isEn) "📐 2. Aspect Ratio (Fix Squished Video)" else "📐 2. Tỉ lệ màn hình (Chống bóp méo hình)",
                                         color = DirectCyan,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold
@@ -1019,218 +1242,7 @@ fun CloudBrowserScreen(
                         }
 
                         // ========================================================
-                        // PHẦN 2: CHẤT LƯỢNG LUỒNG STREAM & TỐI ƯU MẠNG 4G / WI-FI
-                        // ========================================================
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Text(
-                                text = if (isEn) "Stream Bitrate Preset (4G / Wi-Fi)" else "Mức chất lượng luồng (4G / Wi-Fi)",
-                                color = XboxNeonGreen,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                com.example.data.CellularOptimizationMode.entries.forEach { mode ->
-                                    val selected = config.cellularMode == mode
-                                    val shortTitle = when (mode) {
-                                        com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
-                                        com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
-                                        com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
-                                        com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
-                                        com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
-                                    }
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable { SettingsRepository.updateCellularMode(mode) },
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
-                                        border = BorderStroke(
-                                            1.dp,
-                                            if (selected) XboxNeonGreen else XboxCardBorder
-                                        )
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = shortTitle,
-                                                color = if (selected) XboxNeonGreen else TextPrimary,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // 2. Tỷ lệ dựng hình đồ họa (Render Scale) & Giới hạn FPS
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1.25f),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text(
-                                    text = if (isEn) "Render Scale (GPU Load)" else "Độ phân giải dựng hình",
-                                    color = DirectCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    com.example.data.StreamRenderScale.entries.forEach { scale ->
-                                        val selected = config.streamRenderScale == scale
-                                        val label = when (scale) {
-                                            com.example.data.StreamRenderScale.NATIVE_100 -> "100%"
-                                            com.example.data.StreamRenderScale.BALANCED_85 -> "85%"
-                                            com.example.data.StreamRenderScale.PERFORMANCE_75 -> "75%"
-                                            com.example.data.StreamRenderScale.ULTRA_LIGHT_60 -> "60%"
-                                        }
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .clickable { SettingsRepository.updateStreamRenderScale(scale) },
-                                            shape = RoundedCornerShape(7.dp),
-                                            color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF101A14),
-                                            border = BorderStroke(
-                                                1.dp,
-                                                if (selected) DirectCyan else XboxCardBorder
-                                            )
-                                        ) {
-                                            Box(
-                                                modifier = Modifier.padding(vertical = 6.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = label,
-                                                    color = if (selected) DirectCyan else TextPrimary,
-                                                    fontSize = 9.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Text(
-                                    text = if (isEn) "Target FPS" else "Khung hình (FPS)",
-                                    color = XboxNeonGreen,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    com.example.data.StreamFpsCap.entries.forEach { cap ->
-                                        val selected = config.streamFpsCap == cap
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .clickable { SettingsRepository.updateStreamFpsCap(cap) },
-                                            shape = RoundedCornerShape(7.dp),
-                                            color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
-                                            border = BorderStroke(
-                                                1.dp,
-                                                if (selected) XboxNeonGreen else XboxCardBorder
-                                            )
-                                        ) {
-                                            Box(
-                                                modifier = Modifier.padding(vertical = 6.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "${cap.fps}",
-                                                    color = if (selected) XboxNeonGreen else TextPrimary,
-                                                    fontSize = 9.5.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // 3. Giảm tải phần cứng GPU
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isEn) "Reduce Hardware & GPU Load" else "Giảm gánh nặng phần cứng & GPU",
-                                    color = TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = if (isEn) "Strips heavy web blurs, shadows & background effects" else "Tắt làm mờ, đổ bóng và hiệu ứng nền nặng để chống giật lag",
-                                    color = Color(0xFFB0C4B8),
-                                    fontSize = 9.5.sp
-                                )
-                            }
-                            androidx.compose.material3.Switch(
-                                checked = config.gpuLoadReductionEnabled,
-                                onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
-                                colors = androidx.compose.material3.SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = DirectCyan
-                                )
-                            )
-                        }
-
-                        // 4. Chế độ máy yếu
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu toàn diện",
-                                    color = TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = if (isEn) "Light graphics, cool 60 FPS & pauses background tasks" else "Đồ họa nhẹ 5 Mbps, giữ máy mát và giảm tối đa RAM/CPU",
-                                    color = Color(0xFFB0C4B8),
-                                    fontSize = 9.5.sp
-                                )
-                            }
-                            androidx.compose.material3.Switch(
-                                checked = config.lowEndDeviceMode,
-                                onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
-                                colors = androidx.compose.material3.SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = XboxNeonGreen
-                                )
-                            )
-                        }
-
-                        // ========================================================
-                        // PHẦN 5: TÍNH NĂNG PHỤ: QUAY VIDEO MÀN HÌNH & LƯU CLIP
-                        // (Mặc định: Quay Full Màn Hình • Xếp ở cuối cùng để ưu tiên 100% cho đồ họa)
+                        // PHẦN 3 (TÍNH NĂNG PHỤ - XẾP CUỐI CÙNG, THU GỌN): QUAY VIDEO CLIP (.MP4 CÓ ÂM THANH)
                         // ========================================================
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -1251,13 +1263,13 @@ fun CloudBrowserScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isEn) "🎥 Secondary: Screen Recording & Clip" else "🎥 Tính năng phụ: Quay Video Clip",
+                                            text = if (isEn) "🎥 3. Secondary: Record Clip (.MP4 + Audio)" else "🎥 3. Tính năng phụ: Quay Video Clip (.MP4 có tiếng)",
                                             color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextSecondary,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = if (isEn) "Default: Full Screen Recording • Stored in Gallery" else "Mặc định: Quay Full Toàn Màn Hình • Lưu trong Thư viện",
+                                            text = if (isEn) "Default: Full Screen (.MP4 + Stereo Game Audio)" else "Mặc định: Quay Full Màn Hình (Lưu chuẩn .MP4 có âm thanh game)",
                                             color = Color(0xFF7E9488),
                                             fontSize = 9.sp
                                         )
@@ -1357,11 +1369,11 @@ fun CloudBrowserScreen(
                                                 text = if (recorderState.isRecording) {
                                                     val mins = recorderState.elapsedSeconds / 60
                                                     val secs = recorderState.elapsedSeconds % 60
-                                                    if (isEn) "🔴 Recording %02d:%02d — Tap to Stop & Save".format(mins, secs)
-                                                    else "🔴 Đang thu %02d:%02d — Chạm để Lưu video".format(mins, secs)
+                                                    if (isEn) "🔴 Recording %02d:%02d — Tap to Save .MP4".format(mins, secs)
+                                                    else "🔴 Đang thu %02d:%02d — Chạm để Lưu .MP4 có tiếng".format(mins, secs)
                                                 } else {
-                                                    if (isEn) "🎬 Start Recording (${config.recordingCaptureEngine.localizedShort(true)})"
-                                                    else "🎬 Bắt đầu quay Clip (${config.recordingCaptureEngine.localizedShort(false)})"
+                                                    if (isEn) "🎬 Start Recording .MP4 + Audio (${config.recordingCaptureEngine.localizedShort(true)})"
+                                                    else "🎬 Bắt đầu quay .MP4 có tiếng (${config.recordingCaptureEngine.localizedShort(false)})"
                                                 },
                                                 color = if (recorderState.isRecording) Color(0xFFFF6B6B) else Color.White,
                                                 fontSize = 11.sp,

@@ -530,21 +530,21 @@ enum class RecordingCaptureEngine(
 ) {
     HARDWARE_SCREEN(
         id = "HARDWARE_SCREEN",
-        titleVi = "Quay Full Màn Hình (Mặc định • Ghi toàn màn hình thiết bị)",
-        titleEn = "Full Screen Recording (Default • Entire Device Screen)",
-        shortVi = "Quay Full Màn Hình (Mặc định)",
+        titleVi = "Quay Full Screen Toàn Màn Hình (Mặc định • Chuẩn .MP4 + Âm thanh)",
+        titleEn = "Full Screen Recording (Default • Entire Display .MP4 + Audio)",
+        shortVi = "Full Screen (Mặc định)",
         shortEn = "Full Screen (Default)",
-        descVi = "Ghi toàn bộ màn hình khi đang chơi game bằng bộ mã hóa phần cứng của máy, lưu trực tiếp vào Thư viện video",
-        descEn = "Records entire device display during gameplay using hardware encoder, saved to Gallery"
+        descVi = "Quay đúng 100% toàn bộ màn hình thực tế của máy (không bó hẹp 16:9), thu đầy đủ âm thanh Stereo vào file .MP4 và tuyệt đối không đổi tỉ lệ màn hình khi đang chơi",
+        descEn = "Records 100% of the device's full screen with stereo game audio to .MP4 without altering live gameplay display"
     ),
     DIRECT_STREAM(
         id = "DIRECT_STREAM",
-        titleVi = "Lấy Thẳng Luồng Video Stream (Chỉ lấy game 16:9 • 0% Lag)",
-        titleEn = "Direct WebRTC Stream (16:9 Game Only • Zero-Lag)",
-        shortVi = "Luồng Stream 16:9",
-        shortEn = "Direct Stream 16:9",
-        descVi = "Bắt trực tiếp gói hình ảnh WebRTC từ máy chủ Xbox: Không tốn thêm 4G/Wi-Fi, không quay giao diện nổi và giữ nguyên 16:9 gốc",
-        descEn = "Captures inbound WebRTC game video track directly with zero extra data and locked 16:9 frame"
+        titleVi = "Quay 16:9 Chuẩn Quốc Tế (Xuất .MP4 16:9 + Âm thanh • 0% Lag)",
+        titleEn = "16:9 International Standard (.MP4 + Audio • Zero-Lag)",
+        shortVi = "Chuẩn Quốc Tế 16:9",
+        shortEn = "Standard 16:9",
+        descVi = "Xuất video .MP4 theo đúng chuẩn tỉ lệ quốc tế 16:9 (1280x720) kèm âm thanh Stereo của game, xử lý ngầm hoàn toàn không làm thay đổi màn hình đang chơi",
+        descEn = "Outputs standard 16:9 (1280x720) .MP4 video with stereo game audio in the background without changing live screen ratio"
     );
 
 

@@ -477,6 +477,13 @@ class XboxBridge(
                                     window.__activeStatsIntervalId = null;
                                 }
                                 window.__activePeerConnection = pc;
+                                window.__allPeerConnections = window.__allPeerConnections || [];
+                                if (window.__allPeerConnections.indexOf(pc) === -1) {
+                                    window.__allPeerConnections.push(pc);
+                                }
+                                if (window.__allPeerConnections.length > 8) {
+                                    window.__allPeerConnections.shift();
+                                }
 
                                 // SDP Munging optimized for Android Hardware MediaCodec Decoder (Better-xCloud method)
                                 const origSetRemote = pc.setRemoteDescription.bind(pc);
@@ -1271,17 +1278,18 @@ class XboxBridge(
                     // 7. Dynamic Clarity Boost Ultra Controller (Zero-Lag GPU Color Matrix, No Drop-Shadow Blur Pass)
                     // ==========================================
                     let clarityStyleEl = null;
+                    let lastAppliedClarityCss = null;
                     function getPresetCss(preset) {
                         switch(preset) {
                             case 'ULTRA_SHARP':
-                                return 'filter: contrast(1.12) saturate(1.14) brightness(1.02) !important; image-rendering: -webkit-optimize-contrast !important; transform: translateZ(0); backface-visibility: hidden;';
+                                return 'filter: contrast(1.12) saturate(1.14) brightness(1.02) !important; image-rendering: -webkit-optimize-contrast !important; backface-visibility: hidden;';
                             case 'OLED_PUNCH':
-                                return 'filter: contrast(1.16) saturate(1.20) !important; transform: translateZ(0); backface-visibility: hidden;';
+                                return 'filter: contrast(1.16) saturate(1.20) !important; backface-visibility: hidden;';
                             case 'OFF':
-                                return 'filter: none !important; transform: translateZ(0); backface-visibility: hidden;';
+                                return '';
                             case 'BALANCED':
                             default:
-                                return 'filter: contrast(1.06) saturate(1.08) !important; image-rendering: -webkit-optimize-contrast !important; transform: translateZ(0); backface-visibility: hidden;';
+                                return 'filter: contrast(1.06) saturate(1.08) !important; image-rendering: -webkit-optimize-contrast !important; backface-visibility: hidden;';
                         }
                     }
 
@@ -1289,19 +1297,23 @@ class XboxBridge(
                         if (!clarityStyleEl) {
                             clarityStyleEl = document.createElement('style');
                             clarityStyleEl.id = 'cloudplay-clarity-boost';
-                            document.head.appendChild(clarityStyleEl);
+                            (document.head || document.documentElement).appendChild(clarityStyleEl);
                         }
                         const css = getPresetCss(preset);
-                        clarityStyleEl.textContent = `
-                            video#stream-video, video[data-testid="stream-video"], #segmented-video video, video {
+                        const nextBlock = css ? (`
+                            video#stream-video, video[data-testid="stream-video"], #segmented-video video {
                                 ` + css + `
                             }
-                        `;
+                        `) : '';
+                        if (nextBlock !== lastAppliedClarityCss) {
+                            clarityStyleEl.textContent = nextBlock;
+                            lastAppliedClarityCss = nextBlock;
+                        }
                     };
 
                     window.__toggleClarityBoost = function(active) {
                         window.__clarityBoostActive = !!active;
-                        if (active && !window.__isRecordingPerformanceMode) {
+                        if (active) {
                             window.__setClarityPreset("$clarityPreset");
                         } else {
                             window.__setClarityPreset("OFF");
@@ -1313,6 +1325,8 @@ class XboxBridge(
                     // ==========================================
                     let gpuLoadStyleEl = null;
                     let videoAspectStyleEl = null;
+                    let lastAppliedVideoAspectCss = null;
+                    let lastAppliedGpuCss = null;
 
                     window.__applyVideoAspectAndColorCss = function() {
                         try {
@@ -1329,6 +1343,23 @@ class XboxBridge(
                             const saturation = (typeof vc.saturation === 'number') ? (vc.saturation / 100.0) : 1.08;
                             const brightness = (typeof vc.brightness === 'number') ? (vc.brightness / 100.0) : 1.00;
 
+                            const isDefaultFit = (mode === 'FIT_16_9') &&
+                                Math.abs(userScaleX - 1.0) < 0.01 &&
+                                Math.abs(userScaleY - 1.0) < 0.01;
+                            const isDefaultColor = Math.abs(contrast - 1.05) < 0.02 &&
+                                Math.abs(saturation - 1.08) < 0.02 &&
+                                Math.abs(brightness - 1.00) < 0.02;
+
+                            // CRITICAL: When in default 16:9 mode with no custom stretch, do NOT override Xbox's native video layout!
+                            // This prevents ResizeObserver loops and eliminates screen stutters during gameplay.
+                            if (isDefaultFit && isDefaultColor) {
+                                if (lastAppliedVideoAspectCss !== '') {
+                                    videoAspectStyleEl.textContent = '';
+                                    lastAppliedVideoAspectCss = '';
+                                }
+                                return;
+                            }
+
                             let objectFitRule = 'contain';
                             let effScaleX = userScaleX;
                             let effScaleY = userScaleY;
@@ -1336,7 +1367,6 @@ class XboxBridge(
                             if (mode === 'FIT_16_9') {
                                 objectFitRule = 'contain';
                             } else if (mode === 'CINEMA_18_9') {
-                                // Expand 16:9 stream cleanly to 18:9 (18 / 16 = 1.125x horizontal width) while keeping contain boundaries
                                 objectFitRule = 'contain';
                                 effScaleX = parseFloat((userScaleX * 1.125).toFixed(4));
                             } else if (mode === 'ZOOM_COVER') {
@@ -1347,36 +1377,26 @@ class XboxBridge(
                                 objectFitRule = 'contain';
                             }
 
-                            const hasColorTuning = !window.__isRecordingPerformanceMode &&
+                            const hasColorTuning = !isDefaultColor &&
                                 (Math.abs(contrast - 1.0) > 0.01 || Math.abs(saturation - 1.0) > 0.01 || Math.abs(brightness - 1.0) > 0.01);
                             const filterRule = hasColorTuning
                                 ? ('filter: contrast(' + contrast.toFixed(2) + ') saturate(' + saturation.toFixed(2) + ') brightness(' + brightness.toFixed(2) + ') !important;')
                                 : '';
 
-                            videoAspectStyleEl.textContent = `
-                                #game-stream, [data-testid="media-container"], #segmented-video {
-                                    display: flex !important;
-                                    align-items: center !important;
-                                    justify-content: center !important;
-                                    background-color: #000000 !important;
-                                    overflow: hidden !important;
-                                    width: 100vw !important;
-                                    height: 100vh !important;
-                                }
-                                video#stream-video, video[data-testid="stream-video"], #segmented-video video, video {
+                            const nextCss = `
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video {
                                     object-fit: ` + objectFitRule + ` !important;
                                     object-position: center center !important;
-                                    width: 100% !important;
-                                    height: 100% !important;
-                                    max-width: 100vw !important;
-                                    max-height: 100vh !important;
-                                    margin: auto !important;
                                     transform-origin: center center !important;
                                     transform: scale(` + effScaleX + `, ` + effScaleY + `) translateZ(0) !important;
                                     backface-visibility: hidden !important;
                                     ` + filterRule + `
                                 }
                             `;
+                            if (nextCss !== lastAppliedVideoAspectCss) {
+                                videoAspectStyleEl.textContent = nextCss;
+                                lastAppliedVideoAspectCss = nextCss;
+                            }
                         } catch (e) {}
                     };
 
@@ -1395,37 +1415,33 @@ class XboxBridge(
                             }
                             const gt = window.__graphicsTuning || {};
                             const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
-                            const reduceGpu = !!(gt.gpuLoadReduction || isLowEnd || window.__isRecordingPerformanceMode);
+                            const reduceGpu = !!(gt.gpuLoadReduction || isLowEnd);
                             const scale = parseFloat(gt.renderScale) || 1.0;
 
                             let cssRules = '';
                             if (reduceGpu) {
-                                // Strip heavy CSS blurs, shadows, and background animations so GPU focuses 100% on video decoding
+                                // Strip heavy CSS blurs, shadows, and background animations on web UI (never mutating active video transform)
                                 cssRules += `
-                                    *, *::before, *::after {
+                                    [class*="background" i], [class*="ambient" i], [class*="blur" i], [class*="shimmer" i] {
                                         backdrop-filter: none !important;
                                         -webkit-backdrop-filter: none !important;
                                         box-shadow: none !important;
-                                        text-shadow: none !important;
-                                    }
-                                    [class*="background" i], [class*="ambient" i], [class*="blur" i], [class*="shimmer" i] {
                                         animation: none !important;
                                         transition: none !important;
-                                        filter: none !important;
                                     }
                                 `;
                             }
                             if (scale < 0.99) {
-                                // Use crisp hardware upscaling hints when rendering at 85% / 75% / 60% scale
                                 cssRules += `
-                                    video#stream-video, video[data-testid="stream-video"], #segmented-video video, video {
+                                    video#stream-video, video[data-testid="stream-video"], #segmented-video video {
                                         image-rendering: -webkit-optimize-contrast !important;
-                                        contain: layout style paint !important;
-                                        will-change: transform !important;
                                     }
                                 `;
                             }
-                            gpuLoadStyleEl.textContent = cssRules;
+                            if (cssRules !== lastAppliedGpuCss) {
+                                gpuLoadStyleEl.textContent = cssRules;
+                                lastAppliedGpuCss = cssRules;
+                            }
                         } catch (e) {}
                     };
 
@@ -1437,24 +1453,232 @@ class XboxBridge(
 
                     window.__setRecordingPerformanceMode = function(active) {
                         window.__isRecordingPerformanceMode = !!active;
+                        // IMPORTANT: Never alter live <video> aspect ratio, transform, or filter when starting/stopping recording!
+                        // Mutating <video> CSS during recording causes hardware compositor layer recreation and frame stutters.
                         if (active) {
                             if (window.__pauseTranslator) window.__pauseTranslator();
-                            window.__setClarityPreset("OFF");
                         } else {
-                            if (window.__clarityBoostActive) {
-                                window.__setClarityPreset("$clarityPreset");
-                            }
                             const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
                             if (!isLowEnd && location.href.indexOf('/launch/') === -1 && window.__resumeTranslator) {
                                 window.__resumeTranslator();
                             }
                         }
-                        window.__applyGpuAndRenderScaleCss();
-                        window.__applyVideoAspectAndColorCss();
                     };
 
                     let activeMediaRecorder = null;
                     let activeClonedTracks = [];
+                    let activeAudioTapCtx = null;
+                    let activeAudioTapSource = null;
+                    let activeAudioTapProcessor = null;
+                    let activeAudioTapGain = null;
+                    let activeAudioTapClone = null;
+                    let activeAudioTapRetryTimer = null;
+
+                    // Hook HTMLMediaElement.prototype.play & AudioContext to capture detached <audio> or WebAudio streams
+                    try {
+                        if (typeof HTMLMediaElement !== 'undefined' && HTMLMediaElement.prototype && !HTMLMediaElement.prototype.__audioHooked) {
+                            HTMLMediaElement.prototype.__audioHooked = true;
+                            const origMediaPlay = HTMLMediaElement.prototype.play;
+                            HTMLMediaElement.prototype.play = function(...args) {
+                                try {
+                                    if (this.srcObject && typeof this.srcObject.getAudioTracks === 'function') {
+                                        const at = this.srcObject.getAudioTracks();
+                                        if (at && at.length > 0 && at[0].readyState === 'live') {
+                                            window.__capturedGameAudioTrack = at[0];
+                                            window.__capturedAudioElement = this;
+                                        }
+                                    } else if (this.tagName && this.tagName.toLowerCase() === 'audio') {
+                                        window.__capturedAudioElement = this;
+                                    }
+                                } catch (e) {}
+                                return origMediaPlay.apply(this, args);
+                            };
+                        }
+                        const OrigAudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (OrigAudioCtx && OrigAudioCtx.prototype && OrigAudioCtx.prototype.createMediaStreamSource && !OrigAudioCtx.prototype.__mssHooked) {
+                            OrigAudioCtx.prototype.__mssHooked = true;
+                            const origCreateMss = OrigAudioCtx.prototype.createMediaStreamSource;
+                            OrigAudioCtx.prototype.createMediaStreamSource = function(stream) {
+                                try {
+                                    if (stream && typeof stream.getAudioTracks === 'function') {
+                                        const at = stream.getAudioTracks();
+                                        if (at && at.length > 0 && at[0].readyState === 'live') {
+                                            window.__capturedGameAudioTrack = at[0];
+                                        }
+                                    }
+                                } catch (e) {}
+                                return origCreateMss.apply(this, arguments);
+                            };
+                        }
+                    } catch (e) {}
+
+                    window.__findLiveGameAudioTrack = function() {
+                        try {
+                            // 1. Check direct captured track from ontrack / play / AudioContext
+                            if (window.__capturedGameAudioTrack && window.__capturedGameAudioTrack.readyState === 'live') {
+                                return window.__capturedGameAudioTrack;
+                            }
+                            // 2. Check activeWebRtcTracks dictionary
+                            if (window.__activeWebRtcTracks && window.__activeWebRtcTracks.audio && window.__activeWebRtcTracks.audio.readyState === 'live') {
+                                window.__capturedGameAudioTrack = window.__activeWebRtcTracks.audio;
+                                return window.__capturedGameAudioTrack;
+                            }
+                            // 3. Scan ALL RTCPeerConnection instances (not just the latest one)
+                            const pcs = window.__allPeerConnections || (window.__activePeerConnection ? [window.__activePeerConnection] : []);
+                            for (let p = pcs.length - 1; p >= 0; p--) {
+                                const pc = pcs[p];
+                                if (pc && typeof pc.getReceivers === 'function') {
+                                    const recs = pc.getReceivers();
+                                    for (let r = 0; r < recs.length; r++) {
+                                        const t = recs[r] && recs[r].track;
+                                        if (t && t.kind === 'audio' && t.readyState === 'live') {
+                                            window.__capturedGameAudioTrack = t;
+                                            return t;
+                                        }
+                                    }
+                                }
+                            }
+                            // 4. Check captured detached <audio> element
+                            if (window.__capturedAudioElement) {
+                                const el = window.__capturedAudioElement;
+                                if (el.srcObject && typeof el.srcObject.getAudioTracks === 'function') {
+                                    const at = el.srcObject.getAudioTracks();
+                                    if (at && at.length > 0 && at[0].readyState === 'live') {
+                                        window.__capturedGameAudioTrack = at[0];
+                                        return at[0];
+                                    }
+                                }
+                                const capFn = el.captureStream || el.mozCaptureStream;
+                                if (typeof capFn === 'function') {
+                                    const cs = capFn.call(el);
+                                    const at = cs && cs.getAudioTracks ? cs.getAudioTracks() : [];
+                                    if (at && at.length > 0 && at[0].readyState === 'live') {
+                                        window.__capturedGameAudioTrack = at[0];
+                                        return at[0];
+                                    }
+                                }
+                            }
+                            // 5. Check all DOM <audio> and <video> elements
+                            const mediaEls = document.querySelectorAll('audio, video');
+                            for (let m = 0; m < mediaEls.length; m++) {
+                                const mEl = mediaEls[m];
+                                if (mEl.srcObject && typeof mEl.srcObject.getAudioTracks === 'function') {
+                                    const at = mEl.srcObject.getAudioTracks();
+                                    if (at && at.length > 0 && at[0].readyState === 'live') {
+                                        window.__capturedGameAudioTrack = at[0];
+                                        return at[0];
+                                    }
+                                }
+                            }
+                        } catch (e) {}
+                        return null;
+                    };
+
+                    window.__stopLiveAudioPcmTap = function() {
+                        if (activeAudioTapRetryTimer) {
+                            clearInterval(activeAudioTapRetryTimer);
+                            activeAudioTapRetryTimer = null;
+                        }
+                        try {
+                            if (activeAudioTapProcessor) {
+                                activeAudioTapProcessor.onaudioprocess = null;
+                                activeAudioTapProcessor.disconnect();
+                            }
+                        } catch (e) {}
+                        try {
+                            if (activeAudioTapSource) activeAudioTapSource.disconnect();
+                        } catch (e) {}
+                        try {
+                            if (activeAudioTapGain) activeAudioTapGain.disconnect();
+                        } catch (e) {}
+                        try {
+                            if (activeAudioTapClone) activeAudioTapClone.stop();
+                        } catch (e) {}
+                        try {
+                            if (activeAudioTapCtx && activeAudioTapCtx.state !== 'closed') {
+                                activeAudioTapCtx.close();
+                            }
+                        } catch (e) {}
+                        activeAudioTapProcessor = null;
+                        activeAudioTapSource = null;
+                        activeAudioTapGain = null;
+                        activeAudioTapClone = null;
+                        activeAudioTapCtx = null;
+                    };
+
+                    window.__startLiveAudioPcmTap = function() {
+                        window.__stopLiveAudioPcmTap();
+                        function tryAttachAudioTap() {
+                            if (activeAudioTapProcessor) return true;
+                            const liveTrack = window.__findLiveGameAudioTrack();
+                            if (!liveTrack) return false;
+                            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioCtxClass) return false;
+                            try {
+                                const ctx = new AudioCtxClass({ sampleRate: 48000 });
+                                if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+                                    ctx.resume();
+                                }
+                                const cloned = (typeof liveTrack.clone === 'function') ? liveTrack.clone() : liveTrack;
+                                if (cloned !== liveTrack) activeAudioTapClone = cloned;
+                                const mediaStream = new MediaStream([cloned]);
+                                const source = ctx.createMediaStreamSource(mediaStream);
+                                const processor = ctx.createScriptProcessor(4096, 2, 2);
+                                const zeroGain = ctx.createGain();
+                                zeroGain.gain.value = 0.0;
+
+                                processor.onaudioprocess = function(audioEvt) {
+                                    try {
+                                        if (!window.CloudPlayBridge || !window.CloudPlayBridge.onScreenRecordAudioPcm) return;
+                                        const inBuf = audioEvt.inputBuffer;
+                                        const chCount = inBuf.numberOfChannels || 1;
+                                        const left = inBuf.getChannelData(0);
+                                        const right = chCount > 1 ? inBuf.getChannelData(1) : left;
+                                        const frames = left.length;
+                                        const pcm16 = new Int16Array(frames * 2);
+                                        for (let i = 0, j = 0; i < frames; i++) {
+                                            let sL = left[i];
+                                            let sR = right[i];
+                                            sL = sL < -1.0 ? -1.0 : (sL > 1.0 ? 1.0 : sL);
+                                            sR = sR < -1.0 ? -1.0 : (sR > 1.0 ? 1.0 : sR);
+                                            pcm16[j++] = sL < 0 ? (sL * 0x8000) : (sL * 0x7FFF);
+                                            pcm16[j++] = sR < 0 ? (sR * 0x8000) : (sR * 0x7FFF);
+                                        }
+                                        const bytes = new Uint8Array(pcm16.buffer);
+                                        let binary = '';
+                                        const chunkLen = 8192;
+                                        for (let offset = 0; offset < bytes.length; offset += chunkLen) {
+                                            const slice = bytes.subarray(offset, Math.min(offset + chunkLen, bytes.length));
+                                            binary += String.fromCharCode.apply(null, slice);
+                                        }
+                                        const b64 = window.btoa(binary);
+                                        window.CloudPlayBridge.onScreenRecordAudioPcm(b64, ctx.sampleRate || 48000, 2);
+                                    } catch (pcmErr) {}
+                                };
+
+                                source.connect(processor);
+                                processor.connect(zeroGain);
+                                zeroGain.connect(ctx.destination);
+
+                                activeAudioTapCtx = ctx;
+                                activeAudioTapSource = source;
+                                activeAudioTapProcessor = processor;
+                                activeAudioTapGain = zeroGain;
+                                return true;
+                            } catch (e) {
+                                return false;
+                            }
+                        }
+
+                        if (!tryAttachAudioTap()) {
+                            activeAudioTapRetryTimer = setInterval(function() {
+                                if (tryAttachAudioTap() && activeAudioTapRetryTimer) {
+                                    clearInterval(activeAudioTapRetryTimer);
+                                    activeAudioTapRetryTimer = null;
+                                }
+                            }, 900);
+                        }
+                    };
 
                     function cleanupClonedRecordingTracks() {
                         try {
@@ -1469,6 +1693,9 @@ class XboxBridge(
 
                     window.__startZeroLagStreamRecorder = function(width, height, fps, bitrateBps, captureEngine) {
                         try {
+                            // Always start the WebAudio stereo PCM tap so native AAC audio encoding captures game sound in ALL modes
+                            window.__startLiveAudioPcmTap();
+
                             if (captureEngine === 'HARDWARE_SCREEN') {
                                 return "FALLBACK_NATIVE";
                             }
@@ -1503,63 +1730,12 @@ class XboxBridge(
                             const clonedVideoTrack = (typeof vTracks[0].clone === 'function') ? vTracks[0].clone() : vTracks[0];
                             if (clonedVideoTrack !== vTracks[0]) activeClonedTracks.push(clonedVideoTrack);
 
-                            // Comprehensive Live Game Audio Track Finder:
-                            let rawAudioTrack = null;
-
-                            // A. Check actively captured WebRTC audio track from RTCPeerConnection.ontrack
-                            if (window.__capturedGameAudioTrack && window.__capturedGameAudioTrack.readyState === 'live') {
-                                rawAudioTrack = window.__capturedGameAudioTrack;
-                            }
-
-                            // B. Check intercepted tracks dictionary
-                            if (!rawAudioTrack && window.__activeWebRtcTracks && window.__activeWebRtcTracks.audio && window.__activeWebRtcTracks.audio.readyState === 'live') {
-                                rawAudioTrack = window.__activeWebRtcTracks.audio;
-                            }
-
-                            // C. Check RTCPeerConnection active receivers
-                            if (!rawAudioTrack && window.__activePeerConnection && typeof window.__activePeerConnection.getReceivers === 'function') {
-                                try {
-                                    const recs = window.__activePeerConnection.getReceivers();
-                                    for (let r = 0; r < recs.length; r++) {
-                                        const t = recs[r].track;
-                                        if (t && t.kind === 'audio' && t.readyState === 'live') {
-                                            rawAudioTrack = t;
-                                            window.__capturedGameAudioTrack = t;
-                                            break;
-                                        }
-                                    }
-                                } catch(e) {}
-                            }
-
-                            // D. Check any <audio> elements in DOM
-                            if (!rawAudioTrack) {
-                                const audios = document.querySelectorAll('audio');
-                                for (let a = 0; a < audios.length; a++) {
-                                    const aEl = audios[a];
-                                    if (aEl.srcObject && typeof aEl.srcObject.getAudioTracks === 'function') {
-                                        const at = aEl.srcObject.getAudioTracks();
-                                        if (at && at.length > 0 && at[0].readyState === 'live') {
-                                            rawAudioTrack = at[0];
-                                            window.__capturedGameAudioTrack = at[0];
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            // E. Check rawSourceStream for audio
+                            // Comprehensive Live Game Audio Track Finder
+                            let rawAudioTrack = window.__findLiveGameAudioTrack();
                             if (!rawAudioTrack && rawSourceStream.getAudioTracks) {
                                 const aTracks = rawSourceStream.getAudioTracks();
                                 if (aTracks && aTracks.length > 0 && aTracks[0].readyState === 'live') {
                                     rawAudioTrack = aTracks[0];
-                                }
-                            }
-
-                            // F. Check video element srcObject for audio
-                            if (!rawAudioTrack && video && video.srcObject && typeof video.srcObject.getAudioTracks === 'function') {
-                                const vAudio = video.srcObject.getAudioTracks();
-                                if (vAudio && vAudio.length > 0 && vAudio[0].readyState === 'live') {
-                                    rawAudioTrack = vAudio[0];
                                 }
                             }
 
@@ -1575,41 +1751,61 @@ class XboxBridge(
 
                             const streamWithAudio = clonedAudioTrack
                                 ? new MediaStream([clonedVideoTrack, clonedAudioTrack])
-                                : new MediaStream([clonedVideoTrack]);
+                                : null;
                             const streamVideoOnly = new MediaStream([clonedVideoTrack]);
 
-                            // Prioritize MP4 container & codecs so users always get standard playable .mp4 clips
-                            const mimeCandidates = [
+                            // Strictly separate audio-capable MIME types from video-only MIME types so audio is NEVER stripped
+                            const mimeCandidatesWithAudio = [
                                 'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
                                 'video/mp4;codecs=avc1,mp4a.40.2',
-                                'video/mp4;codecs=avc1',
                                 'video/mp4;codecs=h264,aac',
+                                'video/mp4;codecs=avc1,opus',
                                 'video/mp4',
                                 'video/webm;codecs=h264,opus',
-                                'video/webm;codecs=h264',
                                 'video/webm;codecs=vp8,opus',
                                 'video/webm;codecs=vp9,opus',
                                 'video/webm',
                                 ''
                             ];
+                            const mimeCandidatesVideoOnly = [
+                                'video/mp4;codecs=avc1.42E01E',
+                                'video/mp4;codecs=avc1',
+                                'video/mp4',
+                                'video/webm;codecs=h264',
+                                'video/webm;codecs=vp8',
+                                'video/webm',
+                                ''
+                            ];
 
-                            const streamCandidates = clonedAudioTrack ? [streamWithAudio, streamVideoOnly] : [streamVideoOnly];
+                            const attempts = streamWithAudio
+                                ? [
+                                    { stream: streamWithAudio, mimes: mimeCandidatesWithAudio },
+                                    { stream: streamVideoOnly, mimes: mimeCandidatesVideoOnly }
+                                  ]
+                                : [
+                                    { stream: streamVideoOnly, mimes: mimeCandidatesVideoOnly }
+                                  ];
+
                             let recorder = null;
                             let actualMime = 'video/mp4';
 
                             outerLoop:
-                            for (let sIdx = 0; sIdx < streamCandidates.length; sIdx++) {
-                                const targetStream = streamCandidates[sIdx];
-                                for (let mIdx = 0; mIdx < mimeCandidates.length; mIdx++) {
-                                    const candidateMime = mimeCandidates[mIdx];
+                            for (let aIdx = 0; aIdx < attempts.length; aIdx++) {
+                                const targetStream = attempts[aIdx].stream;
+                                const mimes = attempts[aIdx].mimes;
+                                for (let mIdx = 0; mIdx < mimes.length; mIdx++) {
+                                    const candidateMime = mimes[mIdx];
                                     if (candidateMime && MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(candidateMime)) {
                                         continue;
                                     }
                                     try {
-                                        const opts = { videoBitsPerSecond: bitrateBps || 4500000 };
+                                        const opts = {
+                                            videoBitsPerSecond: bitrateBps || 4500000,
+                                            audioBitsPerSecond: 128000
+                                        };
                                         if (candidateMime) opts.mimeType = candidateMime;
                                         const testRec = new MediaRecorder(targetStream, opts);
-                                        actualMime = testRec.mimeType || candidateMime || 'video/webm';
+                                        actualMime = testRec.mimeType || candidateMime || 'video/mp4';
                                         testRec.ondataavailable = function(evt) {
                                             if (!evt || !evt.data || evt.data.size === 0) return;
                                             const isFinal = (testRec.state === 'inactive');
@@ -1654,6 +1850,9 @@ class XboxBridge(
 
                     window.__stopZeroLagStreamRecorder = function() {
                         try {
+                            window.__stopLiveAudioPcmTap();
+                        } catch (e) {}
+                        try {
                             if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
                                 activeMediaRecorder.stop();
                             } else {
@@ -1691,6 +1890,12 @@ class XboxBridge(
     fun onScreenRecordChunk(base64Data: String?, isLastChunk: Boolean, mimeType: String?) {
         if (!isCallerTrusted()) return
         ZeroLagScreenRecorder.onWebStreamChunkReceived(base64Data ?: "", isLastChunk, mimeType)
+    }
+
+    @JavascriptInterface
+    fun onScreenRecordAudioPcm(base64Pcm: String?, sampleRate: Int, channels: Int) {
+        if (!isCallerTrusted()) return
+        ZeroLagScreenRecorder.onWebAudioPcmReceived(base64Pcm ?: "", sampleRate, channels)
     }
 
     @JavascriptInterface

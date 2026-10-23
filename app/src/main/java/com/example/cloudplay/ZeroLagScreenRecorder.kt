@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.ContextWrapper
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.media.MediaCodec
@@ -22,6 +23,7 @@ import android.view.PixelCopy
 import android.view.Surface
 import android.webkit.WebView
 import android.widget.Toast
+import com.example.data.RecordingCaptureEngine
 import com.example.data.ScreenRecordQuality
 import com.example.data.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -111,13 +113,18 @@ object ZeroLagScreenRecorder {
         val isEn = config.isEnglishUI()
         val quality = config.screenRecordQuality
         val autoReduceLoad = config.autoReduceLoadWhenRecording
+        val captureEngine = config.recordingCaptureEngine
 
         _state.value = _state.value.copy(
             isRecording = true,
             elapsedSeconds = 0,
             activeQuality = quality,
             autoLowLoadActive = autoReduceLoad,
-            modeLabel = if (isEn) "Zero-Lag Hardware" else "Phần cứng 0% Lag"
+            modeLabel = if (captureEngine == RecordingCaptureEngine.DIRECT_STREAM) {
+                if (isEn) "Direct Stream 0% Lag" else "Luồng Stream Trực Tiếp 0% Lag"
+            } else {
+                if (isEn) "Hardware Locked 16:9" else "Phần Cứng (Khóa 16:9)"
+            }
         )
 
         startElapsedTimer()
@@ -134,14 +141,14 @@ object ZeroLagScreenRecorder {
             }
         }
 
-        if (webView != null) {
+        if (webView != null && captureEngine == RecordingCaptureEngine.DIRECT_STREAM) {
             val js = """
                 (function() {
                     if (window.__setRecordingPerformanceMode) {
                         window.__setRecordingPerformanceMode(${autoReduceLoad});
                     }
                     if (window.__startZeroLagStreamRecorder) {
-                        return window.__startZeroLagStreamRecorder(${quality.widthPx}, ${quality.heightPx}, ${quality.fps}, ${quality.bitrateBps});
+                        return window.__startZeroLagStreamRecorder(${quality.widthPx}, ${quality.heightPx}, ${quality.fps}, ${quality.bitrateBps}, '${captureEngine.id}');
                     }
                     return "FALLBACK_NATIVE";
                 })();
@@ -154,10 +161,13 @@ object ZeroLagScreenRecorder {
                         if (cleanRes.startsWith("DIRECT_STREAM")) {
                             usingNativeHardwareFallback = false
                             _state.value = _state.value.copy(
-                                modeLabel = if (isEn) "Direct Stream 0% Lag" else "Thu luồng trực tiếp 0% Lag"
+                                modeLabel = if (isEn) "Direct Stream 0% Lag (16:9)" else "Luồng Stream 0% Lag (Chuẩn 16:9)"
                             )
                         } else {
                             usingNativeHardwareFallback = true
+                            _state.value = _state.value.copy(
+                                modeLabel = if (isEn) "Hardware Locked 16:9" else "Phần Cứng (Khóa 16:9)"
+                            )
                             startNativeHardwareSurfaceRecorder(context, webView, quality)
                         }
                     }
@@ -167,8 +177,18 @@ object ZeroLagScreenRecorder {
                 }
             }
         } else {
+            if (webView != null) {
+                webView.post {
+                    try {
+                        webView.evaluateJavascript(
+                            "if (window.__setRecordingPerformanceMode) window.__setRecordingPerformanceMode(${autoReduceLoad});",
+                            null
+                        )
+                    } catch (_: Exception) {}
+                }
+            }
             usingNativeHardwareFallback = true
-            startNativeHardwareSurfaceRecorder(context, null, quality)
+            startNativeHardwareSurfaceRecorder(context, webView, quality)
         }
 
         val toastMsg = if (isEn) {
@@ -323,25 +343,64 @@ object ZeroLagScreenRecorder {
                 val frameBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 val paint = Paint(Paint.FILTER_BITMAP_FLAG)
                 val frameIntervalMs = (1000L / quality.fps.coerceIn(24, 60)).coerceAtLeast(16L)
+                val targetAspect = width.toFloat() / height.toFloat().coerceAtLeast(1f)
 
                 val captureRunnable = object : Runnable {
                     override fun run() {
                         if (!isNativeEncoding) return
                         val tickStart = System.currentTimeMillis()
                         val window = activity?.window
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && window != null && window.peekDecorView() != null) {
+                        val decorView = window?.peekDecorView()
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && window != null && decorView != null) {
                             try {
-                                PixelCopy.request(
-                                    window,
-                                    frameBitmap,
-                                    { copyResult ->
-                                        if (copyResult == PixelCopy.SUCCESS && isNativeEncoding) {
-                                            drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
-                                            drainEncoder(false)
-                                        }
-                                    },
-                                    handler
-                                )
+                                val winW = decorView.width
+                                val winH = decorView.height
+                                // Compute aspect-ratio-preserving crop rect so 20:9 / 21:9 or portrait screens are never squished into 16:9
+                                val srcRect: Rect? = if (winW > 64 && winH > 64) {
+                                    val winAspect = winW.toFloat() / winH.toFloat()
+                                    if (winAspect > targetAspect + 0.02f) {
+                                        // Ultrawide phone screen (e.g. 20:9 / 21:9 landscape): crop centered 16:9 active stream region
+                                        val cropW = (winH * targetAspect).toInt().coerceIn(64, winW)
+                                        val left = ((winW - cropW) / 2).coerceAtLeast(0)
+                                        Rect(left, 0, left + cropW, winH)
+                                    } else if (winAspect < targetAspect - 0.02f) {
+                                        // Taller screen or portrait orientation: crop centered 16:9 horizontal band
+                                        val cropH = (winW / targetAspect).toInt().coerceIn(64, winH)
+                                        val top = ((winH - cropH) / 2).coerceAtLeast(0)
+                                        Rect(0, top, winW, top + cropH)
+                                    } else {
+                                        null
+                                    }
+                                } else {
+                                    null
+                                }
+
+                                if (srcRect != null) {
+                                    PixelCopy.request(
+                                        window,
+                                        srcRect,
+                                        frameBitmap,
+                                        { copyResult ->
+                                            if (copyResult == PixelCopy.SUCCESS && isNativeEncoding) {
+                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                                                drainEncoder(false)
+                                            }
+                                        },
+                                        handler
+                                    )
+                                } else {
+                                    PixelCopy.request(
+                                        window,
+                                        frameBitmap,
+                                        { copyResult ->
+                                            if (copyResult == PixelCopy.SUCCESS && isNativeEncoding) {
+                                                drawBitmapToEncoderSurface(frameBitmap, width, height, paint)
+                                                drainEncoder(false)
+                                            }
+                                        },
+                                        handler
+                                    )
+                                }
                             } catch (_: Exception) {
                                 drainEncoder(false)
                             }
@@ -377,6 +436,7 @@ object ZeroLagScreenRecorder {
                 surface.lockCanvas(null)
             }
             try {
+                canvas.drawColor(Color.BLACK)
                 canvas.drawBitmap(bitmap, null, Rect(0, 0, width, height), paint)
             } finally {
                 surface.unlockCanvasAndPost(canvas)

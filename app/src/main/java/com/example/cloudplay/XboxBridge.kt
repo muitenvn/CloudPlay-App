@@ -531,6 +531,13 @@ class XboxBridge(
                                 // Hardware Decoder Stabilization: adaptive initial target (respects 4G HARQ burst cushion vs Wi-Fi arena zero-delay)
                                 pc.addEventListener('track', function(evt) {
                                     try {
+                                        if (evt.track) {
+                                            window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
+                                            window.__activeWebRtcTracks[evt.track.kind] = evt.track;
+                                        }
+                                        if (evt.streams && evt.streams[0]) {
+                                            window.__activeWebRtcMediaStream = evt.streams[0];
+                                        }
                                         if (evt.receiver) {
                                             const isFortnite = isFortniteSession();
                                             const isFast = !!(window.__networkProfile && (window.__networkProfile.speedFirst || window.__networkProfile.lowEndDeviceMode));
@@ -1295,9 +1302,83 @@ class XboxBridge(
                     };
 
                     // ==========================================
-                    // 7B. Graphics Render Scale, GPU Load Reduction & Zero-Lag Screen Recorder Engine
+                    // 7B. Graphics Render Scale, Aspect Ratio Anti-Squish & Zero-Lag Direct Stream Recorder
                     // ==========================================
                     let gpuLoadStyleEl = null;
+                    let videoAspectStyleEl = null;
+
+                    window.__applyVideoAspectAndColorCss = function() {
+                        try {
+                            if (!videoAspectStyleEl) {
+                                videoAspectStyleEl = document.createElement('style');
+                                videoAspectStyleEl.id = 'cloudplay-video-aspect-controller';
+                                (document.head || document.documentElement).appendChild(videoAspectStyleEl);
+                            }
+                            const vc = window.__videoDisplayConfig || {};
+                            const mode = vc.aspectMode || 'FIT_16_9';
+                            const userScaleX = (typeof vc.scaleX === 'number' && !isNaN(vc.scaleX)) ? vc.scaleX : 1.0;
+                            const userScaleY = (typeof vc.scaleY === 'number' && !isNaN(vc.scaleY)) ? vc.scaleY : 1.0;
+                            const contrast = (typeof vc.contrast === 'number') ? (vc.contrast / 100.0) : 1.05;
+                            const saturation = (typeof vc.saturation === 'number') ? (vc.saturation / 100.0) : 1.08;
+                            const brightness = (typeof vc.brightness === 'number') ? (vc.brightness / 100.0) : 1.00;
+
+                            let objectFitRule = 'contain';
+                            let effScaleX = userScaleX;
+                            let effScaleY = userScaleY;
+
+                            if (mode === 'FIT_16_9') {
+                                objectFitRule = 'contain';
+                            } else if (mode === 'CINEMA_18_9') {
+                                // Expand 16:9 stream cleanly to 18:9 (18 / 16 = 1.125x horizontal width) while keeping contain boundaries
+                                objectFitRule = 'contain';
+                                effScaleX = parseFloat((userScaleX * 1.125).toFixed(4));
+                            } else if (mode === 'ZOOM_COVER') {
+                                objectFitRule = 'cover';
+                            } else if (mode === 'STRETCH_FULL') {
+                                objectFitRule = 'fill';
+                            } else if (mode === 'CUSTOM_SCALE') {
+                                objectFitRule = 'contain';
+                            }
+
+                            const hasColorTuning = !window.__isRecordingPerformanceMode &&
+                                (Math.abs(contrast - 1.0) > 0.01 || Math.abs(saturation - 1.0) > 0.01 || Math.abs(brightness - 1.0) > 0.01);
+                            const filterRule = hasColorTuning
+                                ? ('filter: contrast(' + contrast.toFixed(2) + ') saturate(' + saturation.toFixed(2) + ') brightness(' + brightness.toFixed(2) + ') !important;')
+                                : '';
+
+                            videoAspectStyleEl.textContent = `
+                                #game-stream, [data-testid="media-container"], #segmented-video {
+                                    display: flex !important;
+                                    align-items: center !important;
+                                    justify-content: center !important;
+                                    background-color: #000000 !important;
+                                    overflow: hidden !important;
+                                    width: 100vw !important;
+                                    height: 100vh !important;
+                                }
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video, video {
+                                    object-fit: ` + objectFitRule + ` !important;
+                                    object-position: center center !important;
+                                    width: 100% !important;
+                                    height: 100% !important;
+                                    max-width: 100vw !important;
+                                    max-height: 100vh !important;
+                                    margin: auto !important;
+                                    transform-origin: center center !important;
+                                    transform: scale(` + effScaleX + `, ` + effScaleY + `) translateZ(0) !important;
+                                    backface-visibility: hidden !important;
+                                    ` + filterRule + `
+                                }
+                            `;
+                        } catch (e) {}
+                    };
+
+                    window.__updateVideoDisplayConfig = function(conf) {
+                        if (!conf) return;
+                        window.__videoDisplayConfig = Object.assign(window.__videoDisplayConfig || {}, conf);
+                        window.__applyVideoAspectAndColorCss();
+                    };
+
                     window.__applyGpuAndRenderScaleCss = function() {
                         try {
                             if (!gpuLoadStyleEl) {
@@ -1362,75 +1443,139 @@ class XboxBridge(
                             }
                         }
                         window.__applyGpuAndRenderScaleCss();
+                        window.__applyVideoAspectAndColorCss();
                     };
 
                     let activeMediaRecorder = null;
-                    window.__startZeroLagStreamRecorder = function(width, height, fps, bitrateBps) {
+                    let activeClonedTracks = [];
+
+                    function cleanupClonedRecordingTracks() {
                         try {
-                            if (typeof MediaRecorder === 'undefined') return "FALLBACK_NATIVE";
-                            const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
-                            if (!video) return "FALLBACK_NATIVE";
-
-                            let stream = video.srcObject;
-                            if (!stream && typeof video.captureStream === 'function') {
-                                stream = video.captureStream(fps || 30);
-                            } else if (!stream && typeof video.mozCaptureStream === 'function') {
-                                stream = video.mozCaptureStream(fps || 30);
-                            }
-                            if (!stream) return "FALLBACK_NATIVE";
-
-                            const candidates = [
-                                'video/mp4;codecs=avc1',
-                                'video/mp4',
-                                'video/webm;codecs=h264,opus',
-                                'video/webm;codecs=h264',
-                                'video/webm;codecs=vp8,opus',
-                                'video/webm'
-                            ];
-                            let chosenMime = '';
-                            for (let i = 0; i < candidates.length; i++) {
-                                if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(candidates[i])) {
-                                    chosenMime = candidates[i];
-                                    break;
+                            if (activeClonedTracks && activeClonedTracks.length > 0) {
+                                for (let i = 0; i < activeClonedTracks.length; i++) {
+                                    try { activeClonedTracks[i].stop(); } catch (e) {}
                                 }
                             }
+                        } catch (e) {}
+                        activeClonedTracks = [];
+                    }
 
-                            const recOptions = {
-                                videoBitsPerSecond: bitrateBps || 4500000
-                            };
-                            if (chosenMime) recOptions.mimeType = chosenMime;
+                    window.__startZeroLagStreamRecorder = function(width, height, fps, bitrateBps, captureEngine) {
+                        try {
+                            if (captureEngine === 'HARDWARE_SCREEN') {
+                                return "FALLBACK_NATIVE";
+                            }
+                            if (typeof MediaRecorder === 'undefined') return "FALLBACK_NATIVE";
 
                             if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
                                 try { activeMediaRecorder.stop(); } catch (e) {}
                             }
+                            cleanupClonedRecordingTracks();
 
-                            const recorder = new MediaRecorder(stream, recOptions);
+                            const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                            let rawSourceStream = null;
+                            if (video && video.srcObject && typeof video.srcObject.getVideoTracks === 'function' && video.srcObject.getVideoTracks().length > 0) {
+                                rawSourceStream = video.srcObject;
+                            } else if (window.__activeWebRtcMediaStream && typeof window.__activeWebRtcMediaStream.getVideoTracks === 'function' && window.__activeWebRtcMediaStream.getVideoTracks().length > 0) {
+                                rawSourceStream = window.__activeWebRtcMediaStream;
+                            } else if (window.__activeWebRtcTracks && window.__activeWebRtcTracks.video) {
+                                const tracksArr = [window.__activeWebRtcTracks.video];
+                                if (window.__activeWebRtcTracks.audio) tracksArr.push(window.__activeWebRtcTracks.audio);
+                                rawSourceStream = new MediaStream(tracksArr);
+                            } else if (video && typeof video.captureStream === 'function') {
+                                rawSourceStream = video.captureStream(fps || 30);
+                            } else if (video && typeof video.mozCaptureStream === 'function') {
+                                rawSourceStream = video.mozCaptureStream(fps || 30);
+                            }
+
+                            if (!rawSourceStream) return "FALLBACK_NATIVE";
+
+                            // Clone tracks so recording reads passively from WebRTC receiver buffer with 0% side effect on live <video> playback
+                            const vTracks = rawSourceStream.getVideoTracks ? rawSourceStream.getVideoTracks() : [];
+                            if (!vTracks || vTracks.length === 0) return "FALLBACK_NATIVE";
+                            const clonedVideoTrack = (typeof vTracks[0].clone === 'function') ? vTracks[0].clone() : vTracks[0];
+                            if (clonedVideoTrack !== vTracks[0]) activeClonedTracks.push(clonedVideoTrack);
+
+                            const aTracks = rawSourceStream.getAudioTracks ? rawSourceStream.getAudioTracks() : [];
+                            let clonedAudioTrack = null;
+                            if (aTracks && aTracks.length > 0) {
+                                clonedAudioTrack = (typeof aTracks[0].clone === 'function') ? aTracks[0].clone() : aTracks[0];
+                                if (clonedAudioTrack !== aTracks[0]) activeClonedTracks.push(clonedAudioTrack);
+                            }
+
+                            const streamWithAudio = clonedAudioTrack
+                                ? new MediaStream([clonedVideoTrack, clonedAudioTrack])
+                                : new MediaStream([clonedVideoTrack]);
+                            const streamVideoOnly = new MediaStream([clonedVideoTrack]);
+
+                            // Try combinations in priority order inside try/catch so Android 15 WebView never fails on avc1+opus mismatch
+                            const mimeCandidates = [
+                                'video/webm;codecs=h264,opus',
+                                'video/webm;codecs=h264',
+                                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                                'video/mp4;codecs=avc1.42E01E',
+                                'video/mp4;codecs=avc1',
+                                'video/mp4',
+                                'video/webm;codecs=vp8,opus',
+                                'video/webm',
+                                ''
+                            ];
+
+                            const streamCandidates = clonedAudioTrack ? [streamWithAudio, streamVideoOnly] : [streamVideoOnly];
+                            let recorder = null;
+                            let actualMime = 'video/webm';
+
+                            outerLoop:
+                            for (let sIdx = 0; sIdx < streamCandidates.length; sIdx++) {
+                                const targetStream = streamCandidates[sIdx];
+                                for (let mIdx = 0; mIdx < mimeCandidates.length; mIdx++) {
+                                    const candidateMime = mimeCandidates[mIdx];
+                                    if (candidateMime && MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(candidateMime)) {
+                                        continue;
+                                    }
+                                    try {
+                                        const opts = { videoBitsPerSecond: bitrateBps || 4500000 };
+                                        if (candidateMime) opts.mimeType = candidateMime;
+                                        const testRec = new MediaRecorder(targetStream, opts);
+                                        actualMime = testRec.mimeType || candidateMime || 'video/webm';
+                                        testRec.ondataavailable = function(evt) {
+                                            if (!evt || !evt.data || evt.data.size === 0) return;
+                                            const isFinal = (testRec.state === 'inactive');
+                                            const reader = new FileReader();
+                                            reader.onloadend = function() {
+                                                if (reader.result && window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
+                                                    window.CloudPlayBridge.onScreenRecordChunk(reader.result, isFinal, actualMime);
+                                                }
+                                            };
+                                            reader.readAsDataURL(evt.data);
+                                        };
+                                        testRec.onstop = function() {
+                                            cleanupClonedRecordingTracks();
+                                            setTimeout(function() {
+                                                if (window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
+                                                    window.CloudPlayBridge.onScreenRecordChunk("", true, actualMime);
+                                                }
+                                            }, 180);
+                                        };
+                                        // 2000ms timeslice cuts IPC overhead in half for zero micro-stutter
+                                        testRec.start(2000);
+                                        recorder = testRec;
+                                        break outerLoop;
+                                    } catch (tryErr) {
+                                        // Continue to next codec/stream candidate
+                                    }
+                                }
+                            }
+
+                            if (!recorder) {
+                                cleanupClonedRecordingTracks();
+                                return "FALLBACK_NATIVE";
+                            }
+
                             activeMediaRecorder = recorder;
-                            const actualMime = recorder.mimeType || chosenMime || 'video/webm';
-
-                            recorder.ondataavailable = function(evt) {
-                                if (!evt || !evt.data || evt.data.size === 0) return;
-                                const isFinal = (recorder.state === 'inactive');
-                                const reader = new FileReader();
-                                reader.onloadend = function() {
-                                    if (reader.result && window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
-                                        window.CloudPlayBridge.onScreenRecordChunk(reader.result, isFinal, actualMime);
-                                    }
-                                };
-                                reader.readAsDataURL(evt.data);
-                            };
-
-                            recorder.onstop = function() {
-                                setTimeout(function() {
-                                    if (window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
-                                        window.CloudPlayBridge.onScreenRecordChunk("", true, actualMime);
-                                    }
-                                }, 180);
-                            };
-
-                            recorder.start(1000);
                             return "DIRECT_STREAM:" + actualMime;
                         } catch (err) {
+                            cleanupClonedRecordingTracks();
                             return "FALLBACK_NATIVE";
                         }
                     };
@@ -1439,13 +1584,18 @@ class XboxBridge(
                         try {
                             if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
                                 activeMediaRecorder.stop();
+                            } else {
+                                cleanupClonedRecordingTracks();
                             }
                             activeMediaRecorder = null;
-                        } catch (e) {}
+                        } catch (e) {
+                            cleanupClonedRecordingTracks();
+                        }
                     };
 
                     window.__toggleClarityBoost($clarityBoost);
                     window.__applyGpuAndRenderScaleCss();
+                    window.__applyVideoAspectAndColorCss();
                     if ($lowEndDeviceMode && window.__pauseTranslator) {
                         window.__pauseTranslator();
                     }

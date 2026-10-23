@@ -113,7 +113,7 @@ fun CyberBackdrop(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF13261C).copy(alpha = 0.30f),
+                            Color(0xFF13261C).copy(alpha = 0.32f),
                             Color.Transparent
                         ),
                         center = Offset(w * 0.5f, h * 0.42f),
@@ -121,19 +121,69 @@ fun CyberBackdrop(
                     )
                 )
 
-                // 5. Top-edge subtle laser horizon highlight
+                // 5. UI 3.0 Diagonal Cyber-Light Beam (skipped in low-end mode)
+                if (!config.lowEndDeviceMode) {
+                    drawLine(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                XboxNeonGreen.copy(alpha = 0.045f * pulseShift),
+                                DirectCyan.copy(alpha = 0.045f * (1f - pulseShift)),
+                                Color.Transparent
+                            ),
+                            start = Offset(0f, h * 0.15f),
+                            end = Offset(w, h * 0.65f)
+                        ),
+                        start = Offset(0f, h * 0.15f),
+                        end = Offset(w, h * 0.65f),
+                        strokeWidth = 64.dp.toPx()
+                    )
+                }
+
+                // 6. Top-edge subtle laser horizon highlight
                 drawLine(
                     brush = Brush.horizontalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            XboxNeonGreen.copy(alpha = 0.35f),
-                            DirectCyan.copy(alpha = 0.35f),
+                            XboxNeonGreen.copy(alpha = 0.45f),
+                            DirectCyan.copy(alpha = 0.45f),
                             Color.Transparent
                         )
                     ),
-                    start = Offset(w * 0.05f, 0f),
-                    end = Offset(w * 0.95f, 0f),
-                    strokeWidth = 2f
+                    start = Offset(w * 0.03f, 0f),
+                    end = Offset(w * 0.97f, 0f),
+                    strokeWidth = 2.5f
+                )
+
+                // 7. Subtle Corner Console HUD Micro-Brackets
+                val bracketLen = 18.dp.toPx()
+                val bracketInset = 8.dp.toPx()
+                val bracketColor = DirectCyan.copy(alpha = 0.14f)
+                // Top-left bracket
+                drawLine(
+                    color = bracketColor,
+                    start = Offset(bracketInset, bracketInset),
+                    end = Offset(bracketInset + bracketLen, bracketInset),
+                    strokeWidth = 1.5f
+                )
+                drawLine(
+                    color = bracketColor,
+                    start = Offset(bracketInset, bracketInset),
+                    end = Offset(bracketInset, bracketInset + bracketLen),
+                    strokeWidth = 1.5f
+                )
+                // Top-right bracket
+                drawLine(
+                    color = bracketColor,
+                    start = Offset(w - bracketInset - bracketLen, bracketInset),
+                    end = Offset(w - bracketInset, bracketInset),
+                    strokeWidth = 1.5f
+                )
+                drawLine(
+                    color = bracketColor,
+                    start = Offset(w - bracketInset, bracketInset),
+                    end = Offset(w - bracketInset, bracketInset + bracketLen),
+                    strokeWidth = 1.5f
                 )
             }
     ) {

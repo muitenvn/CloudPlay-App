@@ -31,7 +31,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -332,6 +334,23 @@ fun CloudBrowserScreen(
     ) {
         webViewInstance?.evaluateJavascript(
             "if (window.__updateGraphicsTuning) window.__updateGraphicsTuning({ renderScale: ${config.streamRenderScale.scaleFactor}, fpsCap: ${config.streamFpsCap.fps}, gpuLoadReduction: ${config.gpuLoadReductionEnabled}, lowEndDeviceMode: ${config.lowEndDeviceMode} });",
+            null
+        )
+    }
+
+    // Đồng bộ tức thì Tỉ lệ khung hình chống bóp video (Aspect Ratio), Scale X/Y & Màu sắc với WebView đang chạy
+    LaunchedEffect(
+        config.videoAspectRatioMode,
+        config.videoScaleX,
+        config.videoScaleY,
+        config.videoContrast,
+        config.videoSaturation,
+        config.videoBrightness,
+        streamUiState.isStreamConnected,
+        webViewInstance
+    ) {
+        webViewInstance?.evaluateJavascript(
+            "if (window.__updateVideoDisplayConfig) window.__updateVideoDisplayConfig({ aspectMode: '${config.videoAspectRatioMode.name}', scaleX: ${config.videoScaleX}, scaleY: ${config.videoScaleY}, contrast: ${config.videoContrast}, saturation: ${config.videoSaturation}, brightness: ${config.videoBrightness} });",
             null
         )
     }
@@ -793,9 +812,10 @@ fun CloudBrowserScreen(
             }
         )
 
-        // Compact In-Game Quick Settings Dialog (Quality Level, Graphics Scale, FPS Cap, GPU Load Reduction, Zero-Lag Screen Recorder)
+        // In-Game Video Settings & Stream Capture Dialog (Opened from "🎬 Cài đặt Video" in Expanded HUD)
         if (showQuickSettingsDialog) {
             val isEn = config.isEnglishUI()
+            val dialogScrollState = rememberScrollState()
             androidx.compose.ui.window.Dialog(
                 onDismissRequest = { showQuickSettingsDialog = false }
             ) {
@@ -809,7 +829,9 @@ fun CloudBrowserScreen(
                     shadowElevation = 12.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .padding(14.dp)
+                            .verticalScroll(dialogScrollState),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
@@ -817,12 +839,20 @@ fun CloudBrowserScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (isEn) "Graphics & Lag Optimization" else "Chỉnh đồ họa & Giảm lag",
-                                color = TextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEn) "🎬 Video & Stream Settings" else "🎬 Cài đặt Video & Tỉ lệ màn hình",
+                                    color = TextPrimary,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(
+                                    text = if (isEn) "Fix squished aspect ratio & direct WebRTC stream capture" else "Chống bóp méo video & lấy thẳng luồng Video Streaming 0% lag",
+                                    color = DirectCyan,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Color.White.copy(alpha = 0.08f),
@@ -841,50 +871,266 @@ fun CloudBrowserScreen(
                             }
                         }
 
-                        // 0. Quay màn hình không lag (Zero-Lag Screen Recorder)
+                        // ========================================================
+                        // PHẦN 1: TỈ LỆ MÀN HÌNH & CHỐNG BÓP MÉO VIDEO (ASPECT RATIO & SCALE X/Y)
+                        // ========================================================
                         Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
-                                }
-                                .testTag("quick_settings_record_button"),
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(10.dp),
-                            color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0xFF102218),
-                            border = BorderStroke(
-                                1.dp,
-                                if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen.copy(alpha = 0.7f)
-                            )
+                            color = Color(0xFF0E1B14),
+                            border = BorderStroke(0.9.dp, DirectCyan.copy(alpha = 0.55f))
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
-                                        text = if (recorderState.isRecording) {
-                                            val mins = recorderState.elapsedSeconds / 60
-                                            val secs = recorderState.elapsedSeconds % 60
-                                            if (isEn) "🔴 Recording %02d:%02d — Tap to Stop & Save".format(mins, secs)
-                                            else "🔴 Đang quay %02d:%02d — Chạm để Lưu video".format(mins, secs)
-                                        } else {
-                                            if (isEn) "🎬 Start Zero-Lag Screen Recording" else "🎬 Quay màn hình không lag (Chạm để bắt đầu)"
-                                        },
-                                        color = if (recorderState.isRecording) Color(0xFFFF6B6B) else XboxNeonGreen,
-                                        fontSize = 12.sp,
+                                        text = if (isEn) "📐 Aspect Ratio (Fix Squished Video)" else "📐 Tỉ lệ màn hình (Sửa lỗi video bị bóp lại)",
+                                        color = DirectCyan,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )
-                                    Text(
-                                        text = if (isEn) {
-                                            "${config.screenRecordQuality.localizedTitle(true)} • Direct stream capture without FPS drop"
-                                        } else {
-                                            "${config.screenRecordQuality.localizedTitle(false)} • Thu luồng trực tiếp, không tụt FPS"
-                                        },
-                                        color = Color(0xFFB0C4B8),
-                                        fontSize = 10.sp
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = XboxNeonGreen.copy(alpha = 0.2f),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { SettingsRepository.resetVideoDisplayDefaults() }
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Reset 16:9" else "Chuẩn gốc 16:9",
+                                            color = XboxNeonGreen,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
+
+                                // 5 Chế độ tỉ lệ khung hình
+                                com.example.data.VideoAspectRatioMode.entries.chunked(2).forEach { rowModes ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        rowModes.forEach { mode ->
+                                            val selected = config.videoAspectRatioMode == mode
+                                            Surface(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(7.dp))
+                                                    .clickable { SettingsRepository.updateVideoAspectRatioMode(mode) },
+                                                shape = RoundedCornerShape(7.dp),
+                                                color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF101914),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (selected) DirectCyan else XboxCardBorder
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                                ) {
+                                                    Text(
+                                                        text = mode.localizedShort(isEn),
+                                                        color = if (selected) DirectCyan else TextPrimary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 1
+                                                    )
+                                                    Text(
+                                                        text = mode.localizedTitle(isEn),
+                                                        color = Color(0xFFB0C4B8),
+                                                        fontSize = 8.5.sp,
+                                                        maxLines = 1
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Thanh trượt tinh chỉnh Độ rộng Ngang (Scale X) & Độ cao Dọc (Scale Y) trực tiếp
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Horizontal Stretch (Scale X)" else "Kéo giãn chiều Ngang (Scale X)",
+                                            color = TextPrimary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${(config.videoScaleX * 100).toInt()}%",
+                                            color = XboxNeonGreen,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    androidx.compose.material3.Slider(
+                                        value = config.videoScaleX,
+                                        onValueChange = { SettingsRepository.updateVideoScaleX(it) },
+                                        valueRange = 0.75f..1.35f,
+                                        colors = androidx.compose.material3.SliderDefaults.colors(
+                                            thumbColor = XboxNeonGreen,
+                                            activeTrackColor = XboxNeonGreen
+                                        )
                                     )
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Vertical Height (Scale Y)" else "Kéo giãn chiều Dọc (Scale Y)",
+                                            color = TextPrimary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${(config.videoScaleY * 100).toInt()}%",
+                                            color = DirectCyan,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    androidx.compose.material3.Slider(
+                                        value = config.videoScaleY,
+                                        onValueChange = { SettingsRepository.updateVideoScaleY(it) },
+                                        valueRange = 0.75f..1.35f,
+                                        colors = androidx.compose.material3.SliderDefaults.colors(
+                                            thumbColor = DirectCyan,
+                                            activeTrackColor = DirectCyan
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // ========================================================
+                        // PHẦN 2: CHẾ ĐỘ THU LUỒNG VIDEO TRỰC TIẾP (DIRECT STREAM VS HARDWARE)
+                        // ========================================================
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF101F16),
+                            border = BorderStroke(0.9.dp, XboxNeonGreen.copy(alpha = 0.6f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (isEn) "🎥 Recording Capture Engine (Zero-Lag)" else "🎥 Cơ chế thu Video (Lấy thẳng luồng Stream vs Ghi màn hình)",
+                                    color = XboxNeonGreen,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+
+                                com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
+                                    val selected = config.recordingCaptureEngine == engine
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) },
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else Color(0xFF0C1510),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (selected) XboxNeonGreen else XboxCardBorder
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text(
+                                                text = engine.localizedTitle(isEn),
+                                                color = if (selected) XboxNeonGreen else TextPrimary,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = engine.localizedDesc(isEn),
+                                                color = Color(0xFFB0C4B8),
+                                                fontSize = 9.sp
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Chọn độ phân giải quay
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    com.example.data.ScreenRecordQuality.entries.forEach { q ->
+                                        val selected = config.screenRecordQuality == q
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(7.dp))
+                                                .clickable { SettingsRepository.updateScreenRecordQuality(q) },
+                                            shape = RoundedCornerShape(7.dp),
+                                            color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF0C1510),
+                                            border = BorderStroke(1.dp, if (selected) DirectCyan else XboxCardBorder)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier.padding(vertical = 5.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = q.localizedShort(isEn),
+                                                    color = if (selected) DirectCyan else TextPrimary,
+                                                    fontSize = 9.5.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Nút Bắt đầu / Dừng quay
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .clickable {
+                                            com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
+                                        }
+                                        .testTag("quick_settings_record_button"),
+                                    shape = RoundedCornerShape(9.dp),
+                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else XboxNeonGreen.copy(alpha = 0.22f),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen
+                                    )
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (recorderState.isRecording) {
+                                                val mins = recorderState.elapsedSeconds / 60
+                                                val secs = recorderState.elapsedSeconds % 60
+                                                if (isEn) "🔴 Recording %02d:%02d — Tap to Stop & Save".format(mins, secs)
+                                                else "🔴 Đang thu %02d:%02d — Chạm để Lưu video".format(mins, secs)
+                                            } else {
+                                                if (isEn) "🎬 Start Recording Now (${config.recordingCaptureEngine.localizedShort(true)})"
+                                                else "🎬 Bắt đầu thu Video ngay (${config.recordingCaptureEngine.localizedShort(false)})"
+                                            },
+                                            color = if (recorderState.isRecording) Color(0xFFFF6B6B) else Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1093,44 +1339,6 @@ fun CloudBrowserScreen(
                                 colors = androidx.compose.material3.SwitchDefaults.colors(
                                     checkedThumbColor = Color.Black,
                                     checkedTrackColor = XboxNeonGreen
-                                )
-                            )
-                        }
-
-                        // 5. Bật/tắt bộ dịch
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (isEn) "Auto Translate (Vietnamese)" else "Dịch tự động tiếng Việt",
-                                    color = TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = if (isEn) "Translate Xbox web menus" else "Dịch menu và thông báo trang Xbox",
-                                    color = Color(0xFFB0C4B8),
-                                    fontSize = 9.5.sp
-                                )
-                            }
-                            androidx.compose.material3.Switch(
-                                checked = effectiveTranslate,
-                                onCheckedChange = { enabled ->
-                                    if (config.isEnglishUI() && enabled) {
-                                        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
-                                    }
-                                    SettingsRepository.updateXcloudTranslate(enabled)
-                                    webViewInstance?.evaluateJavascript(
-                                        "if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($enabled);",
-                                        null
-                                    )
-                                },
-                                colors = androidx.compose.material3.SwitchDefaults.colors(
-                                    checkedThumbColor = Color.Black,
-                                    checkedTrackColor = DirectCyan
                                 )
                             )
                         }

@@ -450,17 +450,57 @@ fun SettingsScreen(
                     )
                 }
 
-                // 1.4 Quay màn hình không lag (Zero-Lag Screen Recorder)
-                SettingsCard(title = if (isEn) "Zero-Lag Screen Recording" else "Quay màn hình không lag") {
+                // 1.4 Quay màn hình không lag & Cơ chế lấy thẳng luồng Video Streaming
+                SettingsCard(title = if (isEn) "Zero-Lag Direct Stream Recording" else "Quay video không lag (Lấy thẳng luồng Stream)") {
                     Text(
                         text = if (isEn) {
-                            "Captures the WebRTC video stream directly into your Gallery (Movies/XboxCloudPlay) without taxing CPU/GPU."
+                            "Clones the inbound WebRTC video stream directly into your Gallery (Movies/XboxCloudPlay) with 0% extra network usage, 0% screen-capture GPU lag, and native 16:9 aspect ratio (no squishing)."
                         } else {
-                            "Ghi trực tiếp luồng hình ảnh game vào Bộ sưu tập (Movies/XboxCloudPlay) bằng phần cứng chuyên dụng, không gây tụt FPS khi chiến game."
+                            "Lấy thẳng luồng hình ảnh WebRTC từ máy chủ Xbox lưu vào Bộ sưu tập (Movies/XboxCloudPlay): 0% tốn thêm data mạng, 0% lag chụp màn hình, giữ chuẩn tỉ lệ 16:9 gốc không bị bóp hình."
                         },
                         color = TextSecondary,
                         fontSize = 11.sp
                     )
+
+                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
+                        val isSelected = config.recordingCaptureEngine == engine
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) }
+                                .testTag("settings_capture_engine_${engine.id}"),
+                            color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = engine.localizedTitle(isEn),
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = engine.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -993,17 +1033,228 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 4: NÂNG CAO (Mặc định gập)
+        // NHÓM 4: NÂNG CAO (Đầy đủ thông số Video, Tỉ lệ màn hình, Luồng Stream, Ngôn ngữ & Bộ nhớ đệm)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Advanced" else "Nâng cao",
-                subtitle = if (isEn) "Language, Cache & Terms" else "Ngôn ngữ, Bộ nhớ đệm & Bản quyền",
+                title = if (isEn) "Advanced & Full Video Parameters" else "Nâng cao & Thông số Video đầy đủ",
+                subtitle = if (isEn) "Aspect Ratio, Scale X/Y, Direct Stream Capture, Color & Cache" else "Chỉnh tỉ lệ màn hình chống bóp video, Luồng Stream 0% lag, Màu sắc & Bộ nhớ đệm",
                 icon = Icons.Default.Tune,
                 expanded = expandAdvanced,
                 onToggle = { expandAdvanced = !expandAdvanced },
                 testTag = "settings_group_advanced"
             ) {
+                // 4.0 Menu Cài Đặt Video, Tỉ Lệ Khung Hình & Luồng Ghi Hình Chuyên Sâu
+                SettingsCard(
+                    title = if (isEn) "🎬 Advanced Video Aspect Ratio & Direct Stream Parameters" else "🎬 Menu Cài đặt Video, Tỉ lệ Màn hình & Luồng Ghi hình Chuyên sâu"
+                ) {
+                    Text(
+                        text = if (isEn) {
+                            "Fine-tune video aspect ratio to prevent squished image on 20:9 / 21:9 screens, adjust horizontal/vertical scaling, color calibration, and configure direct WebRTC stream capture."
+                        } else {
+                            "Tinh chỉnh đầy đủ thông số tỉ lệ khung hình chống bóp dẹt video trên màn hình dài 20:9 / 21:9, kéo giãn Ngang/Dọc (Scale X/Y), cân chỉnh màu sắc và chọn cơ chế lấy thẳng luồng Video Streaming."
+                        },
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    Text(
+                        text = if (isEn) "1. Screen Aspect Ratio Mode (Anti-Squish)" else "1. Chế độ tỉ lệ màn hình (Khắc phục lỗi video bị bóp lại)",
+                        color = DirectCyan,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        com.example.data.VideoAspectRatioMode.entries.forEach { aspectMode ->
+                            val isSelected = config.videoAspectRatioMode == aspectMode
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) DirectCyan else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateVideoAspectRatioMode(aspectMode) }
+                                    .testTag("advanced_video_aspect_${aspectMode.id}"),
+                                color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0E1712)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = aspectMode.localizedTitle(isEn),
+                                            color = if (isSelected) DirectCyan else TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = aspectMode.localizedDesc(isEn),
+                                            color = TextSecondary,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Hộp thanh trượt tinh chỉnh thông số Ngang/Dọc & Màu sắc chi tiết
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        LabeledSlider(
+                            label = if (isEn) "Horizontal Width Scale (Scale X)" else "Tỉ lệ kéo giãn Ngang (Scale X)",
+                            valueText = "${(config.videoScaleX * 100).toInt()}%",
+                            value = config.videoScaleX,
+                            onValueChange = { SettingsRepository.updateVideoScaleX(it) },
+                            valueRange = 0.70f..1.40f,
+                            accentColor = XboxNeonGreen
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Vertical Height Scale (Scale Y)" else "Tỉ lệ kéo giãn Dọc (Scale Y)",
+                            valueText = "${(config.videoScaleY * 100).toInt()}%",
+                            value = config.videoScaleY,
+                            onValueChange = { SettingsRepository.updateVideoScaleY(it) },
+                            valueRange = 0.70f..1.40f,
+                            accentColor = DirectCyan
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Video Contrast" else "Độ tương phản Video (Contrast)",
+                            valueText = "${config.videoContrast}%",
+                            value = config.videoContrast.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
+                            valueRange = 80f..140f,
+                            accentColor = XboxNeonGreen
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Color Saturation" else "Độ rực màu (Saturation)",
+                            valueText = "${config.videoSaturation}%",
+                            value = config.videoSaturation.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
+                            valueRange = 80f..150f,
+                            accentColor = DirectCyan
+                        )
+                        LabeledSlider(
+                            label = if (isEn) "Video Brightness" else "Độ sáng khung hình (Brightness)",
+                            valueText = "${config.videoBrightness}%",
+                            value = config.videoBrightness.toFloat(),
+                            onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
+                            valueRange = 80f..130f,
+                            accentColor = XboxNeonGreen
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            SettingsRepository.resetVideoDisplayDefaults()
+                            Toast.makeText(
+                                context,
+                                if (isEn) "Reset video aspect ratio & color to 16:9 default" else "Đã đặt lại tỉ lệ màn hình 16:9 & màu sắc chuẩn gốc",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("advanced_reset_video_defaults_btn"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) "Reset Video Aspect Ratio & Color to 16:9 Default" else "Khôi phục Tỉ lệ 16:9 Chuẩn & Màu sắc Mặc định",
+                            color = DirectCyan,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = if (isEn) "2. Direct Stream Recording Engine & Side-Effect Analysis" else "2. Cơ chế Lấy thẳng luồng Video Streaming & Phân tích tác dụng phụ",
+                        color = XboxNeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    com.example.data.RecordingCaptureEngine.entries.forEach { engine ->
+                        val isSelected = config.recordingCaptureEngine == engine
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { SettingsRepository.updateRecordingCaptureEngine(engine) },
+                            color = if (isSelected) Color(0xFF13241A) else Color(0xFF0E1712)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = engine.localizedTitle(isEn),
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = engine.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF0C1A14),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) "ℹ️ Does Direct Stream Capture have any side effects?" else "ℹ️ Lấy thẳng luồng Video Streaming có tác dụng phụ không?",
+                                color = XboxNeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isEn) {
+                                    "• 0% extra 4G/Wi-Fi data: Clones the already-received WebRTC track in RAM.\n• 0% GPU screen-capture lag: Does not screenshot the UI or stretch 20:9 screens.\n• Note: Only records the pure 16:9 game video + audio (floating HUD buttons are not drawn onto the video)."
+                                } else {
+                                    "• Không tốn thêm 4G/Wi-Fi: Nhân bản luồng WebRTC (Track Clone) đã tải sẵn trong bộ đệm.\n• Không gây tụt FPS & Không bị bóp hình: Không chụp lại màn hình điện thoại nên giữ nguyên khung hình 16:9 chuẩn gốc của Xbox.\n• Lưu ý nhỏ duy nhất: File video thu được là hình ảnh + âm thanh nguyên bản của game (không dính các nút tay cầm ảo hay nút HUD nổi trên màn hình)."
+                                },
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+
                 // 4.1 Ngôn ngữ ứng dụng
                 SettingsCard(title = if (isEn) "App Language" else "Ngôn ngữ ứng dụng") {
                     listOf(

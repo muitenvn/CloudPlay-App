@@ -459,6 +459,99 @@ enum class ScreenRecordQuality(
     fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
 }
 
+enum class VideoAspectRatioMode(
+    val id: String,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    FIT_16_9(
+        id = "fit_16_9",
+        titleVi = "Chuẩn 16:9 Gốc (Không bóp hình)",
+        titleEn = "Native 16:9 Fit (No Squish)",
+        shortVi = "16:9 Chuẩn",
+        shortEn = "16:9 Fit",
+        descVi = "Giữ đúng tỉ lệ 16:9 chuẩn của Xbox Cloud, chống bóp méo hình trên mọi màn hình 20:9 / 21:9",
+        descEn = "Preserves exact 16:9 Xbox Cloud aspect ratio without squishing on 20:9 / 21:9 displays"
+    ),
+    CINEMA_18_9(
+        id = "cinema_18_9",
+        titleVi = "Mở Rộng 18:9 (Cân đối • Giảm viền đen)",
+        titleEn = "Balanced 18:9 (Reduced Black Bars)",
+        shortVi = "18:9 Cân đối",
+        shortEn = "18:9 Wide",
+        descVi = "Mở rộng nhẹ khung hình sang 18:9, giảm viền đen hai bên mà nhân vật vẫn cân đối",
+        descEn = "Expands frame to 18:9 to reduce side bars while keeping characters natural"
+    ),
+    ZOOM_COVER(
+        id = "zoom_cover",
+        titleVi = "Tràn Viền Tự Nhiên (Zoom Cover • Không méo)",
+        titleEn = "Full Screen Zoom Cover (No Distortion)",
+        shortVi = "Tràn viền Zoom",
+        shortEn = "Zoom Cover",
+        descVi = "Phóng lấp đầy màn hình giữ nguyên tỉ lệ gốc (không bóp dẹt hình, cắt nhẹ mép trên/dưới)",
+        descEn = "Fills the entire screen while keeping native proportions (crops top/bottom slightly)"
+    ),
+    STRETCH_FULL(
+        id = "stretch_full",
+        titleVi = "Kéo Giãn Toàn Màn (Full Stretch)",
+        titleEn = "Full Screen Stretch",
+        shortVi = "Kéo giãn Full",
+        shortEn = "Full Stretch",
+        descVi = "Kéo giãn lấp kín 100% diện tích màn hình thiết bị mà không cắt bất kỳ chi tiết nào",
+        descEn = "Stretches video to fill 100% of device screen without cropping any HUD elements"
+    ),
+    CUSTOM_SCALE(
+        id = "custom_scale",
+        titleVi = "Tùy Chỉnh Tỉ Lệ Ngang / Dọc (Scale X/Y)",
+        titleEn = "Custom Horizontal / Vertical Scale (X/Y)",
+        shortVi = "Tùy chỉnh X/Y",
+        shortEn = "Custom X/Y",
+        descVi = "Tự tay kéo thanh trượt độ rộng ngang (Scale X) và độ cao dọc (Scale Y) theo đúng mắt nhìn",
+        descEn = "Manually adjust horizontal width (Scale X) and vertical height (Scale Y) sliders"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
+enum class RecordingCaptureEngine(
+    val id: String,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    DIRECT_STREAM(
+        id = "DIRECT_STREAM",
+        titleVi = "Lấy Thẳng Luồng Video Streaming (0% Lag • Chuẩn 16:9)",
+        titleEn = "Direct WebRTC Stream Capture (0% Lag • Native 16:9)",
+        shortVi = "Luồng Stream Trực Tiếp",
+        shortEn = "Direct Stream",
+        descVi = "Bắt trực tiếp gói hình ảnh WebRTC từ máy chủ Xbox (nhân bản luồng đọc): Không quay màn hình, 0% tốn thêm 4G/Wi-Fi, không tụt FPS và không bao giờ bị bóp tỉ lệ màn hình",
+        descEn = "Clones inbound WebRTC media stream directly: Zero screen-capture lag, 0% extra data usage, and native 16:9 aspect ratio"
+    ),
+    HARDWARE_SCREEN(
+        id = "HARDWARE_SCREEN",
+        titleVi = "Ghi Màn Hình Phần Cứng (Đã Khóa Tỉ Lệ Chống Bóp Hình)",
+        titleEn = "Hardware Surface Recorder (Aspect-Ratio Locked)",
+        shortVi = "Ghi Màn Hình (Khóa 16:9)",
+        shortEn = "Hardware Surface",
+        descVi = "Dùng bộ mã hóa H.264 phần cứng của máy có tự động căn khung Letterbox chuẩn 16:9 chống méo hình",
+        descEn = "Uses device hardware H.264 encoder with automatic 16:9 letterboxing to prevent squished video"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
 data class AppConfig(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM, // Tự động chọn tiếng Việt / tiếng Anh theo hệ thống
     val smartVpnEnabled: Boolean = true, // Tự động kiểm tra IP & điều khiển bật/tắt thông minh
@@ -512,6 +605,14 @@ data class AppConfig(
     val gpuLoadReductionEnabled: Boolean = true,
     val screenRecordQuality: ScreenRecordQuality = ScreenRecordQuality.BALANCED_720P_30,
     val autoReduceLoadWhenRecording: Boolean = true,
+    val recordingCaptureEngine: RecordingCaptureEngine = RecordingCaptureEngine.DIRECT_STREAM,
+    // Cài đặt Tỉ lệ khung hình & Hiển thị Video (Chống bóp méo hình)
+    val videoAspectRatioMode: VideoAspectRatioMode = VideoAspectRatioMode.FIT_16_9,
+    val videoScaleX: Float = 1.0f, // 0.70f .. 1.40f
+    val videoScaleY: Float = 1.0f, // 0.70f .. 1.40f
+    val videoContrast: Int = 105, // 80 .. 140 (%)
+    val videoSaturation: Int = 108, // 80 .. 150 (%)
+    val videoBrightness: Int = 100, // 80 .. 130 (%)
     // Điều khoản người dùng & Tuyên bố bản quyền nguồn mở GitHub (Better-xCloud MIT)
     val userAcceptedTerms: Boolean = false
 ) {
@@ -622,6 +723,23 @@ object SettingsRepository {
                 )
             } catch (_: Exception) { ScreenRecordQuality.BALANCED_720P_30 },
             autoReduceLoadWhenRecording = sp.getBoolean("auto_reduce_load_recording", true),
+            recordingCaptureEngine = try {
+                RecordingCaptureEngine.valueOf(
+                    sp.getString("recording_capture_engine", RecordingCaptureEngine.DIRECT_STREAM.name)
+                        ?: RecordingCaptureEngine.DIRECT_STREAM.name
+                )
+            } catch (_: Exception) { RecordingCaptureEngine.DIRECT_STREAM },
+            videoAspectRatioMode = try {
+                VideoAspectRatioMode.valueOf(
+                    sp.getString("video_aspect_ratio_mode", VideoAspectRatioMode.FIT_16_9.name)
+                        ?: VideoAspectRatioMode.FIT_16_9.name
+                )
+            } catch (_: Exception) { VideoAspectRatioMode.FIT_16_9 },
+            videoScaleX = sp.getFloat("video_scale_x", 1.0f).coerceIn(0.70f, 1.40f),
+            videoScaleY = sp.getFloat("video_scale_y", 1.0f).coerceIn(0.70f, 1.40f),
+            videoContrast = sp.getInt("video_contrast", 105).coerceIn(80, 140),
+            videoSaturation = sp.getInt("video_saturation", 108).coerceIn(80, 150),
+            videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
         _config.value = loaded
@@ -673,6 +791,13 @@ object SettingsRepository {
             putBoolean("gpu_load_reduction_enabled", c.gpuLoadReductionEnabled)
             putString("screen_record_quality", c.screenRecordQuality.name)
             putBoolean("auto_reduce_load_recording", c.autoReduceLoadWhenRecording)
+            putString("recording_capture_engine", c.recordingCaptureEngine.name)
+            putString("video_aspect_ratio_mode", c.videoAspectRatioMode.name)
+            putFloat("video_scale_x", c.videoScaleX)
+            putFloat("video_scale_y", c.videoScaleY)
+            putInt("video_contrast", c.videoContrast)
+            putInt("video_saturation", c.videoSaturation)
+            putInt("video_brightness", c.videoBrightness)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             apply()
         }
@@ -1057,6 +1182,55 @@ object SettingsRepository {
 
     fun updateAutoReduceLoadWhenRecording(enabled: Boolean) {
         _config.update { it.copy(autoReduceLoadWhenRecording = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateRecordingCaptureEngine(engine: RecordingCaptureEngine) {
+        _config.update { it.copy(recordingCaptureEngine = engine) }
+        persist(_config.value)
+    }
+
+    fun updateVideoAspectRatioMode(mode: VideoAspectRatioMode) {
+        _config.update { it.copy(videoAspectRatioMode = mode) }
+        persist(_config.value)
+    }
+
+    fun updateVideoScaleX(scaleX: Float) {
+        _config.update { it.copy(videoScaleX = scaleX.coerceIn(0.70f, 1.40f)) }
+        persist(_config.value)
+    }
+
+    fun updateVideoScaleY(scaleY: Float) {
+        _config.update { it.copy(videoScaleY = scaleY.coerceIn(0.70f, 1.40f)) }
+        persist(_config.value)
+    }
+
+    fun updateVideoContrast(contrast: Int) {
+        _config.update { it.copy(videoContrast = contrast.coerceIn(80, 140)) }
+        persist(_config.value)
+    }
+
+    fun updateVideoSaturation(saturation: Int) {
+        _config.update { it.copy(videoSaturation = saturation.coerceIn(80, 150)) }
+        persist(_config.value)
+    }
+
+    fun updateVideoBrightness(brightness: Int) {
+        _config.update { it.copy(videoBrightness = brightness.coerceIn(80, 130)) }
+        persist(_config.value)
+    }
+
+    fun resetVideoDisplayDefaults() {
+        _config.update {
+            it.copy(
+                videoAspectRatioMode = VideoAspectRatioMode.FIT_16_9,
+                videoScaleX = 1.0f,
+                videoScaleY = 1.0f,
+                videoContrast = 105,
+                videoSaturation = 108,
+                videoBrightness = 100
+            )
+        }
         persist(_config.value)
     }
 }

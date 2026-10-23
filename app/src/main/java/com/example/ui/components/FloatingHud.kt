@@ -994,9 +994,9 @@ fun FloatingHud(
                                                 )
                                                 Text(
                                                     text = if (isEn) {
-                                                        "Scale ${config.streamRenderScale.scaleFactor * 100}% • ${config.streamFpsCap.fps} FPS"
+                                                        "${config.recordingCaptureEngine.localizedShort(true)} • ${config.videoAspectRatioMode.localizedShort(true)}"
                                                     } else {
-                                                        "Đồ họa ${(config.streamRenderScale.scaleFactor * 100).toInt()}% • ${config.streamFpsCap.fps} FPS"
+                                                        "${config.recordingCaptureEngine.localizedShort(false)} • ${config.videoAspectRatioMode.localizedShort(false)}"
                                                     },
                                                     color = DirectCyan,
                                                     fontSize = 7.5.sp,
@@ -1010,6 +1010,59 @@ fun FloatingHud(
                                             fontSize = 8.5.sp,
                                             fontWeight = FontWeight.ExtraBold
                                         )
+                                    }
+                                }
+
+                                // B.5c: Nút Cài Đặt Video & Chỉnh Tỉ Lệ Màn Hình Chống Bóp Hình (Thay cho nút hướng dẫn khi đang chơi)
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            onOpenSettings()
+                                        }
+                                        .testTag("hud_expanded_video_settings_card"),
+                                    shape = RoundedCornerShape(7.dp),
+                                    color = Color(0xFF0E1D24),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = if (isEn) "🎬 Video & Aspect Ratio Settings" else "🎬 Cài đặt Video & Tỉ lệ màn hình",
+                                                color = DirectCyan,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = if (isEn) {
+                                                    "Ratio: ${config.videoAspectRatioMode.localizedShort(true)} (${(config.videoScaleX * 100).toInt()}%x${(config.videoScaleY * 100).toInt()}%) • Fix Squish"
+                                                } else {
+                                                    "Tỉ lệ: ${config.videoAspectRatioMode.localizedShort(false)} (${(config.videoScaleX * 100).toInt()}%x${(config.videoScaleY * 100).toInt()}%) • Chống bóp hình"
+                                                },
+                                                color = TextSecondary,
+                                                fontSize = 7.5.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(5.dp),
+                                            color = DirectCyan.copy(alpha = 0.22f)
+                                        ) {
+                                            Text(
+                                                text = if (isEn) "OPEN" else "MỞ MENU",
+                                                color = Color.White,
+                                                fontSize = 7.5.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            )
+                                        }
                                     }
                                 }
 
@@ -1057,7 +1110,7 @@ fun FloatingHud(
                                     }
                                 )
 
-                                // Hàng nút bật/tắt nhanh: Làm nét, Ẩn bảng kỹ thuật, Dịch tự động, Công cụ dịch
+                                // Hàng nút bật/tắt nhanh: Làm nét, Ẩn bảng kỹ thuật, Dịch tự động, Cài đặt Video
                                 DenseFeatureTogglesSection(
                                     clarityBoostActive = clarityBoostActive,
                                     hideStreamStats = hideStreamStats,
@@ -1075,9 +1128,9 @@ fun FloatingHud(
                                         markUserInteraction()
                                         onToggleTranslation(enabled)
                                     },
-                                    onOpenTranslator = {
+                                    onOpenVideoSettings = {
                                         markUserInteraction()
-                                        onOpenTranslator()
+                                        onOpenSettings()
                                     }
                                 )
 
@@ -1774,7 +1827,7 @@ private fun DenseFeatureTogglesSection(
     onToggleClarityBoost: (Boolean) -> Unit,
     onToggleHideStreamStats: (Boolean) -> Unit,
     onToggleTranslation: (Boolean) -> Unit,
-    onOpenTranslator: () -> Unit
+    onOpenVideoSettings: () -> Unit
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
@@ -1826,10 +1879,10 @@ private fun DenseFeatureTogglesSection(
             modifier = Modifier.weight(1f)
         )
         DenseQuickTogglePill(
-            label = if (isEn) "Translator" else "Bảng dịch",
+            label = if (isEn) "🎬 Video Setup" else "🎬 Cài đặt Video",
             active = true,
             activeColor = DirectCyan,
-            onClick = onOpenTranslator,
+            onClick = onOpenVideoSettings,
             modifier = Modifier.weight(1f)
         )
     }
@@ -1870,7 +1923,7 @@ private fun DenseQuickTogglePill(
 }
 
 /**
- * B.7: Hàng nút tác vụ dưới cùng: Tải lại trang, Xoay màn hình, Cài đặt, Trang chủ.
+ * B.7: Hàng nút tác vụ dưới cùng: Tải lại trang, Xoay màn hình, Cài đặt Video, Trang chủ.
  */
 @Composable
 private fun DenseBottomActionsSection(
@@ -1903,10 +1956,10 @@ private fun DenseBottomActionsSection(
         )
         DenseBottomActionChip(
             icon = Icons.Default.Settings,
-            label = if (isEn) "Settings" else "Cài đặt",
-            tint = TextPrimary,
+            label = if (isEn) "Video" else "Cài đặt Video",
+            tint = DirectCyan,
             onClick = onOpenSettings,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1.25f),
             testTag = "hud_expanded_settings_button"
         )
         DenseBottomActionChip(
@@ -1914,7 +1967,7 @@ private fun DenseBottomActionsSection(
             label = if (isEn) "Exit" else "Thoát",
             tint = JapanRed,
             onClick = onRequestExitHome,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(0.9f),
             testTag = "hud_expanded_home_button"
         )
     }

@@ -23,4 +23,7 @@ release.keystore
 my-upload-key.jks
 service-account*.json
 *-debug.log
+/public/
+*.mp4
+*.webm
 

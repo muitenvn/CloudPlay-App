@@ -150,6 +150,8 @@ fun FloatingHud(
     videoTopRatio: Float = 0f,
     lowEndDeviceMode: Boolean = false,
     onSelectFortniteControlMode: (Boolean) -> Unit = {},
+    recorderState: com.example.cloudplay.ScreenRecorderState = com.example.cloudplay.ScreenRecorderState(),
+    onToggleRecording: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -770,6 +772,48 @@ fun FloatingHud(
                             }
                         }
 
+                        // 4.5. Zero-Lag Screen Record Toggle (1-Tap REC / Timer)
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (recorderState.isRecording) Color(0x44FF3B30) else Color(0x33233A2D),
+                            border = if (recorderState.isRecording) {
+                                androidx.compose.foundation.BorderStroke(0.9.dp, Color(0xFFFF3B30))
+                            } else null,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    isInteracting = true
+                                    onToggleRecording()
+                                }
+                                .testTag("hud_record_button")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.5.dp)
+                                        .clip(CircleShape)
+                                        .background(if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0xFFFF5252))
+                                )
+                                Text(
+                                    text = if (recorderState.isRecording) {
+                                        val mins = recorderState.elapsedSeconds / 60
+                                        val secs = recorderState.elapsedSeconds % 60
+                                        "%02d:%02d".format(mins, secs)
+                                    } else {
+                                        "REC"
+                                    },
+                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextPrimary,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+
                         // 5. Expand Game Bar Menu Button
                         Surface(
                             shape = RoundedCornerShape(6.dp),
@@ -898,6 +942,75 @@ fun FloatingHud(
                                             onSelectFortniteControlMode(useVirtualFpsPro)
                                         }
                                     )
+                                }
+
+                                // B.5b: Nút Quay Màn Hình Không Lag + Tỷ lệ Đồ Họa Nhanh
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            onToggleRecording()
+                                        }
+                                        .testTag("hud_expanded_record_card"),
+                                    shape = RoundedCornerShape(7.dp),
+                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0xFF101D15),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.8.dp,
+                                        if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen.copy(alpha = 0.45f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (recorderState.isRecording) Color(0xFFFF3B30) else XboxNeonGreen)
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = if (recorderState.isRecording) {
+                                                        val mins = recorderState.elapsedSeconds / 60
+                                                        val secs = recorderState.elapsedSeconds % 60
+                                                        if (isEn) "Recording %02d:%02d (Tap to Save)".format(mins, secs)
+                                                        else "Đang quay %02d:%02d (Chạm để lưu)".format(mins, secs)
+                                                    } else {
+                                                        if (isEn) "Zero-Lag Screen Record" else "Quay màn hình không lag"
+                                                    },
+                                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextPrimary,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = if (isEn) {
+                                                        "Scale ${config.streamRenderScale.scaleFactor * 100}% • ${config.streamFpsCap.fps} FPS"
+                                                    } else {
+                                                        "Đồ họa ${(config.streamRenderScale.scaleFactor * 100).toInt()}% • ${config.streamFpsCap.fps} FPS"
+                                                    },
+                                                    color = DirectCyan,
+                                                    fontSize = 7.5.sp,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = if (recorderState.isRecording) "STOP" else "REC",
+                                            color = if (recorderState.isRecording) Color(0xFFFF5252) else XboxNeonGreen,
+                                            fontSize = 8.5.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
                                 }
 
                                 // B.6: Bảng thông số cốt lõi xếp dày (Độ trễ, FPS, Giải mã, Tay cầm, Pin & Nhiệt độ)

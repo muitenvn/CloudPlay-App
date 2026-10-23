@@ -298,6 +298,167 @@ enum class GamepadHapticLevel(
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
 }
 
+enum class StreamRenderScale(
+    val id: String,
+    val scaleFactor: Float,
+    val targetHeightPx: Int,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    NATIVE_100(
+        id = "100",
+        scaleFactor = 1.0f,
+        targetHeightPx = 1080,
+        titleVi = "100% Chuẩn Gốc (1080p)",
+        titleEn = "100% Native (1080p)",
+        shortVi = "100%",
+        shortEn = "100%",
+        descVi = "Độ nét tối đa theo luồng gốc của máy chủ",
+        descEn = "Full native resolution from cloud server"
+    ),
+    BALANCED_85(
+        id = "85",
+        scaleFactor = 0.85f,
+        targetHeightPx = 900,
+        titleVi = "85% Cân Bằng (900p • -25% tải GPU)",
+        titleEn = "85% Balanced (900p • -25% GPU load)",
+        shortVi = "85%",
+        shortEn = "85%",
+        descVi = "Giảm 25% gánh nặng dựng hình mà vẫn giữ chữ & tâm ngắm sắc nét",
+        descEn = "Cuts GPU rendering load by 25% while keeping text & crosshair sharp"
+    ),
+    PERFORMANCE_75(
+        id = "75",
+        scaleFactor = 0.75f,
+        targetHeightPx = 720,
+        titleVi = "75% Siêu Mượt (720p • -45% tải GPU)",
+        titleEn = "75% Ultra Smooth (720p • -45% GPU load)",
+        shortVi = "75%",
+        shortEn = "75%",
+        descVi = "Giảm gần một nửa tải GPU/CPU, chống tụt khung hình khi combat",
+        descEn = "Halves GPU/CPU load to eliminate frame drops in heavy combat"
+    ),
+    ULTRA_LIGHT_60(
+        id = "60",
+        scaleFactor = 0.60f,
+        targetHeightPx = 540,
+        titleVi = "60% Siêu Nhẹ (540p • Máy yếu / Quay mượt)",
+        titleEn = "60% Ultra Light (540p • Low-End / Recording)",
+        shortVi = "60%",
+        shortEn = "60%",
+        descVi = "Nhẹ máy tối đa, lý tưởng cho máy yếu hoặc khi vừa chơi vừa quay màn hình",
+        descEn = "Minimum hardware load, ideal for low-end phones or lag-free recording"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
+enum class StreamFpsCap(
+    val fps: Int,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    FPS_30(
+        fps = 30,
+        titleVi = "30 FPS (Siêu mát • Giảm 50% tải máy)",
+        titleEn = "30 FPS (Ultra Cool • -50% Device Load)",
+        shortVi = "30 FPS",
+        shortEn = "30 FPS",
+        descVi = "Khóa 30 khung hình ổn định, máy cực mát và tiết kiệm pin gấp đôi",
+        descEn = "Locks stable 30 FPS to keep device cool and double battery life"
+    ),
+    FPS_60(
+        fps = 60,
+        titleVi = "60 FPS (Mượt tiêu chuẩn)",
+        titleEn = "60 FPS (Standard Smooth)",
+        shortVi = "60 FPS",
+        shortEn = "60 FPS",
+        descVi = "Chuẩn 60 FPS mượt mà cho mọi tựa game hành động, đua xe, bắn súng",
+        descEn = "Smooth 60 FPS standard for action, racing, and shooter titles"
+    ),
+    FPS_120(
+        fps = 120,
+        titleVi = "120 FPS (Màn hình tần số cao)",
+        titleEn = "120 FPS (High Refresh Display)",
+        shortVi = "120 FPS",
+        shortEn = "120 FPS",
+        descVi = "Mở khóa thương lượng 120Hz cho màn hình 90Hz/120Hz (Fortnite / Series X)",
+        descEn = "Unlocks 120Hz stream negotiation for 90Hz/120Hz displays"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
+enum class ScreenRecordQuality(
+    val id: String,
+    val widthPx: Int,
+    val heightPx: Int,
+    val fps: Int,
+    val bitrateBps: Int,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    LIGHT_540P_30(
+        id = "540p30",
+        widthPx = 960,
+        heightPx = 540,
+        fps = 30,
+        bitrateBps = 2_800_000,
+        titleVi = "Siêu Nhẹ 540p • 30FPS (0% Lag)",
+        titleEn = "Ultra Light 540p • 30FPS (Zero Lag)",
+        shortVi = "540p • 30F",
+        shortEn = "540p • 30F",
+        descVi = "Thu trực tiếp luồng hình ảnh với tải CPU/GPU gần bằng 0, không tụt FPS",
+        descEn = "Direct stream capture with near-zero CPU/GPU overhead and zero frame drops"
+    ),
+    BALANCED_720P_30(
+        id = "720p30",
+        widthPx = 1280,
+        heightPx = 720,
+        fps = 30,
+        bitrateBps = 4_500_000,
+        titleVi = "Chuẩn HD 720p • 30FPS (Khuyên dùng)",
+        titleEn = "Balanced HD 720p • 30FPS (Recommended)",
+        shortVi = "720p • 30F",
+        shortEn = "720p • 30F",
+        descVi = "Video HD rõ nét, dung lượng gọn nhẹ và giữ game mượt ổn định",
+        descEn = "Crisp HD video with compact file size and smooth gameplay"
+    ),
+    SMOOTH_720P_60(
+        id = "720p60",
+        widthPx = 1280,
+        heightPx = 720,
+        fps = 60,
+        bitrateBps = 7_000_000,
+        titleVi = "Mượt Cao 720p • 60FPS (Máy khỏe)",
+        titleEn = "High Smooth 720p • 60FPS (Fast Device)",
+        shortVi = "720p • 60F",
+        shortEn = "720p • 60F",
+        descVi = "Quay 60 khung hình/giây siêu mượt cho các pha highlight bắn súng/đua xe",
+        descEn = "Silky-smooth 60 FPS recording for shooter and racing highlights"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
 data class AppConfig(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM, // Tự động chọn tiếng Việt / tiếng Anh theo hệ thống
     val smartVpnEnabled: Boolean = true, // Tự động kiểm tra IP & điều khiển bật/tắt thông minh
@@ -345,6 +506,12 @@ data class AppConfig(
     val wifiSpeedFirstPriority: Boolean = true,
     // Chế độ máy yếu (tùy chọn do người dùng bật, không tự áp cho mọi máy)
     val lowEndDeviceMode: Boolean = false,
+    // Điều chỉnh đồ họa chuyên sâu & Quay màn hình không lag
+    val streamRenderScale: StreamRenderScale = StreamRenderScale.NATIVE_100,
+    val streamFpsCap: StreamFpsCap = StreamFpsCap.FPS_60,
+    val gpuLoadReductionEnabled: Boolean = true,
+    val screenRecordQuality: ScreenRecordQuality = ScreenRecordQuality.BALANCED_720P_30,
+    val autoReduceLoadWhenRecording: Boolean = true,
     // Điều khoản người dùng & Tuyên bố bản quyền nguồn mở GitHub (Better-xCloud MIT)
     val userAcceptedTerms: Boolean = false
 ) {
@@ -435,6 +602,26 @@ object SettingsRepository {
             } catch (_: Exception) { NetworkTuningMode.AUTO },
             wifiSpeedFirstPriority = sp.getBoolean("wifi_speed_first", true),
             lowEndDeviceMode = sp.getBoolean("low_end_device_mode", false),
+            streamRenderScale = try {
+                StreamRenderScale.valueOf(
+                    sp.getString("stream_render_scale", StreamRenderScale.NATIVE_100.name)
+                        ?: StreamRenderScale.NATIVE_100.name
+                )
+            } catch (_: Exception) { StreamRenderScale.NATIVE_100 },
+            streamFpsCap = try {
+                StreamFpsCap.valueOf(
+                    sp.getString("stream_fps_cap", StreamFpsCap.FPS_60.name)
+                        ?: StreamFpsCap.FPS_60.name
+                )
+            } catch (_: Exception) { StreamFpsCap.FPS_60 },
+            gpuLoadReductionEnabled = sp.getBoolean("gpu_load_reduction_enabled", true),
+            screenRecordQuality = try {
+                ScreenRecordQuality.valueOf(
+                    sp.getString("screen_record_quality", ScreenRecordQuality.BALANCED_720P_30.name)
+                        ?: ScreenRecordQuality.BALANCED_720P_30.name
+                )
+            } catch (_: Exception) { ScreenRecordQuality.BALANCED_720P_30 },
+            autoReduceLoadWhenRecording = sp.getBoolean("auto_reduce_load_recording", true),
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
         _config.value = loaded
@@ -481,6 +668,11 @@ object SettingsRepository {
             putString("network_tuning_mode", c.networkTuningMode.name)
             putBoolean("wifi_speed_first", c.wifiSpeedFirstPriority)
             putBoolean("low_end_device_mode", c.lowEndDeviceMode)
+            putString("stream_render_scale", c.streamRenderScale.name)
+            putString("stream_fps_cap", c.streamFpsCap.name)
+            putBoolean("gpu_load_reduction_enabled", c.gpuLoadReductionEnabled)
+            putString("screen_record_quality", c.screenRecordQuality.name)
+            putBoolean("auto_reduce_load_recording", c.autoReduceLoadWhenRecording)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             apply()
         }
@@ -840,6 +1032,31 @@ object SettingsRepository {
 
     fun resetGamepadCustomOffsets() {
         _config.update { it.copy(gamepadCustomOffsets = "") }
+        persist(_config.value)
+    }
+
+    fun updateStreamRenderScale(scale: StreamRenderScale) {
+        _config.update { it.copy(streamRenderScale = scale) }
+        persist(_config.value)
+    }
+
+    fun updateStreamFpsCap(cap: StreamFpsCap) {
+        _config.update { it.copy(streamFpsCap = cap) }
+        persist(_config.value)
+    }
+
+    fun updateGpuLoadReductionEnabled(enabled: Boolean) {
+        _config.update { it.copy(gpuLoadReductionEnabled = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateScreenRecordQuality(quality: ScreenRecordQuality) {
+        _config.update { it.copy(screenRecordQuality = quality) }
+        persist(_config.value)
+    }
+
+    fun updateAutoReduceLoadWhenRecording(enabled: Boolean) {
+        _config.update { it.copy(autoReduceLoadWhenRecording = enabled) }
         persist(_config.value)
     }
 }

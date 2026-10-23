@@ -2,7 +2,6 @@ package com.example.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,16 +66,15 @@ data class GameBookmark(
     } else badge
 }
 
-// Kho game để trống hoàn toàn trước khi quét để chỉ hiển thị ảnh bìa thật từ máy chủ Xbox (trừ tài nguyên ảnh Fortnite)
+// Kho game để trống hoàn toàn trước khi quét để chỉ hiển thị ảnh bìa thật từ máy chủ Xbox (kể cả Fortnite)
 val INITIAL_XBOX_GAMES: List<GameBookmark> = emptyList()
 private const val FORTNITE_PRODUCT_ID = "BT5P2X999VH2"
-private val FORTNITE_POSTER_RES_ID = R.drawable.fortnite_cloud_poster_1791719536404
 
 object GameLibraryRepository {
     private const val PREFS_NAME = "cloudplay_custom_games_prefs"
     private const val RECENT_PREFS_NAME = "cloudplay_recent_game_prefs"
     private const val KEY_CUSTOM_GAMES_JSON = "custom_games_json"
-    private const val KEY_SYNCED_GAMES_JSON = "synced_xbox_games_json_v3"
+    private const val KEY_SYNCED_GAMES_JSON = "synced_xbox_games_json_v4"
     private const val KEY_LAST_CATALOG_SYNC_MS = "last_catalog_sync_ms"
     private const val KEY_FAVORITE_IDS = "favorite_game_ids"
     private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
@@ -196,14 +194,14 @@ object GameLibraryRepository {
             val idKey = item.id.lowercase(Locale.ROOT)
             val pid = extractProductId(item.playUrl)
             val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
-            // Chỉ giữ game đã có ảnh thật từ Xbox hoặc Fortnite (hoặc game do người dùng tự thêm)
-            if (!item.id.startsWith("custom_") && !isFortnite && item.imageUrl.isNullOrBlank()) return
+            // Chỉ giữ game đã có ảnh thật từ máy chủ Xbox (kể cả Fortnite) hoặc game do người dùng tự thêm
+            if (!item.id.startsWith("custom_") && item.imageUrl.isNullOrBlank()) return
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
-            val finalItem = if (isFortnite && item.drawableResId == null) {
-                item.copy(id = "fortnite", drawableResId = FORTNITE_POSTER_RES_ID)
+            val finalItem = if (isFortnite) {
+                item.copy(id = "fortnite", drawableResId = null)
             } else {
                 item
             }
@@ -640,7 +638,7 @@ object GameLibraryRepository {
                 } else emptyList()
 
                 val existingPids = existingSynced
-                    .filter { !it.imageUrl.isNullOrBlank() || it.id == "fortnite" }
+                    .filter { !it.imageUrl.isNullOrBlank() }
                     .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
                     .toSet()
 
@@ -978,8 +976,8 @@ object GameLibraryRepository {
 
                 val isFortnite = productId.equals(FORTNITE_PRODUCT_ID, ignoreCase = true) ||
                     cleanTitle.equals("Fortnite", ignoreCase = true)
-                // Bỏ qua game nếu chưa lấy được ảnh thật (trừ Fortnite dùng ảnh riêng)
-                if (!isFortnite && bestImageUrl.isNullOrBlank()) continue
+                // Bỏ qua mọi game (kể cả Fortnite) nếu chưa lấy được ảnh thật từ máy chủ Xbox
+                if (bestImageUrl.isNullOrBlank()) continue
 
                 val isTouch = productId in touchIds || isFortnite
                 val isPop = productId in popularIds || isFortnite
@@ -1015,9 +1013,9 @@ object GameLibraryRepository {
                         accentColorHex = accent,
                         badge = badgeVi,
                         badgeEn = badgeEn,
-                        drawableResId = if (isFortnite) FORTNITE_POSTER_RES_ID else null,
+                        drawableResId = null,
                         rating = ratingStr,
-                        imageUrl = if (isFortnite) null else bestImageUrl,
+                        imageUrl = bestImageUrl,
                         heroImageUrl = bestHeroUrl,
                         description = shortDesc,
                         publisher = publisherName,
@@ -1073,9 +1071,9 @@ object GameLibraryRepository {
                         accentColorHex = obj.optLong("accentColorHex", 0xFF107C10L),
                         badge = badge,
                         badgeEn = obj.optString("badgeEn", badge ?: "").takeIf { it.isNotBlank() },
-                        drawableResId = if (isFortnite) FORTNITE_POSTER_RES_ID else null,
+                        drawableResId = null,
                         rating = obj.optString("rating", "4.8"),
-                        imageUrl = if (isFortnite) null else obj.optString("imageUrl", "").takeIf { it.isNotBlank() },
+                        imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() },
                         heroImageUrl = obj.optString("heroImageUrl", "").takeIf { it.isNotBlank() },
                         description = obj.optString("description", "").takeIf { it.isNotBlank() },
                         publisher = obj.optString("publisher", "").takeIf { it.isNotBlank() },
@@ -1099,7 +1097,7 @@ object GameLibraryRepository {
     private fun saveSyncedGames(allGames: List<GameBookmark>) {
         val sharedPrefs = prefs ?: return
         val syncedGames = allGames
-            .filter { !it.id.startsWith("custom_") && (!it.imageUrl.isNullOrBlank() || it.id == "fortnite") }
+            .filter { !it.id.startsWith("custom_") && !it.imageUrl.isNullOrBlank() }
             .take(550)
         saveGamesListToPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON, syncedGames)
     }

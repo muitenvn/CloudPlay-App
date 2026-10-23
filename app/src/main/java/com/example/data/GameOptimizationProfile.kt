@@ -41,7 +41,7 @@ object GameOptimizationRepository {
         title = "FORTNITE BATTLE ROYALE",
         subtitle = "Tối ưu độc quyền: Đệm 8ms Zero-Delay • 120 FPS SDP • Âm thanh bước chân 128kbps • Chuyển nhanh Epic Touch / FPS Pro",
         subtitleEn = "Exclusive Tuning: 8ms Zero-Delay Buffer • 120 FPS SDP • 128kbps Footsteps Audio • Instant Epic Touch / FPS Pro Switch",
-        bannerResId = R.drawable.fortnite_cloud_poster_1791719536404,
+        bannerResId = R.drawable.cyber_gaming_banner_1791438050320,
         primaryAccentHex = 0xFF0074E4, // Fortnite Electric Blue
         secondaryAccentHex = 0xFF9C27B0, // Epic Purple
         badge = "⚡ TỐI ƯU ĐỘC QUYỀN FORTNITE • 120 FPS",

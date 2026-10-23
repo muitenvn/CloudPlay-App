@@ -334,6 +334,189 @@ fun SettingsScreen(
                         onCheckedChange = { SettingsRepository.updateClarityBoost(it) }
                     )
                 }
+
+                // 1.3 Điều chỉnh đồ họa sâu & Giảm gánh nặng phần cứng
+                SettingsCard(title = if (isEn) "Graphics Scaling & Hardware Load Reduction" else "Điều chỉnh đồ họa & Giảm tải phần cứng") {
+                    Text(
+                        text = if (isEn) "Render Resolution Scale" else "Tỷ lệ độ phân giải dựng hình (Giảm nóng & chống tụt FPS)",
+                        color = XboxNeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        com.example.data.StreamRenderScale.entries.chunked(2).forEach { rowScales ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowScales.forEach { scale ->
+                                    val isSelected = config.streamRenderScale == scale
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) DirectCyan else XboxCardBorder,
+                                                RoundedCornerShape(10.dp)
+                                            )
+                                            .clickable { SettingsRepository.updateStreamRenderScale(scale) }
+                                            .testTag("settings_render_scale_${scale.id}"),
+                                        color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = scale.localizedTitle(isEn),
+                                                color = if (isSelected) DirectCyan else TextPrimary,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = scale.localizedDesc(isEn),
+                                                color = TextSecondary,
+                                                fontSize = 9.5.sp,
+                                                maxLines = 2
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (isEn) "Frame Rate Cap (FPS)" else "Giới hạn nhịp khung hình (FPS)",
+                        color = XboxNeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
+                            val isSelected = config.streamFpsCap == fpsCap
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateStreamFpsCap(fpsCap) }
+                                    .testTag("settings_fps_cap_${fpsCap.fps}"),
+                                color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = "${fpsCap.fps} FPS",
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    Text(
+                                        text = fpsCap.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 9.sp,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingToggleRow(
+                        title = if (isEn) "Hardware GPU Offload & Anti-Lag" else "Giảm tải GPU & Tắt hiệu ứng nền nặng",
+                        subtitle = if (isEn) {
+                            "Removes web blur, shadows and background animations so GPU focuses 100% on decoding video"
+                        } else {
+                            "Tắt làm mờ, đổ bóng và hoạt ảnh trang web để GPU tập trung 100% giải mã luồng game mượt nhất"
+                        },
+                        checked = config.gpuLoadReductionEnabled,
+                        onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
+                        activeColor = DirectCyan
+                    )
+                }
+
+                // 1.4 Quay màn hình không lag (Zero-Lag Screen Recorder)
+                SettingsCard(title = if (isEn) "Zero-Lag Screen Recording" else "Quay màn hình không lag") {
+                    Text(
+                        text = if (isEn) {
+                            "Captures the WebRTC video stream directly into your Gallery (Movies/XboxCloudPlay) without taxing CPU/GPU."
+                        } else {
+                            "Ghi trực tiếp luồng hình ảnh game vào Bộ sưu tập (Movies/XboxCloudPlay) bằng phần cứng chuyên dụng, không gây tụt FPS khi chiến game."
+                        },
+                        color = TextSecondary,
+                        fontSize = 11.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.data.ScreenRecordQuality.entries.forEach { recQuality ->
+                            val isSelected = config.screenRecordQuality == recQuality
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) DirectCyan else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateScreenRecordQuality(recQuality) }
+                                    .testTag("settings_record_quality_${recQuality.id}"),
+                                color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = recQuality.localizedTitle(isEn),
+                                        color = if (isSelected) DirectCyan else TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Text(
+                                        text = recQuality.localizedDesc(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 9.sp,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    SettingToggleRow(
+                        title = if (isEn) "Auto-Reduce GPU Load While Recording" else "Tự giảm tải đồ họa khi đang quay",
+                        subtitle = if (isEn) {
+                            "Automatically enables lightweight GPU mode during screen recording to keep frame rate locked"
+                        } else {
+                            "Tự động bật chế độ nhẹ tải GPU trong lúc quay video để giữ khung hình luôn mượt"
+                        },
+                        checked = config.autoReduceLoadWhenRecording,
+                        onCheckedChange = { SettingsRepository.updateAutoReduceLoadWhenRecording(it) },
+                        activeColor = XboxNeonGreen
+                    )
+                }
             }
         }
 

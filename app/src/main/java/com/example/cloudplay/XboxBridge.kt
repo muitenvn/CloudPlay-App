@@ -143,7 +143,10 @@ class XboxBridge(
             speedFirstPriority: Boolean = true,
             effectiveBitrateMbps: Int = 8,
             lowEndDeviceMode: Boolean = false,
-            virtualGamepadEnabled: Boolean = false
+            virtualGamepadEnabled: Boolean = false,
+            renderScaleFactor: Float = 1.0f,
+            fpsCap: Int = 60,
+            gpuLoadReduction: Boolean = true
         ): String {
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
@@ -161,12 +164,14 @@ class XboxBridge(
                         if (window.__setXCloudTranslationConfig) window.__setXCloudTranslationConfig({ preserveTitles: $preserveTitles, bilingual: $bilingualMode, hideStats: $hideStreamStats });
                         if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay($hideStreamStats);
                         if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode });
+                        if (window.__updateGraphicsTuning) window.__updateGraphicsTuning({ renderScale: $renderScaleFactor, fpsCap: $fpsCap, gpuLoadReduction: $gpuLoadReduction, lowEndDeviceMode: $lowEndDeviceMode });
                         if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($virtualGamepadEnabled);
                         if ($lowEndDeviceMode && window.__pauseTranslator) window.__pauseTranslator();
                         return;
                     }
                     window.__cloudPlayInjected = true;
                     window.__virtualGamepadEnabled = $virtualGamepadEnabled;
+                    window.__isRecordingPerformanceMode = false;
 
                     function isFortniteSession() {
                         const h = (location.href || '').toLowerCase();
@@ -182,13 +187,20 @@ class XboxBridge(
                         lowEndDeviceMode: $lowEndDeviceMode
                     };
 
+                    window.__graphicsTuning = {
+                        renderScale: $renderScaleFactor,
+                        fpsCap: $fpsCap,
+                        gpuLoadReduction: $gpuLoadReduction,
+                        lowEndDeviceMode: $lowEndDeviceMode
+                    };
+
                     window.__updateNetworkProfile = function(conf) {
                         if (!conf) return;
                         window.__networkProfile = Object.assign(window.__networkProfile || {}, conf);
                         if (window.__networkProfile.lowEndDeviceMode && window.__pauseTranslator) {
                             window.__pauseTranslator();
                         }
-                        console.log("[xCloud Optimizer] Network Profile Active:", window.__networkProfile);
+                        if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
                     };
 
                     const initialBufSec = isFortniteSession() ? 0.008 : (($speedFirstPriority || $lowEndDeviceMode) ? 0.012 : 0.016);
@@ -473,21 +485,24 @@ class XboxBridge(
                                         try {
                                             let sdp = desc.sdp;
                                             const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                                            const gt = window.__graphicsTuning || {};
+                                            const renderScale = parseFloat(gt.renderScale) || 1.0;
+                                            const configuredFpsCap = parseInt(gt.fpsCap, 10) || 60;
                                             const isFortnite = isFortniteSession();
-                                            const activeMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
-                                            const isLowSaver = isLowEndMode || activeMbps <= 6;
-                                            const isMedium = !isLowEndMode && activeMbps > 6 && activeMbps <= 10;
-                                            const isHigh = !isLowEndMode && activeMbps > 10 && activeMbps <= 15;
-                                            const targetKbps = isLowEndMode ? 5000 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 6000 : 3500), 20000);
+                                            const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
+                                            // Scale target bitrate proportionally when user lowers render resolution (e.g. 60% / 75% / 85%) to save GPU decode overhead
+                                            const scaleBitrateFactor = renderScale < 0.70 ? 0.65 : (renderScale < 0.80 ? 0.78 : (renderScale < 0.92 ? 0.88 : 1.0));
+                                            const activeMbps = Math.max(3, Math.round(rawMbps * scaleBitrateFactor));
+                                            const isLowSaver = isLowEndMode || activeMbps <= 6 || renderScale <= 0.65;
+                                            const isMedium = !isLowSaver && activeMbps <= 10;
+                                            const isHigh = !isLowSaver && activeMbps > 10 && activeMbps <= 15;
+                                            const targetKbps = isLowEndMode ? 4500 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 5500 : 3200), 20000);
+                                            const negotiatedFps = configuredFpsCap <= 30 ? 30 : ((configuredFpsCap >= 120 || (isFortnite && activeMbps >= 14 && !isLowEndMode)) ? 120 : 60);
 
-                                            // Video bandwidth limit (+ 120 FPS negotiation for Fortnite only when High/Ultra >= 14 Mbps and not lowEndDeviceMode)
-                                            if (isLowEndMode) {
-                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:5000\r\na=framerate:60\r\n');
-                                                if (window.__pauseTranslator) window.__pauseTranslator();
-                                            } else if (isFortnite && activeMbps >= 14) {
-                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:120\r\n');
-                                            } else {
-                                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
+                                            // Video bandwidth & framerate negotiation based on user's Graphics & FPS Cap settings
+                                            sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + negotiatedFps + '\r\n');
+                                            if (isLowEndMode && window.__pauseTranslator) {
+                                                window.__pauseTranslator();
                                             }
 
                                             if (isLowSaver) {
@@ -1250,14 +1265,166 @@ class XboxBridge(
                     };
 
                     window.__toggleClarityBoost = function(active) {
-                        if (active) {
+                        window.__clarityBoostActive = !!active;
+                        if (active && !window.__isRecordingPerformanceMode) {
                             window.__setClarityPreset("$clarityPreset");
                         } else {
                             window.__setClarityPreset("OFF");
                         }
                     };
 
+                    // ==========================================
+                    // 7B. Graphics Render Scale, GPU Load Reduction & Zero-Lag Screen Recorder Engine
+                    // ==========================================
+                    let gpuLoadStyleEl = null;
+                    window.__applyGpuAndRenderScaleCss = function() {
+                        try {
+                            if (!gpuLoadStyleEl) {
+                                gpuLoadStyleEl = document.createElement('style');
+                                gpuLoadStyleEl.id = 'cloudplay-gpu-load-optimizer';
+                                (document.head || document.documentElement).appendChild(gpuLoadStyleEl);
+                            }
+                            const gt = window.__graphicsTuning || {};
+                            const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                            const reduceGpu = !!(gt.gpuLoadReduction || isLowEnd || window.__isRecordingPerformanceMode);
+                            const scale = parseFloat(gt.renderScale) || 1.0;
+
+                            let cssRules = '';
+                            if (reduceGpu) {
+                                // Strip heavy CSS blurs, shadows, and background animations so GPU focuses 100% on video decoding
+                                cssRules += `
+                                    *, *::before, *::after {
+                                        backdrop-filter: none !important;
+                                        -webkit-backdrop-filter: none !important;
+                                        box-shadow: none !important;
+                                        text-shadow: none !important;
+                                    }
+                                    [class*="background" i], [class*="ambient" i], [class*="blur" i], [class*="shimmer" i] {
+                                        animation: none !important;
+                                        transition: none !important;
+                                        filter: none !important;
+                                    }
+                                `;
+                            }
+                            if (scale < 0.99) {
+                                // Use crisp hardware upscaling hints when rendering at 85% / 75% / 60% scale
+                                cssRules += `
+                                    video#stream-video, video[data-testid="stream-video"], #segmented-video video, video {
+                                        image-rendering: -webkit-optimize-contrast !important;
+                                        contain: layout style paint !important;
+                                        will-change: transform !important;
+                                    }
+                                `;
+                            }
+                            gpuLoadStyleEl.textContent = cssRules;
+                        } catch (e) {}
+                    };
+
+                    window.__updateGraphicsTuning = function(conf) {
+                        if (!conf) return;
+                        window.__graphicsTuning = Object.assign(window.__graphicsTuning || {}, conf);
+                        window.__applyGpuAndRenderScaleCss();
+                    };
+
+                    window.__setRecordingPerformanceMode = function(active) {
+                        window.__isRecordingPerformanceMode = !!active;
+                        if (active) {
+                            if (window.__pauseTranslator) window.__pauseTranslator();
+                            window.__setClarityPreset("OFF");
+                        } else {
+                            if (window.__clarityBoostActive) {
+                                window.__setClarityPreset("$clarityPreset");
+                            }
+                            const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                            if (!isLowEnd && location.href.indexOf('/launch/') === -1 && window.__resumeTranslator) {
+                                window.__resumeTranslator();
+                            }
+                        }
+                        window.__applyGpuAndRenderScaleCss();
+                    };
+
+                    let activeMediaRecorder = null;
+                    window.__startZeroLagStreamRecorder = function(width, height, fps, bitrateBps) {
+                        try {
+                            if (typeof MediaRecorder === 'undefined') return "FALLBACK_NATIVE";
+                            const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                            if (!video) return "FALLBACK_NATIVE";
+
+                            let stream = video.srcObject;
+                            if (!stream && typeof video.captureStream === 'function') {
+                                stream = video.captureStream(fps || 30);
+                            } else if (!stream && typeof video.mozCaptureStream === 'function') {
+                                stream = video.mozCaptureStream(fps || 30);
+                            }
+                            if (!stream) return "FALLBACK_NATIVE";
+
+                            const candidates = [
+                                'video/mp4;codecs=avc1',
+                                'video/mp4',
+                                'video/webm;codecs=h264,opus',
+                                'video/webm;codecs=h264',
+                                'video/webm;codecs=vp8,opus',
+                                'video/webm'
+                            ];
+                            let chosenMime = '';
+                            for (let i = 0; i < candidates.length; i++) {
+                                if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(candidates[i])) {
+                                    chosenMime = candidates[i];
+                                    break;
+                                }
+                            }
+
+                            const recOptions = {
+                                videoBitsPerSecond: bitrateBps || 4500000
+                            };
+                            if (chosenMime) recOptions.mimeType = chosenMime;
+
+                            if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+                                try { activeMediaRecorder.stop(); } catch (e) {}
+                            }
+
+                            const recorder = new MediaRecorder(stream, recOptions);
+                            activeMediaRecorder = recorder;
+                            const actualMime = recorder.mimeType || chosenMime || 'video/webm';
+
+                            recorder.ondataavailable = function(evt) {
+                                if (!evt || !evt.data || evt.data.size === 0) return;
+                                const isFinal = (recorder.state === 'inactive');
+                                const reader = new FileReader();
+                                reader.onloadend = function() {
+                                    if (reader.result && window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
+                                        window.CloudPlayBridge.onScreenRecordChunk(reader.result, isFinal, actualMime);
+                                    }
+                                };
+                                reader.readAsDataURL(evt.data);
+                            };
+
+                            recorder.onstop = function() {
+                                setTimeout(function() {
+                                    if (window.CloudPlayBridge && window.CloudPlayBridge.onScreenRecordChunk) {
+                                        window.CloudPlayBridge.onScreenRecordChunk("", true, actualMime);
+                                    }
+                                }, 180);
+                            };
+
+                            recorder.start(1000);
+                            return "DIRECT_STREAM:" + actualMime;
+                        } catch (err) {
+                            return "FALLBACK_NATIVE";
+                        }
+                    };
+
+                    window.__stopZeroLagStreamRecorder = function() {
+                        try {
+                            if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+                                activeMediaRecorder.stop();
+                            }
+                            activeMediaRecorder = null;
+                        } catch (e) {}
+                    };
+
                     window.__toggleClarityBoost($clarityBoost);
+                    window.__applyGpuAndRenderScaleCss();
                     if ($lowEndDeviceMode && window.__pauseTranslator) {
                         window.__pauseTranslator();
                     }
@@ -1275,6 +1442,12 @@ class XboxBridge(
         val url = currentNavigatedUrl
         if (url.isNullOrBlank()) return false
         return isTrustedHost(url)
+    }
+
+    @JavascriptInterface
+    fun onScreenRecordChunk(base64Data: String?, isLastChunk: Boolean, mimeType: String?) {
+        if (!isCallerTrusted()) return
+        ZeroLagScreenRecorder.onWebStreamChunkReceived(base64Data ?: "", isLastChunk, mimeType)
     }
 
     @JavascriptInterface

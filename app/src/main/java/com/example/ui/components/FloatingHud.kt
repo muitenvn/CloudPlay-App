@@ -1702,42 +1702,37 @@ private fun DenseQualityModeSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEn) "Resolution & Graphics (4G/5G/Wi-Fi)" else "Độ phân giải & Đồ họa (4G/5G/Wi-Fi)",
+                    text = if (isEn) "Resolution & Network" else "Độ phân giải & Mạng",
                     color = XboxNeonGreen,
                     fontSize = 8.5.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "${String.format("%.1f", liveMbps)}M",
-                        color = DirectCyan,
-                        fontSize = 8.5.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen.copy(alpha = 0.22f) else Color.DarkGray,
-                        modifier = Modifier.clickable { onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting) }
-                    ) {
-                        Text(
-                            text = if (adaptiveQualityState.isAutoAdapting) {
-                                if (isEn) "Auto" else "Tự động"
-                            } else {
-                                if (isEn) "Fixed" else "Cố định"
-                            },
-                            color = if (adaptiveQualityState.isAutoAdapting) XboxNeonGreen else TextSecondary,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.5.dp)
-                        )
-                    }
+                val wifiBandText = when (networkStatus.physicalType) {
+                    com.example.cloudplay.PhysicalNetworkType.WIFI_6GHZ -> "Wi-Fi 6GHz"
+                    com.example.cloudplay.PhysicalNetworkType.WIFI_5GHZ -> "Wi-Fi 5GHz"
+                    com.example.cloudplay.PhysicalNetworkType.WIFI_2_4GHZ -> "Wi-Fi 2.4GHz"
+                    else -> "Wi-Fi"
                 }
+                val signalInfo = when {
+                    networkStatus.isWifi && networkStatus.wifiRssiDbm < 0 ->
+                        "$wifiBandText (${networkStatus.wifiRssiDbm}dBm) • ${String.format("%.1f", liveMbps)}M"
+                    networkStatus.isCellular ->
+                        "4G/5G • ${String.format("%.1f", liveMbps)}M"
+                    else ->
+                        "${String.format("%.1f", liveMbps)}M"
+                }
+                val warnAmber = Color(0xFFF59E0B)
+                Text(
+                    text = signalInfo,
+                    color = if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) warnAmber else DirectCyan,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
             }
 
-            // Hàng 1: Tự động (720p⇄1080p) & 720p•Thấp & 900p•Vừa
+            // Hàng 1: Tự động (720p⇄1080p), 720p•Thấp, 900p•Vừa
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -1746,23 +1741,23 @@ private fun DenseQualityModeSection(
                     label = if (isEn) "Auto" else "Tự động",
                     isSelected = selectedMode == com.example.data.CellularOptimizationMode.AUTO,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.AUTO) },
-                    modifier = Modifier.weight(0.95f)
+                    modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
                     label = if (isEn) "720p•Low" else "720p•Thấp",
                     isSelected = selectedMode == com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
-                    modifier = Modifier.weight(1.05f)
+                    modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
                     label = if (isEn) "900p•Med" else "900p•Vừa",
                     isSelected = selectedMode == com.example.data.CellularOptimizationMode.MEDIUM,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MEDIUM) },
-                    modifier = Modifier.weight(1.05f)
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            // Hàng 2: 1080p•Cao, 1080p+•Rất cao & Ưu tiên giảm trễ
+            // Hàng 2: 1080p•Cao & 1080p+•Cao+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -1771,34 +1766,29 @@ private fun DenseQualityModeSection(
                     label = if (isEn) "1080p•High" else "1080p•Cao",
                     isSelected = selectedMode == com.example.data.CellularOptimizationMode.HIGH,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.HIGH) },
-                    modifier = Modifier.weight(1.05f)
+                    modifier = Modifier.weight(1f)
                 )
                 DenseQualityPresetChip(
                     label = if (isEn) "1080p+•Max" else "1080p+•Cao+",
                     isSelected = selectedMode == com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
-                    modifier = Modifier.weight(1.1f)
-                )
-                DenseQualityPresetChip(
-                    label = if (networkStatus.speedFirstPriority) {
-                        if (isEn) "Low Lag: ON" else "Giảm trễ: Bật"
-                    } else {
-                        if (isEn) "Low Lag: OFF" else "Giảm trễ: Tắt"
-                    },
-                    isSelected = networkStatus.speedFirstPriority,
-                    accentColor = DirectCyan,
-                    onClick = { onToggleWifiSpeedFirst(!networkStatus.speedFirstPriority) },
-                    modifier = Modifier.weight(1.15f)
+                    modifier = Modifier.weight(1f)
                 )
             }
 
             Text(
-                text = if (isEn) {
-                    "⚡ 720p/900p keeps gameplay smooth on 4G, 5G & Wi-Fi"
-                } else {
-                    "⚡ Hạ 720p/900p giúp chơi mượt hơn khi mạng yếu"
+                text = when {
+                    networkStatus.isWeakWifiSignal ->
+                        if (isEn) "⚠️ Weak Wi-Fi signal: Auto-lowering bitrate to prevent stutter"
+                        else "⚠️ Sóng Wi-Fi yếu (xa cục phát): Tự hạ nhẹ độ nét để chống khựng hình"
+                    networkStatus.isWeakCellularSignal ->
+                        if (isEn) "⚠️ Weak 4G signal: Holding 720p low-latency stream"
+                        else "⚠️ Sóng 4G yếu: Tự giữ luồng 720p siêu nhạy để không rớt kết nối"
+                    else ->
+                        if (isEn) "⚡ Low-latency priority active for Wi-Fi & 4G"
+                        else "⚡ Tự động ưu tiên độ trễ thấp & chống khựng hình trên Wi-Fi / 4G"
                 },
-                color = TextSecondary,
+                color = if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) Color(0xFFF59E0B) else TextSecondary,
                 fontSize = 7.5.sp,
                 maxLines = 1
             )

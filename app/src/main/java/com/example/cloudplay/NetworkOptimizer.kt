@@ -42,6 +42,11 @@ data class NetworkOptimizerStatus(
     val effectiveBitrateMbps: Int = 9,
     val speedFirstPriority: Boolean = true,
     val wifiFrequencyMhz: Int = 0,
+    val wifiRssiDbm: Int = -55,
+    val wifiLinkSpeedMbps: Int = 0,
+    val downstreamBandwidthKbps: Int = 0,
+    val isWeakWifiSignal: Boolean = false,
+    val isWeakCellularSignal: Boolean = false,
     val summaryText: String = "Đang tối ưu hóa đồ họa và hiệu năng thiết bị...",
     val profileBadge: String = "⚡ Tự Động"
 )
@@ -171,17 +176,34 @@ object NetworkOptimizer {
         var isCellular = false
         var isMetered = false
         var wifiFreq = 0
+        var wifiRssi = -55
+        var wifiLinkMbps = 0
+        var downstreamKbps = 0
+        var isWeakWifi = false
+        var isWeakCellular = false
 
         if (caps != null) {
             isMetered = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+            downstreamKbps = caps.linkDownstreamBandwidthKbps
 
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                 isWifi = true
-                wifiFreq = detectWifiFrequency(context, caps)
+                val (freq, rssi, linkMbps) = detectWifiTelemetry(context, caps)
+                wifiFreq = freq
+                wifiRssi = rssi
+                wifiLinkMbps = linkMbps
                 type = classifyWifiBand(wifiFreq)
+                // Standing far from router / through walls: RSSI <= -70 dBm or linkSpeed drops below 65 Mbps
+                isWeakWifi = (wifiRssi in -120..-70) || (wifiLinkMbps in 1..64)
             } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
                 isCellular = true
                 type = PhysicalNetworkType.CELLULAR_4G_5G
+                val sigStrength = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    caps.signalStrength
+                } else {
+                    Int.MIN_VALUE
+                }
+                isWeakCellular = (downstreamKbps in 1..9000) || (sigStrength != Int.MIN_VALUE && sigStrength in -140..-104)
             } else if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
                 type = PhysicalNetworkType.ETHERNET
             }
@@ -193,7 +215,12 @@ object NetworkOptimizer {
             isWifi = isWifi,
             isCellular = isCellular,
             isMetered = isMetered,
-            wifiFrequencyMhz = wifiFreq
+            wifiFrequencyMhz = wifiFreq,
+            wifiRssiDbm = wifiRssi,
+            wifiLinkSpeedMbps = wifiLinkMbps,
+            downstreamBandwidthKbps = downstreamKbps,
+            isWeakWifiSignal = isWeakWifi,
+            isWeakCellularSignal = isWeakCellular
         )
 
         recomputeEffectiveProfile(config)
@@ -212,21 +239,21 @@ object NetworkOptimizer {
     }
 
     @Suppress("DEPRECATION")
-    private fun detectWifiFrequency(context: Context, caps: NetworkCapabilities): Int {
+    private fun detectWifiTelemetry(context: Context, caps: NetworkCapabilities): Triple<Int, Int, Int> {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val wifiInfo = caps.transportInfo as? WifiInfo
                 if (wifiInfo != null && wifiInfo.frequency > 0) {
-                    return wifiInfo.frequency
+                    return Triple(wifiInfo.frequency, wifiInfo.rssi, wifiInfo.linkSpeed.coerceAtLeast(0))
                 }
             }
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             val connectionInfo = wifiManager?.connectionInfo
             if (connectionInfo != null && connectionInfo.frequency > 0) {
-                return connectionInfo.frequency
+                return Triple(connectionInfo.frequency, connectionInfo.rssi, connectionInfo.linkSpeed.coerceAtLeast(0))
             }
         } catch (ignored: Exception) {}
-        return 0
+        return Triple(0, -55, 0)
     }
 
     fun recomputeEffectiveProfile(config: AppConfig) {
@@ -235,7 +262,6 @@ object NetworkOptimizer {
         val isCellular = current.isCellular || (!isWifi && current.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
 
         val cellularMode = config.cellularMode
-        val speedFirst = config.wifiSpeedFirstPriority
 
         val profileName: String
         val bitrate: Int
@@ -250,47 +276,52 @@ object NetworkOptimizer {
         } else when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
                 val autoMbps = when {
+                    isWifi && current.isWeakWifiSignal -> 7 // Đứng xa cục phát Wi-Fi 5GHz/2.4GHz: hạ xuống 7M chống rớt gói qua tường
+                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> 8 // Wi-Fi 2.4GHz: giữ gói tin gọn chống nhiễu Bluetooth
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 14
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 12
                     isWifi -> 10
+                    isCellular && current.isWeakCellularSignal -> 5 // Sóng 4G yếu / đang chuyển trạm
                     isCellular -> 6
                     else -> 9
                 }
-                profileName = if (isCellular) {
-                    "Tự Động 4G/5G (720p ⇄ 1080p • ${autoMbps}M)"
-                } else {
-                    "Tự Động Wi-Fi (720p ⇄ 1080p • ${autoMbps}M)"
+                profileName = when {
+                    isCellular && current.isWeakCellularSignal -> "Tự Động 4G Chống Rớt Sóng (${autoMbps}M)"
+                    isCellular -> "Tự Động 4G/5G (720p ⇄ 1080p • ${autoMbps}M)"
+                    isWifi && current.isWeakWifiSignal -> "Tự Động Wi-Fi Xa Cục Phát (${autoMbps}M)"
+                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> "Tự Động Wi-Fi 2.4GHz Chống Nhiễu (${autoMbps}M)"
+                    else -> "Tự Động Wi-Fi (720p ⇄ 1080p • ${autoMbps}M)"
                 }
                 bitrate = autoMbps
-                summary = if (isCellular) {
-                    "Tự động điều chỉnh độ phân giải (720p ⇄ 1080p) và bộ đệm theo sóng 4G/5G để giảm độ trễ và tránh khựng hình."
-                } else {
-                    "Giữ kết nối Wi-Fi ổn định, tự điều chỉnh độ phân giải và bộ đệm theo chất lượng mạng thực tế."
+                summary = when {
+                    isCellular -> "Ưu tiên độ trễ thấp nhất, tự hạ nhẹ độ nét trong 1.5s khi sóng 4G yếu hoặc đổi trạm phát."
+                    current.isWeakWifiSignal -> "Phát hiện sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự thu gọn luồng ${autoMbps}M để xuyên tường mượt mà."
+                    else -> "Ưu tiên thao tác điều khiển nhạy nhất, tự động cân chỉnh độ nét và giải mã < 8ms."
                 }
                 badge = if (isCellular) "📶 Tự động 4G (${autoMbps}M)" else "⚡ Tự động (${autoMbps}M)"
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
                 profileName = "720p • Thấp (Cố Định • 5M)"
                 bitrate = 5
-                summary = "Khóa 720p • 5 Mbps giúp giảm độ trễ trên mạng 4G/5G yếu hoặc Wi-Fi xa router, nhẹ máy và tiết kiệm dung lượng."
+                summary = "Khóa 720p • 5 Mbps giúp giảm độ trễ trên mạng 4G/5G yếu hoặc Wi-Fi xa cục phát, nhẹ máy và mát pin."
                 badge = "❄️ 720p • Thấp (5M)"
             }
             CellularOptimizationMode.MEDIUM -> {
                 profileName = "900p • Vừa (Cố Định • 9M)"
                 bitrate = 9
-                summary = "Khóa cố định 900p • 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và độ ổn định khung hình trên 4G/5G & Wi-Fi."
+                summary = "Khóa cố định 900p • 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và độ nhạy trên 4G/5G & Wi-Fi."
                 badge = "🌿 900p • Vừa (9M)"
             }
             CellularOptimizationMode.HIGH -> {
                 profileName = "1080p • Cao (Cố Định • 14M)"
                 bitrate = 14
-                summary = "Khóa cố định 1080p Full HD • 14 Mbps sắc nét cho mạng Wi-Fi hoặc 5G ổn định."
+                summary = "Khóa cố định 1080p Full HD • 14 Mbps sắc nét cho mạng Wi-Fi gần cục phát hoặc 5G mạnh."
                 badge = "✨ 1080p • Cao (14M)"
             }
             CellularOptimizationMode.MAX_SPEED_UNCAPPED -> {
                 profileName = "1080p+ • Rất cao (Cố Định • 20M)"
                 bitrate = 20
-                summary = "Khóa cố định tối đa 1080p+ • 20 Mbps cho mạng Wi-Fi 5GHz/6GHz hoặc 5G tốc độ cao."
+                summary = "Khóa cố định tối đa 1080p+ • 20 Mbps cho mạng Wi-Fi 5GHz/6GHz gần cục phát."
                 badge = "🔥 1080p+ • Rất cao (20M)"
             }
         }
@@ -298,7 +329,7 @@ object NetworkOptimizer {
         _status.value = current.copy(
             activeProfileName = profileName,
             effectiveBitrateMbps = bitrate,
-            speedFirstPriority = speedFirst,
+            speedFirstPriority = true,
             summaryText = summary,
             profileBadge = badge
         )

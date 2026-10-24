@@ -307,14 +307,6 @@ fun SettingsScreen(
                         }
                     }
                     SettingToggleRow(
-                        title = if (isEn) "Prioritize Smooth Input" else "Ưu tiên thao tác nhạy",
-                        subtitle = if (isEn) "Reduces button delay when signal is weak" else "Giảm trễ nút bấm khi sóng yếu",
-                        checked = config.wifiSpeedFirstPriority,
-                        onCheckedChange = { SettingsRepository.updateWifiSpeedFirstPriority(it) },
-                        activeColor = DirectCyan
-                    )
-
-                    SettingToggleRow(
                         title = if (isEn) "Light Background Effects" else "Giảm hiệu ứng nền",
                         subtitle = if (isEn) "Helps phone run cooler and smoother" else "Giúp máy đỡ nóng và đỡ giật hơn",
                         checked = config.gpuLoadReductionEnabled,

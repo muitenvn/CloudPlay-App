@@ -880,28 +880,34 @@ private fun SessionDetailDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
+                                modifier = Modifier.weight(1f, fill = false),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Speed,
                                     contentDescription = null,
                                     tint = DirectCyan,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Text(
-                                    text = if (isEn) "PING OVER TIME" else "BIỂU ĐỒ PING THEO THỜI GIAN",
+                                    text = if (isEn) "PING CHART" else "BIỂU ĐỒ PING",
                                     color = TextSecondary,
                                     fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isEn) "Min ${minPing}ms • Max ${maxPing}ms" else "Thấp ${minPing}ms • Cao ${maxPing}ms",
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
@@ -1006,6 +1012,7 @@ private fun SessionDetailDialog(
                         onClick = onPlayAgain,
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(42.dp)
@@ -1038,6 +1045,7 @@ private fun SessionDetailDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = JapanRed.copy(alpha = 0.2f)),
                         border = BorderStroke(1.dp, JapanRed.copy(alpha = 0.6f)),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(42.dp)
@@ -1047,14 +1055,16 @@ private fun SessionDetailDialog(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = null,
                             tint = JapanRed,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = if (isEn) "Delete Session" else "Xóa phiên này",
                             color = JapanRed,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -1063,6 +1073,7 @@ private fun SessionDetailDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
                         border = BorderStroke(1.dp, XboxCardBorder),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
                             .height(42.dp)
@@ -1071,7 +1082,9 @@ private fun SessionDetailDialog(
                             text = if (isEn) "Close" else "Đóng",
                             color = Color.White,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -1126,9 +1139,9 @@ private fun buildGlobalSmartTip(sessions: List<PlaySessionRecord>, isEn: Boolean
     val slowOrHotCount = recent.count { it.isSlowDecode || it.isThermalHot }
     if (slowOrHotCount >= 2 || (recent.size == 1 && slowOrHotCount == 1)) {
         return if (isEn) {
-            "Tip: Enable Low-End Device Mode in Settings for cooler and smoother play."
+            "Tip: Keep Auto (720p ⇄ 1080p) quality mode enabled to prevent frame delay when Wi-Fi or 4G fluctuates."
         } else {
-            "Gợi ý: Bật Chế độ máy yếu trong Cài đặt để máy mát và chơi mượt hơn."
+            "Gợi ý: Giữ chế độ Tự động (720p ⇄ 1080p) để tự xả hàng đợi khung hình khi sóng Wi-Fi hoặc 4G dao động."
         }
     }
     return null
@@ -1136,46 +1149,35 @@ private fun buildGlobalSmartTip(sessions: List<PlaySessionRecord>, isEn: Boolean
 
 private fun buildSessionSmartTip(
     session: PlaySessionRecord,
-    allSessions: List<PlaySessionRecord>,
+    @Suppress("UNUSED_PARAMETER") allSessions: List<PlaySessionRecord>,
     isEn: Boolean
 ): String? {
-    val sameGameSessions = allSessions.filter {
-        it.gameTitle.equals(session.gameTitle, ignoreCase = true) &&
-            it.avgPingMs > 0 &&
-            it.serverName.isNotBlank()
-    }
-    val byServer = sameGameSessions
-        .groupBy { it.serverName }
-        .mapValues { (_, list) -> list.sumOf { it.avgPingMs } / list.size }
-
-    if (byServer.size >= 2) {
-        val sorted = byServer.entries.sortedBy { it.value }
-        val best = sorted.first()
-        val secondBest = sorted[1]
-        if (secondBest.value - best.value >= 5) {
-            return if (isEn) {
-                "Best server for this game: ${best.key} (~${best.value}ms)"
-            } else {
-                "Máy chủ tốt nhất cho game này: ${best.key} (~${best.value}ms)"
-            }
-        }
+    val samples = session.pingSamples
+    val pingSwing = if (samples.size >= 2) {
+        (samples.maxOrNull() ?: session.avgPingMs) - (samples.minOrNull() ?: session.avgPingMs)
+    } else {
+        0
     }
 
     if (session.isSlowDecode || session.isThermalHot) {
         return if (isEn) {
-            "Tip: Turn on Low-End Device Mode to reduce heat and frame delay."
+            "Tip: Auto frame-queue draining and Low-End Device Mode help reduce decode delay when signal fluctuates."
         } else {
-            "Gợi ý: Bật Chế độ máy yếu để giảm nóng máy và xử lý hình ảnh nhanh hơn."
+            "Gợi ý: Chế độ Tự động (720p ⇄ 1080p) sẽ tự hạ nhẹ bitrate và xả khung hình trễ khi sóng Wi-Fi / 4G dao động."
         }
     }
 
-    if (byServer.size == 1) {
-        val only = byServer.entries.first()
+    if (pingSwing >= 35 || session.avgPingMs > 95) {
         return if (isEn) {
-            "Best server for this game: ${only.key} (~${only.value}ms)"
+            "Tip: Ping fluctuated by ${pingSwing}ms. Moving closer to your Wi-Fi router or using Auto 720p mode keeps controls responsive."
         } else {
-            "Máy chủ tốt nhất cho game này: ${only.key} (~${only.value}ms)"
+            "Gợi ý: Ping dao động ${pingSwing}ms trong phiên này. Ngồi gần cục phát Wi-Fi hơn hoặc dùng chế độ Tự động sẽ giúp điều khiển nhạy hơn."
         }
     }
-    return null
+
+    return if (isEn) {
+        "Stream & controls stayed stable throughout this session (~${session.avgPingMs}ms)."
+    } else {
+        "Đường truyền và độ nhạy điều khiển duy trì ổn định trong suốt phiên chơi (~${session.avgPingMs}ms)."
+    }
 }

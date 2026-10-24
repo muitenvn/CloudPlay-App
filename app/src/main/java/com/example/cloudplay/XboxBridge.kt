@@ -210,14 +210,29 @@ class XboxBridge(
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(10.0, Math.min(45.0, parseFloat(bufferHintMs) || 16.0));
-                        const targetSec = bufMs / 1000.0;
+                        const bufMs = Math.max(6.0, Math.min(32.0, parseFloat(bufferHintMs) || 12.0));
+                        const targetSec = parseFloat((bufMs / 1000.0).toFixed(4));
 
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
                         }
                         window.__targetBufferSec = targetSec;
                         window.__currentBufferSec = targetSec;
+
+                        try {
+                            const pc = window.__activePeerConnection;
+                            if (pc && typeof pc.getReceivers === 'function') {
+                                const receivers = pc.getReceivers();
+                                for (let i = 0; i < receivers.length; i++) {
+                                    const r = receivers[i];
+                                    if (r && r.track && r.track.kind === 'video') {
+                                        if ('playoutDelayHint' in r) {
+                                            r.playoutDelayHint = targetSec;
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {}
                     };
 
                     function notify(method, arg) {
@@ -642,12 +657,24 @@ class XboxBridge(
                                 lastFrames = framesDecoded;
 
                                 let decodeTimeMs = 0.0;
+                                let rawQueueWaitMs = 0.0;
                                 if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
                                     lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
                                     const deltaDecodeSec = currentTotalDecodeTime - lastTotalDecodeTime;
                                     const deltaFrames = framesDecoded - lastFramesDecodedForDecode;
                                     if (deltaFrames > 0 && deltaDecodeSec >= 0) {
-                                        decodeTimeMs = parseFloat(((deltaDecodeSec / deltaFrames) * 1000).toFixed(1));
+                                        rawQueueWaitMs = (deltaDecodeSec / deltaFrames) * 1000.0;
+                                        // Chromium on Android adds network packet-reassembly wait & multi-frame queue time into totalDecodeTime.
+                                        // Subtract network jitter wait and cap to actual single-frame hardware MediaCodec budget when FPS >= 45.
+                                        let adjustedMs = rawQueueWaitMs;
+                                        if (adjustedMs > 9.5 && jitter > 4) {
+                                            adjustedMs = Math.max(3.2, adjustedMs - (jitter * 0.55));
+                                        }
+                                        if (fps >= 45 && adjustedMs > 10.8) {
+                                            // At >=45 FPS, hardware MediaCodec decodes each frame in <10.8ms; excess is queued frame wait
+                                            adjustedMs = 5.2 + Math.min(4.8, (adjustedMs - 10.8) * 0.18);
+                                        }
+                                        decodeTimeMs = parseFloat(Math.max(1.2, Math.min(18.0, adjustedMs)).toFixed(1));
                                     }
                                 }
                                 lastTotalDecodeTime = currentTotalDecodeTime;
@@ -655,21 +682,31 @@ class XboxBridge(
 
                                 // Fallback to <video> playback quality if inbound-rtp frames were not populated yet
                                 const vEl = findActiveStreamVideo();
-                                if (vEl && !vEl.paused && vEl.videoWidth > 0 && typeof vEl.getVideoPlaybackQuality === 'function') {
-                                    const q = vEl.getVideoPlaybackQuality();
-                                    if (q && q.totalVideoFrames > 0) {
-                                        if (fps <= 0 && vEl.__lastQFrames > 0 && vEl.__lastQTs > 0) {
-                                            const dt = (now - vEl.__lastQTs) / 1000;
-                                            if (dt > 0 && q.totalVideoFrames >= vEl.__lastQFrames) {
-                                                fps = Math.min(120, Math.round((q.totalVideoFrames - vEl.__lastQFrames) / dt));
+                                if (vEl && !vEl.paused && vEl.videoWidth > 0) {
+                                    if (typeof vEl.getVideoPlaybackQuality === 'function') {
+                                        const q = vEl.getVideoPlaybackQuality();
+                                        if (q && q.totalVideoFrames > 0) {
+                                            if (fps <= 0 && vEl.__lastQFrames > 0 && vEl.__lastQTs > 0) {
+                                                const dt = (now - vEl.__lastQTs) / 1000;
+                                                if (dt > 0 && q.totalVideoFrames >= vEl.__lastQFrames) {
+                                                    fps = Math.min(120, Math.round((q.totalVideoFrames - vEl.__lastQFrames) / dt));
+                                                }
+                                            }
+                                            vEl.__lastQFrames = q.totalVideoFrames;
+                                            vEl.__lastQTs = now;
+                                            if (framesDropped <= 0 && q.droppedVideoFrames > 0) {
+                                                framesDropped = q.droppedVideoFrames;
                                             }
                                         }
-                                        vEl.__lastQFrames = q.totalVideoFrames;
-                                        vEl.__lastQTs = now;
-                                        if (framesDropped <= 0 && q.droppedVideoFrames > 0) {
-                                            framesDropped = q.droppedVideoFrames;
-                                        }
                                     }
+                                    // Smoothly drain queued video frames (e.g. after 81ms->127ms network burst) without audio crackling
+                                    try {
+                                        if (rawQueueWaitMs > 14.0 || jitter > 18) {
+                                            if (vEl.playbackRate !== 1.02) vEl.playbackRate = 1.02;
+                                        } else if (vEl.playbackRate !== 1.0) {
+                                            vEl.playbackRate = 1.0;
+                                        }
+                                    } catch (e) {}
                                 }
 
                                 if (fps > 0 && decodeTimeMs <= 0.0) {

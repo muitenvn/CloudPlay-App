@@ -202,35 +202,18 @@ fun DashboardScreen(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                                     ) {
                                         Text(
                                             text = "CLOUDPLAY",
                                             color = TextPrimary,
                                             fontFamily = SpaceGroteskFontFamily,
                                             fontWeight = FontWeight.Black,
-                                            fontSize = 16.sp,
-                                            letterSpacing = 0.7.sp,
+                                            fontSize = 15.sp,
+                                            letterSpacing = 0.5.sp,
                                             maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            softWrap = false
                                         )
-                                        Surface(
-                                            shape = RoundedCornerShape(5.dp),
-                                            color = XboxNeonGreen.copy(alpha = 0.14f),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                0.7.dp,
-                                                XboxNeonGreen.copy(alpha = 0.5f)
-                                            )
-                                        ) {
-                                            Text(
-                                                text = "UI 3.0",
-                                                color = XboxNeonGreen,
-                                                fontFamily = JetBrainsMonoFontFamily,
-                                                fontSize = 8.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                            )
-                                        }
                                     }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -267,8 +250,8 @@ fun DashboardScreen(
                         actions = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(end = 10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.padding(end = 8.dp)
                             ) {
                                 // 1. Live Telemetry Ping Pill (only when real ping is measured)
                                 val directPing = vpnState.directLatencyMs
@@ -428,13 +411,6 @@ fun DashboardScreen(
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent
                         )
-                    )
-
-                    // UI 3.0 Interactive Console Status Telemetry Ribbon
-                    ConsoleLiveTelemetryRibbon(
-                        config = config,
-                        hasPhysicalController = gamepadStatus.hasPhysicalController,
-                        onOpenSettings = { currentTab = DashboardTab.SETTINGS }
                     )
                 }
             }

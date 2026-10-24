@@ -308,13 +308,7 @@ object VpnManager {
         val records = _state.value.unlockRecords
         val all = getAllServers()
 
-        // Lọc bỏ máy chủ đang lỗi và các máy chủ "Không mở khóa" / "Sai vùng"
-        val eligibleSameCountry = all.filter {
-            it.addressPortKey != current.addressPortKey &&
-                it.countryCode.equals(current.countryCode, ignoreCase = true) &&
-                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
-                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
-        }
+        // Lọc bỏ máy chủ đang lỗi và các máy chủ "Không mở khóa" / "Sai vùng", sắp xếp thuần theo trạng thái mở khóa & Ping thấp nhất
         val eligibleAnySupported = all.filter {
             it.addressPortKey != current.addressPortKey &&
                 getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
@@ -322,7 +316,7 @@ object VpnManager {
         }
 
         val sortedPool = sortServersByUnlockAndPing(
-            if (eligibleSameCountry.isNotEmpty()) eligibleSameCountry else eligibleAnySupported,
+            eligibleAnySupported,
             emptyMap(),
             records
         )

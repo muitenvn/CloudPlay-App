@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android</title>
-  <meta name="description" content="CloudPlay là công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.">
+  <meta id="meta-desc" name="description" content="CloudPlay là công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/">
 
   <meta property="og:type" content="website">
-  <meta property="og:title" content="CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming">
-  <meta property="og:description" content="Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng hình ảnh.">
+  <meta id="og-title" property="og:title" content="CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming">
+  <meta id="og-desc" property="og:description" content="Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng hình ảnh.">
   <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/">
 
   <style>
@@ -34,12 +34,35 @@
       margin: 0 auto;
     }
 
+    .top-bar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
     .app-icon {
       display: block;
       width: 64px;
       height: 64px;
       border-radius: 14px;
-      margin-bottom: 16px;
+    }
+
+    .lang-switch {
+      background: none;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: inherit;
+      font-size: 13px;
+      color: #666666;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+
+    .lang-switch .active {
+      color: #1a1a1a;
+      font-weight: 700;
     }
 
     h1 {
@@ -156,28 +179,34 @@
 </head>
 <body>
   <main class="container">
-    <img src="img/icon.png" alt="Biểu tượng ứng dụng CloudPlay" class="app-icon" width="64" height="64" onerror="this.style.display='none'">
+    <div class="top-bar">
+      <img id="app-icon" src="img/icon.png" alt="Biểu tượng ứng dụng CloudPlay" class="app-icon" width="64" height="64" onerror="this.style.display='none'">
+      <button id="lang-toggle" type="button" class="lang-switch" aria-label="Chuyển đổi ngôn ngữ EN hoặc VI">
+        <span id="lang-en" data-lang="en">EN</span> | <span id="lang-vi" data-lang="vi" class="active">VI</span>
+      </button>
+    </div>
+
     <h1>CloudPlay</h1>
-    <p class="subtitle">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.</p>
+    <p id="subtitle" class="subtitle">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.</p>
 
     <div>
       <a id="download-apk-btn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn-download">Tải APK</a>
     </div>
-    <p class="meta-line">Android 7.0+ · <span id="apk-size">~31.7 MB</span></p>
+    <p class="meta-line"><span id="android-req">Android 7.0+</span> · <span id="apk-size">~31.7 MB</span></p>
 
     <div id="screenshots-section" class="screenshots">
-      <img src="img/screenshot-1.png" alt="Màn hình chính ứng dụng CloudPlay chọn dịch vụ chơi" onerror="handleImgError(this)">
-      <img src="img/screenshot-2.png" alt="Màn hình chơi game có thanh theo dõi ping và mạng trực tiếp" onerror="handleImgError(this)">
-      <img src="img/screenshot-3.png" alt="Màn hình cài đặt chất lượng hình ảnh và chọn máy chủ" onerror="handleImgError(this)">
+      <img id="ss-1" src="img/screenshot-1.png" alt="Màn hình trang chủ ứng dụng CloudPlay" onerror="handleImgError(this)">
+      <img id="ss-2" src="img/screenshot-2.png" alt="Màn hình thư viện kho game Xbox Cloud" onerror="handleImgError(this)">
+      <img id="ss-3" src="img/screenshot-3.png" alt="Màn hình cài đặt độ phân giải và đồ họa" onerror="handleImgError(this)">
     </div>
 
     <ul class="features">
-      <li>Theo dõi ping và tình trạng mạng trực tiếp trên màn hình khi đang chơi.</li>
-      <li>Tự động gộp và điều chỉnh chất lượng hình ảnh phù hợp với kết nối Wi-Fi hoặc dữ liệu di động.</li>
-      <li>Hỗ trợ chọn máy chủ khu vực gần nhất và bàn phím ảo trên màn hình cảm ứng.</li>
+      <li id="feat-1">Theo dõi ping và tình trạng mạng trực tiếp trên màn hình khi đang chơi.</li>
+      <li id="feat-2">Tự động gộp và điều chỉnh chất lượng hình ảnh phù hợp với kết nối Wi-Fi hoặc dữ liệu di động.</li>
+      <li id="feat-3">Hỗ trợ chọn máy chủ khu vực gần nhất và bàn phím ảo trên màn hình cảm ứng.</li>
     </ul>
 
-    <p class="disclaimer">
+    <p id="disclaimer" class="disclaimer">
       Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.
     </p>
 
@@ -185,12 +214,148 @@
       <a id="github-releases-btn" href="https://github.com/muitenvn/CloudPlay-App/releases" target="_blank" rel="noopener" class="link">Xem các bản phát hành</a>
     </div>
 
-    <footer>
+    <footer id="footer-text">
       CloudPlay cho Android · Mã nguồn và bản tải tại GitHub
     </footer>
   </main>
 
   <script>
+    (function initI18n() {
+      var dict = {
+        vi: {
+          title: 'CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android',
+          metaDesc: 'CloudPlay là công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.',
+          ogTitle: 'CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming',
+          ogDesc: 'Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng hình ảnh.',
+          iconAlt: 'Biểu tượng ứng dụng CloudPlay',
+          langAria: 'Chuyển đổi ngôn ngữ EN hoặc VI',
+          subtitle: 'Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.',
+          downloadBtn: 'Tải APK',
+          androidReq: 'Android 7.0+',
+          ss1Alt: 'Màn hình trang chủ ứng dụng CloudPlay',
+          ss2Alt: 'Màn hình thư viện kho game Xbox Cloud',
+          ss3Alt: 'Màn hình cài đặt độ phân giải và đồ họa',
+          feat1: 'Theo dõi ping và tình trạng mạng trực tiếp trên màn hình khi đang chơi.',
+          feat2: 'Tự động gộp và điều chỉnh chất lượng hình ảnh phù hợp với kết nối Wi-Fi hoặc dữ liệu di động.',
+          feat3: 'Hỗ trợ chọn máy chủ khu vực gần nhất và bàn phím ảo trên màn hình cảm ứng.',
+          disclaimer: 'Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.',
+          releasesBtn: 'Xem các bản phát hành',
+          footer: 'CloudPlay cho Android · Mã nguồn và bản tải tại GitHub'
+        },
+        en: {
+          title: 'CloudPlay — Xbox Cloud Gaming Helper for Android',
+          metaDesc: 'CloudPlay is an Android helper tool for Xbox Cloud Gaming with live ping monitoring and video quality settings.',
+          ogTitle: 'CloudPlay — Xbox Cloud Gaming Helper',
+          ogDesc: 'Android helper tool for Xbox Cloud Gaming with live ping monitoring and video quality settings.',
+          iconAlt: 'CloudPlay app icon',
+          langAria: 'Switch language between EN and VI',
+          subtitle: 'Helper tool for playing Xbox Cloud Gaming on Android, with live ping monitoring and video quality settings.',
+          downloadBtn: 'Download APK',
+          androidReq: 'Requires Android 7.0+',
+          ss1Alt: 'CloudPlay app home screen',
+          ss2Alt: 'Xbox Cloud game library screen',
+          ss3Alt: 'Resolution and graphics settings screen',
+          feat1: 'Monitor ping and network status live on screen while playing.',
+          feat2: 'Automatically group and adjust video quality for Wi-Fi or mobile data connections.',
+          feat3: 'Support selecting the nearest server region and on-screen touch controls.',
+          disclaimer: 'Independent app, not affiliated with Microsoft, Xbox, or Epic Games. May violate terms of service and lead to account suspension; use at your own risk.',
+          releasesBtn: 'View all releases',
+          footer: 'CloudPlay for Android · Source code and downloads on GitHub'
+        }
+      };
+
+      var currentLang = 'en';
+
+      function detectInitialLang() {
+        try {
+          var saved = localStorage.getItem('cloudplay_lang');
+          if (saved === 'vi' || saved === 'en') {
+            return saved;
+          }
+        } catch (e) {}
+
+        var navLang = '';
+        try {
+          navLang = String(navigator.language || navigator.userLanguage || '').toLowerCase();
+        } catch (e) {}
+        if (navLang.indexOf('vi') === 0) {
+          return 'vi';
+        }
+
+        try {
+          var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz === 'Asia/Ho_Chi_Minh' || tz === 'Asia/Saigon') {
+            return 'vi';
+          }
+        } catch (e) {}
+
+        return 'en';
+      }
+
+      function applyLang(lang) {
+        var t = dict[lang] || dict.en;
+        currentLang = (lang === 'vi') ? 'vi' : 'en';
+        document.documentElement.lang = currentLang;
+        document.title = t.title;
+
+        var metaDesc = document.getElementById('meta-desc');
+        if (metaDesc) metaDesc.setAttribute('content', t.metaDesc);
+        var ogTitle = document.getElementById('og-title');
+        if (ogTitle) ogTitle.setAttribute('content', t.ogTitle);
+        var ogDesc = document.getElementById('og-desc');
+        if (ogDesc) ogDesc.setAttribute('content', t.ogDesc);
+
+        var icon = document.getElementById('app-icon');
+        if (icon) icon.setAttribute('alt', t.iconAlt);
+        var toggle = document.getElementById('lang-toggle');
+        if (toggle) toggle.setAttribute('aria-label', t.langAria);
+
+        var ss1 = document.getElementById('ss-1');
+        if (ss1) ss1.setAttribute('alt', t.ss1Alt);
+        var ss2 = document.getElementById('ss-2');
+        if (ss2) ss2.setAttribute('alt', t.ss2Alt);
+        var ss3 = document.getElementById('ss-3');
+        if (ss3) ss3.setAttribute('alt', t.ss3Alt);
+
+        var map = {
+          'subtitle': t.subtitle,
+          'download-apk-btn': t.downloadBtn,
+          'android-req': t.androidReq,
+          'feat-1': t.feat1,
+          'feat-2': t.feat2,
+          'feat-3': t.feat3,
+          'disclaimer': t.disclaimer,
+          'github-releases-btn': t.releasesBtn,
+          'footer-text': t.footer
+        };
+        for (var id in map) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = map[id];
+        }
+
+        var enSpan = document.getElementById('lang-en');
+        var viSpan = document.getElementById('lang-vi');
+        if (enSpan && viSpan) {
+          enSpan.className = (currentLang === 'en') ? 'active' : '';
+          viSpan.className = (currentLang === 'vi') ? 'active' : '';
+        }
+      }
+
+      var toggleBtn = document.getElementById('lang-toggle');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+          var targetLang = e.target && e.target.getAttribute ? e.target.getAttribute('data-lang') : null;
+          var nextLang = (targetLang === 'en' || targetLang === 'vi') ? targetLang : (currentLang === 'vi' ? 'en' : 'vi');
+          try {
+            localStorage.setItem('cloudplay_lang', nextLang);
+          } catch (err) {}
+          applyLang(nextLang);
+        });
+      }
+
+      applyLang(detectInitialLang());
+    })();
+
     (async function fetchLatestRelease() {
       try {
         const res = await fetch('https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest');

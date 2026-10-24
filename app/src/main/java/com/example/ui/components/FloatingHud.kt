@@ -553,7 +553,7 @@ fun FloatingHud(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
                 horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
-                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (FPS • Ping • Resolution/Bitrate)
+                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + Controller icon only)
                 if (hudMode == HudMode.MINIMIZED) {
                     val rawPing = when {
                         telemetry.rttMs > 0 -> telemetry.rttMs
@@ -573,7 +573,6 @@ fun FloatingHud(
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
-                    val fpsPrefix = if (telemetry.fps > 0) "${telemetry.fps}fps • " else ""
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -594,7 +593,7 @@ fun FloatingHud(
                                 .background(pingColor)
                         )
                         Text(
-                            text = "$fpsPrefix$pingText",
+                            text = pingText,
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.5.sp,

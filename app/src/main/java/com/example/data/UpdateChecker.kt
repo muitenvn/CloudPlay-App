@@ -35,7 +35,7 @@ object UpdateChecker {
     private const val KEY_LAST_CHECK_MS = "last_update_check_epoch_ms"
     private const val KEY_CACHED_LATEST_VER = "cached_latest_version"
     private const val KEY_CACHED_RELEASE_URL = "cached_release_url"
-    private const val KEY_CACHED_RELEASE_NOTES = "cached_release_notes"
+    private const val KEY_CACHED_RELEASE_NOTES = "cached_release_notes_v2"
 
     private const val CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L // 24 giờ
     private const val TIMEOUT_MS = 8000 // 8 giây
@@ -125,10 +125,10 @@ object UpdateChecker {
         val lastCheckMs = sp.getLong(KEY_LAST_CHECK_MS, 0L)
         val now = System.currentTimeMillis()
 
-        if (now - lastCheckMs in 1 until CHECK_INTERVAL_MS) {
+        val cachedNotes = sp.getString(KEY_CACHED_RELEASE_NOTES, "") ?: ""
+        if (now - lastCheckMs in 1 until CHECK_INTERVAL_MS && cachedNotes.isNotBlank()) {
             val cachedLatest = sp.getString(KEY_CACHED_LATEST_VER, "") ?: ""
             val cachedUrl = sp.getString(KEY_CACHED_RELEASE_URL, FALLBACK_RELEASES_URL) ?: FALLBACK_RELEASES_URL
-            val cachedNotes = sp.getString(KEY_CACHED_RELEASE_NOTES, "") ?: ""
             if (cachedLatest.isNotBlank() && isNewerVersion(currentVersion, cachedLatest)) {
                 _state.value = UpdateCheckState.UpdateAvailable(
                     currentVersion = currentVersion,
@@ -254,12 +254,12 @@ object UpdateChecker {
                     .removePrefix("###")
                     .removePrefix("##")
                     .removePrefix("#")
+                    .removePrefix(">")
                     .replace("**", "")
+                    .replace("`", "")
                     .trim()
             }
             .filter { it.isNotBlank() && !it.startsWith("---") }
-            .take(5)
             .joinToString("\n")
-            .take(280)
     }
 }

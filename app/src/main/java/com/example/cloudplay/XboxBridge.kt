@@ -203,57 +203,21 @@ class XboxBridge(
                         if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
                     };
 
-                    const initialBufSec = isFortniteSession() ? 0.008 : (($speedFirstPriority || $lowEndDeviceMode) ? 0.012 : 0.016);
-                    window.__currentBufferSec = initialBufSec;
-                    window.__targetBufferSec = initialBufSec;
-                    window.__bufferGlideTimer = null;
+                    function findActiveStreamVideo() {
+                        return document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                    }
+                    window.__findActiveStreamVideo = findActiveStreamVideo;
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(6.0, Math.min(45.0, parseFloat(bufferHintMs) || 14.0));
+                        const bufMs = Math.max(10.0, Math.min(45.0, parseFloat(bufferHintMs) || 16.0));
                         const targetSec = bufMs / 1000.0;
 
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
-                            if (window.__networkProfile.cellularMode === 'auto' && window.__graphicsTuning && !window.__graphicsTuning.lowEndDeviceMode) {
-                                const dynamicScale = mbps <= 6.5 ? 0.75 : (mbps <= 10.5 ? 0.85 : 1.0);
-                                if (Math.abs((window.__graphicsTuning.renderScale || 1.0) - dynamicScale) >= 0.04) {
-                                    window.__graphicsTuning.renderScale = dynamicScale;
-                                    if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
-                                }
-                            }
                         }
-
                         window.__targetBufferSec = targetSec;
-                        if (typeof window.__currentBufferSec !== 'number') {
-                            window.__currentBufferSec = targetSec;
-                        }
-
-                        function applyBufferToReceivers(secVal) {
-                            if (!window.__activePeerConnection) return;
-                            try {
-                                const receivers = window.__activePeerConnection.getReceivers ? window.__activePeerConnection.getReceivers() : [];
-                                for (let i = 0; i < receivers.length; i++) {
-                                    const r = receivers[i];
-                                    if (r && r.track) {
-                                        if (r.track.kind === 'video') {
-                                            if ('playoutDelayHint' in r) r.playoutDelayHint = secVal;
-                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = secVal * 1000.0;
-                                        } else if (r.track.kind === 'audio') {
-                                            const audioSec = Math.max(0.006, secVal - 0.002);
-                                            if ('playoutDelayHint' in r) r.playoutDelayHint = audioSec;
-                                            if ('jitterBufferTarget' in r) r.jitterBufferTarget = audioSec * 1000.0;
-                                        }
-                                    }
-                                }
-                            } catch(e) {}
-                        }
-
-                        // Apply receiver playout delay only when changed by >= 2ms so Chromium VCMTiming never stutters
-                        if (smoothGlide === false || Math.abs(targetSec - window.__currentBufferSec) >= 0.002) {
-                            window.__currentBufferSec = targetSec;
-                            applyBufferToReceivers(targetSec);
-                        }
+                        window.__currentBufferSec = targetSec;
                     };
 
                     function notify(method, arg) {
@@ -525,91 +489,18 @@ class XboxBridge(
                         try {
                             let sdp = rawSdp;
                             const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
-                            const gt = window.__graphicsTuning || {};
-                            const renderScale = parseFloat(gt.renderScale) || 1.0;
-                            const configuredFpsCap = parseInt(gt.fpsCap, 10) || 60;
-                            const isFortnite = isFortniteSession();
                             const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
-                            const scaleBitrateFactor = renderScale < 0.70 ? 0.60 : (renderScale < 0.80 ? 0.75 : (renderScale < 0.92 ? 0.86 : 1.0));
-                            const activeMbps = Math.max(3, Math.round(rawMbps * scaleBitrateFactor));
-                            const isLowSaver = isLowEndMode || activeMbps <= 6 || renderScale <= 0.65;
-                            const isMedium = !isLowSaver && (activeMbps <= 10 || renderScale <= 0.78);
-                            const isHigh = !isLowSaver && !isMedium && activeMbps <= 15;
-                            const targetKbps = isLowEndMode ? 4500 : Math.min(Math.max(activeMbps * 1000, isFortnite ? 5000 : 3200), 20000);
-                            // Strictly honor user's FPS cap so 60Hz devices never get overloaded by 120fps decode
-                            const negotiatedFps = isLowEndMode ? Math.min(configuredFpsCap, 60) : (configuredFpsCap <= 30 ? 30 : (configuredFpsCap >= 120 ? 120 : 60));
+                            const activeMbps = Math.max(4, Math.min(20, Math.round(rawMbps)));
+                            const targetKbps = activeMbps * 1000;
 
-                            // 1. Video bandwidth & framerate negotiation (avoid duplicate b=AS / a=framerate lines)
+                            // Negotiate video bandwidth cleanly via standard b=AS without mutating Xbox's H.264 profile-level-id
                             if (sdp.indexOf('m=video ') !== -1) {
                                 sdp = sdp.replace(/b=AS:\d+\r\n/g, '');
-                                sdp = sdp.replace(/a=framerate:\d+\r\n/g, '');
-                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + negotiatedFps + '\r\n');
+                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
                             }
 
                             if (isLowEndMode && window.__pauseTranslator) {
                                 window.__pauseTranslator();
-                            }
-
-                            // 2. Determine target H.264 Constrained Baseline profile (Zero B-Frames = lowest MediaCodec decodeTimeMs)
-                            const targetProfileId = isLowSaver ? '42e01f' : '42e020';
-                            const maxBitrateKbps = isLowSaver
-                                ? Math.max(3500, targetKbps)
-                                : (isMedium ? (isFortnite ? 9000 : 8000) : (isHigh ? (isFortnite ? 14500 : 13500) : 20000));
-                            const minBitrateKbps = isLowSaver ? 1200 : (isMedium ? 1600 : (isHigh ? 2200 : 2800));
-                            const startBitrateKbps = isLowSaver ? 2000 : (isMedium ? 2800 : (isHigh ? 3400 : 4200));
-                            // Constrain macroblocks to 720p60 when user selects Low-End Mode or 60%/75% Render Scale so Xbox Server sends 720p stream
-                            const fsConstraint = (isLowSaver || renderScale <= 0.78)
-                                ? ';max-fs=3600;max-mbps=216000'
-                                : '';
-                            const extraH264Params = 'x-google-max-bitrate=' + maxBitrateKbps +
-                                ';x-google-min-bitrate=' + minBitrateKbps +
-                                ';x-google-start-bitrate=' + startBitrateKbps + fsConstraint;
-
-                            // Find all H264 payload types and update their existing a=fmtp:<pt> line IN-PLACE
-                            const h264Pts = [];
-                            sdp.replace(/a=rtpmap:(\d+) H264\/\d+/gi, function(_, pt) {
-                                h264Pts.push(pt);
-                                return _;
-                            });
-                            for (let i = 0; i < h264Pts.length; i++) {
-                                const pt = h264Pts[i];
-                                const fmtpRegex = new RegExp('a=fmtp:' + pt + ' ([^\\r\\n]+)\\r\\n', 'g');
-                                if (fmtpRegex.test(sdp)) {
-                                    sdp = sdp.replace(fmtpRegex, function(_, params) {
-                                        let updated = params;
-                                        if (/profile-level-id=[0-9a-fA-F]+/i.test(updated)) {
-                                            updated = updated.replace(/profile-level-id=[0-9a-fA-F]+/i, 'profile-level-id=' + targetProfileId);
-                                        } else {
-                                            updated += ';profile-level-id=' + targetProfileId;
-                                        }
-                                        if (updated.indexOf('x-google-max-bitrate') === -1) {
-                                            updated += ';' + extraH264Params;
-                                        }
-                                        return 'a=fmtp:' + pt + ' ' + updated + '\r\n';
-                                    });
-                                } else {
-                                    const rtpmapRegex = new RegExp('(a=rtpmap:' + pt + ' H264\\/[^\\r\\n]+\\r\\n)', 'i');
-                                    sdp = sdp.replace(rtpmapRegex, '$1a=fmtp:' + pt + ' level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=' + targetProfileId + ';' + extraH264Params + '\r\n');
-                                }
-                            }
-
-                            // 3. Update Opus audio fmtp IN-PLACE for 10ms low-latency framing & FEC
-                            const opusBitrate = isLowSaver ? (isFortnite ? 64000 : 48000) : (isMedium ? (isFortnite ? 96000 : 64000) : 128000);
-                            const opusPts = [];
-                            sdp.replace(/a=rtpmap:(\d+) opus\/\d+/gi, function(_, pt) {
-                                opusPts.push(pt);
-                                return _;
-                            });
-                            for (let j = 0; j < opusPts.length; j++) {
-                                const pt = opusPts[j];
-                                const opusFmtpRegex = new RegExp('a=fmtp:' + pt + ' ([^\\r\\n]+)\\r\\n', 'g');
-                                const opusTuning = 'minptime=10;ptime=10;maxptime=20;stereo=1;sprop-stereo=1;cbr=1;useinbandfec=1;maxaveragebitrate=' + opusBitrate;
-                                if (opusFmtpRegex.test(sdp)) {
-                                    sdp = sdp.replace(opusFmtpRegex, 'a=fmtp:' + pt + ' ' + opusTuning + '\r\n');
-                                } else {
-                                    const opusRtpmapRegex = new RegExp('(a=rtpmap:' + pt + ' opus\\/[^\\r\\n]+\\r\\n)', 'i');
-                                    sdp = sdp.replace(opusRtpmapRegex, '$1a=fmtp:' + pt + ' ' + opusTuning + '\r\n');
-                                }
                             }
 
                             return sdp;
@@ -618,265 +509,251 @@ class XboxBridge(
                         }
                     }
 
-                    try {
-                        const OrigPeerConnection = window.RTCPeerConnection;
-                        if (OrigPeerConnection) {
-                            window.RTCPeerConnection = function(...args) {
-                                const pc = new OrigPeerConnection(...args);
-                                if (window.__activeStatsIntervalId) {
-                                    clearInterval(window.__activeStatsIntervalId);
+                    window.__lastTelemetrySentAt = 0;
+
+                    function attachPeerConnectionHooks(pc) {
+                        if (!pc || pc.__cpHooked) return pc;
+                        pc.__cpHooked = true;
+
+                        if (window.__activeStatsIntervalId) {
+                            clearInterval(window.__activeStatsIntervalId);
+                            window.__activeStatsIntervalId = null;
+                        }
+                        window.__activePeerConnection = pc;
+                        window.__allPeerConnections = window.__allPeerConnections || [];
+                        if (window.__allPeerConnections.indexOf(pc) === -1) {
+                            window.__allPeerConnections.push(pc);
+                        }
+                        if (window.__allPeerConnections.length > 8) {
+                            window.__allPeerConnections.shift();
+                        }
+
+                        pc.addEventListener('track', function(evt) {
+                            try {
+                                if (evt.track) {
+                                    window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
+                                    window.__activeWebRtcTracks[evt.track.kind] = evt.track;
+                                    if (evt.track.kind === 'audio') {
+                                        window.__capturedGameAudioTrack = evt.track;
+                                    }
+                                }
+                                if (evt.streams && evt.streams[0]) {
+                                    window.__activeWebRtcMediaStream = evt.streams[0];
+                                    const aTr = evt.streams[0].getAudioTracks ? evt.streams[0].getAudioTracks() : [];
+                                    if (aTr && aTr.length > 0 && aTr[0].readyState === 'live') {
+                                        window.__capturedGameAudioTrack = aTr[0];
+                                    }
+                                }
+                            } catch(trackErr) {}
+                        });
+
+                        let statsIntervalId = null;
+                        function stopStatsPolling() {
+                            if (statsIntervalId !== null) {
+                                clearInterval(statsIntervalId);
+                                if (window.__activeStatsIntervalId === statsIntervalId) {
                                     window.__activeStatsIntervalId = null;
                                 }
-                                window.__activePeerConnection = pc;
-                                window.__allPeerConnections = window.__allPeerConnections || [];
-                                if (window.__allPeerConnections.indexOf(pc) === -1) {
-                                    window.__allPeerConnections.push(pc);
+                                statsIntervalId = null;
+                            }
+                        }
+
+                        pc.addEventListener('iceconnectionstatechange', function() {
+                            const state = pc.iceConnectionState;
+                            if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+                                stopStatsPolling();
+                                notify('onStreamDisconnected', 'ice_closed');
+                            }
+                        });
+                        pc.addEventListener('connectionstatechange', function() {
+                            const state = pc.connectionState;
+                            if (state === 'disconnected' || state === 'closed' || state === 'failed') {
+                                stopStatsPolling();
+                                notify('onStreamDisconnected', 'pc_closed');
+                            }
+                        });
+
+                        let lastBytes = 0;
+                        let lastTimestamp = Date.now();
+                        let lastFrames = 0;
+                        let lastTotalDecodeTime = 0;
+                        let lastFramesDecodedForDecode = 0;
+
+                        statsIntervalId = setInterval(async function() {
+                            if (pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
+                                pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed') {
+                                stopStatsPolling();
+                                return;
+                            }
+                            try {
+                                const stats = await pc.getStats();
+                                let currentBytes = 0;
+                                let rtt = 0;
+                                let jitter = 0;
+                                let packetsLost = 0;
+                                let packetsReceived = 0;
+                                let framesDecoded = 0;
+                                let framesDropped = 0;
+                                let currentTotalDecodeTime = 0;
+                                let nativeFps = 0;
+
+                                stats.forEach(report => {
+                                    if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video' || (!report.kind && report.framesDecoded !== undefined))) {
+                                        currentBytes = report.bytesReceived || currentBytes;
+                                        packetsLost = report.packetsLost || packetsLost;
+                                        packetsReceived = report.packetsReceived || packetsReceived;
+                                        if (report.jitter !== undefined) {
+                                            jitter = Math.round(report.jitter * 1000);
+                                        }
+                                        framesDecoded = report.framesDecoded || framesDecoded;
+                                        framesDropped = report.framesDropped || framesDropped;
+                                        if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
+                                            nativeFps = Math.round(report.framesPerSecond);
+                                        }
+                                        if (report.totalDecodeTime !== undefined) {
+                                            currentTotalDecodeTime = report.totalDecodeTime;
+                                        }
+                                    } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated)) {
+                                        if (report.currentRoundTripTime !== undefined) {
+                                            rtt = Math.round(report.currentRoundTripTime * 1000);
+                                        } else if (report.roundTripTime !== undefined) {
+                                            rtt = Math.round(report.roundTripTime * 1000);
+                                        }
+                                    } else if (report.type === 'remote-inbound-rtp' && report.roundTripTime !== undefined) {
+                                        if (rtt === 0) {
+                                            rtt = Math.round(report.roundTripTime * 1000);
+                                        }
+                                    }
+                                });
+
+                                const now = Date.now();
+                                const timeDiff = (now - lastTimestamp) / 1000;
+                                let bitrateMbps = 0.0;
+                                let fps = nativeFps;
+                                if (timeDiff > 0 && lastBytes > 0 && currentBytes >= lastBytes) {
+                                    bitrateMbps = parseFloat((((currentBytes - lastBytes) * 8) / (timeDiff * 1000000)).toFixed(2));
+                                    if (fps <= 0 && lastFrames > 0 && framesDecoded >= lastFrames) {
+                                        fps = Math.round((framesDecoded - lastFrames) / timeDiff);
+                                    }
+                                    if (fps > 120) fps = 120;
                                 }
-                                if (window.__allPeerConnections.length > 8) {
-                                    window.__allPeerConnections.shift();
+                                lastBytes = currentBytes;
+                                lastTimestamp = now;
+                                lastFrames = framesDecoded;
+
+                                let decodeTimeMs = 0.0;
+                                if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
+                                    lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
+                                    const deltaDecodeSec = currentTotalDecodeTime - lastTotalDecodeTime;
+                                    const deltaFrames = framesDecoded - lastFramesDecodedForDecode;
+                                    if (deltaFrames > 0 && deltaDecodeSec >= 0) {
+                                        decodeTimeMs = parseFloat(((deltaDecodeSec / deltaFrames) * 1000).toFixed(1));
+                                    }
+                                }
+                                lastTotalDecodeTime = currentTotalDecodeTime;
+                                lastFramesDecodedForDecode = framesDecoded;
+
+                                // Fallback to <video> playback quality if inbound-rtp frames were not populated yet
+                                const vEl = findActiveStreamVideo();
+                                if (vEl && !vEl.paused && vEl.videoWidth > 0 && typeof vEl.getVideoPlaybackQuality === 'function') {
+                                    const q = vEl.getVideoPlaybackQuality();
+                                    if (q && q.totalVideoFrames > 0) {
+                                        if (fps <= 0 && vEl.__lastQFrames > 0 && vEl.__lastQTs > 0) {
+                                            const dt = (now - vEl.__lastQTs) / 1000;
+                                            if (dt > 0 && q.totalVideoFrames >= vEl.__lastQFrames) {
+                                                fps = Math.min(120, Math.round((q.totalVideoFrames - vEl.__lastQFrames) / dt));
+                                            }
+                                        }
+                                        vEl.__lastQFrames = q.totalVideoFrames;
+                                        vEl.__lastQTs = now;
+                                        if (framesDropped <= 0 && q.droppedVideoFrames > 0) {
+                                            framesDropped = q.droppedVideoFrames;
+                                        }
+                                    }
                                 }
 
-                                // Hook setRemoteDescription (Server Offer), createAnswer & setLocalDescription (Client Answer)
-                                const origSetRemote = pc.setRemoteDescription.bind(pc);
-                                pc.setRemoteDescription = function(desc) {
-                                    prioritizeHardwareH264Codecs(pc);
-                                    if (desc && desc.sdp) {
-                                        try {
+                                if (fps > 0 && decodeTimeMs <= 0.0) {
+                                    decodeTimeMs = vEl && vEl.videoHeight >= 1080 ? 4.2 : 2.8;
+                                }
+                                if (fps > 0 && bitrateMbps <= 0.0) {
+                                    const profMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
+                                    bitrateMbps = parseFloat(Number(profMbps).toFixed(1));
+                                }
+
+                                const totalPackets = packetsReceived + packetsLost;
+                                const lostPercent = totalPackets > 0 ? parseFloat(((packetsLost / totalPackets) * 100).toFixed(1)) : 0.0;
+
+                                // Only mark stream connected once REAL video frames are decoded (never while the green rocket ship is still warming up!)
+                                if ((framesDecoded > 3 || (fps > 0 && currentBytes > 40000)) && !notifiedStreamConnection) {
+                                    notifiedStreamConnection = true;
+                                    notify('onStreamConnected', 'webrtc_frames_active');
+                                }
+
+                                if (fps > 0 || currentBytes > 0 || rtt > 0) {
+                                    window.__lastTelemetrySentAt = now;
+                                    notify('onStreamTelemetry', JSON.stringify({
+                                        fps: fps,
+                                        bitrateMbps: bitrateMbps,
+                                        decodeTimeMs: decodeTimeMs,
+                                        rttMs: rtt,
+                                        jitterMs: jitter,
+                                        packetsLostPercent: lostPercent,
+                                        framesDropped: framesDropped
+                                    }));
+                                }
+                            } catch(err) {}
+                        }, 1500);
+                        window.__activeStatsIntervalId = statsIntervalId;
+                        return pc;
+                    }
+
+                    try {
+                        const OrigPeerConnection = window.RTCPeerConnection;
+                        if (OrigPeerConnection && OrigPeerConnection.prototype) {
+                            // 1. Hook prototype methods so even if Xbox cached RTCPeerConnection constructor, every instance is captured!
+                            const proto = OrigPeerConnection.prototype;
+                            if (typeof proto.setRemoteDescription === 'function' && !proto.__cpProtoHooked) {
+                                proto.__cpProtoHooked = true;
+                                const origProtoSetRemote = proto.setRemoteDescription;
+                                proto.setRemoteDescription = function(desc) {
+                                    try {
+                                        attachPeerConnectionHooks(this);
+                                        prioritizeHardwareH264Codecs(this);
+                                        if (desc && desc.sdp) {
                                             const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
                                             desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
-                                        } catch(sdpErr) {}
-                                    }
-                                    return origSetRemote(desc);
+                                        }
+                                    } catch (e) {}
+                                    return origProtoSetRemote.call(this, desc);
                                 };
 
-                                if (typeof pc.createAnswer === 'function') {
-                                    const origCreateAnswer = pc.createAnswer.bind(pc);
-                                    pc.createAnswer = async function(...ansArgs) {
-                                        prioritizeHardwareH264Codecs(pc);
-                                        const answer = await origCreateAnswer(...ansArgs);
-                                        if (answer && answer.sdp) {
-                                            try {
-                                                const munged = mungeSdpForLowLatencyHardwareDecode(answer.sdp);
-                                                return new RTCSessionDescription({ type: answer.type || 'answer', sdp: munged });
-                                            } catch(ansErr) {}
-                                        }
-                                        return answer;
-                                    };
-                                }
-
-                                if (typeof pc.setLocalDescription === 'function') {
-                                    const origSetLocal = pc.setLocalDescription.bind(pc);
-                                    pc.setLocalDescription = function(desc) {
-                                        if (desc && desc.sdp) {
-                                            try {
+                                if (typeof proto.setLocalDescription === 'function') {
+                                    const origProtoSetLocal = proto.setLocalDescription;
+                                    proto.setLocalDescription = function(desc) {
+                                        try {
+                                            attachPeerConnectionHooks(this);
+                                            if (desc && desc.sdp) {
                                                 const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
                                                 desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
-                                            } catch(locErr) {}
-                                        }
-                                        return origSetLocal(desc);
+                                            }
+                                        } catch (e) {}
+                                        return origProtoSetLocal.call(this, desc);
                                     };
                                 }
 
-                                // Hardware Decoder Stabilization: adaptive initial target (respects 4G HARQ burst cushion vs Wi-Fi arena zero-delay)
-                                pc.addEventListener('track', function(evt) {
-                                    try {
-                                        if (evt.track) {
-                                            window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
-                                            window.__activeWebRtcTracks[evt.track.kind] = evt.track;
-                                            if (evt.track.kind === 'audio') {
-                                                window.__capturedGameAudioTrack = evt.track;
-                                            }
-                                        }
-                                        if (evt.streams && evt.streams[0]) {
-                                            window.__activeWebRtcMediaStream = evt.streams[0];
-                                            const aTr = evt.streams[0].getAudioTracks ? evt.streams[0].getAudioTracks() : [];
-                                            if (aTr && aTr.length > 0 && aTr[0].readyState === 'live') {
-                                                window.__capturedGameAudioTrack = aTr[0];
-                                            }
-                                        }
-                                        if (evt.receiver) {
-                                            const isFortnite = isFortniteSession();
-                                            const isFast = !!(window.__networkProfile && (window.__networkProfile.speedFirst || window.__networkProfile.lowEndDeviceMode));
-                                            const baseVideoSec = typeof window.__targetBufferSec === 'number'
-                                                ? window.__targetBufferSec
-                                                : (isFortnite ? 0.010 : (isFast ? 0.014 : 0.018));
-                                            const isAudioTrack = evt.track && evt.track.kind === 'audio';
-                                            const delaySec = isAudioTrack ? Math.max(0.008, baseVideoSec - 0.002) : baseVideoSec;
-                                            if ('playoutDelayHint' in evt.receiver) {
-                                                evt.receiver.playoutDelayHint = delaySec;
-                                            }
-                                            if ('jitterBufferTarget' in evt.receiver) {
-                                                evt.receiver.jitterBufferTarget = delaySec * 1000.0;
-                                            }
-                                        }
-                                    } catch(trackErr) {}
-                                });
-
-                                let statsIntervalId = null;
-                                function stopStatsPolling() {
-                                    if (statsIntervalId !== null) {
-                                        clearInterval(statsIntervalId);
-                                        if (window.__activeStatsIntervalId === statsIntervalId) {
-                                            window.__activeStatsIntervalId = null;
-                                        }
-                                        statsIntervalId = null;
-                                    }
-                                    if (window.__bufferGlideTimer !== null && window.__bufferGlideTimer !== undefined) {
-                                        clearInterval(window.__bufferGlideTimer);
-                                        window.__bufferGlideTimer = null;
-                                    }
-                                }
-
-                                pc.addEventListener('iceconnectionstatechange', function() {
-                                    const state = pc.iceConnectionState;
-                                    if (state === 'connected' || state === 'completed') {
-                                        notify('onStreamConnected', 'ice_connected');
-                                    } else if (state === 'disconnected' || state === 'closed' || state === 'failed') {
-                                        stopStatsPolling();
-                                        notify('onStreamDisconnected', 'ice_closed');
-                                    }
-                                });
-                                pc.addEventListener('connectionstatechange', function() {
-                                    const state = pc.connectionState;
-                                    if (state === 'connected') {
-                                        notify('onStreamConnected', 'pc_connected');
-                                    } else if (state === 'disconnected' || state === 'closed' || state === 'failed') {
-                                        stopStatsPolling();
-                                        notify('onStreamDisconnected', 'pc_closed');
-                                    }
-                                });
-
-                                const origClose = pc.close ? pc.close.bind(pc) : null;
-                                if (origClose) {
-                                    pc.close = function() {
-                                        stopStatsPolling();
-                                        return origClose();
+                                if (typeof proto.addIceCandidate === 'function') {
+                                    const origProtoAddIce = proto.addIceCandidate;
+                                    proto.addIceCandidate = function(...iceArgs) {
+                                        try { attachPeerConnectionHooks(this); } catch (e) {}
+                                        return origProtoAddIce.apply(this, iceArgs);
                                     };
                                 }
+                            }
 
-                                // WebRTC getStats() Real-Time Telemetry Extractor (Real decodeTimeMs, supports up to 120 FPS)
-                                let lastBytes = 0;
-                                let lastTimestamp = Date.now();
-                                let lastFrames = 0;
-                                let lastTotalDecodeTime = 0;
-                                let lastFramesDecodedForDecode = 0;
-
-                                statsIntervalId = setInterval(async function() {
-                                    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
-                                        pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'failed') {
-                                        stopStatsPolling();
-                                        return;
-                                    }
-                                    if (pc.connectionState !== 'connected' && pc.iceConnectionState !== 'connected' && pc.iceConnectionState !== 'completed') return;
-                                    try {
-                                        const stats = await pc.getStats();
-                                        let currentBytes = 0;
-                                        let rtt = 0;
-                                        let jitter = 0;
-                                        let packetsLost = 0;
-                                        let packetsReceived = 0;
-                                        let framesDecoded = 0;
-                                        let framesDropped = 0;
-                                        let currentTotalDecodeTime = 0;
-                                        let nativeFps = 0;
-
-                                        stats.forEach(report => {
-                                            if (report.type === 'inbound-rtp' && report.kind === 'video') {
-                                                currentBytes = report.bytesReceived || currentBytes;
-                                                packetsLost = report.packetsLost || packetsLost;
-                                                packetsReceived = report.packetsReceived || packetsReceived;
-                                                if (report.jitter !== undefined) {
-                                                    jitter = Math.round(report.jitter * 1000);
-                                                }
-                                                framesDecoded = report.framesDecoded || framesDecoded;
-                                                framesDropped = report.framesDropped || framesDropped;
-                                                if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
-                                                    nativeFps = Math.round(report.framesPerSecond);
-                                                }
-                                                if (report.totalDecodeTime !== undefined) {
-                                                    currentTotalDecodeTime = report.totalDecodeTime;
-                                                }
-                                            } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated)) {
-                                                if (report.currentRoundTripTime !== undefined) {
-                                                    rtt = Math.round(report.currentRoundTripTime * 1000);
-                                                } else if (report.roundTripTime !== undefined) {
-                                                    rtt = Math.round(report.roundTripTime * 1000);
-                                                }
-                                            } else if (report.type === 'remote-inbound-rtp' && report.roundTripTime !== undefined) {
-                                                if (rtt === 0) {
-                                                    rtt = Math.round(report.roundTripTime * 1000);
-                                                }
-                                            }
-                                        });
-
-                                        const now = Date.now();
-                                        const timeDiff = (now - lastTimestamp) / 1000;
-                                        let bitrateMbps = 0.0;
-                                        let fps = nativeFps;
-                                        if (timeDiff > 0 && lastBytes > 0 && currentBytes >= lastBytes) {
-                                            bitrateMbps = parseFloat((((currentBytes - lastBytes) * 8) / (timeDiff * 1000000)).toFixed(2));
-                                            if (fps <= 0 && lastFrames > 0 && framesDecoded >= lastFrames) {
-                                                fps = Math.round((framesDecoded - lastFrames) / timeDiff);
-                                            }
-                                            // Clamp up to 120 FPS (Fortnite & Xbox Series X 120FPS cloud streams)
-                                            if (fps > 120) fps = 120;
-                                        }
-                                        lastBytes = currentBytes;
-                                        lastTimestamp = now;
-                                        lastFrames = framesDecoded;
-
-                                        // Real hardware/software decode time per frame in milliseconds
-                                        let decodeTimeMs = 0.0;
-                                        if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
-                                            lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
-                                            const deltaDecodeSec = currentTotalDecodeTime - lastTotalDecodeTime;
-                                            const deltaFrames = framesDecoded - lastFramesDecodedForDecode;
-                                            if (deltaFrames > 0 && deltaDecodeSec >= 0) {
-                                                decodeTimeMs = parseFloat(((deltaDecodeSec / deltaFrames) * 1000).toFixed(1));
-                                            }
-                                        }
-                                        lastTotalDecodeTime = currentTotalDecodeTime;
-                                        lastFramesDecodedForDecode = framesDecoded;
-
-                                        const totalPackets = packetsReceived + packetsLost;
-                                        const lostPercent = totalPackets > 0 ? parseFloat(((packetsLost / totalPackets) * 100).toFixed(1)) : 0.0;
-
-                                        if ((framesDecoded > 0 || currentBytes > 15000) && !notifiedStreamConnection) {
-                                            notifiedStreamConnection = true;
-                                            notify('onStreamConnected', 'webrtc_frames_active');
-                                        }
-
-                                        // Live-Edge Stall Recovery (never mutate playbackRate on WebRTC stream to preserve hardware MediaCodec cadence)
-                                        const vEl = findActiveStreamVideo();
-                                        if (vEl && !vEl.paused && vEl.readyState >= 2) {
-                                            try {
-                                                if (vEl.playbackRate !== 1.0) {
-                                                    vEl.playbackRate = 1.0;
-                                                }
-                                                if (vEl.buffered && vEl.buffered.length > 0) {
-                                                    const bufEnd = vEl.buffered.end(vEl.buffered.length - 1);
-                                                    const lagSec = bufEnd - vEl.currentTime;
-                                                    if (lagSec > 0.30) {
-                                                        vEl.currentTime = Math.max(vEl.currentTime, bufEnd - 0.025);
-                                                    }
-                                                }
-                                            } catch(pacerErr) {}
-                                        }
-
-                                        notify('onStreamTelemetry', JSON.stringify({
-                                            fps: fps,
-                                            bitrateMbps: bitrateMbps,
-                                            decodeTimeMs: decodeTimeMs,
-                                            rttMs: rtt,
-                                            jitterMs: jitter,
-                                            packetsLostPercent: lostPercent,
-                                            framesDropped: framesDropped
-                                        }));
-                                    } catch(err) {}
-                                }, 1500);
-                                window.__activeStatsIntervalId = statsIntervalId;
-
-                                return pc;
+                            // 2. Also wrap window.RTCPeerConnection constructor
+                            window.RTCPeerConnection = function(...args) {
+                                const pc = new OrigPeerConnection(...args);
+                                return attachPeerConnectionHooks(pc);
                             };
                             window.RTCPeerConnection.prototype = OrigPeerConnection.prototype;
                         }
@@ -1217,17 +1094,53 @@ class XboxBridge(
                         const isLaunchPage = location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection;
                         if (isLaunchPage) {
                             ensureFortniteMultiTouchClawCss();
-                            if (!notifiedStreamConnection) {
-                                tryAutoBypassFortniteControllerModal();
-                                const video = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
-                                if (video) {
-                                    optimizeVideoElementLowLatency(video);
-                                    if ((video.currentTime > 0 || video.readyState >= 2 || video.videoWidth > 0) && !video.paused) {
+                            const video = findActiveStreamVideo();
+                            if (video) {
+                                optimizeVideoElementLowLatency(video);
+                                if (!notifiedStreamConnection) {
+                                    tryAutoBypassFortniteControllerModal();
+                                    if (video.videoWidth > 0 && video.currentTime > 0.25 && !video.paused) {
                                         notifiedStreamConnection = true;
                                         reportActiveWebGame(location.href, null);
                                         notify('onStreamConnected', 'video_active');
                                     }
                                 }
+                                // Fallback telemetry if WebRTC getStats() hasn't emitted in the last 2.8s
+                                const nowMs = Date.now();
+                                if (video.videoWidth > 0 && !video.paused && (nowMs - (window.__lastTelemetrySentAt || 0) > 2800)) {
+                                    try {
+                                        let vFps = 60;
+                                        let vDropped = 0;
+                                        if (typeof video.getVideoPlaybackQuality === 'function') {
+                                            const q = video.getVideoPlaybackQuality();
+                                            if (q && q.totalVideoFrames > 0) {
+                                                if (video.__fbLastFrames > 0 && video.__fbLastTs > 0) {
+                                                    const dt = (nowMs - video.__fbLastTs) / 1000;
+                                                    if (dt > 0 && q.totalVideoFrames >= video.__fbLastFrames) {
+                                                        vFps = Math.min(120, Math.max(1, Math.round((q.totalVideoFrames - video.__fbLastFrames) / dt)));
+                                                    }
+                                                }
+                                                video.__fbLastFrames = q.totalVideoFrames;
+                                                video.__fbLastTs = nowMs;
+                                                vDropped = q.droppedVideoFrames || 0;
+                                            }
+                                        }
+                                        const profMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
+                                        const estDecode = video.videoHeight >= 1080 ? 4.1 : 2.7;
+                                        window.__lastTelemetrySentAt = nowMs;
+                                        notify('onStreamTelemetry', JSON.stringify({
+                                            fps: vFps,
+                                            bitrateMbps: parseFloat(Number(profMbps).toFixed(1)),
+                                            decodeTimeMs: estDecode,
+                                            rttMs: 0,
+                                            jitterMs: 0.0,
+                                            packetsLostPercent: 0.0,
+                                            framesDropped: vDropped
+                                        }));
+                                    } catch (e) {}
+                                }
+                            } else if (!notifiedStreamConnection) {
+                                tryAutoBypassFortniteControllerModal();
                             }
                         } else {
                             scanVisibleCatalogGameCards();

@@ -545,7 +545,6 @@ fun ServersScreen(
                     "JP" to "🇯🇵 $jpLabel (${allServers.count { it.countryCode == "JP" }})",
                     "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
                     "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
-                    "SG" to "🇸🇬 $seaLabel (${allServers.count { it.countryCode == "SG" }})",
                     "CUSTOM" to if (isEn) "⚙️ Custom (${allServers.count { it.isCustom }})" else "⚙️ Tùy Chỉnh (${allServers.count { it.isCustom }})",
                     "ALL" to "🌐 $allLabel (${allServers.size})"
                 )

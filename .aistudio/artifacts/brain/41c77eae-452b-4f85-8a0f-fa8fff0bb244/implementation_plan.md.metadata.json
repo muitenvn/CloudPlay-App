@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch loại bỏ các nút chỉnh sửa dành cho lập trình viên và chuyển toàn bộ câu chữ trong ứng dụng sang ngôn ngữ người dùng ngắn gọn, dễ hiểu.",
-  "updatedAt":  "2026-10-24T11:09:21.094859933Z",
+  "summary":  "Kế hoạch triển khai tính năng tự động kiểm tra bản cập nhật mới từ GitHub Releases (muitenvn/CloudPlay-App) định kỳ 24 giờ kèm hộp thoại thông báo khi mở ứng dụng và nút Kiểm tra ngay trong Cài đặt.",
+  "updatedAt":  "2026-10-24T13:07:32.288514214Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

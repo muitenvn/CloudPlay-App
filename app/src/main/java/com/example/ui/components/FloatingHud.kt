@@ -574,9 +574,6 @@ fun FloatingHud(
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
                     val fpsPrefix = if (telemetry.fps > 0) "${telemetry.fps}fps • " else ""
-                    val liveResTag = adaptiveQualityState.currentStep.tier.resolutionTag
-                    val liveMbpsInt = adaptiveQualityState.smoothBitrateMbps.roundToInt().coerceIn(1, 20)
-                    val resBitrateBadge = "$liveResTag/${liveMbpsInt}M"
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -597,7 +594,7 @@ fun FloatingHud(
                                 .background(pingColor)
                         )
                         Text(
-                            text = "$fpsPrefix$pingText • $resBitrateBadge",
+                            text = "$fpsPrefix$pingText",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.5.sp,
@@ -709,38 +706,6 @@ fun FloatingHud(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                        }
-
-                        // 1.5. 1-Tap Resolution & Bitrate Quick Pill (Cycles Auto -> 720p -> 900p -> 1080p -> 1080p+)
-                        val compactResLabel = when (config.cellularMode) {
-                            com.example.data.CellularOptimizationMode.AUTO -> "Auto•${adaptiveQualityState.currentStep.tier.resolutionTag}"
-                            com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "720p"
-                            com.example.data.CellularOptimizationMode.MEDIUM -> "900p"
-                            com.example.data.CellularOptimizationMode.HIGH -> "1080p"
-                            com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "1080p+"
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = XboxNeonGreen.copy(alpha = 0.20f),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    val modes = com.example.data.CellularOptimizationMode.entries
-                                    val nextIdx = (modes.indexOf(config.cellularMode) + 1) % modes.size
-                                    onSelectCellularMode(modes[nextIdx])
-                                }
-                                .testTag("hud_quality_quick_button")
-                        ) {
-                            Text(
-                                text = compactResLabel,
-                                color = XboxNeonGreen,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.5.dp),
-                                maxLines = 1
-                            )
                         }
 
                         // 2. Controller Toggle (Icon only)

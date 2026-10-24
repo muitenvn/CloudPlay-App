@@ -836,8 +836,9 @@ object VpnManager {
     fun switchToDirectNetwork(context: Context, triggerSource: String = "Game stream detected") {
         if (_state.value.mode == NetworkMode.DIRECT_NETWORK) return
 
+        // Only clear WebView proxy if PROXY_TUNNEL actually applied a ProxyConfig override;
+        // do NOT stop XboxCloudVpnService so Android maintains foreground CPU/Network scheduling priority during gameplay.
         clearWebViewProxy()
-        XboxCloudVpnService.stopVpn(context)
 
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
         _state.value = _state.value.copy(
@@ -936,6 +937,7 @@ object VpnManager {
                 }
 
                 val proxyConfig = builder.build()
+                isWebViewProxyOverrideActive = true
                 ProxyController.getInstance().setProxyOverride(proxyConfig, proxyExecutor) {
                     Log.d(TAG, "WebView proxy applied: ${ruleFor(primaryServer)} with ${backups.size} fallbacks")
                 }
@@ -945,7 +947,12 @@ object VpnManager {
         }
     }
 
+    @Volatile
+    private var isWebViewProxyOverrideActive: Boolean = false
+
     private fun clearWebViewProxy() {
+        if (!isWebViewProxyOverrideActive) return
+        isWebViewProxyOverrideActive = false
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             try {
                 ProxyController.getInstance().clearProxyOverride(proxyExecutor) {

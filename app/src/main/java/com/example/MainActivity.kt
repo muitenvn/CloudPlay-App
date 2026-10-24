@@ -243,6 +243,8 @@ fun MainContent(
     }
 
     val config by SettingsRepository.config.collectAsState()
+    val updateState by com.example.data.UpdateChecker.state.collectAsState()
+    val showUpdateDialog by com.example.data.UpdateChecker.showUpdateDialog.collectAsState()
 
     // Mandatory Terms of Service & Open Source Disclaimer (Better-xCloud MIT)
     if (!config.userAcceptedTerms) {
@@ -255,6 +257,23 @@ fun MainContent(
             },
             isDismissible = false
         )
+    } else {
+        LaunchedEffect(config.autoCheckUpdatesOnLaunch) {
+            if (config.autoCheckUpdatesOnLaunch) {
+                com.example.data.UpdateChecker.checkOnAppLaunchIfNeeded(context)
+            }
+        }
+        val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
+        if (showUpdateDialog && availableUpdate != null) {
+            com.example.ui.components.UpdateAvailableDialog(
+                currentVersion = availableUpdate.currentVersion,
+                latestVersion = availableUpdate.latestVersion,
+                releaseUrl = availableUpdate.releaseUrl,
+                releaseNotes = availableUpdate.releaseNotes,
+                isEn = config.isEnglishUI(),
+                onDismiss = { com.example.data.UpdateChecker.dismissUpdateDialog() }
+            )
+        }
     }
 
     LaunchedEffect(Unit) {

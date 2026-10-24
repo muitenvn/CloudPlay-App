@@ -45,6 +45,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -969,38 +970,145 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 6: CHIA SẺ ỨNG DỤNG & MÃ QR
+        // NHÓM 6: CẬP NHẬT ỨNG DỤNG & CHIA SẺ MÃ QR
         // =========================================================================
         item {
-            SettingsCard(title = if (isEn) "Share App & QR Code" else "Chia sẻ ứng dụng & Mã QR") {
-                Text(
-                    text = if (isEn) {
-                        "Show QR code or copy the download link to share CloudPlay with friends."
+            val updateState by com.example.data.UpdateChecker.state.collectAsState()
+            val currentVersionName = remember { com.example.data.UpdateChecker.getCurrentVersionName(context) }
+
+            SettingsCard(title = if (isEn) "App Updates & Share QR" else "Cập nhật ứng dụng & Chia sẻ QR") {
+                SettingToggleRow(
+                    title = if (isEn) "Check for updates on launch" else "Kiểm tra bản mới khi mở app",
+                    subtitle = if (isEn) {
+                        "Checks GitHub at most once every 24 hours (v$currentVersionName)"
                     } else {
-                        "Hiện mã QR hoặc sao chép link tải ứng dụng để gửi nhanh cho bạn bè."
+                        "Tự kiểm tra ngầm tối đa 1 lần mỗi 24 giờ (Đang dùng v$currentVersionName)"
                     },
-                    color = TextSecondary,
-                    fontSize = 11.5.sp
+                    checked = config.autoCheckUpdatesOnLaunch,
+                    onCheckedChange = { SettingsRepository.updateAutoCheckUpdatesOnLaunch(it) },
+                    activeColor = XboxNeonGreen,
+                    switchTestTag = "auto_check_updates_switch"
                 )
-                Button(
-                    onClick = { showWebPortalDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("open_web_portal_settings_btn"),
-                    colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                    shape = RoundedCornerShape(10.dp)
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    OutlinedButton(
+                        onClick = { com.example.data.UpdateChecker.checkNowManual(context) },
+                        enabled = updateState !is com.example.data.UpdateCheckState.Checking,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("check_update_now_btn"),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.65f))
                     ) {
-                        Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(17.dp))
                         Text(
-                            text = if (isEn) "Open QR Code & Download Link" else "Mở Mã QR & Link Tải Ứng Dụng",
+                            text = when (updateState) {
+                                is com.example.data.UpdateCheckState.Checking ->
+                                    if (isEn) "Checking..." else "Đang kiểm tra..."
+                                else ->
+                                    if (isEn) "Check now" else "Kiểm tra ngay"
+                            },
+                            color = XboxNeonGreen,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
                     }
+
+                    Button(
+                        onClick = { showWebPortalDialog = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("open_web_portal_settings_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Text(
+                                text = if (isEn) "Share & QR" else "Mã QR & Chia sẻ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+
+                when (val st = updateState) {
+                    is com.example.data.UpdateCheckState.UpToDate -> {
+                        Text(
+                            text = if (isEn) {
+                                "✓ Up to date (v${st.currentVersion})"
+                            } else {
+                                "✓ Đã là bản mới nhất (v${st.currentVersion})"
+                            },
+                            color = XboxNeonGreen,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.testTag("update_check_status_text")
+                        )
+                    }
+                    is com.example.data.UpdateCheckState.UpdateAvailable -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(XboxNeonGreen.copy(alpha = 0.14f))
+                                .clickable {
+                                    try {
+                                        val intent = android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse(st.releaseUrl)
+                                        ).apply {
+                                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                                .padding(horizontal = 10.dp, vertical = 7.dp)
+                                .testTag("update_check_status_text"),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isEn) {
+                                    "New version ${st.latestVersion} available · Tap to download"
+                                } else {
+                                    "Có bản ${st.latestVersion} · Bấm để mở trang tải"
+                                },
+                                color = XboxNeonGreen,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "↗",
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    is com.example.data.UpdateCheckState.CheckFailed -> {
+                        if (st.isManual) {
+                            Text(
+                                text = if (isEn) {
+                                    "Could not check right now. Current version: v${st.currentVersion}"
+                                } else {
+                                    "Chưa kết nối được máy chủ kiểm tra. Bản hiện tại: v${st.currentVersion}"
+                                },
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                modifier = Modifier.testTag("update_check_status_text")
+                            )
+                        }
+                    }
+                    else -> {}
                 }
             }
         }

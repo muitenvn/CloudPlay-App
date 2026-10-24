@@ -1,49 +1,92 @@
-# Kế Hoạch Đơn Giản Hóa Ngôn Ngữ Người Dùng & Ẩn Các Tùy Chỉnh Kỹ Thuật
+# Tính Năng Tự Động Kiểm Tra Bản Cập Nhật (CloudPlay)
 
-## 1. Mục tiêu
-Chuyển toàn bộ câu chữ trong ứng dụng từ giọng văn kỹ thuật / lập trình viên sang **ngôn ngữ người dùng phổ thông, giải thích ngắn gọn**, đồng thời **ẩn các ô chỉnh sửa chỉ dành cho lập trình viên** theo đúng lựa chọn của bạn.
+Bổ sung cơ chế tự động kiểm tra phiên bản mới từ GitHub Releases (`muitenvn/CloudPlay-App`) mỗi 24 giờ khi mở ứng dụng, hiển thị hộp thoại thông báo phiên bản mới và cung cấp nút kiểm tra thủ công trong mục Cài đặt.
 
----
+## User Review & Critical Decisions
 
-## 2. Ẩn & Rút gọn các tùy chỉnh dành cho lập trình viên
+> [!IMPORTANT]
+> Dưới đây là các quyết định thiết kế đã được xác nhận theo lựa chọn của bạn:
 
-### 2.1. Hộp thoại Chia sẻ ứng dụng & Mã QR (`SettingsScreen.kt` & `WebDownloadPortalDialog.kt`)
-- **Ẩn hoàn toàn Tab "Đổi Link & SEO"** (ô nhập GitHub Repo Slug, ô sửa link APK, ô sửa URL web, hướng dẫn cấu hình GitHub Pages `/docs/index.html`).
-- **Đổi tên mục trong Cài đặt:** Từ *"Trang Web Tải App (SEO) & Chia Sẻ QR"* kèm mô tả `/docs/index.html` thành **"Chia sẻ ứng dụng & Mã QR"** (*"Quét mã QR hoặc gửi link tải ứng dụng cho bạn bè"*).
-- **Rút gọn hộp thoại Chia sẻ:** Chỉ giữ mã QR, link trang web tải ứng dụng, nút Sao chép link và nút Chia sẻ nhanh (kèm tab xem trước trang giới thiệu nếu cần). Không nhắc đến SEO, `/docs`, hay GitHub Pages.
-
-### 2.2. Mục Vùng ngôn ngữ trang Xbox (`SettingsScreen.kt`)
-- **Ẩn ô nhập văn bản thủ công** (`Mã vùng hoặc link Xbox` / `xbox.com/en-US` và 2 nút *Áp dụng* / *Đặt en-US*).
-- Chỉ giữ danh sách chọn nhanh bằng 1 chạm: **Mặc định (Tiếng Anh - Mỹ)** và các ngôn ngữ phổ biến (Anh, Nhật, Hàn, Trung...).
-
-### 2.3. Mục Quay màn hình (`SettingsScreen.kt`)
-- **Ẩn phần chọn công cụ ghi hình kỹ thuật** (`RecordingCaptureEngine` / WebView Canvas vs MediaProjection).
-- Chỉ giữ lựa chọn **Độ nét video** (`720p Tiết kiệm` / `1080p Sắc nét`) và công tắc **Giữ game mượt khi đang quay**.
+- **Quyết định đã xác nhận 1 (Cách hiển thị thông báo)**: Hiển thị **Hộp thoại thông báo cập nhật** ngay khi mở ứng dụng nếu phát hiện phiên bản trên GitHub mới hơn phiên bản đang cài đặt, kèm nút mở trang tải bản cập nhật hoặc bỏ qua.
+- **Quyết định đã xác nhận 2 (Tần suất & điều khiển)**: Tự động kiểm tra ngầm tối đa **1 lần mỗi 24 giờ** khi mở ứng dụng (có công tắc bật/tắt trong Cài đặt, mặc định bật) kèm nút **"Kiểm tra ngay"** trong mục Cài đặt.
 
 ---
 
-## 3. Viết lại câu chữ ngắn gọn, dễ hiểu cho người dùng phổ thông
+## 1. Overview & Core Concept
 
-### 3.1. Cài đặt & Cấu hình (`SettingsScreen.kt`, `AppSettings.kt`, `NetworkOptimizer.kt`)
-- Thay các thuật ngữ kỹ thuật bằng giải thích ngắn gọn:
-  - *"Giảm tải GPU / Tắt hiệu ứng nền nặng"* ➔ **"Giảm hiệu ứng nền"** (*"Giúp máy đỡ nóng và đỡ giật hơn"*).
-  - *"Làm nét hình ảnh (Clarity Boost)"* ➔ **"Tăng độ nét hình ảnh"** (*"Làm rõ chi tiết nhân vật và khung cảnh"*).
-  - *"Vùng chết tâm cần (Deadzone)"* ➔ **"Độ trễ tâm cần xoay"** (*"Chỉnh độ nhạy khi bắt đầu đẩy cần"*).
-  - *"Giải mã phần cứng GPU dưới 4ms / WebRTC SDP / Playout Buffer"* ➔ **"Phản hồi nhanh, tiết kiệm pin và dữ liệu di động"**.
-
-### 3.2. Kho Game & Trang chủ (`GameLibraryScreen.kt`, `HomeScreen.kt`, `GameOptimizationProfile.kt`)
-- Đổi *"KHO GAME XBOX CLOUD VAULT"* ➔ **"KHO GAME XBOX CLOUD"**.
-- Đổi các dòng nhắc kỹ thuật như *"Đang tự động tải thông tin game (Không tải ảnh, 0 tốn dung lượng ảnh / 0 MB image data)"* ➔ **"Đang cập nhật danh sách game..."** và **"Chạm để tìm thêm trên Xbox Store"**.
-- Đổi nút *"Quét TT / Sync Info"* ➔ **"Làm mới"**.
-- Trong hồ sơ game (`GameOptimizationProfile.kt`): Bỏ các từ kỹ thuật như *"WebRTC Playout"*, *"Opus 128kbps CBR + In-Band FEC"*, *"SDP"*; thay bằng mô tả ngắn gọn: **"Giảm độ trễ thao tác"**, **"Âm thanh bước chân rõ nét"**, **"Chuyển nhanh Cảm ứng & Tay cầm"**.
-
-### 3.3. Màn hình Chơi game & Thanh HUD (`FloatingHud.kt`, `CloudBrowserScreen.kt`)
-- Trong bảng điều khiển nhanh và thông số mở rộng:
-  - Đổi *"Decode"* ➔ **"Xử lý hình"**; *"Packet Loss"* ➔ **"Mất gói"**; *"Jitter"* ➔ **"Độ ổn định"**.
-  - Các thông báo trạng thái mạng ghi ngắn gọn: **"Mạng ổn định"**, **"Mạng yếu – Đã tự hạ độ nét để giữ mượt"**.
+- **Chức năng chính**:
+  - Khi mở ứng dụng (sau khi người dùng đã đồng ý điều khoản sử dụng), ứng dụng kiểm tra ngầm qua API GitHub Releases (`https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest`, timeout 8 giây) nếu đã qua 24 giờ kể từ lần kiểm tra trước.
+  - So sánh phiên bản theo từng cấp số (`X.Y.Z`, ví dụ `1.2.9 < 1.2.10`, tự bỏ tiền tố `v`) với phiên bản hiện tại của ứng dụng.
+  - Khi có bản mới, hiển thị hộp thoại thông báo gọn gàng cho biết số phiên bản mới, tóm tắt ngắn gọn và nút mở trang phát hành trên trình duyệt để tải về.
+  - Khi mạng lỗi, hết giới hạn API hoặc dữ liệu không hợp lệ tijdens kiểm tra tự động: xử lý im lặng, không làm gián đoạn trải nghiệm người dùng.
+- **Đối tượng sử dụng**: Người dùng CloudPlay muốn biết ngay khi có bản APK mới được phát hành trên GitHub mà không cần tự vào web tìm kiếm.
+- **Giá trị mang lại**: Luôn cập nhật các bản vá tối ưu mạng, tay cầm và tính năng mới nhất một cách chủ động, nhẹ nhàng, không tốn tài nguyên nền và không yêu cầu thêm quyền truy cập hệ thống.
 
 ---
 
-## 4. Kiểm tra & Xác nhận
-- Giữ nguyên toàn bộ tính năng cốt lõi (tự động hạ giải 4G/5G, VPN thông minh, tay cầm ảo, dịch tiếng Việt, lọc game).
-- Biên dịch ứng dụng (`compile_applet`) đảm bảo không phát sinh lỗi.
+## 2. User Experience & Visual Design
+
+- **Luồng trải nghiệm chính**:
+  1. **Khi mở ứng dụng (Tự động mỗi 24 giờ)**:
+     - Nếu công tắc *"Tự kiểm tra bản mới khi mở ứng dụng"* đang bật và lần kiểm tra gần nhất cách đây hơn 24 giờ, ứng dụng gọi API GitHub ở luồng nền.
+     - Nếu có bản mới hơn (và người dùng chưa bấm "Để sau" cho phiên bản đó trong phiên hiện tại), một **Hộp thoại thông báo cập nhật** sẽ xuất hiện.
+     - Người dùng có thể bấm **"Xem & Tải bản mới"** (mở trang phát hành GitHub bằng trình duyệt) hoặc **"Để sau"** (đóng hộp thoại).
+  2. **Kiểm tra thủ công trong Cài đặt**:
+     - Trong mục **Cài đặt**, thẻ **Cập nhật ứng dụng** hiển thị phiên bản hiện tại, công tắc bật/tắt tự động kiểm tra khi mở ứng dụng và nút **"Kiểm tra ngay"**.
+     - Khi bấm **"Kiểm tra ngay"**, ứng dụng kiểm tra ngay lập tức (bỏ qua giới hạn 24 giờ), hiển thị trạng thái ngắn gọn ngay bên dưới (*"Đang kiểm tra..."*, *"Đã là bản mới nhất (vX.Y.Z)"*, hoặc *"Có bản mới vX.Y.Z"* kèm mở hộp thoại cập nhật).
+- **Phong cách thiết kế & Giao diện**:
+  - **Đồng bộ giao diện Xbox Dark Neon**: Nền tối (`#11161D`), viền xanh neon (`#22C55E`), nút hành động chính màu xanh Xbox nổi bật, chữ phân cấp rõ ràng, giải thích ngắn gọn dễ hiểu cho người dùng phổ thông (hỗ trợ cả Tiếng Việt và Tiếng Anh).
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Quyết định 1: Mở trang tải bằng trình duyệt thay vì tự tải ngầm APK**
+  - *Cách tiếp cận*: Khi người dùng chọn cập nhật trên hộp thoại, mở trang phát hành chính thức trên trình duyệt.
+  - *Lý do*: Không cần xin quyền nhạy cảm `REQUEST_INSTALL_PACKAGES` (tránh cảnh báo bảo mật của Android và tuân thủ chính sách an toàn), đồng thời giúp người dùng xem rõ thông tin bản phát hành trên GitHub.
+- **Quyết định 2: So sánh phiên bản theo cấp số (Semantic Version Tuple) và giới hạn 24 giờ**
+  - *Cách tiếp cận*: Tách chuỗi phiên bản (`1.2.10` -> `[1, 2, 10]`) để so sánh chính xác theo số học và lưu mốc thời gian kiểm tra gần nhất vào bộ nhớ cài đặt.
+  - *Lý do*: Tránh lỗi so sánh chuỗi (`"1.2.10" < "1.2.9"`) và tránh bị giới hạn tần suất (rate-limit) của GitHub API khi người dùng mở ứng dụng nhiều lần trong ngày.
+
+---
+
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+- **Sơ đồ kiến trúc & luồng dữ liệu**:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              MainActivity                               │
+│  • Khởi chạy kiểm tra tự động (nếu bật & đã qua 24h từ lần kiểm tra cuối)│
+│  • Hiển thị hộp thoại UpdateAvailableDialog khi phát hiện bản mới       │
+└───────────────────┬─────────────────────────────────────┬───────────────┘
+                    │                                     │
+                    ▼                                     ▼
+┌───────────────────────────────────────┐ ┌───────────────────────────────┐
+│            UpdateChecker              │ │        SettingsScreen         │
+│  • GET api.github.com/.../latest      │ │  • Công tắc: Tự kiểm tra      │
+│  • Timeout 8s, User-Agent chuẩn       │ │    bản mới khi mở ứng dụng    │
+│  • So sánh phiên bản số học (X.Y.Z)   │ │  • Nút: Kiểm tra ngay +       │
+│  • StateFlow<UpdateCheckState>        │ │    dòng trạng thái kết quả    │
+└───────────────────┬───────────────────┘ └───────────────┬───────────────┘
+                    │                                     │
+                    └──────────────────┬──────────────────┘
+                                       ▼
+                    ┌─────────────────────────────────────┐
+                    │   SettingsRepository (SharedPrefs)  │
+                    │  • autoCheckUpdatesOnLaunch = true  │
+                    │  • lastUpdateCheckEpochMs           │
+                    │  • cachedLatestVersion / ReleaseUrl │
+                    └─────────────────────────────────────┘
+```
+
+- **Mô hình trạng thái & Tương tác**:
+  - **Cấu hình lưu trữ**:
+    - `autoCheckUpdatesOnLaunch`: Bật/tắt tự kiểm tra khi mở ứng dụng (mặc định `true`).
+    - `lastUpdateCheckEpochMs`: Thời điểm kiểm tra thành công gần nhất để tính chu kỳ 24 giờ.
+  - **Trạng thái kiểm tra (`UpdateCheckState`)**:
+    - `Idle`: Chưa kiểm tra trong phiên.
+    - `Checking`: Đang kết nối máy chủ GitHub.
+    - `UpToDate(currentVersion)`: Đang ở phiên bản mới nhất.
+    - `UpdateAvailable(currentVersion, latestVersion, releaseUrl, releaseNotes)`: Phát hiện bản mới hơn, kích hoạt hiển thị hộp thoại thông báo cập nhật và nút mở trình duyệt.
+    - `SilentError`: Lỗi mạng hoặc giới hạn API (ẩn hoàn toàn khi kiểm tra tự động; chỉ báo ngắn gọn *"Không thể kết nối máy chủ kiểm tra, vui lòng thử lại sau"* nếu người dùng chủ động bấm nút *"Kiểm tra ngay"*).

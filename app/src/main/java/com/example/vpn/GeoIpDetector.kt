@@ -34,8 +34,8 @@ object GeoIpDetector {
         .readTimeout(5, TimeUnit.SECONDS)
         .build()
 
-    // Xbox Cloud officially supported countries
-    val SUPPORTED_COUNTRIES = setOf("JP", "US", "KR", "SG", "DE", "GB", "FR", "NL", "AU", "CA", "SE", "NO", "DK", "FI", "PL", "BR", "MX")
+    // Xbox Cloud officially supported countries (Singapore 'SG' is NOT supported by Xbox Cloud Gaming)
+    val SUPPORTED_COUNTRIES = setOf("JP", "US", "KR", "DE", "GB", "FR", "NL", "AU", "CA", "SE", "NO", "DK", "FI", "PL", "BR", "MX")
 
     fun getFlagEmoji(countryCode: String): String {
         return when (countryCode.uppercase()) {

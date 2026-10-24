@@ -179,6 +179,9 @@ fun HomeScreen(
     }
 
     val scrollState = rememberScrollState()
+    val config by SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    val updateState by com.example.data.UpdateChecker.state.collectAsState()
 
     Column(
         modifier = modifier
@@ -187,6 +190,55 @@ fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
+        if (availableUpdate != null) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .clickable {
+                        try {
+                            val intent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(availableUpdate.releaseUrl)
+                            ).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                        }
+                    }
+                    .testTag("home_update_available_banner"),
+                color = XboxNeonGreen.copy(alpha = 0.12f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isEn) {
+                            "New version ${availableUpdate.latestVersion} available · View"
+                        } else {
+                            "Có bản mới ${availableUpdate.latestVersion} · Xem"
+                        },
+                        color = XboxNeonGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "↗",
+                        color = XboxNeonGreen,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+        }
+
         // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và thanh chỉnh nhanh Video 16:9 / Quay Luồng / Đồ họa
         HeroConsolePlayDeck(
             vpnState = vpnState,

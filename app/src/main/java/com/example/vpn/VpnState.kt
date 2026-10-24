@@ -366,56 +366,6 @@ val DEFAULT_SERVERS = listOf(
         description = "Las Vegas Western Data Hub (Dự phòng #5)",
         speedMbps = 175,
         countryCode = "US"
-    ),
-
-    // === SINGAPORE - 4 MÁY CHỦ DỰ PHÒNG ===
-    ServerLocation(
-        id = "sg_microsoft_1",
-        name = "Singapore Azure Cloud #1",
-        flag = "🇸🇬",
-        ip = "4.194.233.145",
-        port = 3128,
-        protocol = "http",
-        azureEndpoint = "southeastasia.cloudapp.azure.com",
-        description = "Singapore Microsoft Cloud Exchange • Ping cực thấp ~28ms từ VN",
-        speedMbps = 350,
-        countryCode = "SG"
-    ),
-    ServerLocation(
-        id = "sg_equinix_2",
-        name = "Singapore Equinix #2",
-        flag = "🇸🇬",
-        ip = "8.219.97.248",
-        port = 80,
-        protocol = "http",
-        azureEndpoint = "southeastasia.cloudapp.azure.com",
-        description = "Singapore Equinix SG1 Datacenter Route (Dự phòng #2)",
-        speedMbps = 310,
-        countryCode = "SG"
-    ),
-    ServerLocation(
-        id = "sg_ix_3",
-        name = "Singapore Internet Exchange #3",
-        flag = "🇸🇬",
-        ip = "43.160.245.155",
-        port = 8080,
-        protocol = "http",
-        azureEndpoint = "southeastasia.cloudapp.azure.com",
-        description = "Singapore Internet Exchange Relay (Dự phòng #3)",
-        speedMbps = 280,
-        countryCode = "SG"
-    ),
-    ServerLocation(
-        id = "sg_transit_4",
-        name = "Singapore Transit #4",
-        flag = "🇸🇬",
-        ip = "8.209.255.13",
-        port = 3129,
-        protocol = "http",
-        azureEndpoint = "southeastasia.cloudapp.azure.com",
-        description = "Singapore High-Speed Transit Gateway (Dự phòng #4)",
-        speedMbps = 250,
-        countryCode = "SG"
     )
 )
 
@@ -423,7 +373,7 @@ enum class SmartVpnPhase {
     IDLE,                      // Trạng thái chờ / kiểm tra IP
     BYPASS_ACTIVE,             // Giai đoạn 1: Đang BẬT VPN/Bypass để vượt rào vùng (duyệt catalog, mở game)
     DIRECT_GAMING,             // Giai đoạn 2: Đã TỰ ĐỘNG TẮT VPN khi vào trận (Mạng Direct ISP active - 0ms phụ trợ)
-    DIRECT_SUPPORTED_REGION    // Người chơi ở sẵn khu vực hỗ trợ (Mỹ, Nhật, Singapore...), không cần bật VPN
+    DIRECT_SUPPORTED_REGION    // Người chơi ở sẵn khu vực hỗ trợ (Nhật, Hàn, Mỹ...), không cần bật VPN
 }
 
 data class SmartVpnDecision(

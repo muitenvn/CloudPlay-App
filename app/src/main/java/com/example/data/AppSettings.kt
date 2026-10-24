@@ -581,7 +581,8 @@ data class AppConfig(
     val customApkDownloadUrl: String = "https://github.com/muitenvn/CloudPlay-App/releases/latest",
     val publicWebPortalUrl: String = "https://muitenvn.github.io/CloudPlay-App/",
     val githubRepoSlug: String = "muitenvn/CloudPlay-App",
-    val userAcceptedTerms: Boolean = false
+    val userAcceptedTerms: Boolean = false,
+    val autoCheckUpdatesOnLaunch: Boolean = true
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -711,7 +712,8 @@ object SettingsRepository {
                 "github_repo_slug_v2",
                 "muitenvn/CloudPlay-App"
             ) ?: "muitenvn/CloudPlay-App",
-            userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
+            userAcceptedTerms = sp.getBoolean("user_accepted_terms", false),
+            autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -779,6 +781,7 @@ object SettingsRepository {
             putString("public_web_portal_url_v2", c.publicWebPortalUrl)
             putString("github_repo_slug_v2", c.githubRepoSlug)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
+            putBoolean("auto_check_updates_on_launch", c.autoCheckUpdatesOnLaunch)
             apply()
         }
     }
@@ -1025,9 +1028,11 @@ object SettingsRepository {
 
     fun updateCellularMode(mode: CellularOptimizationMode) {
         _config.update {
+            val nextLowEnd = if (mode != CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) false else it.lowEndDeviceMode
             it.copy(
                 cellularMode = mode,
-                streamRenderScale = if (it.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else mode.autoRenderScale,
+                lowEndDeviceMode = nextLowEnd,
+                streamRenderScale = if (nextLowEnd) StreamRenderScale.PERFORMANCE_75 else mode.autoRenderScale,
                 forceDesktopUserAgent = mode.request1080p,
                 maxBitrateMbps = mode.bitrateMbps
             )
@@ -1226,6 +1231,11 @@ object SettingsRepository {
                 videoBrightness = 100
             )
         }
+        persist(_config.value)
+    }
+
+    fun updateAutoCheckUpdatesOnLaunch(enabled: Boolean) {
+        _config.update { it.copy(autoCheckUpdatesOnLaunch = enabled) }
         persist(_config.value)
     }
 }

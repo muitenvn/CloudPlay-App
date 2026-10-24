@@ -158,10 +158,10 @@ class StreamController(private val context: Context) {
                 }
             }
 
-            // Fallback: if WebRTC / video event inside WebView hasn't fired within 5.5s on /launch/,
-            // automatically trigger onStreamConnected() so VPN auto-disconnect and notification always run.
+            // Fallback: only if WebRTC / video event inside WebView hasn't fired after 45s on /launch/,
+            // trigger onStreamConnected() so VPN never disconnects while the rocket ship is still warming up.
             launchFallbackJob = scope.launch {
-                delay(5500)
+                delay(45000)
                 if (_uiState.value.isGameActive && !_uiState.value.isStreamConnected) {
                     onStreamConnected()
                 }

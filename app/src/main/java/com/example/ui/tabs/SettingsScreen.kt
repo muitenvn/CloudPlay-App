@@ -97,6 +97,7 @@ fun SettingsScreen(
         mutableStateOf(if (config.useSystemLanguage) "xbox.com/en-US" else "xbox.com/${config.customLocale}")
     }
     var showTermsDialog by remember { mutableStateOf(false) }
+    var showWebPortalDialog by remember { mutableStateOf(false) }
 
     // 5 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
@@ -122,15 +123,15 @@ fun SettingsScreen(
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Graphics & Frame Rate" else "Đồ họa & Khung hình (FPS)",
+                title = if (isEn) "Resolution, Graphics & FPS" else "Độ phân giải, Đồ họa & FPS",
                 subtitle = "${config.cellularMode.localizedTitle(isEn)} • ${config.streamFpsCap.fps} FPS",
                 icon = Icons.Default.Speed,
                 expanded = expandGraphics,
                 onToggle = { expandGraphics = !expandGraphics },
                 testTag = "settings_group_graphics"
             ) {
-                // 1.1 Mức đồ họa & Tốc độ khung hình (FPS)
-                SettingsCard(title = if (isEn) "Graphics Quality & FPS" else "Chất lượng đồ họa & FPS") {
+                // 1.1 Độ phân giải & Đồ họa (gộp 1) + Nhịp FPS
+                SettingsCard(title = if (isEn) "Resolution & Graphics (4G/5G/Wi-Fi Low Lag)" else "Độ phân giải & Đồ họa (Giảm trễ 4G/5G/Wi-Fi)") {
                     val selectedMode = config.cellularMode
                     val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
 
@@ -165,13 +166,13 @@ fun SettingsScreen(
                                 )
                                 Column {
                                     Text(
-                                        text = if (isEn) "Auto (Recommended)" else "Tự động (Khuyên dùng)",
+                                        text = if (isEn) "Auto • 720p ⇄ 1080p (Recommended)" else "Tự động • 720p ⇄ 1080p (Khuyên dùng)",
                                         color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = if (isEn) "Auto-adjusts to network & keeps device cool" else "Tự chỉnh theo mạng, giữ máy mát",
+                                        text = if (isEn) "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi" else "Tự hạ độ phân giải để giảm độ trễ trên cả 4G, 5G và Wi-Fi",
                                         color = TextSecondary,
                                         fontSize = 10.5.sp
                                     )
@@ -304,54 +305,6 @@ fun SettingsScreen(
                             }
                         }
                     }
-                }
-
-                // 1.2 Độ phân giải dựng hình & Giảm tải phần cứng
-                SettingsCard(title = if (isEn) "Render Scale & Hardware Offload" else "Độ phân giải dựng hình & Giảm tải máy") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        com.example.data.StreamRenderScale.entries.chunked(2).forEach { rowScales ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                rowScales.forEach { scale ->
-                                    val isSelected = config.streamRenderScale == scale
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .border(
-                                                1.dp,
-                                                if (isSelected) DirectCyan else XboxCardBorder,
-                                                RoundedCornerShape(10.dp)
-                                            )
-                                            .clickable { SettingsRepository.updateStreamRenderScale(scale) }
-                                            .testTag("settings_render_scale_${scale.id}"),
-                                        color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(
-                                                text = scale.localizedTitle(isEn),
-                                                color = if (isSelected) DirectCyan else TextPrimary,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                            Text(
-                                                text = scale.localizedDesc(isEn),
-                                                color = TextSecondary,
-                                                fontSize = 9.5.sp,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     SettingToggleRow(
                         title = if (isEn) "Prioritize Smooth Input" else "Ưu tiên phản hồi mượt",
                         subtitle = if (isEn) "Reduces delay on unstable connections" else "Giảm trễ thao tác khi sóng yếu",
@@ -370,22 +323,15 @@ fun SettingsScreen(
 
                     SettingToggleRow(
                         title = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
-                        subtitle = if (isEn) "5 Mbps light stream, cool 60 FPS" else "Đồ họa nhẹ 5 Mbps, giữ máy mát",
+                        subtitle = if (isEn) "Locks light 720p stream, cool 60 FPS" else "Tự động khóa 720p nhẹ 5 Mbps, giữ máy mát",
                         checked = config.lowEndDeviceMode,
                         onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
                         switchTestTag = "settings_low_end_device_mode_switch"
                     )
                 }
 
-                // 1.3 Độ nét & Màu sắc hình ảnh
+                // 1.2 Độ nét & Màu sắc hình ảnh
                 SettingsCard(title = if (isEn) "Sharpness & Image Colors" else "Độ nét & Màu sắc hình ảnh") {
-                    SettingToggleRow(
-                        title = if (isEn) "1080p Full HD Stream" else "Độ phân giải 1080p Full HD",
-                        subtitle = if (isEn) "Requests sharp 1080p stream" else "Ưu tiên luồng 1080p sắc nét",
-                        checked = config.forceDesktopUserAgent,
-                        onCheckedChange = { SettingsRepository.updateDesktopUserAgent(it) }
-                    )
-
                     SettingToggleRow(
                         title = if (isEn) "Clarity Boost" else "Làm nét hình ảnh (Clarity Boost)",
                         subtitle = if (isEn) "Sharpens edges and details" else "Tăng độ nét chi tiết trong game",
@@ -1100,6 +1046,43 @@ fun SettingsScreen(
             }
         }
 
+        // =========================================================================
+        // NHÓM 6: TRANG WEB TẢI APP CHUẨN SEO & CHIA SẺ QR (CHUNG 1 DỰ ÁN)
+        // =========================================================================
+        item {
+            SettingsCard(title = if (isEn) "SEO Download Web Page & APK Share" else "Trang Web Tải App (SEO) & Chia Sẻ QR") {
+                Text(
+                    text = if (isEn) {
+                        "Includes a Google-searchable web landing page (/docs/index.html for GitHub Pages) and an in-app QR & direct APK download link portal."
+                    } else {
+                        "Tích hợp sẵn trang Web giới thiệu & tải APK chuẩn tìm kiếm Google (/docs/index.html) kèm mã QR chia sẻ nhanh ngay trong cùng 1 dự án."
+                    },
+                    color = TextSecondary,
+                    fontSize = 11.5.sp
+                )
+                Button(
+                    onClick = { showWebPortalDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("open_web_portal_settings_btn"),
+                    colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Text(
+                            text = if (isEn) "Open Web Portal, QR & APK Link" else "Mở Cổng Web Tải App, Mã QR & Đổi Link APK",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
@@ -1109,6 +1092,12 @@ fun SettingsScreen(
             onDecline = { showTermsDialog = false },
             isDismissible = true,
             onDismissRequest = { showTermsDialog = false }
+        )
+    }
+
+    if (showWebPortalDialog) {
+        com.example.ui.components.WebDownloadPortalDialog(
+            onDismiss = { showWebPortalDialog = false }
         )
     }
 }

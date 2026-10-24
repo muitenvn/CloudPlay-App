@@ -114,91 +114,126 @@ enum class CellularOptimizationMode(
     val title: String,
     val shortLabel: String,
     val subtitle: String,
+    val resolutionBadge: String,
     val bitrateMbps: Int,
     val deviceLoadBadge: String,
     val description: String,
     val titleEn: String,
     val shortLabelEn: String,
     val subtitleEn: String,
+    val resolutionBadgeEn: String,
     val deviceLoadBadgeEn: String,
-    val descriptionEn: String
+    val descriptionEn: String,
+    val request1080p: Boolean
 ) {
     AUTO(
         id = "auto",
-        title = "Tự Động",
-        shortLabel = "Tự Động",
-        subtitle = "Tự tối ưu theo điều kiện mạng & máy",
-        bitrateMbps = 10,
-        deviceLoadBadge = "⚡ Tự Động Tối Ưu",
-        description = "Tự động nhận diện chất lượng Wi-Fi / 4G / 5G và theo dõi tải giải mã GPU của điện thoại để điều chỉnh đồ họa, giữ 60 FPS mượt mà và chống nóng máy.",
-        titleEn = "Auto",
-        shortLabelEn = "Auto",
-        subtitleEn = "Auto-optimizes for network & device load",
-        deviceLoadBadgeEn = "⚡ Smart Auto-Tune",
-        descriptionEn = "Automatically detects Wi-Fi / 4G / 5G quality and GPU decode load to adjust bitrate smoothly, keeping 60 FPS and preventing overheating."
+        title = "Tự động (720p ⇄ 1080p)",
+        shortLabel = "Tự động (720p⇄1080p)",
+        subtitle = "Tự hạ độ phân giải giảm trễ 4G/5G & Wi-Fi",
+        resolutionBadge = "Auto 720p⇄1080p",
+        bitrateMbps = 12,
+        deviceLoadBadge = "⚡ Tự Động Giảm Trễ 4G/5G/Wi-Fi",
+        description = "Tự động điều chỉnh độ phân giải (720p ⇄ 1080p) và băng thông theo sóng 4G, 5G hoặc Wi-Fi, giữ khung hình mượt và giảm trễ giải mã GPU.",
+        titleEn = "Auto (720p ⇄ 1080p)",
+        shortLabelEn = "Auto (720p⇄1080p)",
+        subtitleEn = "Auto-scales resolution to cut 4G/5G & Wi-Fi lag",
+        resolutionBadgeEn = "Auto 720p⇄1080p",
+        deviceLoadBadgeEn = "⚡ Auto 4G/5G/Wi-Fi Low Lag",
+        descriptionEn = "Automatically scales resolution (720p ⇄ 1080p) and bitrate based on 4G, 5G, or Wi-Fi quality and hardware GPU decode load.",
+        request1080p = true
     ),
     DATA_SAVER_HIGH_SPEED(
         id = "saver",
-        title = "Thấp",
-        shortLabel = "Tiết Kiệm (5M)",
-        subtitle = "Tiết kiệm dung lượng • 5 Mbps",
+        title = "720p • Thấp",
+        shortLabel = "720p • Thấp (5M)",
+        subtitle = "Giảm trễ tối đa 4G/5G & Wi-Fi • 5 Mbps",
+        resolutionBadge = "720p • Thấp",
         bitrateMbps = 5,
-        deviceLoadBadge = "❄️ Siêu Nhẹ • Mát Máy",
-        description = "Giảm tải tối đa cho CPU/GPU điện thoại (giải mã phần cứng dưới 4ms), tiết kiệm đến 60% dung lượng data (~2.2GB/giờ) và đỡ hao pin.",
-        titleEn = "Low",
-        shortLabelEn = "Saver (5M)",
-        subtitleEn = "Data Saver • 5 Mbps",
-        deviceLoadBadgeEn = "❄️ Ultra Light • Cool",
-        descriptionEn = "Minimizes phone CPU/GPU load (<4ms hardware decode), saves up to 60% mobile data (~2.2GB/hr), and extends battery life."
+        deviceLoadBadge = "❄️ 720p Siêu Mượt 4G/5G/Wi-Fi",
+        description = "Gộp độ phân giải 720p & mức Thấp (5 Mbps): Giảm độ trễ rõ rệt khi bật 4G, 5G lẫn Wi-Fi, giải mã GPU dưới 4ms và tiết kiệm 60% data.",
+        titleEn = "720p • Low",
+        shortLabelEn = "720p • Low (5M)",
+        subtitleEn = "Lowest lag on 4G/5G & Wi-Fi • 5 Mbps",
+        resolutionBadgeEn = "720p • Low",
+        deviceLoadBadgeEn = "❄️ 720p Ultra Low Lag",
+        descriptionEn = "Unified 720p & Low tier (5 Mbps): Significantly reduces latency on 4G, 5G, and Wi-Fi with <4ms hardware decode and 60% data savings.",
+        request1080p = false
     ),
     MEDIUM(
         id = "medium",
-        title = "Trung Bình",
-        shortLabel = "Trung Bình (9M)",
-        subtitle = "Cân bằng & mát máy • 9 Mbps",
+        title = "900p • Vừa",
+        shortLabel = "900p • Vừa (9M)",
+        subtitle = "Giảm trễ 4G/5G & Wi-Fi • Nét vừa 9 Mbps",
+        resolutionBadge = "900p • Vừa",
         bitrateMbps = 9,
-        deviceLoadBadge = "🌿 Êm Ái • Chống Nóng",
-        description = "Mức cân bằng lý tưởng cho điện thoại tầm trung. Đảm bảo khung hình 60 FPS ổn định, tiết kiệm ~40% dung lượng và giữ máy mát khi chơi lâu.",
-        titleEn = "Medium",
-        shortLabelEn = "Medium (9M)",
-        subtitleEn = "Balanced & cool • 9 Mbps",
-        deviceLoadBadgeEn = "🌿 Smooth • Cool",
-        descriptionEn = "Ideal balance for mid-range phones. Delivers stable 60 FPS, saves ~40% data, and keeps your device cool during long sessions."
+        deviceLoadBadge = "🌿 900p Cân Bằng 4G/5G/Wi-Fi",
+        description = "Gộp độ phân giải 900p HD+ & mức Vừa (9 Mbps): Giảm độ trễ trên mạng 4G, 5G và Wi-Fi trong khi vẫn giữ hình ảnh sắc nét, máy mát.",
+        titleEn = "900p • Med",
+        shortLabelEn = "900p • Med (9M)",
+        subtitleEn = "Low lag on 4G/5G & Wi-Fi • 9 Mbps",
+        resolutionBadgeEn = "900p • Med",
+        deviceLoadBadgeEn = "🌿 900p Balanced Low Lag",
+        descriptionEn = "Unified 900p HD+ & Medium tier (9 Mbps): Reduces latency on 4G, 5G, and Wi-Fi while keeping crisp visuals and cool temperatures.",
+        request1080p = true
     ),
     HIGH(
         id = "high",
-        title = "Cao",
-        shortLabel = "Cao (14M)",
-        subtitle = "Sắc nét 1080p • 14 Mbps",
+        title = "1080p • Cao",
+        shortLabel = "1080p • Cao (14M)",
+        subtitle = "Full HD sắc nét cho 5G & Wi-Fi • 14 Mbps",
+        resolutionBadge = "1080p • Cao",
         bitrateMbps = 14,
-        deviceLoadBadge = "✨ Chuẩn 1080p60",
-        description = "Tái tạo hình ảnh Full HD 1080p60 sắc nét với chi tiết bề mặt rõ ràng, phù hợp khi mạng ổn định và điện thoại có chip xử lý khá trở lên.",
-        titleEn = "High",
-        shortLabelEn = "High (14M)",
-        subtitleEn = "Crisp 1080p • 14 Mbps",
-        deviceLoadBadgeEn = "✨ 1080p60 Standard",
-        descriptionEn = "Delivers sharp Full HD 1080p60 visuals with crisp textures, ideal for stable connections and capable mobile processors."
+        deviceLoadBadge = "✨ 1080p Full HD Sắc Nét",
+        description = "Gộp độ phân giải 1080p Full HD & mức Cao (14 Mbps): Hình ảnh sắc nét rõ từng chi tiết cho mạng Wi-Fi ổn định hoặc 5G tốc độ cao.",
+        titleEn = "1080p • High",
+        shortLabelEn = "1080p • High (14M)",
+        subtitleEn = "Crisp Full HD for 5G & Wi-Fi • 14 Mbps",
+        resolutionBadgeEn = "1080p • High",
+        deviceLoadBadgeEn = "✨ 1080p Full HD",
+        descriptionEn = "Unified 1080p Full HD & High tier (14 Mbps): Crisp textures and detail for stable Wi-Fi or fast 5G connections.",
+        request1080p = true
     ),
     MAX_SPEED_UNCAPPED(
         id = "max",
-        title = "Rất Cao",
-        shortLabel = "Rất Cao (20M)",
-        subtitle = "Đồ họa tối đa • 20 Mbps",
+        title = "1080p+ • Rất cao",
+        shortLabel = "1080p+ • Rất cao (20M)",
+        subtitle = "Đồ họa tối đa Wi-Fi 5GHz/5G mạnh • 20 Mbps",
+        resolutionBadge = "1080p+ • Rất cao",
         bitrateMbps = 20,
-        deviceLoadBadge = "🔥 Đồ Họa Tối Đa",
-        description = "Bung trọn vẹn 20 Mbps băng thông cho chất lượng đồ họa cao nhất, phản hồi tay cầm tức thì cho máy cấu hình mạnh và mạng tốc độ cao.",
-        titleEn = "Ultra",
-        shortLabelEn = "Ultra (20M)",
-        subtitleEn = "Max Graphics • 20 Mbps",
-        deviceLoadBadgeEn = "🔥 Max Graphics",
-        descriptionEn = "Unlocks the full 20 Mbps bandwidth for maximum visual fidelity and instant input response on high-speed networks."
+        deviceLoadBadge = "🔥 1080p+ Đồ Họa Tối Đa",
+        description = "Gộp độ phân giải 1080p+ nguyên bản & mức Rất cao (20 Mbps): Độ nét tối đa cho mạng Wi-Fi 5GHz/6GHz hoặc 5G cực khỏe.",
+        titleEn = "1080p+ • Ultra",
+        shortLabelEn = "1080p+ • Ultra (20M)",
+        subtitleEn = "Max fidelity for fast Wi-Fi/5G • 20 Mbps",
+        resolutionBadgeEn = "1080p+ • Ultra",
+        deviceLoadBadgeEn = "🔥 1080p+ Max Graphics",
+        descriptionEn = "Unified native 1080p+ & Ultra tier (20 Mbps): Maximum visual fidelity for fast 5GHz/6GHz Wi-Fi or strong 5G.",
+        request1080p = true
     );
+
+    val autoRenderScale: StreamRenderScale
+        get() = when (this) {
+            AUTO -> StreamRenderScale.NATIVE_100
+            DATA_SAVER_HIGH_SPEED -> StreamRenderScale.PERFORMANCE_75
+            MEDIUM -> StreamRenderScale.BALANCED_85
+            HIGH -> StreamRenderScale.NATIVE_100
+            MAX_SPEED_UNCAPPED -> StreamRenderScale.NATIVE_100
+        }
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
     fun localizedShortLabel(isEn: Boolean): String = if (isEn) shortLabelEn else shortLabel
     fun localizedSubtitle(isEn: Boolean): String = if (isEn) subtitleEn else subtitle
+    fun localizedResolutionBadge(isEn: Boolean): String = if (isEn) resolutionBadgeEn else resolutionBadge
     fun localizedBadge(isEn: Boolean): String = if (isEn) deviceLoadBadgeEn else deviceLoadBadge
     fun localizedDesc(isEn: Boolean): String = if (isEn) descriptionEn else description
+    fun unifiedChipLabel(isEn: Boolean): String = when (this) {
+        AUTO -> if (isEn) "Auto (720p⇄1080p)" else "Tự động (720p⇄1080p)"
+        DATA_SAVER_HIGH_SPEED -> if (isEn) "720p • Low" else "720p • Thấp"
+        MEDIUM -> if (isEn) "900p • Med" else "900p • Vừa"
+        HIGH -> if (isEn) "1080p • High" else "1080p • Cao"
+        MAX_SPEED_UNCAPPED -> if (isEn) "1080p+ • Ultra" else "1080p+ • Rất cao"
+    }
 }
 
 enum class NetworkTuningMode(
@@ -543,6 +578,9 @@ data class AppConfig(
     val videoContrast: Int = 100, // 80 .. 140 (%)
     val videoSaturation: Int = 100, // 80 .. 150 (%)
     val videoBrightness: Int = 100, // 80 .. 130 (%)
+    val customApkDownloadUrl: String = "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk",
+    val publicWebPortalUrl: String = "https://nguyenhphuc956.github.io/CloudPlay-Xbox/",
+    val githubRepoSlug: String = "nguyenhphuc956/CloudPlay-Xbox",
     val userAcceptedTerms: Boolean = false
 ) {
     val targetRegionUrl: String
@@ -661,9 +699,26 @@ object SettingsRepository {
             videoContrast = sp.getInt("video_contrast_v2", 100).coerceIn(80, 140),
             videoSaturation = sp.getInt("video_saturation_v2", 100).coerceIn(80, 150),
             videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
+            customApkDownloadUrl = sp.getString(
+                "custom_apk_download_url",
+                "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk"
+            ) ?: "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk",
+            publicWebPortalUrl = sp.getString(
+                "public_web_portal_url",
+                "https://nguyenhphuc956.github.io/CloudPlay-Xbox/"
+            ) ?: "https://nguyenhphuc956.github.io/CloudPlay-Xbox/",
+            githubRepoSlug = sp.getString(
+                "github_repo_slug",
+                "nguyenhphuc956/CloudPlay-Xbox"
+            ) ?: "nguyenhphuc956/CloudPlay-Xbox",
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
-        _config.value = loaded
+        // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
+        val synced = loaded.copy(
+            streamRenderScale = if (loaded.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else loaded.cellularMode.autoRenderScale,
+            forceDesktopUserAgent = loaded.cellularMode.request1080p
+        )
+        _config.value = synced
     }
 
     private fun persist(c: AppConfig) {
@@ -720,6 +775,9 @@ object SettingsRepository {
             putInt("video_contrast", c.videoContrast)
             putInt("video_saturation", c.videoSaturation)
             putInt("video_brightness", c.videoBrightness)
+            putString("custom_apk_download_url", c.customApkDownloadUrl)
+            putString("public_web_portal_url", c.publicWebPortalUrl)
+            putString("github_repo_slug", c.githubRepoSlug)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             apply()
         }
@@ -966,7 +1024,14 @@ object SettingsRepository {
     }
 
     fun updateCellularMode(mode: CellularOptimizationMode) {
-        _config.update { it.copy(cellularMode = mode) }
+        _config.update {
+            it.copy(
+                cellularMode = mode,
+                streamRenderScale = if (it.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else mode.autoRenderScale,
+                forceDesktopUserAgent = mode.request1080p,
+                maxBitrateMbps = mode.bitrateMbps
+            )
+        }
         persist(_config.value)
     }
 
@@ -1023,7 +1088,33 @@ object SettingsRepository {
     }
 
     fun updateLowEndDeviceMode(enabled: Boolean) {
-        _config.update { it.copy(lowEndDeviceMode = enabled) }
+        _config.update {
+            it.copy(
+                lowEndDeviceMode = enabled,
+                streamRenderScale = if (enabled) StreamRenderScale.PERFORMANCE_75 else it.cellularMode.autoRenderScale
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun updateWebPortalSettings(
+        apkDownloadUrl: String,
+        webPortalUrl: String,
+        githubRepo: String
+    ) {
+        _config.update {
+            it.copy(
+                customApkDownloadUrl = apkDownloadUrl.trim().ifBlank {
+                    "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk"
+                },
+                publicWebPortalUrl = webPortalUrl.trim().ifBlank {
+                    "https://nguyenhphuc956.github.io/CloudPlay-Xbox/"
+                },
+                githubRepoSlug = githubRepo.trim().ifBlank {
+                    "nguyenhphuc956/CloudPlay-Xbox"
+                }
+            )
+        }
         persist(_config.value)
     }
 

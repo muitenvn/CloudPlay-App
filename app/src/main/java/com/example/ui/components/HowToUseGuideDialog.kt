@@ -274,11 +274,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Wifi,
                                     iconColor = XboxNeonGreen,
-                                    title = if (isVi) "Chọn mức chất lượng phù hợp" else "Choose the right quality level",
+                                    title = if (isVi) "Độ phân giải & Đồ họa gộp 1 (Giảm trễ 4G/5G/Wi-Fi)" else "Unified Resolution & Graphics (4G/5G/Wi-Fi Low Lag)",
                                     content = if (isVi) {
-                                        "• Tự động (Khuyên dùng): Tự cân bằng độ nét và độ mượt theo mạng.\n• Thấp / Chế độ máy yếu: Giúp máy mát, đỡ hao pin và tiết kiệm dữ liệu.\n• Cao / Rất cao: Dành cho mạng Wi-Fi mạnh và máy khỏe."
+                                        "• Tự động (720p ⇄ 1080p): Tự hạ độ phân giải để giảm trễ theo sóng.\n• 720p • Thấp / 900p • Vừa: Giảm độ trễ rõ rệt khi bật 4G, 5G lẫn Wi-Fi và nhẹ GPU.\n• 1080p • Cao / 1080p+ • Rất cao: Dành cho mạng Wi-Fi 5GHz/5G mạnh."
                                     } else {
-                                        "• Auto (Recommended): Balances sharpness and smoothness automatically.\n• Low / Low-End Mode: Keeps your device cool and saves mobile data.\n• High / Ultra: Best for strong Wi-Fi and fast devices."
+                                        "• Auto (720p ⇄ 1080p): Automatically scales resolution to cut lag.\n• 720p • Low / 900p • Med: Significantly reduces latency on 4G, 5G, and Wi-Fi.\n• 1080p • High / 1080p+ • Ultra: Best for fast 5GHz Wi-Fi and 5G."
                                     }
                                 )
                             }

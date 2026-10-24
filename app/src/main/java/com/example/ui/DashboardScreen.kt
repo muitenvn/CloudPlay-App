@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Translate
@@ -125,6 +126,7 @@ fun DashboardScreen(
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(GuideSection.QUICK_START) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
+    var showWebPortalDialog by remember { mutableStateOf(false) }
 
     fun handleConnect() {
         VpnManager.connect(context)
@@ -379,7 +381,27 @@ fun DashboardScreen(
                                     }
                                 }
 
-                                // 4. Quick User Guide Icon Button
+                                // 4. SEO Web Download Portal & QR Share Button
+                                Surface(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(9.dp))
+                                        .clickable { showWebPortalDialog = true }
+                                        .testTag("topbar_web_portal_button"),
+                                    color = XboxNeonGreen.copy(alpha = 0.14f)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Public,
+                                            contentDescription = if (isEnUi) "Web Download Portal" else "Trang Web Tải App & QR",
+                                            tint = XboxNeonGreen,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                }
+
+                                // 5. Quick User Guide Icon Button
                                 Surface(
                                     modifier = Modifier
                                         .size(30.dp)
@@ -505,6 +527,12 @@ fun DashboardScreen(
     if (showTranslatorDialog) {
         com.example.ui.components.SmartTranslatorDialog(
             onDismissRequest = { showTranslatorDialog = false }
+        )
+    }
+
+    if (showWebPortalDialog) {
+        com.example.ui.components.WebDownloadPortalDialog(
+            onDismiss = { showWebPortalDialog = false }
         )
     }
 }

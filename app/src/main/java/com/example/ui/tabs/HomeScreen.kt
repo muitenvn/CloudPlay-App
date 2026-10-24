@@ -337,7 +337,7 @@ private fun HeroConsolePlayDeck(
                             }
                         }
 
-                        // Nhãn hiển thị độ phân giải & tốc độ khung hình chuẩn
+                        // Nhãn hiển thị công nghệ giảm trễ 4G/5G & Wi-Fi
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = Color(0xD907130E),
@@ -348,9 +348,9 @@ private fun HeroConsolePlayDeck(
                         ) {
                             Text(
                                 text = if (isEn) {
-                                    "${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps} FPS"
+                                    "⚡ 4G/5G & Wi-Fi Low Lag"
                                 } else {
-                                    "${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps} FPS MƯỢT"
+                                    "⚡ Giảm trễ 4G/5G & Wi-Fi"
                                 },
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
@@ -485,15 +485,9 @@ private fun HeroConsolePlayDeck(
                     }
                 }
 
-                // Thanh chỉnh nhanh theo thứ tự ưu tiên: Đồ họa -> Nhịp FPS -> Điều khiển/Cài đặt
+                // Thanh chỉnh nhanh theo thứ tự ưu tiên: Độ phân giải & Đồ họa (gộp 1) -> Nhịp FPS -> Điều khiển/Cài đặt
                 val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
-                val graphicsShort = when (config.cellularMode) {
-                    com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
-                    com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
-                    com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
-                    com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
-                    com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
-                }
+                val unifiedGraphicsRes = config.cellularMode.unifiedChipLabel(isEn)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -501,14 +495,14 @@ private fun HeroConsolePlayDeck(
                 ) {
                     HeroCapabilityChip(
                         icon = "✨",
-                        label = if (isEn) "Graphics: $graphicsShort" else "Đồ họa: $graphicsShort",
+                        label = unifiedGraphicsRes,
                         accentColor = XboxNeonGreen,
                         onClick = {
                             val modes = com.example.data.CellularOptimizationMode.entries
                             val nextIdx = (modes.indexOf(config.cellularMode) + 1) % modes.size
                             SettingsRepository.updateCellularMode(modes[nextIdx])
                         },
-                        modifier = Modifier.weight(1.15f)
+                        modifier = Modifier.weight(1.25f)
                     )
                     HeroCapabilityChip(
                         icon = "⚡",

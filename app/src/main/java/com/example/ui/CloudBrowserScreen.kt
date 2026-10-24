@@ -890,23 +890,29 @@ fun CloudBrowserScreen(
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
-                                        text = if (isEn) "🔥 1. Graphics Quality" else "🔥 1. Mức đồ họa",
+                                        text = if (isEn) "🔥 1. Resolution & Graphics (4G/5G/Wi-Fi Low Lag)" else "🔥 1. Độ phân giải & Đồ họa (Giảm trễ 4G/5G/Wi-Fi)",
                                         color = XboxNeonGreen,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold
                                     )
+                                    Text(
+                                        text = config.cellularMode.localizedSubtitle(isEn),
+                                        color = DirectCyan,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         com.example.data.CellularOptimizationMode.entries.forEach { mode ->
                                             val selected = config.cellularMode == mode
                                             val shortTitle = when (mode) {
                                                 com.example.data.CellularOptimizationMode.AUTO -> if (isEn) "Auto" else "Tự động"
-                                                com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "Low" else "Thấp"
-                                                com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "Med" else "Vừa"
-                                                com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "High" else "Cao"
-                                                com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "Ultra" else "Rất cao"
+                                                com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> if (isEn) "720p•Low" else "720p•Thấp"
+                                                com.example.data.CellularOptimizationMode.MEDIUM -> if (isEn) "900p•Med" else "900p•Vừa"
+                                                com.example.data.CellularOptimizationMode.HIGH -> if (isEn) "1080p•High" else "1080p•Cao"
+                                                com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> if (isEn) "1080p+•Max" else "1080p+•Cao+"
                                             }
                                             Surface(
                                                 modifier = Modifier
@@ -927,7 +933,7 @@ fun CloudBrowserScreen(
                                                     Text(
                                                         text = shortTitle,
                                                         color = if (selected) XboxNeonGreen else TextPrimary,
-                                                        fontSize = 10.sp,
+                                                        fontSize = 9.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         maxLines = 1
                                                     )
@@ -937,99 +943,44 @@ fun CloudBrowserScreen(
                                     }
                                 }
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier.weight(1.25f),
-                                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                                    Text(
+                                        text = if (isEn) "Frame Rate (FPS)" else "Khung hình (FPS)",
+                                        color = XboxNeonGreen,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(
-                                            text = if (isEn) "Render Scale" else "Độ phân giải dựng hình",
-                                            color = DirectCyan,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            com.example.data.StreamRenderScale.entries.forEach { scale ->
-                                                val selected = config.streamRenderScale == scale
-                                                val label = when (scale) {
-                                                    com.example.data.StreamRenderScale.NATIVE_100 -> "100%"
-                                                    com.example.data.StreamRenderScale.BALANCED_85 -> "85%"
-                                                    com.example.data.StreamRenderScale.PERFORMANCE_75 -> "75%"
-                                                    com.example.data.StreamRenderScale.ULTRA_LIGHT_60 -> "60%"
-                                                }
-                                                Surface(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(7.dp))
-                                                        .clickable { SettingsRepository.updateStreamRenderScale(scale) },
-                                                    shape = RoundedCornerShape(7.dp),
-                                                    color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF101A14),
-                                                    border = BorderStroke(
-                                                        1.dp,
-                                                        if (selected) DirectCyan else XboxCardBorder
-                                                    )
+                                        com.example.data.StreamFpsCap.entries.forEach { cap ->
+                                            val selected = config.streamFpsCap == cap
+                                            Surface(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clip(RoundedCornerShape(7.dp))
+                                                    .clickable { SettingsRepository.updateStreamFpsCap(cap) },
+                                                shape = RoundedCornerShape(7.dp),
+                                                color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (selected) XboxNeonGreen else XboxCardBorder
+                                                )
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier.padding(vertical = 6.dp),
+                                                    contentAlignment = Alignment.Center
                                                 ) {
-                                                    Box(
-                                                        modifier = Modifier.padding(vertical = 6.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = label,
-                                                            color = if (selected) DirectCyan else TextPrimary,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Column(
-                                        modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isEn) "Frame Rate (FPS)" else "Khung hình (FPS)",
-                                            color = XboxNeonGreen,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            com.example.data.StreamFpsCap.entries.forEach { cap ->
-                                                val selected = config.streamFpsCap == cap
-                                                Surface(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .clip(RoundedCornerShape(7.dp))
-                                                        .clickable { SettingsRepository.updateStreamFpsCap(cap) },
-                                                    shape = RoundedCornerShape(7.dp),
-                                                    color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF101A14),
-                                                    border = BorderStroke(
-                                                        1.dp,
-                                                        if (selected) XboxNeonGreen else XboxCardBorder
+                                                    Text(
+                                                        text = "${cap.fps} FPS",
+                                                        color = if (selected) XboxNeonGreen else TextPrimary,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold
                                                     )
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.padding(vertical = 6.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = "${cap.fps}",
-                                                            color = if (selected) XboxNeonGreen else TextPrimary,
-                                                            fontSize = 9.5.sp,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
                                                 }
                                             }
                                         }

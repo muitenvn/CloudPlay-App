@@ -1049,9 +1049,9 @@ fun FloatingHud(
                                             )
                                             Text(
                                                 text = if (isEn) {
-                                                    "Scale: ${config.streamRenderScale.shortEn} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
+                                                    "${config.cellularMode.localizedTitle(true)} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
                                                 } else {
-                                                    "Độ nét: ${config.streamRenderScale.shortVi} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
+                                                    "${config.cellularMode.localizedTitle(false)} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
                                                 },
                                                 color = TextSecondary,
                                                 fontSize = 7.5.sp,
@@ -1681,6 +1681,7 @@ private fun DenseQualityModeSection(
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
+    val selectedMode = config.cellularMode
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -1697,7 +1698,7 @@ private fun DenseQualityModeSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEn) "Quality Mode" else "Chế độ chất lượng",
+                    text = if (isEn) "Resolution & Graphics (4G/5G/Wi-Fi)" else "Độ phân giải & Đồ họa (4G/5G/Wi-Fi)",
                     color = XboxNeonGreen,
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.Bold
@@ -1732,47 +1733,47 @@ private fun DenseQualityModeSection(
                 }
             }
 
-            // Hàng 1: Tự động & Thấp & Vừa
+            // Hàng 1: Tự động (720p⇄1080p) & 720p•Thấp & 900p•Vừa
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 DenseQualityPresetChip(
                     label = if (isEn) "Auto" else "Tự động",
-                    isSelected = networkStatus.activeProfileName.contains("Tự Động") || networkStatus.activeProfileName.contains("Auto", ignoreCase = true),
+                    isSelected = selectedMode == com.example.data.CellularOptimizationMode.AUTO,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.AUTO) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(0.95f)
                 )
                 DenseQualityPresetChip(
-                    label = if (isEn) "Low" else "Thấp",
-                    isSelected = networkStatus.activeProfileName.contains("Thấp") || networkStatus.activeProfileName.contains("Low", ignoreCase = true),
+                    label = if (isEn) "720p•Low" else "720p•Thấp",
+                    isSelected = selectedMode == com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.05f)
                 )
                 DenseQualityPresetChip(
-                    label = if (isEn) "Med" else "Vừa",
-                    isSelected = networkStatus.activeProfileName.contains("Trung Bình") || networkStatus.activeProfileName.contains("Medium", ignoreCase = true),
+                    label = if (isEn) "900p•Med" else "900p•Vừa",
+                    isSelected = selectedMode == com.example.data.CellularOptimizationMode.MEDIUM,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MEDIUM) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.05f)
                 )
             }
 
-            // Hàng 2: Cao, Rất cao & Ưu tiên giảm trễ
+            // Hàng 2: 1080p•Cao, 1080p+•Rất cao & Ưu tiên giảm trễ
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 DenseQualityPresetChip(
-                    label = if (isEn) "High" else "Cao",
-                    isSelected = networkStatus.activeProfileName.contains("Cao (") || networkStatus.activeProfileName.contains("High", ignoreCase = true),
+                    label = if (isEn) "1080p•High" else "1080p•Cao",
+                    isSelected = selectedMode == com.example.data.CellularOptimizationMode.HIGH,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.HIGH) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.05f)
                 )
                 DenseQualityPresetChip(
-                    label = if (isEn) "Max" else "Tối đa",
-                    isSelected = networkStatus.activeProfileName.contains("Rất Cao") || networkStatus.activeProfileName.contains("Ultra", ignoreCase = true),
+                    label = if (isEn) "1080p+•Max" else "1080p+•Cao+",
+                    isSelected = selectedMode == com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED,
                     onClick = { onSelectCellularMode(com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1.1f)
                 )
                 DenseQualityPresetChip(
                     label = if (networkStatus.speedFirstPriority) {
@@ -1783,18 +1784,20 @@ private fun DenseQualityModeSection(
                     isSelected = networkStatus.speedFirstPriority,
                     accentColor = DirectCyan,
                     onClick = { onToggleWifiSpeedFirst(!networkStatus.speedFirstPriority) },
-                    modifier = Modifier.weight(1.2f)
+                    modifier = Modifier.weight(1.15f)
                 )
             }
 
-            if (telemetry.estimatedDataSavedMb > 1.0) {
-                Text(
-                    text = if (isEn) "Data saved: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB" else "Tiết kiệm: ~${String.format("%.1f", telemetry.estimatedDataSavedMb)} MB",
-                    color = TextSecondary,
-                    fontSize = 7.5.sp,
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = if (isEn) {
+                    "⚡ 720p/900p cuts lag on 4G, 5G & Wi-Fi"
+                } else {
+                    "⚡ Hạ 720p/900p giúp giảm độ trễ trên cả 4G, 5G & Wi-Fi"
+                },
+                color = TextSecondary,
+                fontSize = 7.5.sp,
+                maxLines = 1
+            )
         }
     }
 }

@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>Tải CloudPlay Xbox APK — Chơi Xbox Cloud Gaming 120FPS Giảm Ping &amp; Decode</title>
-  <meta name="description" content="Tải ứng dụng CloudPlay Xbox APK mới nhất cho Android. Hỗ trợ Xbox Cloud Gaming (xCloud) &amp; Fortnite 120FPS, đệm khung hình 8ms Zero-Delay, giảm Ping, chống trễ Decode phần cứng và chuyển đổi Cảm ứng Epic 1 chạm." />
-  <meta name="keywords" content="CloudPlay Xbox, tải CloudPlay APK, Xbox Cloud Gaming Android, xCloud giảm ping, xCloud giảm decode, chơi Fortnite xCloud 120FPS, Better xCloud Android, tay cầm ảo FPS Pro" />
+  <title>CloudPlay Xbox APK — Công Cụ Hỗ Trợ Chơi Xbox Cloud Gaming / xCloud Helper Tool</title>
+  <meta name="description" content="Tải ứng dụng CloudPlay Xbox APK cho Android: công cụ hỗ trợ chơi Xbox Cloud Gaming, có theo dõi ping và chất lượng luồng phát. / Helper tool for Xbox Cloud Gaming on Android with ping and stream quality monitoring." />
+  <meta name="keywords" content="CloudPlay Xbox, tải CloudPlay APK, công cụ hỗ trợ Xbox Cloud Gaming Android, theo dõi ping xCloud, chất lượng luồng phát, tay cầm ảo Android" />
   <meta name="robots" content="index, follow" />
   <meta name="theme-color" content="#07110B" />
-  <link rel="canonical" href="https://nguyenhphuc956.github.io/CloudPlay-Xbox/" />
+  <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/" />
 
   <style>
     :root {
@@ -20,6 +20,7 @@
       --cyan: #00e5ff;
       --text: #f2fbf5;
       --muted: #9ab3a3;
+      --amber: #ffca28;
     }
     * {
       box-sizing: border-box;
@@ -39,6 +40,25 @@
       margin: 0 auto;
       padding: 14px 12px;
     }
+    .disclaimer-banner {
+      background: rgba(255, 202, 40, 0.12);
+      border: 1px solid rgba(255, 202, 40, 0.55);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: #fff3cd;
+      line-height: 1.45;
+    }
+    .disclaimer-banner strong {
+      color: var(--amber);
+    }
+    .disclaimer-en {
+      display: block;
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--muted);
+    }
     .topbar {
       display: flex;
       align-items: center;
@@ -47,7 +67,7 @@
       background: rgba(13, 25, 18, 0.88);
       border: 1px solid var(--border);
       border-radius: 14px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .brand {
       display: flex;
@@ -88,9 +108,9 @@
       background: linear-gradient(160deg, rgba(18, 36, 26, 0.95) 0%, rgba(10, 20, 15, 0.95) 100%);
       border: 1px solid rgba(34, 255, 102, 0.35);
       border-radius: 18px;
-      padding: 20px 16px;
+      padding: 18px 14px;
       text-align: center;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .hero-tag {
       display: inline-block;
@@ -101,10 +121,10 @@
       color: var(--cyan);
       font-size: 11px;
       font-weight: 700;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .hero h1 {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 900;
       margin-bottom: 8px;
       line-height: 1.3;
@@ -114,8 +134,8 @@
     }
     .hero p {
       color: var(--muted);
-      font-size: 13px;
-      margin: 0 auto 16px;
+      font-size: 12.5px;
+      margin: 0 auto 14px;
     }
     .btn-download {
       display: inline-flex;
@@ -139,7 +159,7 @@
       gap: 8px;
       font-size: 11px;
       color: var(--muted);
-      margin-top: 12px;
+      margin-top: 10px;
     }
     .meta-item {
       background: rgba(0, 0, 0, 0.35);
@@ -151,7 +171,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 10px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .card {
       background: var(--surface);
@@ -160,13 +180,13 @@
       padding: 12px;
     }
     .card-title {
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 800;
       color: var(--neon);
       margin-bottom: 4px;
     }
     .card p {
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--muted);
     }
     .section-box {
@@ -176,7 +196,7 @@
       padding: 14px;
     }
     .section-box h2 {
-      font-size: 14.5px;
+      font-size: 14px;
       font-weight: 800;
       color: var(--cyan);
       margin-bottom: 8px;
@@ -184,7 +204,7 @@
     .changelog-list {
       list-style: none;
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
     .changelog-list li {
       font-size: 12px;
@@ -196,60 +216,66 @@
 </head>
 <body>
   <div class="container">
+    <div class="disclaimer-banner" role="alert">
+      <strong>⚠️ Lưu ý / Disclaimer:</strong> Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.
+      <span class="disclaimer-en">Independent application, not affiliated with Microsoft, Xbox, or Epic Games. May violate Terms of Service and result in account suspension; use at your own risk.</span>
+    </div>
+
     <header class="topbar">
       <div class="brand">
         <div class="logo-badge">X</div>
         <div>
           <div class="brand-title">CLOUDPLAY XBOX</div>
-          <div class="brand-sub">Trang Web Tải App Chuẩn SEO</div>
+          <div class="brand-sub">Công cụ hỗ trợ Xbox Cloud Gaming • xCloud Helper</div>
         </div>
       </div>
       <span id="version-badge" class="version-pill">v1.2.35</span>
     </header>
 
     <section class="hero">
-      <span class="hero-tag">⚡ ĐỆM 8MS • 120FPS • GIẢM TRỄ DECODE</span>
+      <span class="hero-tag">📊 THEO DÕI PING &amp; CHẤT LƯỢNG • PING &amp; QUALITY MONITOR</span>
       <h1>Tải <span>CloudPlay Xbox APK</span> Cho Android</h1>
       <p>
-        Chơi Xbox Cloud Gaming &amp; Fortnite mượt 120FPS, tự động chọn độ phân giải (720p ⇄ 1080p) theo chất lượng đồ họa và giảm Ping/Decode phần cứng.
+        Công cụ hỗ trợ chơi Xbox Cloud Gaming, có theo dõi ping và chất lượng luồng phát, gộp chọn độ phân giải (720p / 900p / 1080p) theo chất lượng đồ họa.<br />
+        <em>Helper tool for Xbox Cloud Gaming with ping and stream quality monitoring.</em>
       </p>
 
-      <a id="download-apk-btn" class="btn-download" href="https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk">
-        <span>📥 TẢI FILE APK NGAY (31.7 MB)</span>
+      <a id="download-apk-btn" class="btn-download" href="https://github.com/muitenvn/CloudPlay-App/releases/latest">
+        <span>📥 TẢI XUỐNG APK / DOWNLOAD APK</span>
       </a>
 
       <div class="meta-row">
         <span class="meta-item">🤖 Android 8.0+</span>
-        <span class="meta-item">🔄 Cài đè không mất dữ liệu</span>
+        <span class="meta-item">🔄 Cài đè trực tiếp / Direct Update</span>
         <span class="meta-item">🔒 Chữ ký APK cố định</span>
       </div>
     </section>
 
     <section class="grid">
       <article class="card">
-        <div class="card-title">🚀 120 FPS &amp; Đệm 8ms</div>
-        <p>Thương lượng luồng 120 FPS trực tiếp với máy chủ Xbox Series X và hạ đệm khung hình xuống 8ms.</p>
-      </article>
-      <article class="card">
-        <div class="card-title">🛡️ Giảm Ping &amp; Decode</div>
-        <p>Ưu tiên giải mã phần cứng H.264 Baseline và tự động xả khung hình trễ khi mạng dao động.</p>
+        <div class="card-title">📡 Theo Dõi Ping &amp; Chất Lượng</div>
+        <p>Hiển thị thông số mạng (Ping, FPS, Bitrate, thời gian giải mã) theo thời gian thực. / Real-time ping and stream quality HUD.</p>
       </article>
       <article class="card">
         <div class="card-title">🎯 Độ Phân Giải Tự Động</div>
-        <p>Tích hợp thẳng độ phân giải 720p / 900p / 1080p vào mức Chất lượng đồ họa chỉ với 1 chạm.</p>
+        <p>Tích hợp độ phân giải 720p / 900p / 1080p vào mức Chất lượng đồ họa cho 4G/5G và Wi-Fi. / Unified resolution and graphics presets.</p>
       </article>
       <article class="card">
-        <div class="card-title">👆 Cảm Ứng Epic 1 Chạm</div>
-        <p>Tự động ngắt tay cầm giả lập khi chọn Cảm ứng Epic để hiện đầy đủ nút bắn/xây gốc của Fortnite.</p>
+        <div class="card-title">🎮 Cảm Ứng &amp; Tay Cầm Ảo</div>
+        <p>Hỗ trợ chuyển đổi giữa thao tác cảm ứng và bộ nút tay cầm ảo. / Switch between touch controls and virtual gamepad.</p>
+      </article>
+      <article class="card">
+        <div class="card-title">🌐 Hỗ Trợ Vùng &amp; Ngôn Ngữ</div>
+        <p>Tùy chỉnh vùng kết nối và ngôn ngữ hiển thị song ngữ Việt/Anh. / Region selection and bilingual VI/EN interface.</p>
       </article>
     </section>
 
     <section class="section-box">
-      <h2>✨ Điểm mới trong bản cập nhật</h2>
+      <h2>✨ Nhật ký cập nhật / Changelog</h2>
       <ul class="changelog-list">
-        <li><strong>Gộp tự động Độ phân giải vào Chất lượng đồ họa:</strong> Chọn mức đồ họa sẽ tự chỉnh luôn 720p, 900p hoặc 1080p Full HD.</li>
-        <li><strong>Giảm Ping &amp; chống vọt ms Decode:</strong> Tối ưu hóa đường ống giải mã phần cứng GPU.</li>
-        <li><strong>Tích hợp chung 1 dự án:</strong> Bao gồm cả ứng dụng Android và trang Web chuẩn SEO Google Search.</li>
+        <li><strong>Gộp Độ phân giải vào Chất lượng đồ họa / Unified Resolution &amp; Quality:</strong> Chọn mức đồ họa tự đồng bộ 720p, 900p hoặc 1080p.</li>
+        <li><strong>Theo dõi Ping &amp; Chất lượng / Ping &amp; Quality Monitor:</strong> Hiển thị trực quan thông số mạng và luồng phát.</li>
+        <li><strong>Liên kết tải về ổn định / Stable Release Link:</strong> Dùng liên kết <code>releases/latest</code> tránh lỗi 404 khi đổi phiên bản.</li>
       </ul>
     </section>
   </div>

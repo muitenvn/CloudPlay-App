@@ -578,9 +578,9 @@ data class AppConfig(
     val videoContrast: Int = 100, // 80 .. 140 (%)
     val videoSaturation: Int = 100, // 80 .. 150 (%)
     val videoBrightness: Int = 100, // 80 .. 130 (%)
-    val customApkDownloadUrl: String = "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk",
-    val publicWebPortalUrl: String = "https://nguyenhphuc956.github.io/CloudPlay-Xbox/",
-    val githubRepoSlug: String = "nguyenhphuc956/CloudPlay-Xbox",
+    val customApkDownloadUrl: String = "https://github.com/muitenvn/CloudPlay-App/releases/latest",
+    val publicWebPortalUrl: String = "https://muitenvn.github.io/CloudPlay-App/",
+    val githubRepoSlug: String = "muitenvn/CloudPlay-App",
     val userAcceptedTerms: Boolean = false
 ) {
     val targetRegionUrl: String
@@ -700,17 +700,17 @@ object SettingsRepository {
             videoSaturation = sp.getInt("video_saturation_v2", 100).coerceIn(80, 150),
             videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
             customApkDownloadUrl = sp.getString(
-                "custom_apk_download_url",
-                "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk"
-            ) ?: "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk",
+                "custom_apk_download_url_v2",
+                "https://github.com/muitenvn/CloudPlay-App/releases/latest"
+            ) ?: "https://github.com/muitenvn/CloudPlay-App/releases/latest",
             publicWebPortalUrl = sp.getString(
-                "public_web_portal_url",
-                "https://nguyenhphuc956.github.io/CloudPlay-Xbox/"
-            ) ?: "https://nguyenhphuc956.github.io/CloudPlay-Xbox/",
+                "public_web_portal_url_v2",
+                "https://muitenvn.github.io/CloudPlay-App/"
+            ) ?: "https://muitenvn.github.io/CloudPlay-App/",
             githubRepoSlug = sp.getString(
-                "github_repo_slug",
-                "nguyenhphuc956/CloudPlay-Xbox"
-            ) ?: "nguyenhphuc956/CloudPlay-Xbox",
+                "github_repo_slug_v2",
+                "muitenvn/CloudPlay-App"
+            ) ?: "muitenvn/CloudPlay-App",
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
@@ -775,9 +775,9 @@ object SettingsRepository {
             putInt("video_contrast", c.videoContrast)
             putInt("video_saturation", c.videoSaturation)
             putInt("video_brightness", c.videoBrightness)
-            putString("custom_apk_download_url", c.customApkDownloadUrl)
-            putString("public_web_portal_url", c.publicWebPortalUrl)
-            putString("github_repo_slug", c.githubRepoSlug)
+            putString("custom_apk_download_url_v2", c.customApkDownloadUrl)
+            putString("public_web_portal_url_v2", c.publicWebPortalUrl)
+            putString("github_repo_slug_v2", c.githubRepoSlug)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             apply()
         }
@@ -1105,13 +1105,13 @@ object SettingsRepository {
         _config.update {
             it.copy(
                 customApkDownloadUrl = apkDownloadUrl.trim().ifBlank {
-                    "https://github.com/nguyenhphuc956/CloudPlay-Xbox/releases/latest/download/CloudPlay-Xbox-v1.2.34.apk"
+                    "https://github.com/muitenvn/CloudPlay-App/releases/latest"
                 },
                 publicWebPortalUrl = webPortalUrl.trim().ifBlank {
-                    "https://nguyenhphuc956.github.io/CloudPlay-Xbox/"
+                    "https://muitenvn.github.io/CloudPlay-App/"
                 },
                 githubRepoSlug = githubRepo.trim().ifBlank {
-                    "nguyenhphuc956/CloudPlay-Xbox"
+                    "muitenvn/CloudPlay-App"
                 }
             )
         }

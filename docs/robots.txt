@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://nguyenhphuc956.github.io/CloudPlay-Xbox/sitemap.xml
+Sitemap: https://muitenvn.github.io/CloudPlay-App/sitemap.xml

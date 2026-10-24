@@ -22,7 +22,9 @@ sealed class UpdateCheckState {
         val currentVersion: String,
         val latestVersion: String,
         val releaseUrl: String,
-        val releaseNotes: String
+        val releaseNotes: String,
+        val apkDirectUrl: String = "",
+        val fastCdnApkUrl: String = ""
     ) : UpdateCheckState()
     data class CheckFailed(
         val currentVersion: String,
@@ -36,11 +38,13 @@ object UpdateChecker {
     private const val KEY_CACHED_LATEST_VER = "cached_latest_version"
     private const val KEY_CACHED_RELEASE_URL = "cached_release_url"
     private const val KEY_CACHED_RELEASE_NOTES = "cached_release_notes_v2"
+    private const val KEY_CACHED_APK_DIRECT_URL = "cached_apk_direct_url"
 
     private const val CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L // 24 giờ
     private const val TIMEOUT_MS = 8000 // 8 giây
     private const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest"
     private const val FALLBACK_RELEASES_URL = "https://github.com/muitenvn/CloudPlay-App/releases/latest"
+    private const val FAST_CDN_PREFIX = "https://ghfast.top/"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -108,6 +112,17 @@ object UpdateChecker {
         }
     }
 
+    private fun buildFastCdnUrl(apkDirectUrl: String, latestVersion: String): String {
+        val resolvedDirect = apkDirectUrl.ifBlank {
+            "https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
+        }
+        return if (resolvedDirect.startsWith("https://github.com/")) {
+            "$FAST_CDN_PREFIX$resolvedDirect"
+        } else {
+            resolvedDirect
+        }
+    }
+
     /**
      * Kiểm tra tự động khi mở ứng dụng (tối đa 1 lần mỗi 24 giờ).
      * Nếu chưa đủ 24 giờ kể từ lần kiểm tra trước nhưng có sẵn bản mới hơn trong bộ nhớ đệm,
@@ -126,7 +141,8 @@ object UpdateChecker {
         val now = System.currentTimeMillis()
 
         val cachedNotes = sp.getString(KEY_CACHED_RELEASE_NOTES, "") ?: ""
-        if (now - lastCheckMs in 1 until CHECK_INTERVAL_MS && cachedNotes.isNotBlank()) {
+        val cachedApkDirect = sp.getString(KEY_CACHED_APK_DIRECT_URL, "") ?: ""
+        if (now - lastCheckMs in 1 until CHECK_INTERVAL_MS && cachedNotes.isNotBlank() && cachedApkDirect.isNotBlank()) {
             val cachedLatest = sp.getString(KEY_CACHED_LATEST_VER, "") ?: ""
             val cachedUrl = sp.getString(KEY_CACHED_RELEASE_URL, FALLBACK_RELEASES_URL) ?: FALLBACK_RELEASES_URL
             if (cachedLatest.isNotBlank() && isNewerVersion(currentVersion, cachedLatest)) {
@@ -134,7 +150,9 @@ object UpdateChecker {
                     currentVersion = currentVersion,
                     latestVersion = cachedLatest,
                     releaseUrl = cachedUrl,
-                    releaseNotes = cachedNotes
+                    releaseNotes = cachedNotes,
+                    apkDirectUrl = cachedApkDirect,
+                    fastCdnApkUrl = buildFastCdnUrl(cachedApkDirect, cachedLatest)
                 )
                 _showUpdateDialog.value = true
             }
@@ -200,6 +218,24 @@ object UpdateChecker {
                 FALLBACK_RELEASES_URL
             }
 
+            var apkDirectUrl = ""
+            val assetsArr = json.optJSONArray("assets")
+            if (assetsArr != null) {
+                for (i in 0 until assetsArr.length()) {
+                    val assetObj = assetsArr.optJSONObject(i) ?: continue
+                    val name = assetObj.optString("name", "")
+                    val dlUrl = assetObj.optString("browser_download_url", "").trim()
+                    if (name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
+                        apkDirectUrl = dlUrl
+                        if (name.contains("CloudPlay-Xbox", ignoreCase = true)) break
+                    }
+                }
+            }
+            if (apkDirectUrl.isBlank()) {
+                apkDirectUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
+            }
+            val fastCdnUrl = buildFastCdnUrl(apkDirectUrl, latestVersion)
+
             val rawNotes = json.optString("body", "").trim()
             val cleanNotes = sanitizeReleaseNotes(rawNotes)
 
@@ -209,6 +245,7 @@ object UpdateChecker {
                 .putString(KEY_CACHED_LATEST_VER, latestVersion)
                 .putString(KEY_CACHED_RELEASE_URL, releaseUrl)
                 .putString(KEY_CACHED_RELEASE_NOTES, cleanNotes)
+                .putString(KEY_CACHED_APK_DIRECT_URL, apkDirectUrl)
                 .apply()
 
             if (isNewerVersion(currentVersion, latestVersion)) {
@@ -216,7 +253,9 @@ object UpdateChecker {
                     currentVersion = currentVersion,
                     latestVersion = latestVersion,
                     releaseUrl = releaseUrl,
-                    releaseNotes = cleanNotes
+                    releaseNotes = cleanNotes,
+                    apkDirectUrl = apkDirectUrl,
+                    fastCdnApkUrl = fastCdnUrl
                 )
                 _showUpdateDialog.value = true
             } else {

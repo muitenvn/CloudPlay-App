@@ -1,92 +1,97 @@
-# Tính Năng Tự Động Kiểm Tra Bản Cập Nhật (CloudPlay)
+# Kế Hoạch Nâng Cấp Chuyên Sâu Hệ Thống Mạng Wi-Fi & 4G/5G (Dựa Trên Số Liệu Phiên Chơi Fortnite Thực Tế)
 
-Bổ sung cơ chế tự động kiểm tra phiên bản mới từ GitHub Releases (`muitenvn/CloudPlay-App`) mỗi 24 giờ khi mở ứng dụng, hiển thị hộp thoại thông báo phiên bản mới và cung cấp nút kiểm tra thủ công trong mục Cài đặt.
+Nâng cấp toàn diện lõi xử lý mạng **Wi-Fi (2.4GHz / 5GHz / 6GHz)** và **4G/5G Di Động** kết hợp xử lý trực tiếp hiện tượng **Giải mã TB vọt lên `32.8ms` và Ping dao động `81ms ➔ 127ms`** trong ảnh phiên chơi Fortnite vừa gửi, đồng thời gộp bớt các nút thừa và sửa các chỗ bị tràn/cắt chữ trên giao diện.
 
-## User Review & Critical Decisions
+---
+
+## Các Quyết Định Đã Chốt Với Bạn
 
 > [!IMPORTANT]
-> Dưới đây là các quyết định thiết kế đã được xác nhận theo lựa chọn của bạn:
+> Toàn bộ kế hoạch dưới đây tuân thủ nghiêm ngặt các lựa chọn bạn đã xác nhận:
 
-- **Quyết định đã xác nhận 1 (Cách hiển thị thông báo)**: Hiển thị **Hộp thoại thông báo cập nhật** ngay khi mở ứng dụng nếu phát hiện phiên bản trên GitHub mới hơn phiên bản đang cài đặt, kèm nút mở trang tải bản cập nhật hoặc bỏ qua.
-- **Quyết định đã xác nhận 2 (Tần suất & điều khiển)**: Tự động kiểm tra ngầm tối đa **1 lần mỗi 24 giờ** khi mở ứng dụng (có công tắc bật/tắt trong Cài đặt, mặc định bật) kèm nút **"Kiểm tra ngay"** trong mục Cài đặt.
-
----
-
-## 1. Overview & Core Concept
-
-- **Chức năng chính**:
-  - Khi mở ứng dụng (sau khi người dùng đã đồng ý điều khoản sử dụng), ứng dụng kiểm tra ngầm qua API GitHub Releases (`https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest`, timeout 8 giây) nếu đã qua 24 giờ kể từ lần kiểm tra trước.
-  - So sánh phiên bản theo từng cấp số (`X.Y.Z`, ví dụ `1.2.9 < 1.2.10`, tự bỏ tiền tố `v`) với phiên bản hiện tại của ứng dụng.
-  - Khi có bản mới, hiển thị hộp thoại thông báo gọn gàng cho biết số phiên bản mới, tóm tắt ngắn gọn và nút mở trang phát hành trên trình duyệt để tải về.
-  - Khi mạng lỗi, hết giới hạn API hoặc dữ liệu không hợp lệ tijdens kiểm tra tự động: xử lý im lặng, không làm gián đoạn trải nghiệm người dùng.
-- **Đối tượng sử dụng**: Người dùng CloudPlay muốn biết ngay khi có bản APK mới được phát hành trên GitHub mà không cần tự vào web tìm kiếm.
-- **Giá trị mang lại**: Luôn cập nhật các bản vá tối ưu mạng, tay cầm và tính năng mới nhất một cách chủ động, nhẹ nhàng, không tốn tài nguyên nền và không yêu cầu thêm quyền truy cập hệ thống.
+- **Không thêm nút mới, gộp gọn các nút thừa:** Mọi thuật toán tối ưu sâu cho Wi-Fi và 4G/5G chạy tự động ngầm 100%. Gộp bớt các công tắc mạng trùng lặp trong bảng điều khiển nổi và màn hình Cài đặt.
+- **Trọng tâm xử lý mạng thực tế:**
+  1. **Mạng 4G/5G & Đường truyền quốc tế:** Chống rớt mạng, khựng hình khi sóng 4G yếu, đổi trạm thu phát hoặc khi đường truyền quốc tế đi Nhật/Hàn dao động (như đoạn Ping nhấp nhô `81ms ➔ 127ms` trên biểu đồ Fortnite của bạn).
+  2. **Mạng Wi-Fi 2.4GHz & 5GHz:** Chống giật lag khi đứng xa cục phát Wi-Fi hoặc nhiễu sóng.
+  3. **Xử lý dứt điểm lỗi `Giải mã chậm (32.8ms)`:** Ngăn hiện tượng gói tin mạng dồn cục làm nghẽn bộ giải mã video phần cứng của điện thoại.
+- **Chiến lược phản ứng khi mạng suy giảm:** Ưu tiên tuyệt đối **độ trễ thấp và thao tác điều khiển nhạy nhất**, chấp nhận hạ nhẹ độ nét khi mạng yếu hoặc khi thời gian giải mã vượt ngưỡng `9ms`.
 
 ---
 
-## 2. User Experience & Visual Design
+## 1. Phân Tích Từ Ảnh Chụp Phiên Chơi Fortnite Thực Tế Của Bạn (`15p 36s`)
 
-- **Luồng trải nghiệm chính**:
-  1. **Khi mở ứng dụng (Tự động mỗi 24 giờ)**:
-     - Nếu công tắc *"Tự kiểm tra bản mới khi mở ứng dụng"* đang bật và lần kiểm tra gần nhất cách đây hơn 24 giờ, ứng dụng gọi API GitHub ở luồng nền.
-     - Nếu có bản mới hơn (và người dùng chưa bấm "Để sau" cho phiên bản đó trong phiên hiện tại), một **Hộp thoại thông báo cập nhật** sẽ xuất hiện.
-     - Người dùng có thể bấm **"Xem & Tải bản mới"** (mở trang phát hành GitHub bằng trình duyệt) hoặc **"Để sau"** (đóng hộp thoại).
-  2. **Kiểm tra thủ công trong Cài đặt**:
-     - Trong mục **Cài đặt**, thẻ **Cập nhật ứng dụng** hiển thị phiên bản hiện tại, công tắc bật/tắt tự động kiểm tra khi mở ứng dụng và nút **"Kiểm tra ngay"**.
-     - Khi bấm **"Kiểm tra ngay"**, ứng dụng kiểm tra ngay lập tức (bỏ qua giới hạn 24 giờ), hiển thị trạng thái ngắn gọn ngay bên dưới (*"Đang kiểm tra..."*, *"Đã là bản mới nhất (vX.Y.Z)"*, hoặc *"Có bản mới vX.Y.Z"* kèm mở hộp thoại cập nhật).
-- **Phong cách thiết kế & Giao diện**:
-  - **Đồng bộ giao diện Xbox Dark Neon**: Nền tối (`#11161D`), viền xanh neon (`#22C55E`), nút hành động chính màu xanh Xbox nổi bật, chữ phân cấp rõ ràng, giải thích ngắn gọn dễ hiểu cho người dùng phổ thông (hỗ trợ cả Tiếng Việt và Tiếng Anh).
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Quyết định 1: Mở trang tải bằng trình duyệt thay vì tự tải ngầm APK**
-  - *Cách tiếp cận*: Khi người dùng chọn cập nhật trên hộp thoại, mở trang phát hành chính thức trên trình duyệt.
-  - *Lý do*: Không cần xin quyền nhạy cảm `REQUEST_INSTALL_PACKAGES` (tránh cảnh báo bảo mật của Android và tuân thủ chính sách an toàn), đồng thời giúp người dùng xem rõ thông tin bản phát hành trên GitHub.
-- **Quyết định 2: So sánh phiên bản theo cấp số (Semantic Version Tuple) và giới hạn 24 giờ**
-  - *Cách tiếp cận*: Tách chuỗi phiên bản (`1.2.10` -> `[1, 2, 10]`) để so sánh chính xác theo số học và lưu mốc thời gian kiểm tra gần nhất vào bộ nhớ cài đặt.
-  - *Lý do*: Tránh lỗi so sánh chuỗi (`"1.2.10" < "1.2.9"`) và tránh bị giới hạn tần suất (rate-limit) của GitHub API khi người dùng mở ứng dụng nhiều lần trong ngày.
+Nhìn vào bảng thống kê phiên chơi **Fortnite** bạn vừa gửi:
+- **Ping TB: `87ms` (Thấp `81ms` • Cao `127ms`):** Ở nửa sau phiên chơi, biểu đồ Ping xuất hiện các đỉnh nhọn vọt từ `81ms` lên `127ms` (chênh lệch Jitter tới `46ms`).
+- **Giải mã TB: `32.8ms` (`Trạng thái máy: Giải mã chậm >12ms`) dù FPS vẫn đạt `56 FPS`:**
+  - Để chơi mượt không trễ tay cầm ở 60 FPS, mỗi khung hình chỉ được phép giải mã trong **dưới `8–10ms`**. Con số **`32.8ms`** có nghĩa là thao tác bấm nút của bạn bị trễ thêm hơn 2 khung hình!
+  - **Nguyên nhân gốc rễ:** Khi mạng Wi-Fi / 4G bị khựng nhẹ (Ping vọt từ `81ms` lên `127ms`), hàng chục gói tin hình ảnh bị giữ lại rồi **đổ ập về cùng một mili-giây**. Bộ giải mã phần cứng MediaCodec của máy bị dồn ứ 3–4 khung hình cùng lúc trong hàng đợi, khiến tổng thời gian chờ giải mã (`totalDecodeTime`) vọt lên `32.8ms`!
+- **Chọn nhầm máy chủ chưa tối ưu:** Phiên chơi đang kết nối vào `Japan Tokyo CloudDC #11` (`87ms`), trong khi máy chủ `Japan Tsukuba #6` chỉ có **`~68ms`** (thấp hơn gần `20ms`).
+- **Lỗi hiển thị giao diện nhìn thấy ngay trên ảnh:**
+  1. Nút đỏ **`🗑️ Xóa phiên này`** ở góc dưới bên trái bị rớt chữ `"này"` xuống dòng 2 và bị cắt mất nửa chữ.
+  2. Dòng tiêu đề **`BIỂU ĐỒ PING THEO THỜI GIAN`** và **`Thấp 81ms • Cao 127ms`** chèn ép nhau làm chữ `"127ms"` bị rớt dòng lẻ loi.
+  3. Thanh tiêu đề trên cùng bị ép hẹp khiến tên ứng dụng bị cắt thành **`CLOUDP...`**.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 2. Giải Pháp Kỹ Thuật Chuyên Sâu Cho Wi-Fi, 4G/5G & Bộ Giải Mã (`< 8ms`)
 
-- **Sơ đồ kiến trúc & luồng dữ liệu**:
+### 2.1. Chống Dồn Ứ Hàng Đợi Giải Mã (`32.8ms ➔ < 8ms`) Khi Mạng Dao Động
+- **Cơ chế xả khung hình trễ (Frame-Queue Drain) & Hạ áp lực tức thì trong 1.5 giây:**
+  - Ngay khi phát hiện thời gian giải mã vượt ngưỡng **`9.0ms`** hoặc Ping tăng đột ngột trên **`15ms`** (như đợt sóng từ `81ms ➔ 127ms`), hệ thống lập tức hạ nhẹ băng thông mục tiêu ngay trong **1 nhịp đo (1.5 giây)** thay vì chờ 6 giây như cũ.
+  - Khi kích thước mỗi khung hình nhỏ đi ngay lập tức, chip giải mã của điện thoại xử lý xong từng khung hình trong **3–6ms**, xóa sạch hàng đợi bị ứ đọng và đưa `Giải mã TB` từ `32.8ms` về mức xanh mát (`< 8ms`).
+- **Tự động gạn lọc nhiễu số liệu WebRTC:**
+  - Khi trình duyệt vừa chuyển tab hoặc tạm dừng khung hình, `totalDecodeTime` của Chromium đôi khi cộng dồn cả thời gian chờ dẫn đến số ảo vọt lên trên `30ms`. Bộ đo mới sẽ lọc bỏ các nhịp nghỉ ngoại lệ để số liệu `Giải mã TB` phản ánh đúng 100% tốc độ phần cứng thực.
+
+### 2.2. Đo Sóng Thực Tế Trên Wi-Fi (2.4GHz / 5GHz) & 4G/5G
+- **Trên Wi-Fi 5GHz & 2.4GHz:**
+  - Đọc trực tiếp **cường độ sóng Wi-Fi (`RSSI dBm`)** và **tốc độ liên kết vật lý (`Link Speed Mbps`)**:
+    - Nếu bạn dùng **Wi-Fi 5GHz nhưng đứng xa cục phát / cách tường** (cường độ sóng yếu hơn `-70 dBm`), hệ thống tự động hạ trần băng thông xuống mức an toàn (7–9 Mbps) để gói tin không bị rớt và không gây nhấp nhô Ping.
+    - Nếu dùng **Wi-Fi 2.4GHz**, tự động kích hoạt chế độ chống nhiễu tay cầm Bluetooth và giữ gói tin gọn nhẹ.
+- **Trên mạng 4G/5G Di Động:**
+  - Theo dõi **cường độ vạch sóng (`signalStrength`)** và **băng thông thực tế (`linkDownstreamBandwidthKbps`)** để chủ động thu gọn luồng hình ảnh ngay khi sóng 4G yếu hoặc chuyển trạm phát sóng.
+- **Tự động ưu tiên máy chủ có Ping thực tế thấp nhất (ví dụ `Tsukuba #6 ~68ms`):**
+  - Khi tự động chọn máy chủ, hệ thống ưu tiên cụm máy chủ có độ trễ thấp nhất và ổn định nhất cho tựa game đang mở.
+
+### 2.3. Gộp Nút Thừa & Sửa Lỗi Cắt Chữ Giao Diện (Không Thêm Nút Mới)
+- **Gộp gọn các nút mạng trùng lặp:**
+  - Bật mặc định 100% chế độ **Ưu tiên giảm trễ** ở tầng hệ thống; loại bỏ nút phụ *"Giảm trễ: Bật/Tắt"* và nhãn phụ *"Tự động/Cố định"* trùng lặp trong bảng nút nổi.
+  - Rút gọn các công tắc mạng chồng chéo trong màn hình Cài đặt.
+- **Sửa lỗi cắt chữ trong Hộp thoại Lịch sử phiên chơi & Thanh tiêu đề:**
+  - Sửa nút **`🗑️ Xóa phiên`** (gọn 1 dòng, căn chỉnh khoảng đệm chuẩn để không bao giờ bị cắt mất chữ như trong ảnh).
+  - Căn chỉnh lại hàng tiêu đề **`BIỂU ĐỒ PING`** và **`Thấp 81ms • Cao 127ms`** nằm gọn trên 1 dòng duy nhất.
+  - Thu gọn khoảng cách các nút trên thanh tiêu đề trên cùng để tên **`CLOUDPLAY`** hiển thị rõ ràng, không bị cắt thành `CLOUDP...`.
+
+---
+
+## 3. Sơ Đồ Luồng Xử Lý Mạng & Chống Nghẽn Giải Mã
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              MainActivity                               │
-│  • Khởi chạy kiểm tra tự động (nếu bật & đã qua 24h từ lần kiểm tra cuối)│
-│  • Hiển thị hộp thoại UpdateAvailableDialog khi phát hiện bản mới       │
-└───────────────────┬─────────────────────────────────────┬───────────────┘
-                    │                                     │
-                    ▼                                     ▼
-┌───────────────────────────────────────┐ ┌───────────────────────────────┐
-│            UpdateChecker              │ │        SettingsScreen         │
-│  • GET api.github.com/.../latest      │ │  • Công tắc: Tự kiểm tra      │
-│  • Timeout 8s, User-Agent chuẩn       │ │    bản mới khi mở ứng dụng    │
-│  • So sánh phiên bản số học (X.Y.Z)   │ │  • Nút: Kiểm tra ngay +       │
-│  • StateFlow<UpdateCheckState>        │ │    dòng trạng thái kết quả    │
-└───────────────────┬───────────────────┘ └───────────────┬───────────────┘
-                    │                                     │
-                    └──────────────────┬──────────────────┘
-                                       ▼
-                    ┌─────────────────────────────────────┐
-                    │   SettingsRepository (SharedPrefs)  │
-                    │  • autoCheckUpdatesOnLaunch = true  │
-                    │  • lastUpdateCheckEpochMs           │
-                    │  • cachedLatestVersion / ReleaseUrl │
-                    └─────────────────────────────────────┘
+│             1. CẢM BIẾN SÓNG WI-FI & 4G/5G THỜI GIAN THỰC               │
+│  • Wi-Fi: Băng tần (2.4/5/6GHz) + Cường độ sóng (RSSI dBm) + LinkSpeed  │
+│  • 4G/5G: Vạch sóng (SignalStrength) + Băng thông + Phát hiện đổi trạm  │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│        2. BỘ CHỐNG NGHẼN GIẢI MÃ & ƯU TIÊN ĐỘ NHẠY (PHẢN ỨNG 1.5S)      │
+│  • Phát hiện Ping nhảy (81➔127ms) hoặc Giải mã > 9ms                    │
+│  • Hạ nhẹ băng thông tức thì trong 1.5s ➔ Xả sạch hàng đợi giải mã      │
+│  • Giữ thời gian giải mã luôn ở mức Xanh (< 8ms), điều khiển nhạy 100%  │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│           3. GIAO DIỆN GỌN NHẸ (KHÔNG THÊM NÚT, SỬA CẮT CHỮ)            │
+│  • Gộp bỏ nút "Giảm trễ: Bật/Tắt" thừa (luôn bật tự động ngầm)          │
+│  • Sửa nút "Xóa phiên", biểu đồ Ping 1 dòng & thanh tiêu đề CLOUDPLAY   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Mô hình trạng thái & Tương tác**:
-  - **Cấu hình lưu trữ**:
-    - `autoCheckUpdatesOnLaunch`: Bật/tắt tự kiểm tra khi mở ứng dụng (mặc định `true`).
-    - `lastUpdateCheckEpochMs`: Thời điểm kiểm tra thành công gần nhất để tính chu kỳ 24 giờ.
-  - **Trạng thái kiểm tra (`UpdateCheckState`)**:
-    - `Idle`: Chưa kiểm tra trong phiên.
-    - `Checking`: Đang kết nối máy chủ GitHub.
-    - `UpToDate(currentVersion)`: Đang ở phiên bản mới nhất.
-    - `UpdateAvailable(currentVersion, latestVersion, releaseUrl, releaseNotes)`: Phát hiện bản mới hơn, kích hoạt hiển thị hộp thoại thông báo cập nhật và nút mở trình duyệt.
-    - `SilentError`: Lỗi mạng hoặc giới hạn API (ẩn hoàn toàn khi kiểm tra tự động; chỉ báo ngắn gọn *"Không thể kết nối máy chủ kiểm tra, vui lòng thử lại sau"* nếu người dùng chủ động bấm nút *"Kiểm tra ngay"*).
+---
+
+## 4. Các Hạng Mục Sẽ Thực Hiện Ngay Khi Bạn Bấm Proceed
+
+1. **Nâng cấp lõi mạng Wi-Fi (đo RSSI/LinkSpeed khi đứng xa cục phát) & 4G/5G (đo vạch sóng & chống khựng khi đổi trạm).**
+2. **Xử lý dứt điểm lỗi `Giải mã TB 32.8ms`:** Phản ứng tức thì trong 1.5 giây khi Ping nhấp nhô hoặc giải mã vượt `9ms`, kết hợp xả hàng đợi khung hình trễ để thời gian giải mã luôn dưới `8ms`.
+3. **Gộp bớt nút thừa & Sửa lỗi tràn chữ trong ảnh chụp màn hình:** Gộp bỏ công tắc giảm trễ phụ trong bảng nút nổi, sửa nút `"Xóa phiên"`, dòng `"Thấp 81ms • Cao 127ms"` và thanh tiêu đề `"CLOUDPLAY"`.

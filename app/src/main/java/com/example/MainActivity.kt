@@ -270,6 +270,7 @@ fun MainContent(
                 latestVersion = availableUpdate.latestVersion,
                 releaseUrl = availableUpdate.releaseUrl,
                 releaseNotes = availableUpdate.releaseNotes,
+                fastCdnApkUrl = availableUpdate.fastCdnApkUrl,
                 isEn = config.isEnglishUI(),
                 onDismiss = { com.example.data.UpdateChecker.dismissUpdateDialog() }
             )

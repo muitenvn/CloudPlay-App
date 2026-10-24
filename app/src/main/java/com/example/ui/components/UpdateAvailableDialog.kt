@@ -56,11 +56,15 @@ fun UpdateAvailableDialog(
     latestVersion: String,
     releaseUrl: String,
     releaseNotes: String,
+    fastCdnApkUrl: String = "",
     isEn: Boolean,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val notesScrollState = rememberScrollState()
+    val effectiveFastUrl = fastCdnApkUrl.ifBlank {
+        "https://ghfast.top/https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -135,7 +139,7 @@ fun UpdateAvailableDialog(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 260.dp)
+                            .heightIn(max = 240.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -154,6 +158,32 @@ fun UpdateAvailableDialog(
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
+
+                // Nút tải tốc độ cao qua CDN Châu Á (chống bóp băng thông quốc tế VNPT/Viettel tới GitHub US)
+                Button(
+                    onClick = {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(effectiveFastUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                        }
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("update_dialog_fast_cdn_btn"),
+                    colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (isEn) "⚡ Fast Download APK (Asia CDN)" else "⚡ Tải nhanh APK (Server Châu Á - Không nghẽn)",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -175,7 +205,7 @@ fun UpdateAvailableDialog(
                         )
                     }
 
-                    Button(
+                    OutlinedButton(
                         onClick = {
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)).apply {
@@ -189,23 +219,23 @@ fun UpdateAvailableDialog(
                         modifier = Modifier
                             .weight(1.3f)
                             .testTag("update_dialog_open_browser_btn"),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f))
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.OpenInNew,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(15.dp)
+                                tint = DirectCyan,
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = if (isEn) "View & Download" else "Xem & Tải về",
-                                color = Color.White,
-                                fontSize = 12.sp,
+                                text = if (isEn) "GitHub Page" else "Mở trang GitHub",
+                                color = DirectCyan,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }

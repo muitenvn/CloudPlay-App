@@ -614,11 +614,18 @@ def main() -> None:
         lines.append("</details>")
         lines.append("")
 
+    repo_slug = os.environ.get("GITHUB_REPOSITORY", "").strip() or "muitenvn/CloudPlay-App"
+    direct_gh_url = f"https://github.com/{repo_slug}/releases/download/{tag_name}/{apk_ver_name}"
+    cdn_fast_1 = f"https://ghfast.top/{direct_gh_url}"
+    cdn_fast_2 = f"https://gh-proxy.com/{direct_gh_url}"
+
     lines.extend(
         [
             "---",
-            "### 📥 Tải về & Cài đặt đè trực tiếp",
-            f"- **File APK bản cập nhật này:** Nhấn tải **`{apk_ver_name}`** tại mục **Assets** bên dưới.",
+            "### 📥 Tải về & Cài đặt đè trực tiếp (Có Link CDN Tốc Độ Cao)",
+            f"- ⚡ **[Tải Nhanh APK qua Server Châu Á (CDN #1 - Chống nghẽn mạng VNPT/Viettel)]({cdn_fast_1})**",
+            f"- 🚀 **[Tải Nhanh APK Dự Phòng (CDN #2)]({cdn_fast_2})**",
+            f"- 📦 **[Tải trực tiếp từ GitHub gốc (`{apk_ver_name}`)]({direct_gh_url})** *(hoặc mục **Assets** bên dưới)*",
             "- **Cài đặt đè không mất dữ liệu:** APK được ký bằng chữ ký cố định — cài đặt đè trực tiếp lên bản cũ mà không cần gỡ ứng dụng.",
             f"- **SHA-256:** `{apk_sha256}`",
             "",

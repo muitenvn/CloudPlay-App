@@ -189,10 +189,11 @@
     <h1>CloudPlay</h1>
     <p id="subtitle" class="subtitle">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.</p>
 
-    <div>
-      <a id="download-apk-btn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn-download">Tải APK</a>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+      <a id="download-fast-cdn-btn" href="https://ghfast.top/https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn-download">⚡ Tải Nhanh APK (Server Châu Á)</a>
+      <a id="download-apk-btn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn-download" style="background-color:#262626;">Tải APK (GitHub gốc)</a>
     </div>
-    <p class="meta-line"><span id="android-req">Android 7.0+</span> · <span id="apk-size">~31.7 MB</span></p>
+    <p class="meta-line"><span id="android-req">Android 7.0+</span> · <span id="apk-size">~35.1 MB</span> · <span id="cdn-hint">Khuyên dùng nút Tải Nhanh nếu mạng VNPT/Viettel tải GitHub bị chậm buổi tối</span></p>
 
     <div id="screenshots-section" class="screenshots">
       <img id="ss-1" src="img/screenshot-1.png" alt="Màn hình trang chủ ứng dụng CloudPlay" onerror="handleImgError(this)">
@@ -230,7 +231,9 @@
           iconAlt: 'Biểu tượng ứng dụng CloudPlay',
           langAria: 'Chuyển đổi ngôn ngữ EN hoặc VI',
           subtitle: 'Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.',
-          downloadBtn: 'Tải APK',
+          fastBtn: '⚡ Tải Nhanh APK (Server Châu Á)',
+          downloadBtn: 'Tải APK (GitHub gốc)',
+          cdnHint: 'Khuyên dùng nút Tải Nhanh nếu mạng VNPT/Viettel tải GitHub bị chậm buổi tối',
           androidReq: 'Android 7.0+',
           ss1Alt: 'Màn hình trang chủ ứng dụng CloudPlay',
           ss2Alt: 'Màn hình thư viện kho game Xbox Cloud',
@@ -250,7 +253,9 @@
           iconAlt: 'CloudPlay app icon',
           langAria: 'Switch language between EN and VI',
           subtitle: 'Helper tool for playing Xbox Cloud Gaming on Android, with live ping monitoring and video quality settings.',
-          downloadBtn: 'Download APK',
+          fastBtn: '⚡ Fast Download APK (Asia CDN)',
+          downloadBtn: 'Download APK (GitHub)',
+          cdnHint: 'Use Fast Download if GitHub direct downloads are throttled by your ISP',
           androidReq: 'Requires Android 7.0+',
           ss1Alt: 'CloudPlay app home screen',
           ss2Alt: 'Xbox Cloud game library screen',
@@ -319,7 +324,9 @@
 
         var map = {
           'subtitle': t.subtitle,
+          'download-fast-cdn-btn': t.fastBtn,
           'download-apk-btn': t.downloadBtn,
+          'cdn-hint': t.cdnHint,
           'android-req': t.androidReq,
           'feat-1': t.feat1,
           'feat-2': t.feat2,
@@ -365,6 +372,7 @@
           const apkAsset = data.assets.find(a => a.name.endsWith('.apk')) || data.assets[0];
           if (apkAsset && apkAsset.browser_download_url) {
             document.getElementById('download-apk-btn').href = apkAsset.browser_download_url;
+            document.getElementById('download-fast-cdn-btn').href = 'https://ghfast.top/' + apkAsset.browser_download_url;
           }
           if (apkAsset && apkAsset.size) {
             const mb = (apkAsset.size / (1024 * 1024)).toFixed(1);

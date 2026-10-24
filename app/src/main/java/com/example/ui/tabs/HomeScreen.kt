@@ -1000,9 +1000,9 @@ private fun FeaturedGamesSection(
                     )
                     Text(
                         text = if (isEn) {
-                            "Auto-fetching game info from Xbox Cloud (0 MB image data)..."
+                            "Loading featured games..."
                         } else {
-                            "Đang tự động tải thông tin game từ Xbox Cloud (không tải ảnh, tiết kiệm 4G/Wi-Fi)..."
+                            "Đang tải danh sách game nổi bật..."
                         },
                         color = TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,

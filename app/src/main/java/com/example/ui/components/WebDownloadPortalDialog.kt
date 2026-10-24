@@ -174,7 +174,7 @@ fun WebDownloadPortalDialog(
                             }
                             Column {
                                 Text(
-                                    text = if (isEn) "SEO Web Portal & APK Share" else "Trang Web Tải App & Chia Sẻ",
+                                    text = if (isEn) "Share CloudPlay App" else "Chia sẻ ứng dụng CloudPlay",
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 15.sp,
@@ -183,7 +183,7 @@ fun WebDownloadPortalDialog(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (isEn) "Built into this project (/docs + In-App Portal)" else "Tích hợp sẵn chung 1 dự án (/docs + Cổng chia sẻ)",
+                                    text = if (isEn) "Scan QR code or send download link" else "Quét mã QR hoặc gửi link tải cho bạn bè",
                                     color = DirectCyan,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -204,7 +204,7 @@ fun WebDownloadPortalDialog(
                     }
                 }
 
-                // 3 Tabs
+                // 2 User-facing Tabs (Share & QR | Web Preview)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -212,9 +212,8 @@ fun WebDownloadPortalDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val tabs = listOf(
-                        Triple(0, if (isEn) "Share & QR" else "Chia sẻ & QR", Icons.Default.QrCode2),
-                        Triple(1, if (isEn) "Web Preview" else "Xem Trang Web", Icons.Default.Language),
-                        Triple(2, if (isEn) "Link & SEO" else "Đổi Link & SEO", Icons.Default.Tune)
+                        Triple(0, if (isEn) "QR Code & Link" else "Mã QR & Link tải", Icons.Default.QrCode2),
+                        Triple(1, if (isEn) "Web Page" else "Trang giới thiệu", Icons.Default.Language)
                     )
                     tabs.forEach { (index, label, icon) ->
                         val active = selectedTab == index
@@ -284,14 +283,13 @@ fun WebDownloadPortalDialog(
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         Text(
-                                            text = if (isEn) "SCAN OR TAP TO DOWNLOAD APK" else "MÃ CHIA SẺ NHANH & LINK TẢI APK",
+                                            text = if (isEn) "SCAN QR TO DOWNLOAD" else "QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG",
                                             color = XboxNeonGreen,
                                             fontFamily = SpaceGroteskFontFamily,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.ExtraBold
                                         )
 
-                                        // Visual QR Matrix badge generated deterministically from the APK URL
                                         Box(
                                             modifier = Modifier
                                                 .size(156.dp)
@@ -308,9 +306,9 @@ fun WebDownloadPortalDialog(
 
                                         Text(
                                             text = if (isEn) {
-                                                "Users searching on Google will find your Web Portal and click the button to download this APK directly."
+                                                "Scan the QR code with another phone or copy the link below to download CloudPlay."
                                             } else {
-                                                "Người dùng tìm kiếm trên Google sẽ thấy trang Web của bạn và bấm nút tải trực tiếp file APK bên dưới."
+                                                "Dùng điện thoại khác quét mã QR hoặc sao chép đường dẫn bên dưới để tải ứng dụng."
                                             },
                                             color = TextSecondary,
                                             fontSize = 11.5.sp,
@@ -331,7 +329,7 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = if (isEn) "🌐 Public Search Website (SEO)" else "🌐 Địa chỉ Trang Web tìm kiếm (SEO)",
+                                                        text = if (isEn) "🌐 Download Web Page" else "🌐 Trang web giới thiệu & tải ứng dụng",
                                                         color = DirectCyan,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -372,7 +370,7 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = if (isEn) "📥 Direct APK Download Link" else "📥 Link tải trực tiếp file APK",
+                                                        text = if (isEn) "📥 Direct APK File Link" else "📥 Link tải trực tiếp file APK",
                                                         color = XboxNeonGreen,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -442,7 +440,7 @@ fun WebDownloadPortalDialog(
                                                 Icon(Icons.Default.Download, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.size(6.dp))
                                                 Text(
-                                                    text = if (isEn) "Test Download" else "Mở Link Tải",
+                                                    text = if (isEn) "Download APK" else "Tải file APK",
                                                     color = DirectCyan,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
@@ -454,8 +452,8 @@ fun WebDownloadPortalDialog(
                             }
                         }
 
-                        1 -> {
-                            // Live Preview of the bundled SEO Website (assets/web/index.html)
+                        else -> {
+                            // Live Preview of the bundled Web Landing Page (assets/web/index.html)
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -497,158 +495,6 @@ fun WebDownloadPortalDialog(
                                             )
                                         }
                                     )
-                                }
-                            }
-                        }
-
-                        2 -> {
-                            // Customize APK Download Link + GitHub Pages 1-Project Guide
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isEn) "Customize Download Links" else "Tùy chỉnh Link Tải APK & Trang Web",
-                                            color = XboxNeonGreen,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-
-                                        OutlinedTextField(
-                                            value = apkUrlInput,
-                                            onValueChange = { apkUrlInput = it },
-                                            label = {
-                                                Text(
-                                                    if (isEn) "Direct APK Download Link (GitHub Releases / Drive)"
-                                                    else "Link tải file APK trực tiếp (GitHub Releases / Drive)"
-                                                )
-                                            },
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = XboxNeonGreen,
-                                                unfocusedBorderColor = XboxCardBorder,
-                                                focusedTextColor = TextPrimary,
-                                                unfocusedTextColor = TextPrimary
-                                            ),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("portal_apk_url_input")
-                                        )
-
-                                        OutlinedTextField(
-                                            value = webUrlInput,
-                                            onValueChange = { webUrlInput = it },
-                                            label = {
-                                                Text(
-                                                    if (isEn) "Public Website URL (GitHub Pages)"
-                                                    else "Địa chỉ trang Web công khai (GitHub Pages)"
-                                                )
-                                            },
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = DirectCyan,
-                                                unfocusedBorderColor = XboxCardBorder,
-                                                focusedTextColor = TextPrimary,
-                                                unfocusedTextColor = TextPrimary
-                                            ),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("portal_web_url_input")
-                                        )
-
-                                        OutlinedTextField(
-                                            value = repoSlugInput,
-                                            onValueChange = { repoSlugInput = it },
-                                            label = {
-                                                Text(
-                                                    if (isEn) "GitHub Repository (owner/repo)"
-                                                    else "Kho GitHub tự lấy bản mới (owner/repo)"
-                                                )
-                                            },
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = XboxNeonGreen,
-                                                unfocusedBorderColor = XboxCardBorder,
-                                                focusedTextColor = TextPrimary,
-                                                unfocusedTextColor = TextPrimary
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-
-                                        Button(
-                                            onClick = {
-                                                SettingsRepository.updateWebPortalSettings(
-                                                    apkDownloadUrl = apkUrlInput,
-                                                    webPortalUrl = webUrlInput,
-                                                    githubRepo = repoSlugInput
-                                                )
-                                                Toast.makeText(
-                                                    context,
-                                                    if (isEn) "Saved APK & Web links!" else "Đã lưu cấu hình Link tải & Trang Web!",
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            },
-                                            colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("portal_save_links_btn")
-                                        ) {
-                                            Text(
-                                                text = if (isEn) "Save Links" else "Lưu Cấu Hình Link",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.5.sp
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Instructions on how 1 project runs both Android APK + Public SEO Website
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = Color(0xFF0E1D24),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f))
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(14.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isEn) "🚀 How to publish your Web Page from this project:" else "🚀 Cách bật Trang Web lên Google từ chung 1 dự án này:",
-                                            color = DirectCyan,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-                                        Text(
-                                            text = if (isEn) {
-                                                "1. Push this project to GitHub.\n" +
-                                                    "2. In your GitHub repo, open Settings ➔ Pages.\n" +
-                                                    "3. Select Branch 'main' and folder '/docs' ➔ Save.\n" +
-                                                    "• The file docs/index.html (already created in this project with full Google SEO & sitemap.xml) will immediately go live and automatically point the Download button to your latest APK Release!"
-                                            } else {
-                                                "1. Đẩy (Push) dự án này lên GitHub.\n" +
-                                                    "2. Trên GitHub, vào mục Settings ➔ Pages.\n" +
-                                                    "3. Chọn nhánh 'main' và thư mục '/docs' ➔ bấm Save.\n" +
-                                                    "• Bộ mã nguồn Web chuẩn SEO (docs/index.html, sitemap.xml, robots.txt) đã được tích hợp sẵn trong dự án này sẽ tự động chạy thành trang web công khai để người dùng tìm thấy trên Google và bấm tải thẳng file APK mới nhất!"
-                                            },
-                                            color = TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            lineHeight = 17.sp
-                                        )
-                                    }
                                 }
                             }
                         }

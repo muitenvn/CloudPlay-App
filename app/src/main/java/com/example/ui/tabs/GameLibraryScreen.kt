@@ -259,21 +259,20 @@ fun GameLibraryScreen(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
-                                text = if (isEn) "XBOX CLOUD GAMING VAULT" else "KHO GAME XBOX CLOUD VAULT",
+                                text = if (isEn) "XBOX CLOUD GAMES" else "KHO GAME XBOX CLOUD",
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.8.sp
                             )
-                            val totalCloud = xboxStatus.totalCloudCatalogCount.coerceAtLeast(games.size)
                             Text(
                                 text = if (isSyncingCatalog) {
-                                    if (isEn) "Auto-fetching game info (${games.size}/$totalCloud • No images)..."
-                                    else "Đang tự động tải thông tin game (${games.size}/$totalCloud • Không tải ảnh)..."
+                                    if (isEn) "Updating game list (${games.size} games)..."
+                                    else "Đang cập nhật danh sách game (${games.size} game)..."
                                 } else {
-                                    if (isEn) "${games.size}/$totalCloud Info Only • $freeCount Free • $touchCount Touch"
-                                    else "${games.size}/$totalCloud game (Chỉ thông tin) • $freeCount Free • $touchCount Cảm ứng"
+                                    if (isEn) "${games.size} Games • $freeCount Free • $touchCount Touch"
+                                    else "${games.size} game • $freeCount Miễn phí • $touchCount Cảm ứng"
                                 },
                                 color = if (isSyncingCatalog) DirectCyan else TextSecondary,
                                 fontSize = 10.5.sp,
@@ -312,7 +311,7 @@ fun GameLibraryScreen(
                                         text = if (isSyncingCatalog) {
                                             "..."
                                         } else {
-                                            if (isEn) "Sync Info" else "Quét TT"
+                                            if (isEn) "Refresh" else "Làm mới"
                                         },
                                         color = DirectCyan,
                                         fontFamily = SpaceGroteskFontFamily,
@@ -525,11 +524,11 @@ fun GameLibraryScreen(
                                 )
                                 Text(
                                     text = if (isSearchingLiveXbox) {
-                                        if (isEn) "Fetching game info for \"$searchQuery\" (no images)..."
-                                        else "Đang tải thông tin game \"$searchQuery\" (không tải ảnh)..."
+                                        if (isEn) "Searching Xbox Store for \"$searchQuery\"..."
+                                        else "Đang tìm \"$searchQuery\" trên Xbox Store..."
                                     } else {
-                                        if (isEn) "Tap to import \"$searchQuery\" info from Xbox Store (0 MB images)"
-                                        else "Chạm để nhập thông tin \"$searchQuery\" từ Xbox (chỉ tải thông tin, 0 tốn dung lượng ảnh)"
+                                        if (isEn) "Tap to search \"$searchQuery\" on Xbox Store"
+                                        else "Chạm để tìm thêm \"$searchQuery\" trên Xbox Store"
                                     },
                                     color = DirectCyan,
                                     fontFamily = SpaceGroteskFontFamily,

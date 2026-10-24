@@ -39,35 +39,35 @@ object GameOptimizationRepository {
     val FORTNITE_PROFILE = GameOptimizationProfile(
         gameId = "fortnite",
         title = "FORTNITE BATTLE ROYALE",
-        subtitle = "Hỗ trợ Cảm ứng Epic & Tay cầm FPS • Tối ưu âm thanh Stereo 128kbps • Giảm độ trễ đầu vào",
-        subtitleEn = "Epic Touch & FPS Pad Support • 128kbps Stereo Audio • Low Input Latency",
+        subtitle = "Hỗ trợ Cảm ứng Epic & Tay cầm ảo • Âm thanh bước chân rõ • Thao tác nhạy",
+        subtitleEn = "Epic Touch & Virtual Pad • Clear Footsteps Audio • Responsive Controls",
         bannerResId = R.drawable.cyber_gaming_banner_1791438050320,
         primaryAccentHex = 0xFF0074E4, // Fortnite Electric Blue
         secondaryAccentHex = 0xFF9C27B0, // Epic Purple
-        badge = "⚡ TỐI ƯU FORTNITE • CẢM ỨNG & TAY CẦM",
-        badgeEn = "⚡ FORTNITE TUNED • TOUCH & GAMEPAD",
+        badge = "⚡ HỖ TRỢ CẢM ỨNG & TAY CẦM",
+        badgeEn = "⚡ TOUCH & GAMEPAD READY",
         isFreeToPlay = true,
         recommendedFps = "60 FPS",
         nativeTouchSupport = true,
         loadingQuote = "Nhảy dù Battle Bus • Điều khiển nhạy • Giành Victory Royale! 👑",
         loadingQuoteEn = "Drop from the Battle Bus • Responsive controls • Claim Victory Royale! 👑",
         tips = listOf(
-            "Đã bật cấu hình giảm độ trễ đệm phát WebRTC giúp phản hồi ngắm bắn và xây dựng nhanh hơn.",
-            "Mở Game Bar để chuyển 1 chạm giữa [👆 Cảm ứng Epic] (ngắt tay cầm ảo để hiện HUD xây nhà/bắn súng gốc của Epic) và [🎮 Tay cầm FPS Pro] (cần ngắm phải lớn +15%).",
-            "Âm thanh Opus 128kbps CBR + In-Band FEC được bật giúp nghe rõ tiếng bước chân, tiếng mở rương và hướng tiếng súng.",
-            "Hỗ trợ cảm ứng đa điểm 4 ngón (Claw) để xây nhà, sửa tường (Edit) và xoay tâm mượt mà."
+            "Đã bật chế độ phản hồi nhanh giúp thao tác ngắm bắn và xây dựng nhạy hơn.",
+            "Mở thanh điều khiển để chuyển 1 chạm giữa [👆 Cảm ứng Epic] (dùng nút cảm ứng gốc của game) và [🎮 Tay cầm ảo].",
+            "Tối ưu âm thanh nổi giúp nghe rõ tiếng bước chân và hướng tiếng súng.",
+            "Hỗ trợ chạm nhiều ngón cùng lúc để vừa di chuyển, vừa xây dựng và ngắm bắn mượt mà."
         ),
         tipsEn = listOf(
-            "Low-latency WebRTC playout buffer tuning is active for responsive building and aiming.",
-            "Open the HUD Game Bar to switch in 1 tap between [👆 Epic Native Touch] (cleanly hides virtual gamepad so Epic's touch HUD appears) and [🎮 FPS Pro Pad] (+15% Right Stick).",
-            "128kbps CBR Stereo Opus with In-Band FEC is active for clear footsteps, chest cues, and directional gunfire.",
-            "4-Finger Claw multi-touch support is enabled for responsive building, wall editing, and aiming."
+            "Fast input response is active for responsive building and aiming.",
+            "Open the control bar to switch in 1 tap between [👆 Epic Touch] (game's native touch buttons) and [🎮 Virtual Pad].",
+            "Stereo audio is tuned for clear footsteps, chest cues, and directional gunfire.",
+            "Multi-touch support is enabled for smooth building, editing, and aiming."
         ),
         checklist = listOf(
-            OptimizationCheckItem("Đệm khung hình thấp", "Giảm trễ đệm phát WebRTC", true, "Low Frame Buffer", "Reduced WebRTC playout buffer"),
-            OptimizationCheckItem("Chuyển đổi điều khiển", "Tự động nhường HUD Cảm ứng Epic hoặc bật FPS Pro", true, "Smart Input Switch", "Clean Epic Native Touch or FPS Pro Pad (+15% Aim)"),
-            OptimizationCheckItem("Âm thanh bước chân", "Opus 128kbps CBR Stereo định hướng tiếng chân/súng", true, "Footsteps Audio", "Opus 128kbps CBR Stereo directional footsteps"),
-            OptimizationCheckItem("Cảm ứng đa điểm", "Hỗ trợ thao tác 4 ngón khi xây nhà & ngắm bắn", true, "Multi-Touch Support", "Responsive multi-touch for builds & edits")
+            OptimizationCheckItem("Phản hồi thao tác", "Giảm độ trễ nút bấm và xoay tâm", true, "Fast Response", "Reduced button and aiming delay"),
+            OptimizationCheckItem("Chuyển đổi điều khiển", "Đổi nhanh giữa Cảm ứng Epic và Tay cầm ảo", true, "Control Switch", "1-tap switch between Epic Touch and Virtual Pad"),
+            OptimizationCheckItem("Âm thanh trong trận", "Nghe rõ tiếng bước chân và hướng súng", true, "Clear Audio", "Clear footsteps and directional sound"),
+            OptimizationCheckItem("Cảm ứng đa điểm", "Hỗ trợ bấm nhiều ngón cùng lúc", true, "Multi-Touch", "Smooth multi-finger touch support")
         )
     )
 

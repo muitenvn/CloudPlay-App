@@ -1060,13 +1060,13 @@ fun CloudBrowserScreen(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isEn) "Reduce GPU Load" else "Giảm tải GPU",
+                                            text = if (isEn) "Light Background Effects" else "Giảm hiệu ứng nền",
                                             color = TextPrimary,
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
-                                            text = if (isEn) "Disables heavy web blur & shadows" else "Tắt hiệu ứng nền nặng để chống giật",
+                                            text = if (isEn) "Helps phone run cooler and smoother" else "Giúp máy đỡ nóng và đỡ giật hơn",
                                             color = Color(0xFFB0C4B8),
                                             fontSize = 9.sp
                                         )

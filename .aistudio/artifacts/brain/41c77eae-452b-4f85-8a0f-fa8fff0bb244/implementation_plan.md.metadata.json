@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch cải thiện toàn diện ứng dụng CloudPlay: tối ưu tự động hạ độ phân giải/bitrate trên mạng 4G/5G yếu để giảm trễ, thu gọn HUD trong game và menu điều khiển nhanh, nâng cấp bộ lọc và khởi chạy nhanh tại Trang chủ & Kho Game, tối ưu Tab Mạng/Cài đặt, và làm gọn toàn bộ câu chữ trong app theo hướng trung tính đồng bộ với trang web.",
-  "updatedAt":  "2026-10-24T10:07:30.492011228Z",
+  "summary":  "Kế hoạch loại bỏ các nút chỉnh sửa dành cho lập trình viên và chuyển toàn bộ câu chữ trong ứng dụng sang ngôn ngữ người dùng ngắn gọn, dễ hiểu.",
+  "updatedAt":  "2026-10-24T11:09:21.094859933Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

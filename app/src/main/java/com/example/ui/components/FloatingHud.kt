@@ -1614,9 +1614,9 @@ private fun DenseCoreTelemetrySection(
                 valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
             )
 
-            // 3. Dòng Thời gian giải mã
+            // 3. Dòng Thời gian xử lý khung hình
             DenseMetricRowItem(
-                label = if (isEn) "Decode" else "Giải mã",
+                label = if (isEn) "Frame Delay" else "Xử lý hình",
                 value = decodeTimeText,
                 valueColor = decodeColor
             )
@@ -1830,9 +1830,9 @@ private fun DenseQualityModeSection(
 
             Text(
                 text = if (isEn) {
-                    "⚡ 720p/900p cuts lag on 4G, 5G & Wi-Fi"
+                    "⚡ 720p/900p keeps gameplay smooth on 4G, 5G & Wi-Fi"
                 } else {
-                    "⚡ Hạ 720p/900p giúp giảm độ trễ trên cả 4G, 5G & Wi-Fi"
+                    "⚡ Hạ 720p/900p giúp chơi mượt hơn khi mạng yếu"
                 },
                 color = TextSecondary,
                 fontSize = 7.5.sp,
@@ -1874,7 +1874,7 @@ private fun DenseQualityPresetChip(
 }
 
 /**
- * B.7: Hàng nút bật/tắt gọn cho Làm nét, Giảm tải GPU chống giật/nóng, Ẩn thông số web và Dịch tiếng Việt.
+ * B.7: Hàng nút bật/tắt gọn cho Làm nét, Giảm hiệu ứng nền, Chế độ máy yếu và Dịch tiếng Việt.
  */
 @Composable
 private fun DenseFeatureTogglesSection(
@@ -1895,9 +1895,9 @@ private fun DenseFeatureTogglesSection(
     ) {
         DenseQuickTogglePill(
             label = if (clarityBoostActive) {
-                if (isEn) "Clarity: ON" else "Làm nét: Bật"
+                if (isEn) "Sharpen: ON" else "Làm nét: Bật"
             } else {
-                if (isEn) "Clarity: OFF" else "Làm nét: Tắt"
+                if (isEn) "Sharpen: OFF" else "Làm nét: Tắt"
             },
             active = clarityBoostActive,
             activeColor = XboxNeonGreen,
@@ -1906,9 +1906,9 @@ private fun DenseFeatureTogglesSection(
         )
         DenseQuickTogglePill(
             label = if (config.gpuLoadReductionEnabled) {
-                if (isEn) "⚡ Low GPU: ON" else "⚡ Giảm GPU: Bật"
+                if (isEn) "⚡ Light BG: ON" else "⚡ Giảm nền: Bật"
             } else {
-                if (isEn) "⚡ Low GPU: OFF" else "⚡ Giảm GPU: Tắt"
+                if (isEn) "⚡ Light BG: OFF" else "⚡ Giảm nền: Tắt"
             },
             active = config.gpuLoadReductionEnabled,
             activeColor = DirectCyan,
@@ -1923,9 +1923,9 @@ private fun DenseFeatureTogglesSection(
     ) {
         DenseQuickTogglePill(
             label = if (config.lowEndDeviceMode) {
-                if (isEn) "Decode Fix: ON" else "Giảm Decode: Bật"
+                if (isEn) "Cool Mode: ON" else "Máy yếu: Bật"
             } else {
-                if (isEn) "Decode Fix: OFF" else "Giảm Decode: Tắt"
+                if (isEn) "Cool Mode: OFF" else "Máy yếu: Tắt"
             },
             active = config.lowEndDeviceMode,
             activeColor = DirectCyan,

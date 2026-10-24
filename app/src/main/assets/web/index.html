@@ -18,7 +18,7 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 16px;
       line-height: 1.6;
-      padding: 32px 16px;
+      padding: 48px 16px;
     }
 
     .container {
@@ -26,16 +26,24 @@
       margin: 0 auto;
     }
 
+    .app-icon {
+      display: block;
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      margin-bottom: 16px;
+    }
+
     h1 {
       font-size: 28px;
       font-weight: 700;
       color: #1a1a1a;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
 
     .subtitle {
       color: #666666;
-      margin-bottom: 24px;
+      margin-bottom: 32px;
     }
 
     .btn-download {
@@ -55,42 +63,48 @@
     .meta-line {
       font-size: 14px;
       color: #666666;
-      margin-top: 8px;
-      margin-bottom: 28px;
+      margin-top: 10px;
+      margin-bottom: 40px;
     }
 
-    .app-preview {
-      width: 100%;
-      height: 220px;
-      background-color: #f5f5f5;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
+    .screenshots {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #666666;
-      font-size: 14px;
-      margin-bottom: 28px;
+      gap: 16px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 40px;
+      padding-bottom: 4px;
+    }
+
+    .screenshots img {
+      height: 360px;
+      width: auto;
+      border-radius: 8px;
+      border: 1px solid #e5e5e5;
+      scroll-snap-align: start;
+      flex-shrink: 0;
+      display: block;
     }
 
     .features {
       padding-left: 20px;
-      margin-bottom: 28px;
+      margin-bottom: 40px;
       color: #1a1a1a;
     }
 
     .features li {
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
     .disclaimer {
       font-size: 14px;
       color: #666666;
-      margin-bottom: 24px;
+      margin-bottom: 32px;
     }
 
     .releases-wrap {
-      margin-bottom: 36px;
+      margin-bottom: 48px;
     }
 
     a.link {
@@ -100,7 +114,7 @@
 
     footer {
       border-top: 1px solid #e5e5e5;
-      padding-top: 16px;
+      padding-top: 20px;
       font-size: 14px;
       color: #666666;
     }
@@ -112,9 +126,29 @@
       }
     }
   </style>
+  <script>
+    function handleImgError(img) {
+      img.style.display = 'none';
+      img.setAttribute('data-failed', 'true');
+      var container = document.getElementById('screenshots-section');
+      if (!container) return;
+      var imgs = container.querySelectorAll('img');
+      var allFailed = true;
+      for (var i = 0; i < imgs.length; i++) {
+        if (imgs[i].getAttribute('data-failed') !== 'true' && imgs[i].style.display !== 'none') {
+          allFailed = false;
+          break;
+        }
+      }
+      if (allFailed) {
+        container.style.display = 'none';
+      }
+    }
+  </script>
 </head>
 <body>
   <main class="container">
+    <img src="img/icon.png" alt="Biểu tượng ứng dụng CloudPlay" class="app-icon" width="64" height="64" onerror="this.style.display='none'">
     <h1>CloudPlay</h1>
     <p class="subtitle">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.</p>
 
@@ -123,7 +157,11 @@
     </div>
     <p class="meta-line">Android 7.0+ · <span id="apk-size">~31.7 MB</span></p>
 
-    <div class="app-preview">Ảnh chụp màn hình ứng dụng</div>
+    <div id="screenshots-section" class="screenshots">
+      <img src="img/screenshot-1.png" alt="Màn hình chính ứng dụng CloudPlay chọn dịch vụ chơi" onerror="handleImgError(this)">
+      <img src="img/screenshot-2.png" alt="Màn hình chơi game có thanh theo dõi ping và mạng trực tiếp" onerror="handleImgError(this)">
+      <img src="img/screenshot-3.png" alt="Màn hình cài đặt chất lượng hình ảnh và chọn máy chủ" onerror="handleImgError(this)">
+    </div>
 
     <ul class="features">
       <li>Theo dõi ping và tình trạng mạng trực tiếp trên màn hình khi đang chơi.</li>

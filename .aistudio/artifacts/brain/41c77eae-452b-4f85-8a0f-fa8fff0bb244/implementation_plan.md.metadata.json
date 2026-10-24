@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch tích hợp Trang Web tải ứng dụng chuẩn SEO (GitHub Pages + Cổng chia sẻ trong App) và gộp tự động Độ phân giải vào Chất lượng đồ họa.",
-  "updatedAt":  "2026-10-24T03:38:15.048764132Z",
+  "summary":  "Kế hoạch cập nhật trang web giới thiệu CloudPlay (docs/index.html và assets/web/index.html): thêm icon ứng dụng 64px bo góc, dãy 3 ảnh chụp màn hình dọc vuốt ngang (scroll-snap) cao 360px kèm tự động ẩn khi lỗi 404, và tăng khoảng cách giữa các khối nội dung.",
+  "updatedAt":  "2026-10-24T09:19:21.808117048Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

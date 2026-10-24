@@ -1,417 +1,173 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>CloudPlay Xbox APK — Công Cụ Hỗ Trợ Chơi Xbox Cloud Gaming / xCloud Helper Tool</title>
-  <meta name="description" content="Tải ứng dụng CloudPlay Xbox APK cho Android: công cụ hỗ trợ chơi Xbox Cloud Gaming, có theo dõi ping và chất lượng luồng phát. / Helper tool for Xbox Cloud Gaming on Android with ping and stream quality monitoring." />
-  <meta name="keywords" content="CloudPlay Xbox, tải CloudPlay APK, công cụ hỗ trợ Xbox Cloud Gaming Android, theo dõi ping xCloud, chất lượng luồng phát, tay cầm ảo Android" />
-  <meta name="robots" content="index, follow" />
-  <meta name="theme-color" content="#07110B" />
-  <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android</title>
+  <meta name="description" content="CloudPlay là công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/">
 
-  <!-- Open Graph / Facebook / Zalo -->
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="CloudPlay Xbox APK — Công Cụ Hỗ Trợ Chơi Xbox Cloud Gaming" />
-  <meta property="og:description" content="Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng. / Helper tool for Xbox Cloud Gaming with ping and quality monitoring." />
-  <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/" />
-  <meta property="og:site_name" content="CloudPlay Xbox" />
-
-  <!-- Structured Data (JSON-LD) for Google Search Rich Snippet -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "CloudPlay Xbox",
-    "operatingSystem": "Android 8.0+",
-    "applicationCategory": "GameApplication",
-    "softwareVersion": "v1.2.35",
-    "fileSize": "31.7 MB",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "VND"
-    },
-    "description": "Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng luồng phát. / Helper tool for Xbox Cloud Gaming on Android with ping and stream quality monitoring."
-  }
-  </script>
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="CloudPlay — Công cụ hỗ trợ chơi Xbox Cloud Gaming">
+  <meta property="og:description" content="Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và chất lượng hình ảnh.">
+  <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/">
 
   <style>
-    :root {
-      --bg: #060d09;
-      --surface: #0d1912;
-      --surface-2: #12241a;
-      --border: #1e3a2a;
-      --neon: #22ff66;
-      --cyan: #00e5ff;
-      --text: #f2fbf5;
-      --muted: #9ab3a3;
-      --amber: #ffca28;
-    }
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: radial-gradient(circle at 50% 0%, #102a1b 0%, var(--bg) 65%);
-      color: var(--text);
-      line-height: 1.55;
-      min-height: 100vh;
-      padding-bottom: 48px;
-    }
-    .container {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 20px 16px;
-    }
-    .disclaimer-banner {
-      background: rgba(255, 202, 40, 0.12);
-      border: 1px solid rgba(255, 202, 40, 0.55);
-      border-radius: 14px;
-      padding: 12px 16px;
-      margin-bottom: 16px;
-      font-size: 13px;
-      color: #fff3cd;
-      line-height: 1.5;
-    }
-    .disclaimer-banner strong {
-      color: var(--amber);
-    }
-    .disclaimer-en {
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: rgba(13, 25, 18, 0.88);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      backdrop-filter: blur(10px);
-      margin-bottom: 20px;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .logo-badge {
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, var(--neon), var(--cyan));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 20px;
-      color: #041008;
-      box-shadow: 0 0 18px rgba(34, 255, 102, 0.35);
-    }
-    .brand-title {
-      font-weight: 800;
-      font-size: 18px;
-      letter-spacing: 0.5px;
-    }
-    .brand-sub {
-      font-size: 12px;
-      color: var(--cyan);
-      font-weight: 600;
-    }
-    .version-pill {
-      padding: 5px 10px;
-      border-radius: 999px;
-      background: rgba(34, 255, 102, 0.14);
-      border: 1px solid rgba(34, 255, 102, 0.45);
-      color: var(--neon);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .hero {
-      background: linear-gradient(160deg, rgba(18, 36, 26, 0.95) 0%, rgba(10, 20, 15, 0.95) 100%);
-      border: 1px solid rgba(34, 255, 102, 0.35);
-      border-radius: 22px;
-      padding: 26px 20px;
-      text-align: center;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
-      margin-bottom: 20px;
-    }
-    .hero-tag {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(0, 229, 255, 0.12);
-      border: 1px solid rgba(0, 229, 255, 0.4);
-      color: var(--cyan);
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    .hero h1 {
-      font-size: clamp(21px, 4.8vw, 30px);
-      font-weight: 900;
-      margin-bottom: 10px;
-      line-height: 1.25;
-    }
-    .hero h1 span {
-      background: linear-gradient(90deg, var(--neon), var(--cyan));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .hero p {
-      color: var(--muted);
-      font-size: 14px;
-      max-width: 640px;
-      margin: 0 auto 18px;
-    }
-    .cta-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: center;
-      margin-bottom: 16px;
-    }
-    .btn-download {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: linear-gradient(90deg, var(--neon), #12d852);
-      color: #031208;
-      font-weight: 900;
-      font-size: 15px;
-      padding: 14px 26px;
-      border-radius: 14px;
-      text-decoration: none;
-      box-shadow: 0 8px 24px rgba(34, 255, 102, 0.35);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn-download:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(34, 255, 102, 0.5);
-    }
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: var(--surface-2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      font-weight: 700;
-      font-size: 14px;
-      padding: 14px 20px;
-      border-radius: 14px;
-      text-decoration: none;
-    }
-    .meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 8px;
-    }
-    .meta-item {
-      background: rgba(0, 0, 0, 0.35);
-      padding: 5px 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 14px;
-      margin-bottom: 20px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px;
-    }
-    .card-title {
-      font-size: 14.5px;
-      font-weight: 800;
-      color: var(--neon);
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card p {
-      font-size: 12.5px;
-      color: var(--muted);
-    }
-    .section-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 18px;
-      margin-bottom: 18px;
-    }
-    .section-box h2 {
+      background-color: #121212;
+      color: #e5e5e5;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       font-size: 16px;
-      font-weight: 800;
-      color: var(--cyan);
-      margin-bottom: 10px;
+      line-height: 1.6;
+      padding: 32px 16px;
     }
-    .changelog-list {
-      list-style: none;
-      display: grid;
-      gap: 8px;
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
     }
-    .changelog-list li {
-      font-size: 13px;
-      color: var(--text);
-      padding-left: 12px;
-      border-left: 3px solid var(--neon);
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
     }
-    .changelog-list li strong {
-      color: var(--neon);
+
+    .subtitle {
+      color: #b3b3b3;
+      margin-bottom: 24px;
     }
-    .sha-box {
-      margin-top: 12px;
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.45);
-      border-radius: 10px;
-      font-family: monospace;
-      font-size: 11.5px;
-      color: var(--muted);
-      word-break: break-all;
-    }
-    footer {
+
+    .btn-download {
+      display: inline-block;
+      background-color: #107c10;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      padding: 12px 28px;
+      border-radius: 6px;
       text-align: center;
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 20px;
+      white-space: nowrap;
+      min-width: 180px;
+    }
+
+    .meta-line {
+      font-size: 14px;
+      color: #999999;
+      margin-top: 8px;
+      margin-bottom: 28px;
+    }
+
+    .app-preview {
+      width: 100%;
+      height: 220px;
+      background-color: #1c1c1c;
+      border: 1px solid #2e2e2e;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #777777;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+
+    .features {
+      padding-left: 20px;
+      margin-bottom: 28px;
+    }
+
+    .features li {
+      margin-bottom: 8px;
+    }
+
+    .disclaimer {
+      font-size: 14px;
+      color: #b3b3b3;
+      margin-bottom: 24px;
+    }
+
+    .releases-wrap {
+      margin-bottom: 36px;
+    }
+
+    a.link {
+      color: #22c55e;
+      text-decoration: underline;
+    }
+
+    footer {
+      border-top: 1px solid #262626;
+      padding-top: 16px;
+      font-size: 14px;
+      color: #888888;
+    }
+
+    @media (max-width: 480px) {
+      .btn-download {
+        display: block;
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="disclaimer-banner" role="alert">
-      <strong>⚠️ Lưu ý / Disclaimer:</strong> Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.
-      <span class="disclaimer-en">Independent application, not affiliated with Microsoft, Xbox, or Epic Games. May violate Terms of Service and result in account suspension; use at your own risk.</span>
+  <main class="container">
+    <h1>CloudPlay</h1>
+    <p class="subtitle">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, có theo dõi ping và tùy chỉnh chất lượng hình ảnh.</p>
+
+    <div>
+      <a id="download-apk-btn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn-download">Tải APK</a>
+    </div>
+    <p class="meta-line">Android 7.0+ · <span id="apk-size">~31.7 MB</span></p>
+
+    <div class="app-preview">Ảnh chụp màn hình ứng dụng</div>
+
+    <ul class="features">
+      <li>Theo dõi ping và tình trạng mạng trực tiếp trên màn hình khi đang chơi.</li>
+      <li>Tự động gộp và điều chỉnh chất lượng hình ảnh phù hợp với kết nối Wi-Fi hoặc dữ liệu di động.</li>
+      <li>Hỗ trợ chọn máy chủ khu vực gần nhất và bàn phím ảo trên màn hình cảm ứng.</li>
+    </ul>
+
+    <p class="disclaimer">
+      Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.
+    </p>
+
+    <div class="releases-wrap">
+      <a id="github-releases-btn" href="https://github.com/muitenvn/CloudPlay-App/releases" target="_blank" rel="noopener" class="link">Xem các bản phát hành</a>
     </div>
 
-    <header class="topbar">
-      <div class="brand">
-        <div class="logo-badge">X</div>
-        <div>
-          <div class="brand-title">CLOUDPLAY XBOX</div>
-          <div class="brand-sub">Công cụ hỗ trợ Xbox Cloud Gaming • xCloud Helper</div>
-        </div>
-      </div>
-      <span id="version-badge" class="version-pill">v1.2.35</span>
-    </header>
-
-    <section class="hero">
-      <span class="hero-tag">📊 THEO DÕI PING &amp; CHẤT LƯỢNG • PING &amp; QUALITY MONITOR</span>
-      <h1>Công Cụ Hỗ Trợ <span>Xbox Cloud Gaming</span> Trên Android</h1>
-      <p>
-        Công cụ hỗ trợ chơi Xbox Cloud Gaming, có theo dõi ping và chất lượng luồng phát, gộp chọn độ phân giải (720p / 900p / 1080p) theo mức đồ họa và hỗ trợ tay cầm ảo.<br />
-        <em>Helper tool for Xbox Cloud Gaming with ping and stream quality monitoring, unified resolution &amp; graphics presets, and virtual controller support.</em>
-      </p>
-
-      <div class="cta-group">
-        <a id="download-apk-btn" class="btn-download" href="https://github.com/muitenvn/CloudPlay-App/releases/latest">
-          <span>📥 TẢI XUỐNG APK / DOWNLOAD APK</span>
-        </a>
-        <a id="github-releases-btn" class="btn-secondary" href="https://github.com/muitenvn/CloudPlay-App/releases" target="_blank" rel="noopener">
-          <span>📂 Bản phát hành / Releases</span>
-        </a>
-      </div>
-
-      <div class="meta-row">
-        <span class="meta-item">📦 Kích thước / Size: <strong id="apk-size">~31.7 MB</strong></span>
-        <span class="meta-item">🤖 Android 8.0+</span>
-        <span class="meta-item">🔄 Cài đè trực tiếp / Direct Update</span>
-      </div>
-    </section>
-
-    <section class="grid" aria-label="Tính năng chính / Key Features">
-      <article class="card">
-        <div class="card-title">📡 Theo Dõi Ping &amp; Chất Lượng</div>
-        <p>Hiển thị thông số mạng (Ping, FPS, Bitrate, thời gian giải mã) theo thời gian thực. / Real-time ping and stream quality HUD.</p>
-      </article>
-      <article class="card">
-        <div class="card-title">🎯 Độ Phân Giải Gộp Trong Đồ Họa</div>
-        <p>Tự động chọn 720p, 900p hoặc 1080p tương ứng mức chất lượng đồ họa cho 4G/5G và Wi-Fi. / Unified resolution and graphics quality presets.</p>
-      </article>
-      <article class="card">
-        <div class="card-title">🎮 Cảm Ứng &amp; Tay Cầm Ảo</div>
-        <p>Chuyển đổi giữa chế độ cảm ứng trên màn hình và bộ nút tay cầm ảo tùy chỉnh. / Switch between touch input and virtual controller.</p>
-      </article>
-      <article class="card">
-        <div class="card-title">🌐 Hỗ Trợ Vùng &amp; Ngôn Ngữ</div>
-        <p>Tùy chỉnh vùng kết nối và ngôn ngữ hiển thị song ngữ Việt/Anh. / Region selection and bilingual VI/EN interface.</p>
-      </article>
-    </section>
-
-    <section class="section-box">
-      <h2>✨ Nhật ký cập nhật / Changelog</h2>
-      <ul class="changelog-list">
-        <li><strong>Gộp Độ phân giải &amp; Chất lượng đồ họa / Unified Resolution &amp; Quality:</strong> Tự động chọn 720p, 900p hoặc 1080p theo cấu hình mạng.</li>
-        <li><strong>Theo dõi Ping &amp; Chất lượng / Ping &amp; Stream Monitor:</strong> Bảng HUD theo dõi độ trễ mạng và trạng thái luồng phát.</li>
-        <li><strong>Liên kết tải về ổn định / Stable Release Link:</strong> Sử dụng liên kết <code>releases/latest</code> tránh lỗi 404 khi cập nhật phiên bản mới.</li>
-      </ul>
-      <div class="sha-box">
-        🔒 <strong>SHA-256 Checksum:</strong> 0e6a21ae27bcdbb6879997aa5c17d85ec44a9e74e4d08f4fe6aeb51610ca5a61
-      </div>
-    </section>
-
     <footer>
-      <p>© 2026 CloudPlay App • Công cụ độc lập hỗ trợ chơi Xbox Cloud Gaming trên Android / Independent helper tool for Android.</p>
+      CloudPlay cho Android · Mã nguồn và bản tải tại GitHub
     </footer>
-  </div>
+  </main>
 
   <script>
-    (function() {
-      var defaultRepo = window.__CLOUDPLAY_GITHUB_REPO || "muitenvn/CloudPlay-App";
-      var customApk = window.__CLOUDPLAY_CUSTOM_APK_URL || "";
-      var downloadBtn = document.getElementById("download-apk-btn");
-      var releasesBtn = document.getElementById("github-releases-btn");
-      var versionBadge = document.getElementById("version-badge");
-      var apkSizeEl = document.getElementById("apk-size");
-
-      if (customApk && downloadBtn) {
-        downloadBtn.href = customApk;
-      }
-      if (defaultRepo && releasesBtn) {
-        releasesBtn.href = "https://github.com/" + defaultRepo + "/releases";
-      }
-
-      if (!customApk && defaultRepo) {
-        fetch("https://api.github.com/repos/" + defaultRepo + "/releases/latest")
-          .then(function(r) { return r.ok ? r.json() : null; })
-          .then(function(data) {
-            if (!data) return;
-            if (data.tag_name && versionBadge) {
-              versionBadge.textContent = data.tag_name;
-            }
-            if (Array.isArray(data.assets) && data.assets.length > 0) {
-              var apkAsset = data.assets.find(function(a) {
-                return a.name && a.name.toLowerCase().endsWith(".apk");
-              }) || data.assets[0];
-              if (apkAsset && apkAsset.browser_download_url && downloadBtn) {
-                downloadBtn.href = apkAsset.browser_download_url;
-              }
-              if (apkAsset && apkAsset.size && apkSizeEl) {
-                var mb = (apkAsset.size / (1024 * 1024)).toFixed(1);
-                apkSizeEl.textContent = mb + " MB";
-              }
-            }
-          })
-          .catch(function() {});
-      }
+    (async function fetchLatestRelease() {
+      try {
+        const res = await fetch('https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.assets && data.assets.length > 0) {
+          const apkAsset = data.assets.find(a => a.name.endsWith('.apk')) || data.assets[0];
+          if (apkAsset && apkAsset.browser_download_url) {
+            document.getElementById('download-apk-btn').href = apkAsset.browser_download_url;
+          }
+          if (apkAsset && apkAsset.size) {
+            const mb = (apkAsset.size / (1024 * 1024)).toFixed(1);
+            document.getElementById('apk-size').textContent = mb + ' MB';
+          }
+        }
+      } catch (e) {}
     })();
   </script>
 </body>

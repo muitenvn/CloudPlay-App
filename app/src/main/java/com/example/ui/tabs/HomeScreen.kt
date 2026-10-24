@@ -159,6 +159,25 @@ fun HomeScreen(
         }
     }
 
+    val recentQuickGames = remember(lastPlayedGame, featuredGames, recentSessions) {
+        buildList {
+            if (lastPlayedGame != null) add(lastPlayedGame)
+            recentSessions.forEach { session ->
+                val title = session.gameTitle.trim()
+                if (title.isNotBlank()) {
+                    val matched = featuredGames.firstOrNull {
+                        it.title.equals(title, ignoreCase = true) ||
+                            it.title.contains(title, ignoreCase = true) ||
+                            title.contains(it.title, ignoreCase = true)
+                    }
+                    if (matched != null && none { it.id == matched.id }) {
+                        add(matched)
+                    }
+                }
+            }
+        }.take(4)
+    }
+
     val scrollState = rememberScrollState()
 
     Column(
@@ -192,11 +211,12 @@ fun HomeScreen(
             onNavigateToServers = onNavigateToServers
         )
 
-        // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho game vừa chơi gần nhất
+        // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho các game vừa chơi gần nhất
         FeaturedGamesSection(
             featuredGames = sortedFeaturedGames,
             favoriteIds = favoriteIds,
             lastPlayedGame = lastPlayedGame,
+            recentGames = recentQuickGames,
             onLaunchBookmark = recordAndLaunch,
             onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
             onNavigateToLibrary = onNavigateToLibrary
@@ -737,6 +757,7 @@ private fun FeaturedGamesSection(
     featuredGames: List<GameBookmark>,
     favoriteIds: Set<String>,
     lastPlayedGame: GameBookmark?,
+    recentGames: List<GameBookmark> = emptyList(),
     onLaunchBookmark: (GameBookmark) -> Unit,
     onToggleFavorite: (GameBookmark) -> Unit,
     onNavigateToLibrary: () -> Unit
@@ -870,7 +891,7 @@ private fun FeaturedGamesSection(
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = if (isEn) "• SMOOTH 60FPS" else "• MƯỢT 60FPS",
+                                    text = if (isEn) "• 60FPS STREAM" else "• STREAM 60FPS",
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.5.sp,
@@ -911,6 +932,46 @@ private fun FeaturedGamesSection(
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
+                        }
+                    }
+                }
+            }
+
+            if (recentGames.size > 1) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp)
+                ) {
+                    items(recentGames.drop(1), key = { "recent_${it.id}" }) { recent ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = XboxSurface.copy(alpha = 0.9f),
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onLaunchBookmark(recent) }
+                                .testTag("recent_quick_chip_${recent.id}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = DirectCyan,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = recent.title,
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }

@@ -845,13 +845,13 @@ fun CloudBrowserScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isEn) "⚡ Graphics, FPS & Colors" else "⚡ Đồ họa, FPS & Màu sắc",
+                                    text = if (isEn) "Quick Stream & Display Settings" else "Tùy chỉnh nhanh Hiển thị & Điều khiển",
                                     color = TextPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = if (isEn) "Instant tuning for bitrate, 60/120 FPS & image colors" else "Chỉnh nhanh độ nét, khung hình 60/120 FPS và màu sắc",
+                                    text = if (isEn) "Adjust resolution, frame rate, controls & image colors" else "Chỉnh nhanh độ phân giải, khung hình, tay cầm và màu sắc",
                                     color = DirectCyan,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -875,8 +875,74 @@ fun CloudBrowserScreen(
                             }
                         }
 
+                        // Hàng thao tác nhanh: Tay cầm ảo & Dịch giao diện
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable {
+                                        val next = !config.showVirtualController
+                                        SettingsRepository.updateShowVirtualController(next)
+                                        webViewInstance?.evaluateJavascript("if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($next);", null)
+                                    },
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (config.showVirtualController) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF101A14),
+                                border = BorderStroke(1.dp, if (config.showVirtualController) XboxNeonGreen else XboxCardBorder)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (config.showVirtualController) {
+                                            if (isEn) "🎮 Touch Pad: ON" else "🎮 Tay cầm ảo: Bật"
+                                        } else {
+                                            if (isEn) "🎮 Touch Pad: OFF" else "🎮 Tay cầm ảo: Tắt"
+                                        },
+                                        color = if (config.showVirtualController) XboxNeonGreen else TextPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable {
+                                        SettingsRepository.updateXcloudTranslate(!config.xcloudTranslateEnabled)
+                                    },
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (config.xcloudTranslateEnabled) DirectCyan.copy(alpha = 0.20f) else Color(0xFF101A14),
+                                border = BorderStroke(1.dp, if (config.xcloudTranslateEnabled) DirectCyan else XboxCardBorder)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (config.xcloudTranslateEnabled) {
+                                            if (isEn) "🌐 VI Translate: ON" else "🌐 Dịch Tiếng Việt: Bật"
+                                        } else {
+                                            if (isEn) "🌐 VI Translate: OFF" else "🌐 Dịch Tiếng Việt: Tắt"
+                                        },
+                                        color = if (config.xcloudTranslateEnabled) DirectCyan else TextPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+
                         // ========================================================
-                        // PHẦN 1 (ƯU TIÊN SỐ 1): ĐỒ HỌA & KHUNG HÌNH 60/120 FPS
+                        // PHẦN 1 (ƯU TIÊN SỐ 1): ĐỘ PHÂN GIẢI, ĐỒ HỌA & KHUNG HÌNH
                         // ========================================================
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
@@ -890,7 +956,7 @@ fun CloudBrowserScreen(
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                                     Text(
-                                        text = if (isEn) "🔥 1. Resolution & Graphics (4G/5G/Wi-Fi Low Lag)" else "🔥 1. Độ phân giải & Đồ họa (Giảm trễ 4G/5G/Wi-Fi)",
+                                        text = if (isEn) "1. Resolution & Graphics (4G/5G/Wi-Fi)" else "1. Độ phân giải & Đồ họa (4G/5G/Wi-Fi)",
                                         color = XboxNeonGreen,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold

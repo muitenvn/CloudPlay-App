@@ -988,14 +988,14 @@ object GameLibraryRepository {
                 val accent = ACCENT_PALETTE[(cleanTitle.hashCode() and 0x7FFFFFFF) % ACCENT_PALETTE.size]
 
                 val badgeVi = when {
-                    isFortnite -> "Hỗ Trợ 120FPS • Free 100%"
+                    isFortnite -> "Cảm ứng Epic • Miễn phí"
                     isRecent -> "Mới lên kệ • Cloud"
                     isPop -> "Top Hot • Xbox"
                     isTouch -> "Cảm ứng • Cloud"
                     else -> "Game Pass"
                 }
                 val badgeEn = when {
-                    isFortnite -> "120FPS Ready • 100% Free"
+                    isFortnite -> "Epic Touch • Free"
                     isRecent -> "New on Cloud"
                     isPop -> "Popular • Xbox"
                     isTouch -> "Touch • Cloud"

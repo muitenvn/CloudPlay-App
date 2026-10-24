@@ -243,10 +243,10 @@ object NetworkOptimizer {
         val badge: String
 
         if (config.lowEndDeviceMode) {
-            profileName = "Chế Độ Máy Yếu & 4G Siêu Mượt (5 Mbps • 60FPS)"
+            profileName = "Chế Độ Máy Yếu • 720p Nhẹ (5 Mbps)"
             bitrate = 5
-            summary = "Đang bật Chế độ máy yếu: Khóa 5 Mbps Zero-B-Frame chống nghẽn 4G & giảm trễ Wi-Fi."
-            badge = "🛡️ Máy Yếu (5M)"
+            summary = "Đang bật Chế độ máy yếu: Khóa 720p (5 Mbps) để giảm tải giải mã và giữ ổn định trên 4G/Wi-Fi."
+            badge = "🛡️ 720p Máy Yếu (5M)"
         } else when (cellularMode) {
             CellularOptimizationMode.AUTO -> {
                 val autoMbps = when {
@@ -257,41 +257,41 @@ object NetworkOptimizer {
                     else -> 9
                 }
                 profileName = if (isCellular) {
-                    "Tự Động 4G Chống Giật (${autoMbps}M • Zero-B-Frame)"
+                    "Tự Động 4G/5G (720p ⇄ 1080p • ${autoMbps}M)"
                 } else {
-                    "Tự Động Giảm Trễ Wi-Fi (${autoMbps}M • Low-Latency)"
+                    "Tự Động Wi-Fi (720p ⇄ 1080p • ${autoMbps}M)"
                 }
                 bitrate = autoMbps
                 summary = if (isCellular) {
-                    "Chống nghẽn sóng 4G (Anti-Bufferbloat 6M), tự co giãn đệm chống đứt hình & tự xả độ trễ tích tụ."
+                    "Tự động điều chỉnh độ phân giải (720p ⇄ 1080p) và bộ đệm theo sóng 4G/5G để giảm độ trễ và tránh khựng hình."
                 } else {
-                    "Khóa chip Wi-Fi Low-Latency chống ngủ ngầm, tự siết đệm 6–12ms giảm độ trễ điều khiển tối đa."
+                    "Giữ kết nối Wi-Fi ổn định, tự điều chỉnh độ phân giải và bộ đệm theo chất lượng mạng thực tế."
                 }
-                badge = if (isCellular) "📶 4G Mượt (${autoMbps}M)" else "⚡ Tự Động (${autoMbps}M)"
+                badge = if (isCellular) "📶 Tự động 4G (${autoMbps}M)" else "⚡ Tự động (${autoMbps}M)"
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
-                profileName = "Đồ Họa: Thấp / 4G Siêu Ổn Định (5M)"
+                profileName = "720p • Thấp (Cố Định • 5M)"
                 bitrate = 5
-                summary = "Khóa 5 Mbps Zero-B-Frame, cực mượt khi sóng 4G yếu hoặc Wi-Fi xa router, máy luôn mát."
-                badge = "❄️ 4G/Nhẹ (5M)"
+                summary = "Khóa 720p • 5 Mbps giúp giảm độ trễ trên mạng 4G/5G yếu hoặc Wi-Fi xa router, nhẹ máy và tiết kiệm dung lượng."
+                badge = "❄️ 720p • Thấp (5M)"
             }
             CellularOptimizationMode.MEDIUM -> {
-                profileName = "Đồ Họa: Trung Bình (Cố Định • 9M)"
+                profileName = "900p • Vừa (Cố Định • 9M)"
                 bitrate = 9
-                summary = "Khóa cố định mức 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và chống trễ khung hình."
-                badge = "🌿 Cố Định (9M)"
+                summary = "Khóa cố định 900p • 9 Mbps (~3.8GB/giờ), cân bằng giữa độ nét và độ ổn định khung hình trên 4G/5G & Wi-Fi."
+                badge = "🌿 900p • Vừa (9M)"
             }
             CellularOptimizationMode.HIGH -> {
-                profileName = "Đồ Họa: Cao (Cố Định • 14M)"
+                profileName = "1080p • Cao (Cố Định • 14M)"
                 bitrate = 14
-                summary = "Khóa cố định mức 14 Mbps Full HD 1080p sắc nét (hỗ trợ 120 FPS cho Fortnite)."
-                badge = "✨ Cố Định (14M)"
+                summary = "Khóa cố định 1080p Full HD • 14 Mbps sắc nét cho mạng Wi-Fi hoặc 5G ổn định."
+                badge = "✨ 1080p • Cao (14M)"
             }
             CellularOptimizationMode.MAX_SPEED_UNCAPPED -> {
-                profileName = "Đồ Họa: Rất Cao (Cố Định • 20M)"
+                profileName = "1080p+ • Rất cao (Cố Định • 20M)"
                 bitrate = 20
-                summary = "Khóa cố định tối đa 20 Mbps chất lượng hình ảnh cao nhất (hỗ trợ 120 FPS)."
-                badge = "🔥 Cố Định (20M)"
+                summary = "Khóa cố định tối đa 1080p+ • 20 Mbps cho mạng Wi-Fi 5GHz/6GHz hoặc 5G tốc độ cao."
+                badge = "🔥 1080p+ • Rất cao (20M)"
             }
         }
 

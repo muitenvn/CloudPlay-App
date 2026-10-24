@@ -39,35 +39,35 @@ object GameOptimizationRepository {
     val FORTNITE_PROFILE = GameOptimizationProfile(
         gameId = "fortnite",
         title = "FORTNITE BATTLE ROYALE",
-        subtitle = "Tối ưu độc quyền: Đệm 8ms Zero-Delay • 120 FPS SDP • Âm thanh bước chân 128kbps • Chuyển nhanh Epic Touch / FPS Pro",
-        subtitleEn = "Exclusive Tuning: 8ms Zero-Delay Buffer • 120 FPS SDP • 128kbps Footsteps Audio • Instant Epic Touch / FPS Pro Switch",
+        subtitle = "Hỗ trợ Cảm ứng Epic & Tay cầm FPS • Tối ưu âm thanh Stereo 128kbps • Giảm độ trễ đầu vào",
+        subtitleEn = "Epic Touch & FPS Pad Support • 128kbps Stereo Audio • Low Input Latency",
         bannerResId = R.drawable.cyber_gaming_banner_1791438050320,
         primaryAccentHex = 0xFF0074E4, // Fortnite Electric Blue
         secondaryAccentHex = 0xFF9C27B0, // Epic Purple
-        badge = "⚡ TỐI ƯU ĐỘC QUYỀN FORTNITE • 120 FPS",
-        badgeEn = "⚡ FORTNITE ARENA EXCLUSIVE • 120 FPS",
+        badge = "⚡ TỐI ƯU FORTNITE • CẢM ỨNG & TAY CẦM",
+        badgeEn = "⚡ FORTNITE TUNED • TOUCH & GAMEPAD",
         isFreeToPlay = true,
-        recommendedFps = "60–120 FPS",
+        recommendedFps = "60 FPS",
         nativeTouchSupport = true,
-        loadingQuote = "Nhảy dù Battle Bus • Xây tường 0ms • Giành Victory Royale! 👑",
-        loadingQuoteEn = "Drop from the Battle Bus • Zero-delay builds • Claim Victory Royale! 👑",
+        loadingQuote = "Nhảy dù Battle Bus • Điều khiển nhạy • Giành Victory Royale! 👑",
+        loadingQuoteEn = "Drop from the Battle Bus • Responsive controls • Claim Victory Royale! 👑",
         tips = listOf(
-            "Đã kích hoạt Đệm 8ms Arena Zero-Delay & thương lượng luồng 120 FPS trực tiếp với máy chủ Xbox Series X cho Fortnite!",
+            "Đã bật cấu hình giảm độ trễ đệm phát WebRTC giúp phản hồi ngắm bắn và xây dựng nhanh hơn.",
             "Mở Game Bar để chuyển 1 chạm giữa [👆 Cảm ứng Epic] (ngắt tay cầm ảo để hiện HUD xây nhà/bắn súng gốc của Epic) và [🎮 Tay cầm FPS Pro] (cần ngắm phải lớn +15%).",
-            "Âm thanh Opus 128kbps CBR + In-Band FEC đã được bật riêng cho Fortnite giúp nghe rõ tiếng bước chân, tiếng mở rương và hướng tiếng súng.",
-            "Lớp cảm ứng Claw 4 ngón chống trễ đã được kích hoạt để xây nhà, sửa tường (Edit) và vẩy Shotgun mượt tối đa."
+            "Âm thanh Opus 128kbps CBR + In-Band FEC được bật giúp nghe rõ tiếng bước chân, tiếng mở rương và hướng tiếng súng.",
+            "Hỗ trợ cảm ứng đa điểm 4 ngón (Claw) để xây nhà, sửa tường (Edit) và xoay tâm mượt mà."
         ),
         tipsEn = listOf(
-            "8ms Arena Zero-Delay playout buffer & 120 FPS SDP negotiation are active for Fortnite on Xbox Series X blades!",
+            "Low-latency WebRTC playout buffer tuning is active for responsive building and aiming.",
             "Open the HUD Game Bar to switch in 1 tap between [👆 Epic Native Touch] (cleanly hides virtual gamepad so Epic's touch HUD appears) and [🎮 FPS Pro Pad] (+15% Right Stick).",
-            "128kbps CBR Stereo Opus with In-Band FEC is active for crystal-clear footsteps, chest cues, and directional gunfire.",
-            "4-Finger Claw zero-delay multi-touch protection is enabled for responsive building, wall editing, and shotgun flicks."
+            "128kbps CBR Stereo Opus with In-Band FEC is active for clear footsteps, chest cues, and directional gunfire.",
+            "4-Finger Claw multi-touch support is enabled for responsive building, wall editing, and aiming."
         ),
         checklist = listOf(
-            OptimizationCheckItem("Đệm khung hình 8ms", "WebRTC Playout 8ms + 120Hz SDP Series X", true, "8ms Frame Buffer", "8ms WebRTC Playout + 120Hz Series X SDP"),
+            OptimizationCheckItem("Đệm khung hình thấp", "Giảm trễ đệm phát WebRTC", true, "Low Frame Buffer", "Reduced WebRTC playout buffer"),
             OptimizationCheckItem("Chuyển đổi điều khiển", "Tự động nhường HUD Cảm ứng Epic hoặc bật FPS Pro", true, "Smart Input Switch", "Clean Epic Native Touch or FPS Pro Pad (+15% Aim)"),
             OptimizationCheckItem("Âm thanh bước chân", "Opus 128kbps CBR Stereo định hướng tiếng chân/súng", true, "Footsteps Audio", "Opus 128kbps CBR Stereo directional footsteps"),
-            OptimizationCheckItem("Cảm ứng Claw 4 ngón", "Chống trễ đa điểm khi xây nhà & vẩy tâm", true, "4-Finger Claw Touch", "Zero-delay multi-touch for fast builds & edits")
+            OptimizationCheckItem("Cảm ứng đa điểm", "Hỗ trợ thao tác 4 ngón khi xây nhà & ngắm bắn", true, "Multi-Touch Support", "Responsive multi-touch for builds & edits")
         )
     )
 

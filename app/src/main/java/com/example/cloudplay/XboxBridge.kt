@@ -215,6 +215,13 @@ class XboxBridge(
 
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
+                            if (window.__networkProfile.cellularMode === 'auto' && window.__graphicsTuning && !window.__graphicsTuning.lowEndDeviceMode) {
+                                const dynamicScale = mbps <= 6.5 ? 0.75 : (mbps <= 10.5 ? 0.85 : 1.0);
+                                if (Math.abs((window.__graphicsTuning.renderScale || 1.0) - dynamicScale) >= 0.04) {
+                                    window.__graphicsTuning.renderScale = dynamicScale;
+                                    if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
+                                }
+                            }
                         }
 
                         window.__targetBufferSec = targetSec;
@@ -287,7 +294,7 @@ class XboxBridge(
                     } catch(e) {}
 
                     // ==========================================
-                    // 1. Better-xCloud Smart Region Interceptor
+                    // 1. Smart Region Header Interceptor
                     // ==========================================
                     try {
                         const NATIVE_FETCH = window.fetch;

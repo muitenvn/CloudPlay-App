@@ -110,10 +110,11 @@ fun GameLibraryScreen(
     var activeSection by remember { mutableStateOf(GameTabSection.LIBRARY) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(GameFilterTab.ALL) }
+    var selectedGenre by remember { mutableStateOf("ALL") }
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedDetailGame by remember { mutableStateOf<GameBookmark?>(null) }
 
-    val filteredGames = remember(games, selectedTab, searchQuery, favoriteIds) {
+    val filteredGames = remember(games, selectedTab, selectedGenre, searchQuery, favoriteIds) {
         games.filter { game ->
             val matchesTab = when (selectedTab) {
                 GameFilterTab.ALL -> true
@@ -124,13 +125,36 @@ fun GameLibraryScreen(
                 GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
                 GameFilterTab.GAME_PASS -> !game.freeToPlay
             }
+            val matchesGenre = when (selectedGenre) {
+                "ALL" -> true
+                "SHOOTER" -> game.category.contains("Bắn súng", ignoreCase = true) ||
+                    game.categoryEn.contains("Shooter", ignoreCase = true) ||
+                    game.categoryEn.contains("Battle Royale", ignoreCase = true)
+                "ACTION" -> game.category.contains("Hành động", ignoreCase = true) ||
+                    game.category.contains("Phiêu lưu", ignoreCase = true) ||
+                    game.categoryEn.contains("Action", ignoreCase = true) ||
+                    game.categoryEn.contains("Adventure", ignoreCase = true)
+                "RACING" -> game.category.contains("Đua xe", ignoreCase = true) ||
+                    game.category.contains("Lái", ignoreCase = true) ||
+                    game.categoryEn.contains("Racing", ignoreCase = true) ||
+                    game.categoryEn.contains("Simulation", ignoreCase = true)
+                "RPG" -> game.category.contains("Nhập vai", ignoreCase = true) ||
+                    game.category.contains("Sinh tồn", ignoreCase = true) ||
+                    game.categoryEn.contains("RPG", ignoreCase = true) ||
+                    game.categoryEn.contains("Survival", ignoreCase = true)
+                "SPORTS" -> game.category.contains("Thể thao", ignoreCase = true) ||
+                    game.category.contains("Đối kháng", ignoreCase = true) ||
+                    game.categoryEn.contains("Sports", ignoreCase = true) ||
+                    game.categoryEn.contains("Fighting", ignoreCase = true)
+                else -> true
+            }
             val matchesSearch = if (searchQuery.isBlank()) true else {
                 game.title.contains(searchQuery, ignoreCase = true) ||
                     game.category.contains(searchQuery, ignoreCase = true) ||
                     game.categoryEn.contains(searchQuery, ignoreCase = true) ||
                     (game.publisher?.contains(searchQuery, ignoreCase = true) == true)
             }
-            matchesTab && matchesSearch
+            matchesTab && matchesGenre && matchesSearch
         }.sortedByDescending { it.id in favoriteIds }
     }
 
@@ -411,6 +435,60 @@ fun GameLibraryScreen(
                             )
                         }
                     }
+                }
+
+                // 3b. Quick Genre Chips + Live Result Counter
+                val genreOptions = listOf(
+                    "ALL" to (if (isEn) "All Genres" else "Mọi thể loại"),
+                    "SHOOTER" to (if (isEn) "Shooter / FPS" else "Bắn súng"),
+                    "ACTION" to (if (isEn) "Action & Adv" else "Hành động"),
+                    "RACING" to (if (isEn) "Racing & Sim" else "Đua xe / Lái"),
+                    "RPG" to (if (isEn) "RPG & Survival" else "Nhập vai / Sinh tồn"),
+                    "SPORTS" to (if (isEn) "Sports & Fight" else "Thể thao / Đối kháng")
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LazyRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(genreOptions) { (genreCode, genreLabel) ->
+                            val isGenreSelected = selectedGenre == genreCode
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (isGenreSelected) DirectCyan.copy(alpha = 0.2f) else XboxSurface.copy(alpha = 0.8f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    0.8.dp,
+                                    if (isGenreSelected) DirectCyan else XboxCardBorder
+                                ),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .clickable { selectedGenre = genreCode }
+                                    .testTag("genre_chip_${genreCode.lowercase()}")
+                            ) {
+                                Text(
+                                    text = genreLabel,
+                                    color = if (isGenreSelected) DirectCyan else TextSecondary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (isGenreSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (isEn) "${filteredGames.size} games" else "${filteredGames.size} game",
+                        color = XboxNeonGreen,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
                 }
 
                 // Live Microsoft Xbox Store Search bar trigger when user types a query

@@ -110,9 +110,9 @@ fun WebDownloadPortalDialog(
 
     fun sharePortalLink() {
         val shareText = if (isEn) {
-            "🎮 Download CloudPlay Xbox (120FPS • Low Ping & Decode):\n🌐 Web: ${config.publicWebPortalUrl}\n📥 Direct APK: ${config.customApkDownloadUrl}"
+            "🎮 Download CloudPlay for Xbox Cloud Gaming (Low Latency • Virtual Controller & Touch):\n🌐 Web: ${config.publicWebPortalUrl}\n📥 Direct APK: ${config.customApkDownloadUrl}"
         } else {
-            "🎮 Tải CloudPlay Xbox (120FPS • Giảm Ping & Decode • Cảm ứng Epic):\n🌐 Trang Web: ${config.publicWebPortalUrl}\n📥 Tải trực tiếp APK: ${config.customApkDownloadUrl}"
+            "🎮 Tải CloudPlay cho Xbox Cloud Gaming (Giảm độ trễ • Tay cầm ảo & Cảm ứng):\n🌐 Trang Web: ${config.publicWebPortalUrl}\n📥 Tải trực tiếp APK: ${config.customApkDownloadUrl}"
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"

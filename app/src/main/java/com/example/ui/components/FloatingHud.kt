@@ -553,9 +553,13 @@ fun FloatingHud(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
                 horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
-                // MINIMIZED STATE: Ultra-compact Capsule Pill (tap to expand)
+                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (FPS • Ping • Resolution/Bitrate)
                 if (hudMode == HudMode.MINIMIZED) {
-                    val rawPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs
+                    val rawPing = when {
+                        telemetry.rttMs > 0 -> telemetry.rttMs
+                        vpnState.mode == NetworkMode.DIRECT_NETWORK -> vpnState.directLatencyMs
+                        else -> vpnState.latencyMs
+                    }
                     val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
                         !hasValidPing -> Color.Gray
@@ -565,10 +569,14 @@ fun FloatingHud(
                         else -> JapanRed
                     }
                     val pingText = if (!hasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡-- ms" else "${vpnState.currentServer.flag}-- ms"
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--ms" else "${vpnState.currentServer.flag}--ms"
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
+                    val fpsPrefix = if (telemetry.fps > 0) "${telemetry.fps}fps • " else ""
+                    val liveResTag = adaptiveQualityState.currentStep.tier.resolutionTag
+                    val liveMbpsInt = adaptiveQualityState.smoothBitrateMbps.roundToInt().coerceIn(1, 20)
+                    val resBitrateBadge = "$liveResTag/${liveMbpsInt}M"
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -589,17 +597,17 @@ fun FloatingHud(
                                 .background(pingColor)
                         )
                         Text(
-                            text = pingText,
+                            text = "$fpsPrefix$pingText • $resBitrateBadge",
                             color = TextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
+                            fontSize = 10.5.sp,
                             maxLines = 1
                         )
                         Icon(
                             imageVector = Icons.Default.Gamepad,
                             contentDescription = null,
                             tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
-                            modifier = Modifier.size(13.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                     }
                 } else {
@@ -701,6 +709,38 @@ fun FloatingHud(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
+                        }
+
+                        // 1.5. 1-Tap Resolution & Bitrate Quick Pill (Cycles Auto -> 720p -> 900p -> 1080p -> 1080p+)
+                        val compactResLabel = when (config.cellularMode) {
+                            com.example.data.CellularOptimizationMode.AUTO -> "Auto•${adaptiveQualityState.currentStep.tier.resolutionTag}"
+                            com.example.data.CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "720p"
+                            com.example.data.CellularOptimizationMode.MEDIUM -> "900p"
+                            com.example.data.CellularOptimizationMode.HIGH -> "1080p"
+                            com.example.data.CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "1080p+"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = XboxNeonGreen.copy(alpha = 0.20f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    lastInteractionTime = System.currentTimeMillis()
+                                    isInteracting = true
+                                    val modes = com.example.data.CellularOptimizationMode.entries
+                                    val nextIdx = (modes.indexOf(config.cellularMode) + 1) % modes.size
+                                    onSelectCellularMode(modes[nextIdx])
+                                }
+                                .testTag("hud_quality_quick_button")
+                        ) {
+                            Text(
+                                text = compactResLabel,
+                                color = XboxNeonGreen,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.5.dp),
+                                maxLines = 1
+                            )
                         }
 
                         // 2. Controller Toggle (Icon only)
@@ -1241,14 +1281,14 @@ private fun FortniteExclusiveHudCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEn) "⚡ FORTNITE EXCLUSIVE" else "⚡ TỐI ƯU RIÊNG FORTNITE",
+                    text = if (isEn) "FORTNITE CONTROLS" else "ĐIỀU KHIỂN FORTNITE",
                     color = fortniteBlue,
                     fontSize = 8.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1
                 )
                 Text(
-                    text = if (isEn) "Ultra Smooth • 120FPS" else "Siêu nhạy • 120FPS",
+                    text = if (isEn) "Epic Touch / FPS Pad" else "Cảm ứng Epic / Tay cầm",
                     color = XboxNeonGreen,
                     fontSize = 7.5.sp,
                     fontWeight = FontWeight.Bold,

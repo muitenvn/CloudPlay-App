@@ -13,12 +13,12 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-enum class QualityTier(val title: String, val badge: String) {
-    ULTRA("Rất Cao 1080p", "🔥 Rất Cao"),
-    HIGH("Cao (Sắc Nét)", "✨ Cao"),
-    BALANCED("Trung Bình (Cân Bằng)", "🌿 Trung Bình"),
-    SAVER("Thấp (Tiết Kiệm)", "❄️ Tiết Kiệm"),
-    EMERGENCY("Siêu Nhẹ (Chống Giật)", "🛡️ Siêu Nhẹ")
+enum class QualityTier(val title: String, val badge: String, val resolutionTag: String) {
+    ULTRA("1080p+ • Rất cao", "🔥 1080p+ Rất cao", "1080p+"),
+    HIGH("1080p • Cao", "✨ 1080p Cao", "1080p"),
+    BALANCED("900p • Vừa", "🌿 900p Vừa", "900p"),
+    SAVER("720p • Thấp", "❄️ 720p Thấp", "720p"),
+    EMERGENCY("720p • Siêu nhẹ", "🛡️ 720p Nhẹ", "720p")
 }
 
 data class BitrateLadderStep(
@@ -39,7 +39,7 @@ data class AdaptiveQualityState(
     val minAutoMbps: Double = 1.0,
     val maxAutoMbps: Double = 20.0,
     val qualityGrade: String = "Sẵn sàng",
-    val qualityNotice: String = "Tự động biến thiên tự do (1M ➔ 20M): Tăng giảm từng nấc mượt, không giới hạn bậc cố định",
+    val qualityNotice: String = "Tự động điều chỉnh độ phân giải (720p ⇄ 1080p) và băng thông theo mạng thực tế",
     val lastDegradeReason: String? = null,
     val lastUpgradeReason: String? = null
 )
@@ -59,8 +59,8 @@ private val FULL_CONTINUOUS_SPECTRUM: List<BitrateLadderStep> = (1..20).map { mb
         tier = tier,
         targetBitrateMbps = mbps.toDouble(),
         bufferHintMs = buf,
-        title = "Tự Động Linh Hoạt • ${mbps} Mbps (${tier.title})",
-        description = "Biến thiên tự do từng nấc 1..20 Mbps theo mạng & tải máy thực tế"
+        title = "Tự động • ${tier.title} (${mbps} Mbps)",
+        description = "Tự động điều chỉnh 720p ⇄ 1080p (1..20 Mbps) theo mạng 4G/5G & Wi-Fi"
     )
 }
 
@@ -312,15 +312,16 @@ object AdaptiveQualityManager {
             else -> if (isEn) "Stable" else "Ổn Định"
         }
 
-        // Theo dõi thời gian giải mã trung bình > 12ms hoặc mất gói 4G liên tục:
-        // Chỉ tự lưu mức thấp hơn (15 -> 12 -> 9 -> 6 -> 5) khi đang bật Tự động (isAutoAdapting == true).
+        // Theo dõi áp lực mạng 4G/5G & tải giải mã GPU:
+        // Khi bật Tự động (isAutoAdapting == true), chủ động hạ mượt Bitrate & Độ phân giải (1080p ➔ 900p ➔ 720p)
+        // để giảm độ trễ ngay lập tức, và nâng dần lại khi đường truyền sạch ổn định.
         var steppedDownForNextSession = false
         var fixedDecodeSlowHint = false
-        if (effectiveDecode > 12.0 || emaLossPercent > 2.5) {
+        if (effectiveDecode > 10.5 || emaLossPercent > 1.5 || (NetworkOptimizer.status.value.isCellular && (effectiveRtt > 105.0 || effectiveJitter > 16.0))) {
             val now = System.currentTimeMillis()
             if (highDecodeStartMs == 0L) highDecodeStartMs = now
             highDecodeTicks++
-            if (now - highDecodeStartMs >= 10_000L || highDecodeTicks >= 7) {
+            if (now - highDecodeStartMs >= 6_000L || highDecodeTicks >= 4) {
                 if (current.isAutoAdapting) {
                     val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(5)
                     val nextLowerMbps = when {
@@ -331,8 +332,6 @@ object AdaptiveQualityManager {
                     }
                     if (savedNextSessionMbps != nextLowerMbps) {
                         savedNextSessionMbps = nextLowerMbps
-                        // Không gọi SettingsRepository.updateMaxBitrate(nextLowerMbps) ngay giữa lúc đang chơi
-                        // để tránh kích hoạt Compose Recomposition toàn màn hình gây khựng hình (stutter).
                         steppedDownForNextSession = true
                     }
                 } else {
@@ -350,25 +349,32 @@ object AdaptiveQualityManager {
             val isCellular = NetworkOptimizer.status.value.isCellular
             val minBufMs = if (isCellular) 10.0 else 6.0
             val maxBufMs = if (isCellular) 42.0 else 32.0
+            val maxTargetMbps = when {
+                isCellular -> 10.0
+                NetworkOptimizer.status.value.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 15.0
+                NetworkOptimizer.status.value.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 14.0
+                else -> 12.0
+            }
 
-            // Tính toán mức đệm lý tưởng dựa theo độ dao động sóng (jitter) thực tế của 4G hoặc Wi-Fi
+            // Tính toán mức đệm lý tưởng dựa theo độ dao động sóng (jitter) thực tế của 4G/5G hoặc Wi-Fi
             val jitterMatchedTargetMs = (effectiveJitter * 1.45 + emaLossPercent * 3.5 + (effectiveDecode * 0.4)).coerceIn(minBufMs, maxBufMs)
             var deltaBufferMs = 0.0
+            var deltaBitrateMbps = 0.0
             var actionNote: String? = null
 
             val isHeavyPressure = effectiveDecode > 10.0 ||
                 decodeTime > 11.0 ||
                 emaLossPercent > 1.0 ||
                 loss > 1.4 ||
-                effectiveRtt > 120.0 ||
-                effectiveJitter > 15.0 ||
+                effectiveRtt > 115.0 ||
+                effectiveJitter > 14.0 ||
                 (fps in 1..48 && loss > 0.4)
 
             val isEarlyWarmup = (effectiveDecode in 7.6..10.0) ||
                 (decodeTime >= 7.0 && decodeTrendDelta >= 0.9) ||
-                (effectiveJitter in 8.0..15.0) ||
+                (effectiveJitter in 8.0..14.0) ||
                 (jitterTrendDelta >= 3.5 && jitter >= 7.5) ||
-                (effectiveRtt in 85.0..120.0 && rttTrendDelta >= 8.0) ||
+                (effectiveRtt in 85.0..115.0 && rttTrendDelta >= 8.0) ||
                 (emaLossPercent in 0.3..1.0)
 
             if (isHeavyPressure) {
@@ -377,10 +383,12 @@ object AdaptiveQualityManager {
                 } else {
                     +1.5
                 }
-                actionNote = if (isEn) "Absorbing 4G/Wi-Fi burst" else "Co giãn đệm chống giật 4G/Wi-Fi"
+                deltaBitrateMbps = if (isCellular) -1.5 else -1.0
+                actionNote = if (isEn) "Auto lowering resolution/bitrate to cut 4G/5G lag" else "Tự hạ độ phân giải & băng thông giảm trễ 4G/5G"
             } else if (isEarlyWarmup) {
                 deltaBufferMs = +0.8
-                actionNote = if (isEn) "Steady anti-jitter buffer" else "Ổn định bộ đệm chống trễ"
+                deltaBitrateMbps = -0.5
+                actionNote = if (isEn) "Stabilizing 4G/Wi-Fi latency" else "Ổn định độ phân giải & bộ đệm chống trễ"
             } else if (
                 emaLossPercent <= 0.15 &&
                 (effectiveDecode in 0.1..6.8 || effectiveDecode == 0.0) &&
@@ -389,37 +397,55 @@ object AdaptiveQualityManager {
                 effectiveJitter <= 6.5
             ) {
                 deltaBufferMs = -0.8
+                if (current.smoothBitrateMbps < maxTargetMbps) {
+                    deltaBitrateMbps = +0.5
+                }
                 actionNote = if (isEn) "Tightening live latency" else "Siết bộ đệm giảm độ trễ"
             }
 
             val nextBufMs = formatOneDecimal(
                 (current.smoothBufferMs + deltaBufferMs).coerceIn(minBufMs, maxBufMs)
             )
+            val nextBitrateMbps = formatOneDecimal(
+                (current.smoothBitrateMbps + deltaBitrateMbps).coerceIn(4.5, maxTargetMbps)
+            )
             val bufferChanged = abs(nextBufMs - current.smoothBufferMs) >= 0.3
+            val bitrateChanged = abs(nextBitrateMbps - current.smoothBitrateMbps) >= 0.4
             val gradeChanged = current.qualityGrade != grade
 
-            if (bufferChanged || gradeChanged || steppedDownForNextSession) {
+            if (bufferChanged || bitrateChanged || gradeChanged || steppedDownForNextSession) {
+                val updatedTier = tierForMbps(nextBitrateMbps)
+                val updatedIdx = (nextBitrateMbps.roundToInt() - 1).coerceIn(0, FULL_CONTINUOUS_SPECTRUM.lastIndex)
                 val updatedStep = current.currentStep.copy(
-                    bufferHintMs = nextBufMs.roundToInt()
+                    tier = updatedTier,
+                    targetBitrateMbps = nextBitrateMbps,
+                    bufferHintMs = nextBufMs.roundToInt(),
+                    title = if (isEn) {
+                        "Auto • ${updatedTier.resolutionTag} (${nextBitrateMbps.roundToInt()} Mbps)"
+                    } else {
+                        "Tự động • ${updatedTier.title} (${nextBitrateMbps.roundToInt()} Mbps)"
+                    }
                 )
                 val notice = when {
+                    actionNote != null && (bufferChanged || bitrateChanged) -> "🌊 $actionNote (${updatedTier.resolutionTag} • ${nextBufMs.roundToInt()}ms)"
                     steppedDownForNextSession -> "📌 $nextSessionNote"
-                    actionNote != null && bufferChanged -> "🌊 $actionNote (${nextBufMs.roundToInt()}ms)"
                     else -> "🌊 $nextSessionNote"
                 }
 
                 _state.value = current.copy(
                     currentStep = updatedStep,
+                    currentStepIndex = updatedIdx,
+                    smoothBitrateMbps = nextBitrateMbps,
                     smoothBufferMs = nextBufMs,
                     qualityGrade = grade,
                     qualityNotice = notice,
-                    lastDegradeReason = if (deltaBufferMs > 0) actionNote else current.lastDegradeReason,
-                    lastUpgradeReason = if (deltaBufferMs < 0) actionNote else current.lastUpgradeReason
+                    lastDegradeReason = if (deltaBufferMs > 0 || deltaBitrateMbps < 0) actionNote else current.lastDegradeReason,
+                    lastUpgradeReason = if (deltaBufferMs < 0 || deltaBitrateMbps > 0) actionNote else current.lastUpgradeReason
                 )
 
-                if (bufferChanged) {
+                if (bufferChanged || bitrateChanged) {
                     QualityAdapter.applyAdaptiveBitrate(
-                        targetBitrateMbps = current.smoothBitrateMbps,
+                        targetBitrateMbps = nextBitrateMbps,
                         bufferHintMs = nextBufMs,
                         smoothGlide = true
                     )

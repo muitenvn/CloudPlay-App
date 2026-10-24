@@ -577,14 +577,22 @@ fun ServersScreen(
         }
 
         // Servers list
+        val recommendedServerId = filteredServers.firstOrNull { server ->
+            val p = serverPings[server.id] ?: server.lastPingMs ?: -1
+            val st = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
+            p > 0 && st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+        }?.id ?: filteredServers.firstOrNull()?.id
+
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
             val ping = serverPings[server.id] ?: server.lastPingMs ?: -1
             val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
+            val isRecommended = server.id == recommendedServerId
 
             ServerCard(
                 server = server,
                 isSelected = isSelected,
+                isRecommended = isRecommended,
                 pingMs = ping,
                 unlockStatus = unlockStatus,
                 isEn = isEn,
@@ -619,6 +627,7 @@ fun ServersScreen(
 private fun ServerCard(
     server: ServerLocation,
     isSelected: Boolean,
+    isRecommended: Boolean = false,
     pingMs: Int,
     unlockStatus: RegionUnlockStatus,
     isEn: Boolean = false,
@@ -720,6 +729,22 @@ private fun ServerCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
+                        if (isRecommended) {
+                            Surface(
+                                shape = RoundedCornerShape(5.dp),
+                                color = DirectCyan.copy(alpha = 0.18f),
+                                border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.65f))
+                            ) {
+                                Text(
+                                    text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
+                                    color = DirectCyan,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                                )
+                            }
+                        }
                         Surface(
                             shape = RoundedCornerShape(5.dp),
                             color = XboxGreen.copy(alpha = 0.22f),
@@ -823,8 +848,13 @@ private fun ServerCard(
                             )
                         }
                     } else {
+                        val stabilityText = when {
+                            pingMs in 1..85 -> if (isEn) "Stable • ${server.speedMbps} Mbps" else "Ổn định • ${server.speedMbps} Mbps"
+                            pingMs in 86..150 -> if (isEn) "Good • ${server.speedMbps} Mbps" else "Khá • ${server.speedMbps} Mbps"
+                            else -> "${server.speedMbps} Mbps"
+                        }
                         Text(
-                            text = "${server.speedMbps} Mbps",
+                            text = stabilityText,
                             color = TextSecondary,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp

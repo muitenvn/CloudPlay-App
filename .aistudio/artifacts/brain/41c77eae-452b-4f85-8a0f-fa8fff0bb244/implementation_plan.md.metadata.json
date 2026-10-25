@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch điều tra và khắc phục triệt để tình trạng giật/lắc luồng game, đo chính xác các chỉ số rớt khung hình/đứng hình/jitter từ WebRTC getStats() và khôi phục cơ chế điều tiết bộ đệm, SDP bitrate, cảm ứng trên máy yếu.",
-  "updatedAt":  "2026-10-25T10:32:14.823108456Z",
+  "summary":  "Kế hoạch chỉnh sửa chi tiết 9 mục giao diện và trải nghiệm (DashboardScreen, ServersScreen, GameLibraryScreen, HomeScreen, SessionHistoryScreen, SettingsScreen, FloatingHud, GameOptimizationProfile, GameBookmark) theo đánh giá video 34 giây và phản hồi người dùng, giữ nguyên phong cách neon xanh tối và kiểm soát chặt số dòng từng file.",
+  "updatedAt":  "2026-10-25T11:30:00.965957020Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

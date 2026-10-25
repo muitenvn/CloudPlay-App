@@ -250,7 +250,7 @@ fun SettingsScreen(
                                                 text = mode.localizedSubtitle(isEn),
                                                 color = TextSecondary,
                                                 fontSize = 10.sp,
-                                                maxLines = 1
+                                                maxLines = 2
                                             )
                                         }
                                     }
@@ -301,7 +301,7 @@ fun SettingsScreen(
                                         color = TextSecondary,
                                         fontSize = 9.sp,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 1
+                                        maxLines = 2
                                     )
                                 }
                             }
@@ -934,7 +934,7 @@ fun SettingsScreen(
                                         color = TextSecondary,
                                         fontSize = 9.sp,
                                         textAlign = TextAlign.Center,
-                                        maxLines = 1
+                                        maxLines = 2
                                     )
                                 }
                             }
@@ -977,7 +977,7 @@ fun SettingsScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
@@ -987,6 +987,7 @@ fun SettingsScreen(
                             .weight(1f)
                             .testTag("check_update_now_btn"),
                         shape = RoundedCornerShape(10.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.65f))
                     ) {
                         Text(
@@ -998,7 +999,8 @@ fun SettingsScreen(
                             },
                             color = XboxNeonGreen,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp,
+                            maxLines = 1
                         )
                     }
 
@@ -1008,17 +1010,19 @@ fun SettingsScreen(
                             .weight(1f)
                             .testTag("open_web_portal_settings_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp))
                             Text(
                                 text = if (isEn) "Share & QR" else "Mã QR & Chia sẻ",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
+                                fontSize = 11.5.sp,
+                                maxLines = 1
                             )
                         }
                     }

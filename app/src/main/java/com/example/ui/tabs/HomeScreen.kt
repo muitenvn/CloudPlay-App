@@ -949,6 +949,7 @@ private fun FeaturedGamesSection(
         }
 
         if (featuredGames.isEmpty()) {
+            val isSyncing by GameLibraryRepository.isSyncingCatalog.collectAsState()
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
@@ -969,10 +970,10 @@ private fun FeaturedGamesSection(
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = if (isEn) {
-                            "Loading featured games..."
+                        text = if (isSyncing) {
+                            if (isEn) "Loading games..." else "Đang tải game..."
                         } else {
-                            "Đang tải danh sách game nổi bật..."
+                            if (isEn) "No games yet" else "Chưa có game"
                         },
                         color = TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,
@@ -983,8 +984,8 @@ private fun FeaturedGamesSection(
             }
         } else {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(horizontal = 2.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(start = 2.dp, end = 12.dp)
             ) {
                 items(featuredGames, key = { it.id }) { game ->
                     FeaturedGameCard(
@@ -1018,9 +1019,21 @@ private fun FeaturedGameCard(
             .joinToString("") { it.first().uppercaseChar().toString() }
             .ifBlank { "XB" }
     }
+    val secondaryColorHex = remember(game.title, game.accentColorHex) {
+        val hash = game.title.hashCode()
+        when (kotlin.math.abs(hash) % 4) {
+            0 -> 0xFF00E5FFL
+            1 -> 0xFF107C10L
+            2 -> 0xFF7C4DFFL
+            else -> 0xFF00B4D8L
+        }
+    }
+    var coverImageLoaded by remember(game.id, game.imageUrl) {
+        mutableStateOf(false)
+    }
     Card(
         modifier = Modifier
-            .width(188.dp)
+            .width(156.dp)
             .clip(RoundedCornerShape(18.dp))
             .border(
                 1.1.dp,
@@ -1042,7 +1055,7 @@ private fun FeaturedGameCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(128.dp)
+                    .height(124.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -1050,35 +1063,35 @@ private fun FeaturedGameCard(
                         .background(
                             Brush.linearGradient(
                                 listOf(
-                                    Color(game.accentColorHex).copy(alpha = 0.48f),
-                                    XboxSurfaceVariant.copy(alpha = 0.92f),
+                                    Color(game.accentColorHex).copy(alpha = 0.65f),
+                                    Color(secondaryColorHex).copy(alpha = 0.35f),
                                     XboxDark
                                 )
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isImportingCatalog || game.imageUrl.isNullOrBlank()) {
+                    if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp)
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0x88060B08),
+                                color = Color(0xAA060B08),
                                 border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    Color(game.accentColorHex).copy(alpha = 0.75f)
+                                    1.2.dp,
+                                    Color(game.accentColorHex).copy(alpha = 0.85f)
                                 ),
-                                modifier = Modifier.size(38.dp)
+                                modifier = Modifier.size(44.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = monogram,
                                         color = Color.White,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 13.5.sp,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Black
                                     )
                                 }
@@ -1111,6 +1124,8 @@ private fun FeaturedGameCard(
                         },
                         contentDescription = game.title,
                         contentScale = ContentScale.Crop,
+                        onSuccess = { coverImageLoaded = true },
+                        onError = { coverImageLoaded = false },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else if (game.drawableResId != null) {

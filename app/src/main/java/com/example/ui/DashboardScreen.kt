@@ -33,15 +33,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import android.provider.Settings
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -127,12 +132,22 @@ fun DashboardScreen(
     var guideInitialSection by remember { mutableStateOf(GuideSection.QUICK_START) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
+    var showOverflowMenu by remember { mutableStateOf(false) }
+
+    val systemReduceMotion = remember(context) {
+        try {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        } catch (_: Exception) {
+            false
+        }
+    }
+    val reduceMotion = config.lowEndDeviceMode || systemReduceMotion
 
     fun handleConnect() {
         VpnManager.connect(context)
     }
 
-    val dotPulse = if (config.lowEndDeviceMode) {
+    val dotPulse = if (reduceMotion) {
         0.9f
     } else {
         val pulseTransition = rememberInfiniteTransition(label = "header_pulse")
@@ -172,19 +187,19 @@ fun DashboardScreen(
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 // Console Emblem with Neon Rim
                                 Box(
                                     modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(11.dp))
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .border(
                                             1.4.dp,
                                             Brush.linearGradient(
                                                 listOf(XboxNeonGreen, DirectCyan)
                                             ),
-                                            RoundedCornerShape(11.dp)
+                                            RoundedCornerShape(10.dp)
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -200,21 +215,16 @@ fun DashboardScreen(
                                     modifier = Modifier.weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(1.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                    ) {
-                                        Text(
-                                            text = "CLOUDPLAY",
-                                            color = TextPrimary,
-                                            fontFamily = SpaceGroteskFontFamily,
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 15.sp,
-                                            letterSpacing = 0.5.sp,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
+                                    Text(
+                                        text = "CLOUDPLAY",
+                                        color = TextPrimary,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 14.5.sp,
+                                        letterSpacing = 0.4.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -248,10 +258,11 @@ fun DashboardScreen(
                             }
                         },
                         actions = {
+                            val isEnUi = config.isEnglishUI()
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                modifier = Modifier.padding(end = 8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(end = 4.dp)
                             ) {
                                 // 1. Live Telemetry Ping Pill (only when real ping is measured)
                                 val directPing = vpnState.directLatencyMs
@@ -262,36 +273,43 @@ fun DashboardScreen(
                                         directPing < 100 -> XboxNeonGreen
                                         else -> WarningAmber
                                     }
-                                    Surface(
+                                    Box(
                                         modifier = Modifier
-                                            .clip(RoundedCornerShape(9.dp))
-                                            .border(1.dp, pingTint.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
-                                        color = pingTint.copy(alpha = 0.10f)
+                                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                            .clickable { currentTab = DashboardTab.SERVERS },
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        Surface(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .border(1.dp, pingTint.copy(alpha = 0.45f), RoundedCornerShape(9.dp)),
+                                            color = pingTint.copy(alpha = 0.10f)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Speed,
-                                                contentDescription = "Ping",
-                                                tint = pingTint,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Text(
-                                                text = "${directPing}ms",
-                                                color = pingTint,
-                                                fontFamily = JetBrainsMonoFontFamily,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                maxLines = 1
-                                            )
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Speed,
+                                                    contentDescription = "Ping",
+                                                    tint = pingTint,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                                Text(
+                                                    text = "${directPing}ms",
+                                                    color = pingTint,
+                                                    fontFamily = JetBrainsMonoFontFamily,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    maxLines = 1
+                                                )
+                                            }
                                         }
                                     }
                                 }
 
-                                // 2. Language Icon Button (short 2-char code)
+                                // 2. Language Button (48dp touch target)
                                 val currentLangLabel = when (config.appLanguage) {
                                     com.example.data.AppLanguage.SYSTEM -> {
                                         val sys = java.util.Locale.getDefault()
@@ -300,11 +318,10 @@ fun DashboardScreen(
                                     com.example.data.AppLanguage.VIETNAMESE -> "VI"
                                     com.example.data.AppLanguage.ENGLISH -> "EN"
                                 }
-                                Surface(
+                                Box(
                                     modifier = Modifier
-                                        .height(30.dp)
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp))
+                                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             val nextLang = when (config.appLanguage) {
                                                 com.example.data.AppLanguage.SYSTEM -> com.example.data.AppLanguage.VIETNAMESE
@@ -314,95 +331,153 @@ fun DashboardScreen(
                                             SettingsRepository.updateAppLanguage(nextLang)
                                         }
                                         .testTag("topbar_language_button"),
-                                    color = XboxSurfaceVariant.copy(alpha = 0.9f)
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    Surface(
+                                        modifier = Modifier
+                                            .height(34.dp)
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp)),
+                                        color = XboxSurfaceVariant.copy(alpha = 0.9f)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Language,
-                                            contentDescription = stringResource(R.string.current_language),
-                                            tint = XboxNeonGreen,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Text(
-                                            text = currentLangLabel,
-                                            color = TextPrimary,
-                                            fontFamily = SpaceGroteskFontFamily,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Language,
+                                                contentDescription = stringResource(R.string.current_language),
+                                                tint = XboxNeonGreen,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = currentLangLabel,
+                                                color = TextPrimary,
+                                                fontFamily = SpaceGroteskFontFamily,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
+                                            )
+                                        }
                                     }
                                 }
 
-                                // 3. Translator Icon Button
-                                val isEnUi = config.isEnglishUI()
+                                // 3. Translator Button (48dp touch target)
                                 val isTranslateOn = config.isEffectiveTranslateEnabled()
-                                Surface(
+                                Box(
                                     modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .border(
-                                            1.dp,
-                                            if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
-                                            RoundedCornerShape(9.dp)
-                                        )
+                                        .size(48.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable { showTranslatorDialog = true }
                                         .testTag("topbar_translator_button"),
-                                    color = if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.9f)
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Translate,
-                                            contentDescription = if (isEnUi) "Auto Translate" else "Dịch tự động",
-                                            tint = XboxNeonGreen,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                }
-
-                                // 4. SEO Web Download Portal & QR Share Button
-                                Surface(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(9.dp))
-                                        .clickable { showWebPortalDialog = true }
-                                        .testTag("topbar_web_portal_button"),
-                                    color = XboxNeonGreen.copy(alpha = 0.14f)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Public,
-                                            contentDescription = if (isEnUi) "Web Download Portal" else "Trang Web Tải App & QR",
-                                            tint = XboxNeonGreen,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                    }
-                                }
-
-                                // 5. Quick User Guide Icon Button
-                                Surface(
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp))
-                                        .clickable {
-                                            guideInitialSection = GuideSection.QUICK_START
-                                            showGuideDialog = true
+                                    Surface(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(RoundedCornerShape(9.dp))
+                                            .border(
+                                                1.dp,
+                                                if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
+                                                RoundedCornerShape(9.dp)
+                                            ),
+                                        color = if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.9f)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Translate,
+                                                contentDescription = if (isEnUi) "Auto Translate" else "Dịch tự động",
+                                                tint = XboxNeonGreen,
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                         }
-                                        .testTag("topbar_guide_button"),
-                                    color = XboxSurfaceVariant.copy(alpha = 0.85f)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                                            contentDescription = stringResource(R.string.guide_button),
-                                            tint = DirectCyan,
-                                            modifier = Modifier.size(15.dp)
+                                    }
+                                }
+
+                                // 4. Overflow Menu ("⋯") for secondary items (Web Download Portal & User Guide)
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { showOverflowMenu = true }
+                                            .testTag("topbar_overflow_menu_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp)),
+                                            color = XboxSurfaceVariant.copy(alpha = 0.9f)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.MoreVert,
+                                                    contentDescription = if (isEnUi) "More options" else "Thêm tùy chọn",
+                                                    tint = TextPrimary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showOverflowMenu,
+                                        onDismissRequest = { showOverflowMenu = false },
+                                        modifier = Modifier
+                                            .background(XboxSurface)
+                                            .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp))
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = if (isEnUi) "Share & QR Code" else "Mã QR & Chia sẻ",
+                                                    color = TextPrimary,
+                                                    fontFamily = SpaceGroteskFontFamily,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Public,
+                                                    contentDescription = null,
+                                                    tint = XboxNeonGreen,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                showWebPortalDialog = true
+                                            },
+                                            modifier = Modifier.testTag("topbar_web_portal_button")
+                                        )
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    text = stringResource(R.string.guide_button),
+                                                    color = TextPrimary,
+                                                    fontFamily = SpaceGroteskFontFamily,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.HelpOutline,
+                                                    contentDescription = null,
+                                                    tint = DirectCyan,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            },
+                                            onClick = {
+                                                showOverflowMenu = false
+                                                guideInitialSection = GuideSection.QUICK_START
+                                                showGuideDialog = true
+                                            },
+                                            modifier = Modifier.testTag("topbar_guide_button")
                                         )
                                     }
                                 }
@@ -432,8 +507,12 @@ fun DashboardScreen(
             AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {
-                    (fadeIn(tween(220)) + scaleIn(initialScale = 0.985f, animationSpec = tween(220))) togetherWith
-                        fadeOut(tween(150))
+                    if (reduceMotion) {
+                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                    } else {
+                        (fadeIn(tween(180)) + scaleIn(initialScale = 0.99f, animationSpec = tween(180))) togetherWith
+                            fadeOut(tween(120))
+                    }
                 },
                 label = "tab_animation"
             ) { tab ->

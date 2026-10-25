@@ -1075,7 +1075,14 @@ object GameLibraryRepository {
                 val id = obj.optString("id", "custom_$i")
                 val isFortnite = id == "fortnite" || extractProductId(playUrl).equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
                 val cat = obj.optString("category", "Xbox Cloud Game Pass")
-                val badge = obj.optString("badge", "").takeIf { it.isNotBlank() }
+                val rawBadge = obj.optString("badge", "").takeIf { it.isNotBlank() }
+                val badge = rawBadge?.let { b ->
+                    if (b.contains("120", ignoreCase = true)) "Cảm ứng Epic • Miễn phí" else b
+                }
+                val rawBadgeEn = obj.optString("badgeEn", badge ?: "").takeIf { it.isNotBlank() }
+                val badgeEn = rawBadgeEn?.let { b ->
+                    if (b.contains("120", ignoreCase = true)) "Epic Touch • Free" else b
+                }
                 val imgUrl = normalizeImageUrl(obj.optString("imageUrl", ""), widthPx = 260, quality = 70)
                 val heroUrl = normalizeImageUrl(obj.optString("heroImageUrl", ""), widthPx = 520, quality = 70) ?: imgUrl
                 list.add(
@@ -1089,7 +1096,7 @@ object GameLibraryRepository {
                         supportsTouch = obj.optBoolean("supportsTouch", true),
                         accentColorHex = obj.optLong("accentColorHex", 0xFF107C10L),
                         badge = badge,
-                        badgeEn = obj.optString("badgeEn", badge ?: "").takeIf { it.isNotBlank() },
+                        badgeEn = badgeEn,
                         drawableResId = null,
                         rating = obj.optString("rating", "4.8"),
                         imageUrl = imgUrl,

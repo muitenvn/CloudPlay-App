@@ -52,19 +52,19 @@ object GameOptimizationRepository {
         loadingQuote = "Nhảy dù Battle Bus • Điều khiển nhạy • Giành Victory Royale! 👑",
         loadingQuoteEn = "Drop from the Battle Bus • Responsive controls • Claim Victory Royale! 👑",
         tips = listOf(
-            "Đã bật chế độ phản hồi nhanh giúp thao tác ngắm bắn và xây dựng nhạy hơn.",
+            "Bật phản hồi cảm ứng nhanh",
             "Mở thanh điều khiển để chuyển 1 chạm giữa [👆 Cảm ứng Epic] (dùng nút cảm ứng gốc của game) và [🎮 Tay cầm ảo].",
             "Tối ưu âm thanh nổi giúp nghe rõ tiếng bước chân và hướng tiếng súng.",
             "Hỗ trợ chạm nhiều ngón cùng lúc để vừa di chuyển, vừa xây dựng và ngắm bắn mượt mà."
         ),
         tipsEn = listOf(
-            "Fast input response is active for responsive building and aiming.",
+            "Enable fast touch response",
             "Open the control bar to switch in 1 tap between [👆 Epic Touch] (game's native touch buttons) and [🎮 Virtual Pad].",
             "Stereo audio is tuned for clear footsteps, chest cues, and directional gunfire.",
             "Multi-touch support is enabled for smooth building, editing, and aiming."
         ),
         checklist = listOf(
-            OptimizationCheckItem("Phản hồi thao tác", "Giảm độ trễ nút bấm và xoay tâm", true, "Fast Response", "Reduced button and aiming delay"),
+            OptimizationCheckItem("Phản hồi thao tác", "Bật phản hồi cảm ứng nhanh", true, "Fast Response", "Enable fast touch response"),
             OptimizationCheckItem("Chuyển đổi điều khiển", "Đổi nhanh giữa Cảm ứng Epic và Tay cầm ảo", true, "Control Switch", "1-tap switch between Epic Touch and Virtual Pad"),
             OptimizationCheckItem("Âm thanh trong trận", "Nghe rõ tiếng bước chân và hướng súng", true, "Clear Audio", "Clear footsteps and directional sound"),
             OptimizationCheckItem("Cảm ứng đa điểm", "Hỗ trợ bấm nhiều ngón cùng lúc", true, "Multi-Touch", "Smooth multi-finger touch support")
@@ -133,8 +133,8 @@ object GameOptimizationRepository {
     val HALO_PROFILE = GameOptimizationProfile(
         gameId = "halo_infinite",
         title = "HALO INFINITE",
-        subtitle = "Huyền thoại Master Chief • Bắn súng Arena phản xạ cực nhanh",
-        subtitleEn = "Master Chief Campaign & Arena • Ultra-low input latency",
+        subtitle = "Huyền thoại Master Chief • Bắn súng Arena phản xạ nhạy",
+        subtitleEn = "Master Chief Campaign & Arena • Responsive input tuning",
         bannerResId = R.drawable.cloudplay_hero_banner_1791392804712,
         primaryAccentHex = 0xFF2D6A4F,
         secondaryAccentHex = 0xFF52B788,
@@ -146,15 +146,15 @@ object GameOptimizationRepository {
         loadingQuote = "Chiến binh Spartan trở lại bảo vệ loài người trước thế lực Banished! 🛡️",
         loadingQuoteEn = "Become the Master Chief and defend humanity against the Banished! 🛡️",
         tips = listOf(
-            "Cần độ trễ thấp để ngắm bắn Battle Rifle chuẩn từng viên đạn.",
+            "Bật phản hồi cảm ứng nhanh để ngắm bắn Battle Rifle chính xác.",
             "Tay cầm Bluetooth hoặc phím ảo ABXY độ nhạy cao là lựa chọn tối ưu cho Halo."
         ),
         tipsEn = listOf(
-            "Zero-Reload Direct Network keeps aim response crisp for Battle Rifle precision.",
+            "Fast touch response keeps aim response crisp for Battle Rifle precision.",
             "Pair a Bluetooth controller or use responsive virtual sticks for Arena combat."
         ),
         checklist = listOf(
-            OptimizationCheckItem("Độ trễ đầu vào", "Zero Input Delay Mode kích hoạt", true, "Input Latency", "Zero Input Delay Mode enabled"),
+            OptimizationCheckItem("Độ trễ đầu vào", "Bật phản hồi cảm ứng nhanh", true, "Input Latency", "Enable fast touch response"),
             OptimizationCheckItem("Âm thanh vòm", "Tối ưu tiếng bước chân địch trong Arena", true, "Spatial Audio", "Stereo 128kbps footsteps clarity")
         )
     )

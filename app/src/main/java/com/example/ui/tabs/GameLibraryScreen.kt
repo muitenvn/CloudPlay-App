@@ -250,12 +250,14 @@ fun GameLibraryScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
@@ -269,14 +271,14 @@ fun GameLibraryScreen(
                             Text(
                                 text = if (isSyncingCatalog) {
                                     if (isEn) "Updating game list (${games.size} games)..."
-                                    else "Đang cập nhật danh sách game (${games.size} game)..."
+                                    else "Đang tải danh sách (${games.size} game)..."
                                 } else {
                                     if (isEn) "${games.size} Games • $freeCount Free • $touchCount Touch"
                                     else "${games.size} game • $freeCount Miễn phí • $touchCount Cảm ứng"
                                 },
                                 color = if (isSyncingCatalog) DirectCyan else TextSecondary,
                                 fontSize = 10.5.sp,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
@@ -297,9 +299,9 @@ fun GameLibraryScreen(
                                     .testTag("sync_xbox_catalog_button")
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Sync,
@@ -316,7 +318,8 @@ fun GameLibraryScreen(
                                         color = DirectCyan,
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -330,22 +333,23 @@ fun GameLibraryScreen(
                                     .clickable { showAddDialog = true }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = null,
                                         tint = XboxNeonGreen,
-                                        modifier = Modifier.size(14.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = stringResource(R.string.btn_add_game),
+                                        text = if (isEn) "Add" else "Thêm",
                                         color = XboxNeonGreen,
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -562,11 +566,14 @@ fun GameLibraryScreen(
                             )
                             Text(
                                 text = if (isSyncingCatalog && games.isEmpty()) {
-                                    if (isEn) "Auto-fetching game info from Xbox Cloud (saving mobile data)..."
-                                    else "Đang tự động tải thông tin game từ Xbox Cloud (không tải ảnh để tiết kiệm 4G/Wi-Fi)..."
+                                    if (isEn) "Loading games from Xbox Cloud..."
+                                    else "Đang tải danh sách game..."
+                                } else if (games.isEmpty()) {
+                                    if (isEn) "No games yet"
+                                    else "Chưa có game"
                                 } else {
-                                    if (isEn) "No matching games found in local vault"
-                                    else "Chưa có game này trong kho đã tải"
+                                    if (isEn) "No matching games found"
+                                    else "Chưa có game phù hợp"
                                 },
                                 color = if (isSyncingCatalog && games.isEmpty()) DirectCyan else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -597,7 +604,7 @@ fun GameLibraryScreen(
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 152.dp),
-                        contentPadding = PaddingValues(bottom = 84.dp),
+                        contentPadding = PaddingValues(bottom = 112.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.weight(1f)
@@ -692,6 +699,19 @@ private fun LibraryGameCard(
             .joinToString("") { it.first().uppercaseChar().toString() }
             .ifBlank { "XB" }
     }
+    val secondaryGradientColor = remember(game.title, game.accentColorHex) {
+        val palette = listOf(
+            Color(0xFF00B4D8),
+            Color(0xFF107C10),
+            Color(0xFF7B2CBF),
+            Color(0xFFFF007A),
+            Color(0xFF0077B6),
+            Color(0xFF2D6A4F)
+        )
+        palette[(game.title.hashCode() and 0x7FFFFFFF) % palette.size]
+    }
+    var coverImageLoaded by remember(game.imageUrl) { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -709,43 +729,45 @@ private fun LibraryGameCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Base Gradient + Monogram surface (shown during catalog import so 0 image bytes are downloaded while importing)
+            // Gradient + Initial Monogram fallback (always shown when cover URL is missing, importing, loading, or failed)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.verticalGradient(
+                        Brush.linearGradient(
                             listOf(
-                                Color(game.accentColorHex).copy(alpha = 0.42f),
-                                XboxSurfaceVariant.copy(alpha = 0.85f),
+                                Color(game.accentColorHex).copy(alpha = 0.62f),
+                                secondaryGradientColor.copy(alpha = 0.45f),
                                 XboxDark
                             )
                         )
                     )
             ) {
-                if (isImportingCatalog || game.imageUrl.isNullOrBlank()) {
+                if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(horizontal = 12.dp, vertical = 28.dp),
+                            .padding(start = 12.dp, end = 12.dp, bottom = 34.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0x88060B08),
+                            color = Color(0xAA060B08),
                             border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                Color(game.accentColorHex).copy(alpha = 0.75f)
+                                1.4.dp,
+                                Brush.linearGradient(
+                                    listOf(Color(game.accentColorHex), DirectCyan)
+                                )
                             ),
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(54.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = monogram,
                                     color = Color.White,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 15.sp,
+                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Black
                                 )
                             }
@@ -753,9 +775,9 @@ private fun LibraryGameCard(
                         if (!game.publisher.isNullOrBlank()) {
                             Text(
                                 text = game.publisher,
-                                color = DirectCyan.copy(alpha = 0.9f),
+                                color = DirectCyan.copy(alpha = 0.95f),
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.5.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -765,7 +787,7 @@ private fun LibraryGameCard(
                 }
             }
 
-            // Cover Art: only loaded AFTER catalog import finishes (!isImportingCatalog) so importing only downloads game info
+            // Cover Art: loaded when available; updates coverImageLoaded on success so fallback stays visible on error
             if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
                 val context = LocalContext.current
                 AsyncImage(
@@ -779,6 +801,8 @@ private fun LibraryGameCard(
                     },
                     contentDescription = game.title,
                     contentScale = ContentScale.Crop,
+                    onSuccess = { coverImageLoaded = true },
+                    onError = { coverImageLoaded = false },
                     modifier = Modifier.fillMaxSize()
                 )
             } else if (game.drawableResId != null) {

@@ -93,6 +93,81 @@ private enum class HistoryFilterMode {
     ALERTS
 }
 
+/**
+ * Ngưỡng đánh giá chất lượng phiên chơi theo tỉ lệ thời gian (tập trung tại một nơi để dễ tinh chỉnh).
+ */
+object SessionVerdictThresholds {
+    const val MIN_DURATION_SECONDS = 120L
+
+    // Ngưỡng "Mượt" (tất cả điều kiện đều thỏa)
+    const val SMOOTH_MAX_DROP_PCT = 3.0
+    const val SMOOTH_MAX_FREEZES_PER_MIN = 3.0
+    const val SMOOTH_MAX_PING_MS = 130
+    const val SMOOTH_MAX_JITTER_MS = 20
+
+    // Ngưỡng "Giật nhiều" (chỉ cần 1 điều kiện vượt ngưỡng)
+    const val HEAVY_STUTTER_MIN_DROP_PCT = 8.0
+    const val HEAVY_STUTTER_MIN_FREEZES_PER_MIN = 6.0
+    const val HEAVY_STUTTER_MIN_PING_MS = 200
+    const val HEAVY_STUTTER_MIN_JITTER_MS = 35
+}
+
+private enum class SessionVerdictLevel {
+    INSUFFICIENT_DATA,
+    SMOOTH,
+    SLIGHT_STUTTER,
+    HEAVY_STUTTER
+}
+
+private data class SessionVerdictEvaluation(
+    val level: SessionVerdictLevel,
+    val dropRatioPct: Double,
+    val freezesPerMinute: Double
+)
+
+private fun evaluateSessionVerdict(session: PlaySessionRecord): SessionVerdictEvaluation {
+    val estimatedRenderedFrames = (session.durationSeconds.coerceAtLeast(1L) * session.avgFps.coerceAtLeast(30)).coerceAtLeast(1L)
+    val totalFrames = (estimatedRenderedFrames + session.framesDropped.coerceAtLeast(0)).coerceAtLeast(1L)
+    val dropRatioPct = (session.framesDropped.coerceAtLeast(0).toDouble() * 100.0) / totalFrames.toDouble()
+    val durationMinutes = (session.durationSeconds.coerceAtLeast(1L).toDouble() / 60.0).coerceAtLeast(0.1)
+    val freezesPerMinute = session.freezeCount.coerceAtLeast(0).toDouble() / durationMinutes
+
+    if (session.durationSeconds < SessionVerdictThresholds.MIN_DURATION_SECONDS) {
+        return SessionVerdictEvaluation(
+            level = SessionVerdictLevel.INSUFFICIENT_DATA,
+            dropRatioPct = dropRatioPct,
+            freezesPerMinute = freezesPerMinute
+        )
+    }
+
+    val isHeavyStutter =
+        dropRatioPct >= SessionVerdictThresholds.HEAVY_STUTTER_MIN_DROP_PCT ||
+            freezesPerMinute >= SessionVerdictThresholds.HEAVY_STUTTER_MIN_FREEZES_PER_MIN ||
+            session.avgPingMs >= SessionVerdictThresholds.HEAVY_STUTTER_MIN_PING_MS ||
+            session.jitterMs >= SessionVerdictThresholds.HEAVY_STUTTER_MIN_JITTER_MS
+
+    if (isHeavyStutter) {
+        return SessionVerdictEvaluation(
+            level = SessionVerdictLevel.HEAVY_STUTTER,
+            dropRatioPct = dropRatioPct,
+            freezesPerMinute = freezesPerMinute
+        )
+    }
+
+    val isSmooth =
+        dropRatioPct < SessionVerdictThresholds.SMOOTH_MAX_DROP_PCT &&
+            freezesPerMinute < SessionVerdictThresholds.SMOOTH_MAX_FREEZES_PER_MIN &&
+            (session.avgPingMs in 1 until SessionVerdictThresholds.SMOOTH_MAX_PING_MS) &&
+            session.jitterMs < SessionVerdictThresholds.SMOOTH_MAX_JITTER_MS
+
+    val level = if (isSmooth) SessionVerdictLevel.SMOOTH else SessionVerdictLevel.SLIGHT_STUTTER
+    return SessionVerdictEvaluation(
+        level = level,
+        dropRatioPct = dropRatioPct,
+        freezesPerMinute = freezesPerMinute
+    )
+}
+
 @Composable
 fun SessionHistoryScreen(
     onLaunchGame: ((String) -> Unit)? = null,
@@ -247,9 +322,9 @@ fun SessionHistoryScreen(
                     }
                     Text(
                         text = if (isEn) {
-                            "No play sessions yet. Launch a game to start recording."
+                            "No session history"
                         } else {
-                            "Chưa có phiên chơi nào. Vào game để bắt đầu ghi lại."
+                            "Chưa có lịch sử"
                         },
                         color = TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,
@@ -618,7 +693,7 @@ private fun SessionHistoryItemCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Hàng tiêu đề + thời lượng
+                // Hàng tiêu đề + thời lượng + nút Chơi lại gọn gàng (không bị ép thành vạch dọc bên phải)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -634,50 +709,17 @@ private fun SessionHistoryItemCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = formatDurationCompact(session.durationSeconds, isEn),
                         color = XboxNeonGreen,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
-                }
-
-                // Ngày giờ + máy chủ/mạng
-                Text(
-                    text = "${formatSessionDateTime(session.startTimeMillis)} • ${session.formattedNetworkLabel(isEn)}",
-                    color = TextSecondary,
-                    fontSize = 10.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // 3 chip số liệu (Ping / FPS / Giải mã) + nút Chơi lại nhanh
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MetricChip(
-                            text = "Ping ${session.avgPingMs}ms",
-                            color = pingMetricColor(session.avgPingMs)
-                        )
-                        MetricChip(
-                            text = "${session.avgFps} FPS",
-                            color = fpsMetricColor(session.avgFps)
-                        )
-                        MetricChip(
-                            text = if (isEn) "Dec ${session.avgDecodeMs}ms" else "Giải mã ${session.avgDecodeMs}ms",
-                            color = decodeMetricColor(session.avgDecodeMs)
-                        )
-                    }
-
                     if (onPlayAgain != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(7.dp),
                             color = XboxGreen.copy(alpha = 0.25f),
@@ -702,12 +744,42 @@ private fun SessionHistoryItemCard(
                                     text = if (isEn) "Play" else "Chơi lại",
                                     color = XboxNeonGreen,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
+                }
+
+                // Ngày giờ + máy chủ/mạng
+                Text(
+                    text = "${formatSessionDateTime(session.startTimeMillis)} • ${session.formattedNetworkLabel(isEn)}",
+                    color = TextSecondary,
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // 3 chip số liệu (Ping / FPS / Giải mã) xếp gọn trên 1 hàng, không tràn ngang
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MetricChip(
+                        text = "Ping ${session.avgPingMs}ms",
+                        color = pingMetricColor(session.avgPingMs)
+                    )
+                    MetricChip(
+                        text = "${session.avgFps} FPS",
+                        color = fpsMetricColor(session.avgFps)
+                    )
+                    MetricChip(
+                        text = if (isEn) "Dec ${session.avgDecodeMs}ms" else "Giải mã ${session.avgDecodeMs}ms",
+                        color = decodeMetricColor(session.avgDecodeMs)
+                    )
                 }
 
                 if (session.isThermalHot || session.isSlowDecode) {
@@ -860,6 +932,103 @@ private fun SessionDetailDialog(
                             tint = TextSecondary,
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                }
+
+                // Nhãn kết luận lớn ở đầu chi tiết phiên (Mượt / Hơi giật / Giật nhiều / Chưa đủ dữ liệu)
+                val verdict = remember(session) { evaluateSessionVerdict(session) }
+                val verdictColor = when (verdict.level) {
+                    SessionVerdictLevel.SMOOTH -> XboxNeonGreen
+                    SessionVerdictLevel.SLIGHT_STUTTER -> WarningAmber
+                    SessionVerdictLevel.HEAVY_STUTTER -> JapanRed
+                    SessionVerdictLevel.INSUFFICIENT_DATA -> DirectCyan
+                }
+                val verdictTitle = when (verdict.level) {
+                    SessionVerdictLevel.SMOOTH -> if (isEn) "Smooth" else "Mượt"
+                    SessionVerdictLevel.SLIGHT_STUTTER -> if (isEn) "Slightly Stuttery" else "Hơi giật"
+                    SessionVerdictLevel.HEAVY_STUTTER -> if (isEn) "Heavy Stutter" else "Giật nhiều"
+                    SessionVerdictLevel.INSUFFICIENT_DATA -> if (isEn) "Insufficient Data" else "Chưa đủ dữ liệu"
+                }
+                val verdictSummary = when (verdict.level) {
+                    SessionVerdictLevel.INSUFFICIENT_DATA -> if (isEn) {
+                        "Session under 2 minutes (${formatDurationCompact(session.durationSeconds, true)}) • Play ≥ 2m for full rating"
+                    } else {
+                        "Phiên dưới 2 phút (${formatDurationCompact(session.durationSeconds, false)}) • Cần chơi từ 2 phút để đánh giá chuẩn"
+                    }
+                    else -> if (isEn) {
+                        String.format(
+                            Locale.US,
+                            "Drop %.1f%% • Freezes %.1f/min • Ping %dms • Jitter %dms",
+                            verdict.dropRatioPct,
+                            verdict.freezesPerMinute,
+                            session.avgPingMs,
+                            session.jitterMs
+                        )
+                    } else {
+                        String.format(
+                            Locale.US,
+                            "Rớt %.1f%% • Đứng %.1f lần/phút • Ping %dms • Jitter %dms",
+                            verdict.dropRatioPct,
+                            verdict.freezesPerMinute,
+                            session.avgPingMs,
+                            session.jitterMs
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("session_verdict_banner"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = verdictColor.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, verdictColor.copy(alpha = 0.65f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = verdictColor.copy(alpha = 0.24f),
+                                    border = BorderStroke(0.8.dp, verdictColor)
+                                ) {
+                                    Text(
+                                        text = verdictTitle,
+                                        color = verdictColor,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.5.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
+                                    )
+                                }
+                                Text(
+                                    text = if (isEn) "Session Verdict" else "Đánh giá phiên chơi",
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Text(
+                                text = verdictSummary,
+                                color = TextSecondary,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 10.sp,
+                                maxLines = 2
+                            )
+                        }
                     }
                 }
 

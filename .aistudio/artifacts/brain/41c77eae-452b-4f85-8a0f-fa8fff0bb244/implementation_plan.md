@@ -1,95 +1,84 @@
-# Khắc Phục Giật Lắc Luồng Game & Đo Chính Xác Chỉ Số WebRTC
+# Kế Hoạch Nâng Cấp Giao Diện & Trải Nghiệm Theo Video Soát Lỗi (9 Mục)
 
-Kế hoạch điều tra và xử lý triệt để nguyên nhân gây giật/lắc luồng game trên máy yếu và máy chủ xa (như Tokyo, ping 94–267ms), khôi phục số liệu giải mã thực tế từ WebRTC và bổ sung bộ đo Rớt khung hình, Đứng hình, Jitter và Độ trễ bộ đệm.
-
-## Quyết Định Đã Xác Nhận
-
-> [!IMPORTANT]
-> Các quyết định kỹ thuật và phản biện dưới đây đã được thống nhất dựa trên bằng chứng đối chiếu mã nguồn:
-
-- **Khôi phục số đo Giải mã thực tế & bỏ đổi tốc độ phát 1.02x**: Gỡ bỏ hoàn toàn công thức trừ ngược jitter và ép trần thời gian giải mã về ~9.1ms; trả về đúng thời gian giải mã phần cứng thực tế (`totalDecodeTime / framesDecoded`) để bộ điều tiết chất lượng tự động nhận biết chính xác khi máy yếu quá tải giải mã. Đồng thời bỏ việc bật/tắt `playbackRate = 1.02` mỗi 1.5 giây khi jitter cao.
-- **Tắt `requestUnbufferedDispatch` cho cảm ứng màn hình**: Gỡ bỏ `requestUnbufferedDispatch` trong `onTouchEvent` để hệ điều hành Android gom sự kiện chạm theo nhịp VSync 60Hz (tránh đẩy 120–240 sự kiện/giây làm nghẽn CPU máy yếu khi đang giải mã video); chỉ giữ cho tay cầm vật lý và thêm dòng ghi log debug đếm số sự kiện cảm ứng mỗi giây.
-- **Phản biện có bằng chứng cho mục (f) và (h)**:
-  - **Mục (f) — Đo ping khi vào trận**: Giá trị `-1` trong bộ quản lý VPN không gây lỗi vì đã có điều kiện chặn `if (ping > 0)`, nhưng lỗi thực sự nằm ở nhánh dự phòng của cầu nối WebRTC gửi `rttMs = 0` khi `currentRoundTripTime` chưa kịp có mặt, làm bộ điều tiết hiểu nhầm `rttOverloaded = false`. Sẽ sửa bằng cách lấy thêm `totalRoundTripTime / responsesReceived` và giữ nguyên mẫu RTT hợp lệ gần nhất thay vì ghi đè `0`.
-  - **Mục (h) — Ngưỡng tắt màn hình chờ 80%**: Giữ nguyên ngưỡng 80% kèm nút bỏ qua vì chỉ số này chỉ phản ánh tiến độ tải khung HTML ban đầu của trang SPA Xbox, trong khi màn hình chờ tàu vũ trụ của Xbox tự giữ cho đến khi thẻ `<video>` của luồng WebRTC phát hình.
+## 1. Nguyên Tắc Thực Hiện & Cam Kết
+- **Sửa từng phần, không viết lại màn hình**: Giữ nguyên phong cách neon xanh tối (`XboxNeonGreen`, `XboxDark`, `XboxSurface`), giữ đầy đủ mọi tính năng và công tắc hiện có.
+- **Tương thích màn hình nhỏ (`360dp`) & chữ hệ thống phóng to**: Khắc phục triệt để các lỗi thiếu `Modifier.weight(1f)` trong `Row` khiến cột nút bị ép thành vệt xanh dọc `2dp` và khung đen trống lớn.
+- **Kiểm soát số dòng code**: Mọi file chỉnh sửa đều giữ nguyên hoặc tăng nhẹ số dòng để bổ sung bố cục co giãn, xử lý ảnh bìa lỗi và nhãn kết luận phiên chơi; không rút gọn bất kỳ file nào quá 5%.
 
 ---
 
-## 1. Tổng Quan & Mục Tiêu Cốt Lõi
+## 2. Chi Tiết Thực Hiện Từng Mục (1 → 9)
 
-- **Vấn đề giải quyết**: Người chơi gặp tình trạng giật/khựng hình và hiện cảnh báo "Giải mã" + "Ping" của Xbox khi chơi Fortnite ở máy chủ Tokyo trên máy yếu, nhưng ứng dụng vẫn báo "Giải mã 9.1ms • Mát & Ổn định" do số liệu giải mã bị ép trần và bộ đệm khung hình bị hạ quá thấp (trần 22–32ms) kèm chu kỳ co giãn liên tục 1.5 giây.
-- **Giá trị mang lại**:
-  1. **Đo đúng nguyên nhân gây giật**: Thu thập đầy đủ `framesDropped`, `freezeCount`, `totalFreezesDuration`, `jitter`, và `jitterBufferDelay / jitterBufferEmittedCount` từ chuẩn WebRTC `getStats()`.
-  2. **Khôi phục độ mượt luồng phát**: Trả lại trần bộ đệm 42–45ms, giữ bộ đệm ổn định có thời gian chờ hạ (cooldown), đặt bộ đệm ngay khi luồng video/audio bắt đầu, tính lại băng thông SDP theo tỷ lệ thu phóng và giới hạn khung hình, đồng thời loại bỏ hoàn toàn các tác vụ nền thừa của bộ quay màn hình khi không quay.
+### Mục 1 — Thanh đầu trang (`DashboardScreen.kt`)
+- **Nguyên nhân**: Khu vực `actions` của `TopAppBar` đang đặt 5 mục trên cùng một hàng ngang (Ping, Ngôn ngữ, Dịch, Cổng tải Web/QR, Hướng dẫn), khiến trên màn `360dp` chip Ping ép sát vào chữ `"CLOUDPLAY"`, đồng thời chiều cao nút chỉ `30.dp`.
+- **Cách sửa**:
+  - Giữ tối đa **3 mục hiện sẵn** trên thanh đầu trang: **Chip Ping**, **Ngôn ngữ (`VI/EN`)**, và **Nút Dịch trong game**, kèm nút mở menu phụ **`"⋯"`**.
+  - Đưa 2 mục **Cổng tải Web & Mã QR** và **Hướng dẫn sử dụng** vào `DropdownMenu` của nút **`"⋯"`**.
+  - Đảm bảo vùng chạm các nút hành động trên thanh đầu trang đạt chuẩn tối thiểu **`48.dp`** (`Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)`), giúp chữ `"CLOUDPLAY"` luôn hiển thị đủ và thoáng trên màn `360dp`.
 
----
+### Mục 2 — Trang máy chủ (`ServersScreen.kt`)
+- **Nguyên nhân**:
+  1. Ở thẻ đầu trang (dòng 385), cột bên trái hiển thị `"MÁY CHỦ ĐANG CHỌN: 🇯🇵 Japan Tokyo CloudDC #11"` **thiếu `Modifier.weight(1f)`**, chiếm hết 99% chiều ngang `Row` và ép cụm nút bên phải (`"Chọn tối ưu"` + `"350 Mbps"`) thành một vệt xanh dọc `2dp` cao 12 dòng — tạo ra khung đen trống khổng lồ bên trái.
+  2. Hai nút `"Cập Nhật ..."` và `"+ Thêm ..."` bị cắt chữ do chia 3 cột hẹp.
+  3. Tên máy chủ trong `ServerCard` (dòng 727) đang khóa `maxLines = 1` nên bị cắt `"..."`.
+- **Cách sửa**:
+  - Thu gọn thẻ đầu trang thành **thẻ trạng thái gọn gàng**: hiển thị rõ **Máy chủ đang chọn**, **Trạng thái mở khóa**, **Ping hiện tại**, và nút **`"Đo ping"`** (thêm đầy đủ `Modifier.weight(1f)` cho cột thông tin để không bao giờ bị ép dọc).
+  - Bố trí hàng nút công cụ (`"Đo ping"`, `"Cập nhật"`, `"Thêm"`) có icon kèm nhãn hiển thị đủ chữ, không bị cắt `"..."`.
+  - Trong `ServerCard`, đổi tên máy chủ từ `maxLines = 1` sang **`maxLines = 2`** để tên máy chủ dài tự xuống 2 dòng rõ ràng.
 
-## 2. Trải Nghiệm Người Dùng & Giao Diện
+### Mục 3 — Thư viện game (`GameLibraryScreen.kt`)
+- **Nguyên nhân**:
+  1. Trong `LibraryGameCard` (dòng 726), nền gradient + chữ cái đầu chỉ hiện khi `imageUrl.isNullOrBlank()`, còn khi `AsyncImage` tải ảnh bị lỗi mạng/404 thì không bắt trạng thái lỗi nên chỉ hiện khung đen trống.
+  2. Dòng phụ đề `"502 game • 5 Miễn p..."` (dòng 279) khóa `maxLines = 1` và bị 2 nút bên phải ép hẹp.
+  3. Khoảng đệm dưới của lưới `LazyVerticalGrid` (`84.dp`) chưa đủ cao khi có nút `"+"` nổi.
+- **Cách sửa**:
+  - Theo dõi trạng thái tải ảnh của `AsyncImage` (`onError` / `onSuccess`): khi chưa có ảnh hoặc tải lỗi, hiển thị **nền gradient theo tên game kèm chữ cái đầu nổi bật** ở chính giữa thẻ.
+  - Cho phép dòng thống kê `"502 game • 5 Miễn phí • ..."` hiển thị đủ (`maxLines = 2`, bố cục linh hoạt với cụm nút `"Làm mới"` / `"+ Thêm"`).
+  - Tăng `contentPadding` đáy của `LazyVerticalGrid` lên **`112.dp`** để nút `"+"` nổi không che mất nút `"PLAY"` của hàng game cuối cùng.
 
-- **Giữ nguyên bố cục giao diện**: Không thay đổi cấu trúc các màn hình hiện có ngoài việc hiển thị đúng một dòng thông tin chẩn đoán ngắn gọn trong hộp thoại Chi tiết phiên chơi.
-- **Hiển thị trong Chi tiết phiên chơi**:
-  - Bổ sung một dòng duy nhất hiển thị rõ ràng:
-    `Khung hình rớt: X • Đứng hình: Y lần • Jitter: Z ms`
-  - Nhãn trạng thái máy ("Giải mã chậm" / "Mát & Ổn định") phản ánh trung thực thời gian giải mã phần cứng thực tế.
+### Mục 4 — Trang chủ (`HomeScreen.kt`)
+- **Nguyên nhân**: Mục `"Game nổi bật"` (`FeaturedGamesSection`) đặt `LazyRow` bên trong `Column` có `padding(horizontal = 16.dp)` và mỗi thẻ rộng cố định `188.dp`, làm thẻ thứ hai bị cắt ngang ngay giữa nút `"▶ Chơi ngay"`.
+- **Cách sửa**:
+  - Chuyển `LazyRow` của `"Game nổi bật"` sang tràn lề ngang với `contentPadding = PaddingValues(horizontal = 16.dp)` và điều chỉnh chiều rộng thẻ hợp lý (`160.dp`), đồng thời đảm bảo nút `"Chơi ngay"` và ảnh bìa dự phòng (gradient + chữ cái đầu khi lỗi ảnh) hiển thị nguyên vẹn, cuộn ngang mượt và rõ ràng.
 
----
+### Mục 5 — Lịch sử phiên (`SessionHistoryScreen.kt`)
+- **Nguyên nhân**:
+  1. Trong `SessionHistoryItemCard` (dòng 657–711), hàng chứa 3 chip (`Ping`, `FPS`, `Giải mã`) đặt chung `Row` với nút `"Chơi lại"` mà không có `weight` hay tách hàng, khiến 3 chip chiếm hết chiều ngang và ép nút `"Chơi lại"` thành một thanh dọc màu xanh bên phải kèm khoảng trống lớn.
+  2. Chi tiết phiên (`SessionDetailDialog`) chưa có nhãn kết luận tổng hợp ở đầu hộp thoại.
+- **Cách sửa**:
+  - **Làm gọn thẻ phiên chơi (`SessionHistoryItemCard`)**: Đưa nút `"Chơi lại"` lên khu vực góc phải tiêu đề hoặc tách hàng gọn gàng để 3 chip thông số và nút `"Chơi lại"` luôn hiển thị nguyên vẹn trên màn `360dp`, xóa bỏ hoàn toàn thanh dọc lạ và khoảng trống thừa.
+  - **Thêm nhãn kết luận lớn ở đầu `SessionDetailDialog`**:
+    - Gom toàn bộ ngưỡng vào một đối tượng hằng số `SessionVerdictThresholds` ngay đầu file để dễ chỉnh về sau:
+      - `MIN_DURATION_SECONDS = 120L` (Phiên dưới 2 phút hiện **"Chưa đủ dữ liệu"**)
+      - **Mượt**: tỉ lệ khung hình rớt `< 3.0%` **VÀ** số lần đứng hình `< 3.0 lần/phút` **VÀ** `avgPingMs < 130` **VÀ** `jitterMs < 20`
+      - **Giật nhiều**: tỉ lệ khung hình rớt `>= 8.0%` **HOẶC** số lần đứng hình `>= 6.0 lần/phút` **HOẶC** `avgPingMs >= 200` **HOẶC** `jitterMs >= 35`
+      - **Hơi giật**: các trường hợp còn lại.
+    - Hiển thị thẻ kết luận lớn kèm dòng tóm tắt rõ ràng các chỉ số thực tế (`% rớt khung hình`, `lần đứng hình/phút`, `ping`, `jitter`).
 
-## 3. Quyết Định Kỹ Thuật & Đánh Đổi (Bước 1 — Bảng Điều Tra)
+### Mục 6 — Trang Cài đặt (`SettingsScreen.kt` & `AppSettings.kt`)
+- **Cách sửa**:
+  - Cho phép các dòng mô tả phụ đang bị cắt `"..."` trong `SettingsScreen.kt` được xuống dòng tự nhiên (`maxLines = 2` hoặc bỏ giới hạn 1 dòng).
+  - Căn lại nút **`"Mã QR & Chia sẻ"`** (`maxLines = 1`, đồng bộ độ rộng và đệm ngang) để luôn nằm gọn trên 1 dòng.
+  - Trong `AppSettings.kt` (`ScreenRecordQuality`), đổi nhãn rút gọn từ `"540p • 30F"`, `"720p • 30F"`, `"720p • 60F"` thành **`"540p • 30 FPS"`**, **`"720p • 30 FPS"`**, **`"720p • 60 FPS"`**.
 
-- **Mục (a) — Trần bộ đệm & chu kỳ điều chỉnh EMA 1.5 giây**:
-  - *Bằng chứng*: Trần bộ đệm trong JS bị khóa ở 32ms và trong bộ điều tiết khóa ở 22ms (Wi-Fi) / 28ms (4G); mặc định hạ xuống 14ms (4G) và 9ms (mạng tốt); mỗi nhịp 1.5 giây không có áp lực là lập tức trừ `-0.8ms` ngay lập tức.
-  - *Giải pháp*: Khôi phục trần bộ đệm lên 42ms (Wi-Fi) và 45ms (4G), mặc định 18ms (4G) / 10–12ms (Wi-Fi). Thêm cơ chế giữ ổn định tối thiểu 9 giây liên tiếp không có áp lực mới giảm dần bộ đệm, và chỉ gửi lệnh cập nhật sang WebView khi mức chênh lệch `>= 1.5ms`.
-- **Mục (b) — Khởi tạo bộ đệm tại sự kiện `'track'` cho Video & Audio**:
-  - *Bằng chứng*: Sự kiện `pc.addEventListener('track')` chỉ lưu tham chiếu track mà không cài `playoutDelayHint` / `jitterBufferTarget`, và hàm cập nhật bộ đệm bỏ qua kênh âm thanh (`audio`).
-  - *Giải pháp*: Cài đặt ngay `playoutDelayHint` và `jitterBufferTarget` ngay khi nhận sự kiện `'track'` cho cả `video` và `audio` để luồng ổn định ngay từ giây đầu tiên và không lệch tiếng.
-- **Mục (c) — Băng thông SDP, giới hạn FPS và H.264 Profile**:
-  - *Bằng chứng*: Hàm chỉnh sửa SDP đang gán cứng `b=AS` tối đa tới 20 Mbps mà không nhân hệ số tỷ lệ hiển thị (`renderScaleFactor`), không thêm `a=framerate`, và không ưu tiên H.264 profile nhẹ cho máy yếu.
-  - *Giải pháp*: Tính lại băng thông SDP theo `renderScaleFactor`, giới hạn trần an toàn cho máy yếu/mạng di động, chèn `a=framerate` theo cấu hình FPS và ưu tiên H.264 Constrained Baseline/Main (`42e01f`/`42001f`) khi bật Chế độ máy yếu.
-- **Mục (e) — Tách biệt công tắc tự tắt VPN khi vào trận**:
-  - *Bằng chứng*: Việc kiểm tra gộp `smartVpnEnabled || autoBypassEnabled` làm VPN tự ngắt giữa phiên ngay cả khi người chơi chỉ muốn bật VPN thông minh mà tắt tự ngắt.
-  - *Giải pháp*: Chỉ kích hoạt đếm ngược tự ngắt VPN khi cờ `autoBypassEnabled` thực sự bật.
-- **Mục (g) — Tác vụ nền của máy quay màn hình khi không quay**:
-  - *Bằng chứng*: Sự kiện `touchstart`/`pointerdown` mở khóa âm thanh chạy lặp lại ở mọi lần chạm cảm ứng, và các hàm `AudioNode.prototype.connect` / `HTMLMediaElement.prototype.play` tự động gắn nhánh thu âm (`GainNode` + `MediaStreamAudioDestinationNode`) ngay cả khi không quay.
-  - *Giải pháp*: Dùng tùy chọn `{ once: true }` để gỡ bỏ sự kiện chạm ngay sau lần chạm đầu tiên, và chỉ gắn nhánh thu âm khi người chơi thực sự bấm nút Bắt đầu quay.
+### Mục 7 — Bảng HUD mở rộng (`FloatingHud.kt`)
+- **Nguyên nhân**: `panelMaxWidth` đang tính theo `screenMaxWidth * 0.38f` (chỉ `172dp` khi màn dọc) và dùng cỡ chữ `7.5sp–9sp`, khiến các nút bị cắt chữ (`"720p•Thấ"`, `"Tải / Xoa / Độ / Tho"`).
+- **Cách sửa**:
+  - Giữ bảng HUD gọn theo chiều ngang nhưng đảm bảo độ rộng tối thiểu hợp lý (`248.dp–280.dp` tùy màn hình) để không ép vỡ chữ trên màn dọc.
+  - Nâng toàn bộ cỡ chữ trong bảng HUD mở rộng lên **tối thiểu `11.sp`**.
+  - Chia bố cục bảng HUD mở rộng thành **4 nhóm tiêu đề rõ ràng**:
+    1. **Độ phân giải**
+    2. **Điều khiển**
+    3. **Màu sắc**
+    4. **Quay màn hình**
+  - Xếp **4 nút hành động cuối trên 1 hàng ngang** (**Tải lại**, **Xoay**, **Đồ họa**, **Thoát**) với **biểu tượng ở trên và nhãn `>= 11.sp` ở dưới**, hiển thị đầy đủ chữ không bị cắt.
 
----
+### Mục 8 — Câu chữ trung lập, đúng thực tế (`GameOptimizationProfile.kt` & `GameBookmark.kt`)
+- **Cách sửa**:
+  - Trong `GameOptimizationProfile.kt`: Đổi mô tả của Fortnite từ *"Đã bật chế độ phản hồi nhanh giúp thao tác ngắm bắn và xây dựng nhạy hơn."* sang câu trung lập **`"Bật phản hồi cảm ứng nhanh"`** (và rà soát các mô tả preset khác để giữ văn phong trung lập, ngắn gọn).
+  - Trong `GameBookmark.kt`: Khi nạp danh sách game đã lưu từ `SharedPreferences` (`loadGamesArrayFromPrefs`), tự động thay thế các nhãn cũ chứa `"120FPS"` (như `"Hỗ Trợ 120FPS • Free 100%"`) bằng nhãn trung lập **`"Cảm ứng Epic • Miễn phí"`**.
 
-## 4. Kiến Trúc Kỹ Thuật & Luồng Dữ Liệu
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                        WebRTC Inbound Video/Audio                        │
-│  • Sự kiện 'track' -> Đặt playoutDelayHint & jitterBufferTarget (V + A)  │
-│  • SDP Munging     -> Bitrate * renderScale + a=framerate + H.264 nhẹ    │
-└───────────────────────────────────┬──────────────────────────────────────┘
-                                    │ Chu kỳ getStats()
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                     Bộ Thu Thập Chỉ Số Thực Tế (JS)                      │
-│  • decodeTimeMs thực (bỏ ép trần 9.1ms, bỏ đổi playbackRate 1.02x)       │
-│  • framesDropped, freezeCount, totalFreezesDuration                      │
-│  • jitter (ms), jitterBufferDelay / jitterBufferEmittedCount (ms)        │
-│  • rttMs thực (giữ mẫu hợp lệ gần nhất, không ghi đè 0ms)                │
-└─────────────────┬─────────────────────────────────────┬──────────────────┘
-                  │                                     │
-                  ▼                                     ▼
-┌───────────────────────────────────┐ ┌────────────────────────────────────┐
-│   Bộ Điều Tiết Chất Lượng & Đệm   │ │      Lưu Trữ Lịch Sử Phiên Chơi    │
-│ • Trần đệm 42–45ms (4G 18ms)      │ │ • Lưu framesDropped, freezeCount,  │
-│ • Giữ ổn định ≥9s mới giảm đệm    │ │   totalFreezesDuration, jitter,    │
-│ • Hạ bậc ngay khi decode > 15ms   │ │   jitterBufferDelayMs              │
-│   hoặc freezeCount / rớt hình tăng│ │ • Chi tiết phiên: "Khung hình rớt: │
-└───────────────────────────────────┘ │   X • Đứng hình: Y lần • Jitter:   │
-                                      │   Z ms"                            │
-                                      └────────────────────────────────────┘
-```
-
-### Luồng Xử Lý Chi Tiết
-1. **Đo & Truyền Chỉ Số (`StreamTelemetry`)**:
-   - Mở rộng mô hình dữ liệu telemetry nhận từ WebRTC `getStats()` với 5 trường thực tế: tổng số khung hình rớt (`framesDropped`), số lần đứng hình (`freezeCount`), tổng thời gian đứng hình (`totalFreezesDurationSec`), độ chập chờn mạng (`jitterMs`), và độ trễ bộ đệm thực tế (`jitterBufferDelayMs`).
-   - Sử dụng trực tiếp các chỉ số này trong bộ điều tiết chất lượng để phát hiện chính xác hiện tượng đứng hình hoặc quá tải giải mã trên máy yếu.
-2. **Lưu Trữ & Hiển Thị Lịch Sử Phiên (`PlaySessionRecord`)**:
-   - Ghi nhận giá trị cuối phiên của `framesDropped`, `freezeCount`, `totalFreezesDuration`, cùng giá trị trung bình của `jitterMs` và `jitterBufferDelayMs` vào dữ liệu phiên chơi.
-   - Hiển thị dòng tóm tắt `"Khung hình rớt: X • Đứng hình: Y lần • Jitter: Z ms"` trong hộp thoại chi tiết phiên.
-3. **Đo Tần Suất Cảm Ứng Debug**:
-   - Đếm số lần `onTouchEvent` mỗi giây trên WebView và ghi ra `Log.d("CloudBrowserTouch", ...)` mỗi giây có thao tác chạm (chỉ ghi log hệ thống, không hiển thị lên giao diện).
+### Mục 9 — Trạng thái trống / đang tải & chuyển cảnh `< 250ms`
+- **Cách sửa**:
+  - Đồng bộ câu chữ tiếng Việt ngắn gọn, thân thiện cho các trạng thái: **`"Chưa có game"`**, **`"Chưa có lịch sử"`**, **`"Đang đo ping..."`**.
+  - Đảm bảo mọi hiệu ứng chuyển cảnh (`tween`) đều **`< 250ms`** (150ms–220ms) và kiểm tra thêm `Settings.Global.ANIMATOR_DURATION_SCALE` của hệ thống để tự động tắt chuyển động khi người dùng bật "Giảm chuyển động" hoặc "Chế độ máy yếu".

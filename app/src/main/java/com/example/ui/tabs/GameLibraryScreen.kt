@@ -1,11 +1,5 @@
 package com.example.ui.tabs
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -95,11 +89,6 @@ import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
-import com.example.ui.theme.xboxSlideFadeIn
-import com.example.ui.theme.xboxTabEnterTransition
-import com.example.ui.theme.xboxTabExitTransition
 
 private enum class GameTabSection {
     LIBRARY,
@@ -118,10 +107,6 @@ fun GameLibraryScreen(
     val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
     val xboxStatus by GameLibraryRepository.xboxStatus.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     var activeSection by remember { mutableStateOf(GameTabSection.LIBRARY) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedTab by remember { mutableStateOf(GameFilterTab.ALL) }
@@ -207,15 +192,9 @@ fun GameLibraryScreen(
                     )
                     sections.forEach { (section, label) ->
                         val isSelected = activeSection == section
-                        val segmentBg by animateColorAsState(
-                            targetValue = if (isSelected) XboxGreen else Color.Transparent,
-                            animationSpec = tween(durationMillis = if (motionEnabled) 160 else 0),
-                            label = "library_segment_bg"
-                        )
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { activeSection = section }
                                 .testTag(
@@ -223,7 +202,7 @@ fun GameLibraryScreen(
                                     else "segment_history_button"
                                 ),
                             shape = RoundedCornerShape(10.dp),
-                            color = segmentBg,
+                            color = if (isSelected) XboxGreen else Color.Transparent,
                             border = if (isSelected) {
                                 androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f))
                             } else null
@@ -245,34 +224,17 @@ fun GameLibraryScreen(
                 }
             }
 
-            AnimatedContent(
-                targetState = activeSection,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                transitionSpec = {
-                    if (!motionEnabled) {
-                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                    } else {
-                        val direction = targetState.ordinal.compareTo(initialState.ordinal)
-                        xboxTabEnterTransition(direction) togetherWith xboxTabExitTransition(direction)
-                    }
-                },
-                label = "library_history_section_anim"
-            ) { sectionState ->
-            if (sectionState == GameTabSection.HISTORY) {
+            if (activeSection == GameTabSection.HISTORY) {
                 SessionHistoryScreen(
                     onLaunchGame = { url ->
                         GameLibraryRepository.recordLastPlayedByUrl(url)
                         onLaunchGame(url)
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
                 )
             } else {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
                 // 1. Vault Telemetry Header Strip
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -455,20 +417,14 @@ fun GameLibraryScreen(
                 ) {
                     items(filterOptions) { (tab, label) ->
                         val isSelected = selectedTab == tab
-                        val pillBg by animateColorAsState(
-                            targetValue = if (isSelected) XboxGreen else XboxSurfaceVariant.copy(alpha = 0.85f),
-                            animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                            label = "filter_tab_bg"
-                        )
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = pillBg,
+                            color = if (isSelected) XboxGreen else XboxSurfaceVariant.copy(alpha = 0.85f),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 if (isSelected) XboxNeonGreen else XboxCardBorder
                             ),
                             modifier = Modifier
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { selectedTab = tab }
                         ) {
@@ -504,20 +460,14 @@ fun GameLibraryScreen(
                     ) {
                         items(genreOptions) { (genreCode, genreLabel) ->
                             val isGenreSelected = selectedGenre == genreCode
-                            val genreBg by animateColorAsState(
-                                targetValue = if (isGenreSelected) DirectCyan.copy(alpha = 0.2f) else XboxSurface.copy(alpha = 0.8f),
-                                animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                                label = "genre_chip_bg"
-                            )
                             Surface(
                                 shape = RoundedCornerShape(9.dp),
-                                color = genreBg,
+                                color = if (isGenreSelected) DirectCyan.copy(alpha = 0.2f) else XboxSurface.copy(alpha = 0.8f),
                                 border = androidx.compose.foundation.BorderStroke(
                                     0.8.dp,
                                     if (isGenreSelected) DirectCyan else XboxCardBorder
                                 ),
                                 modifier = Modifier
-                                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                     .clip(RoundedCornerShape(9.dp))
                                     .clickable { selectedGenre = genreCode }
                                     .testTag("genre_chip_${genreCode.lowercase()}")
@@ -677,8 +627,6 @@ fun GameLibraryScreen(
                         }
                     }
                 }
-                }
-            }
             }
         }
 
@@ -692,7 +640,6 @@ fun GameLibraryScreen(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(20.dp)
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.93f)
                     .testTag("fab_add_game")
             ) {
                 Icon(Icons.Default.Add, contentDescription = if (isEn) "Add Game" else "Thêm Game")
@@ -743,10 +690,6 @@ private fun LibraryGameCard(
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
     val monogram = remember(game.title) {
@@ -773,8 +716,6 @@ private fun LibraryGameCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(210.dp)
-            .xboxSlideFadeIn(enabled = motionEnabled, key = game.id, durationMillis = 165)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(20.dp))
             .border(
                 1.dp,

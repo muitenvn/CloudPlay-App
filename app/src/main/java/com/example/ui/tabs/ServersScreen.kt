@@ -1,7 +1,5 @@
 package com.example.ui.tabs
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,10 +79,6 @@ import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceElevated
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.animateXboxIntAsState
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
-import com.example.ui.theme.xboxSlideFadeIn
 import com.example.data.SettingsRepository
 import com.example.vpn.DEFAULT_SERVERS
 import com.example.vpn.LiveProxyFetcher
@@ -107,10 +101,6 @@ fun ServersScreen(
     val vpnState by VpnManager.state.collectAsState()
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val scope = rememberCoroutineScope()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
@@ -287,7 +277,6 @@ fun ServersScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .xboxSlideFadeIn(enabled = motionEnabled, key = "servers_header_deck", durationMillis = 170)
                     .clip(RoundedCornerShape(22.dp))
                     .border(
                         1.2.dp,
@@ -465,7 +454,6 @@ fun ServersScreen(
                                 color = XboxGreen.copy(alpha = 0.25f),
                                 border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f)),
                                 modifier = Modifier
-                                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable(enabled = !isTestingAll) { testAllServers(autoPickBest = true) }
                                     .testTag("auto_pick_best_server_button")
@@ -504,8 +492,7 @@ fun ServersScreen(
                             enabled = !isTestingAll,
                             modifier = Modifier
                                 .weight(1f)
-                                .defaultMinSize(minHeight = 42.dp)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
+                                .defaultMinSize(minHeight = 42.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                             shape = RoundedCornerShape(11.dp)
@@ -538,8 +525,7 @@ fun ServersScreen(
                             enabled = !isFetchingLive,
                             modifier = Modifier
                                 .weight(1f)
-                                .defaultMinSize(minHeight = 42.dp)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
+                                .defaultMinSize(minHeight = 42.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
                             shape = RoundedCornerShape(11.dp)
@@ -573,8 +559,7 @@ fun ServersScreen(
                             onClick = { showCustomDialog = true },
                             modifier = Modifier
                                 .weight(0.85f)
-                                .defaultMinSize(minHeight = 42.dp)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
+                                .defaultMinSize(minHeight = 42.dp),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
                             shape = RoundedCornerShape(11.dp)
@@ -611,17 +596,11 @@ fun ServersScreen(
 
                 items(categories) { (code, title) ->
                     val isSelected = selectedCategory == code
-                    val regionPillBg by animateColorAsState(
-                        targetValue = if (isSelected) XboxNeonGreen else XboxSurfaceVariant.copy(alpha = 0.88f),
-                        animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                        label = "region_pill_bg"
-                    )
                     Surface(
                         modifier = Modifier
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                             .clip(RoundedCornerShape(14.dp))
                             .clickable { selectedCategory = code },
-                        color = regionPillBg,
+                        color = if (isSelected) XboxNeonGreen else XboxSurfaceVariant.copy(alpha = 0.88f),
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             if (isSelected) XboxNeonGreen else XboxCardBorder
@@ -699,33 +678,13 @@ private fun ServerCard(
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
-    val animatedPingMs by animateXboxIntAsState(
-        targetValue = if (pingMs > 0) pingMs else 0,
-        motionEnabled = motionEnabled,
-        label = "server_ping_${server.id}"
-    )
-    val targetPingColor = when {
+    val pingColor = when {
         pingMs <= 0 -> Color.Gray
         pingMs < 60 -> DirectCyan
         pingMs < 100 -> XboxNeonGreen
         pingMs < 160 -> WarningAmber
         else -> JapanRed
     }
-    val pingColor by animateColorAsState(
-        targetValue = targetPingColor,
-        animationSpec = tween(durationMillis = if (motionEnabled) 170 else 0),
-        label = "server_ping_color"
-    )
-    val cardContainerColor by animateColorAsState(
-        targetValue = if (isSelected) XboxSurfaceVariant.copy(alpha = 0.96f) else XboxSurface.copy(alpha = 0.94f),
-        animationSpec = tween(durationMillis = if (motionEnabled) 170 else 0),
-        label = "server_card_bg"
-    )
 
     val activeBars = when {
         pingMs <= 0 -> 2
@@ -752,8 +711,6 @@ private fun ServerCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = server.id, durationMillis = 165)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(18.dp))
             .border(
                 width = if (isSelected) 1.6.dp else 1.dp,
@@ -767,7 +724,7 @@ private fun ServerCard(
             .clickable { onClick() }
             .testTag("server_card_${server.id}"),
         colors = CardDefaults.cardColors(
-            containerColor = cardContainerColor
+            containerColor = if (isSelected) XboxSurfaceVariant.copy(alpha = 0.96f) else XboxSurface.copy(alpha = 0.94f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 3.dp)
     ) {
@@ -910,7 +867,7 @@ private fun ServerCard(
                         }
 
                         Text(
-                            text = if (pingMs > 0) "${animatedPingMs}ms" else "--ms",
+                            text = if (pingMs > 0) "${pingMs}ms" else "--ms",
                             color = pingColor,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.ExtraBold,

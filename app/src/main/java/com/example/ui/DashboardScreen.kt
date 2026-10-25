@@ -1,13 +1,18 @@
 package com.example.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -60,9 +65,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -94,11 +99,6 @@ import com.example.ui.theme.XboxGlassBorder
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.animateXboxIntAsState
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
-import com.example.ui.theme.xboxTabEnterTransition
-import com.example.ui.theme.xboxTabExitTransition
 import com.example.vpn.NetworkMode
 import com.example.vpn.VpnManager
 
@@ -134,24 +134,34 @@ fun DashboardScreen(
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
-    val reduceMotion = !motionEnabled
+    val systemReduceMotion = remember(context) {
+        try {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        } catch (_: Exception) {
+            false
+        }
+    }
+    val reduceMotion = config.lowEndDeviceMode || systemReduceMotion
 
     fun handleConnect() {
         VpnManager.connect(context)
     }
 
-    val dotPulse by animateFloatAsState(
-        targetValue = if (vpnState.mode == NetworkMode.DISCONNECTED) 0.55f else 1f,
-        animationSpec = tween(
-            durationMillis = if (reduceMotion) 0 else 180,
-            easing = FastOutSlowInEasing
-        ),
-        label = "header_status_alpha"
-    )
+    val dotPulse = if (reduceMotion) {
+        0.9f
+    } else {
+        val pulseTransition = rememberInfiniteTransition(label = "header_pulse")
+        val animatedDot by pulseTransition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1100, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "dot_pulse"
+        )
+        animatedDot
+    }
 
     Scaffold(
         modifier = modifier.testTag("dashboard_screen"),
@@ -258,25 +268,14 @@ fun DashboardScreen(
                                 val directPing = vpnState.directLatencyMs
                                 val hasPing = directPing != null && directPing > 0
                                 if (hasPing) {
-                                    val animatedPing by animateXboxIntAsState(
-                                        targetValue = directPing,
-                                        motionEnabled = motionEnabled,
-                                        label = "topbar_ping_counter"
-                                    )
-                                    val targetPingTint = when {
+                                    val pingTint = when {
                                         directPing < 55 -> DirectCyan
                                         directPing < 100 -> XboxNeonGreen
                                         else -> WarningAmber
                                     }
-                                    val pingTint by animateColorAsState(
-                                        targetValue = targetPingTint,
-                                        animationSpec = tween(if (reduceMotion) 0 else 180),
-                                        label = "topbar_ping_tint"
-                                    )
                                     Box(
                                         modifier = Modifier
                                             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
                                             .clickable { currentTab = DashboardTab.SERVERS },
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -298,7 +297,7 @@ fun DashboardScreen(
                                                     modifier = Modifier.size(12.dp)
                                                 )
                                                 Text(
-                                                    text = "${animatedPing}ms",
+                                                    text = "${directPing}ms",
                                                     color = pingTint,
                                                     fontFamily = JetBrainsMonoFontFamily,
                                                     fontSize = 10.sp,
@@ -322,7 +321,6 @@ fun DashboardScreen(
                                 Box(
                                     modifier = Modifier
                                         .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                        .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
                                         .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             val nextLang = when (config.appLanguage) {
@@ -370,7 +368,6 @@ fun DashboardScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(48.dp)
-                                        .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
                                         .clip(RoundedCornerShape(10.dp))
                                         .clickable { showTranslatorDialog = true }
                                         .testTag("topbar_translator_button"),
@@ -498,7 +495,6 @@ fun DashboardScreen(
                 currentTab = currentTab,
                 gamesCount = allGames.size,
                 isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED,
-                motionEnabled = motionEnabled,
                 onSelectTab = { currentTab = it }
             )
         }
@@ -514,8 +510,8 @@ fun DashboardScreen(
                     if (reduceMotion) {
                         fadeIn(tween(0)) togetherWith fadeOut(tween(0))
                     } else {
-                        val direction = targetState.ordinal.compareTo(initialState.ordinal)
-                        xboxTabEnterTransition(direction) togetherWith xboxTabExitTransition(direction)
+                        (fadeIn(tween(180)) + scaleIn(initialScale = 0.99f, animationSpec = tween(180))) togetherWith
+                            fadeOut(tween(120))
                     }
                 },
                 label = "tab_animation"
@@ -721,7 +717,6 @@ private fun ConsoleFloatingNavigationDock(
     currentTab: DashboardTab,
     gamesCount: Int,
     isVpnActive: Boolean,
-    motionEnabled: Boolean = true,
     onSelectTab: (DashboardTab) -> Unit
 ) {
     val navItems = listOf(
@@ -761,37 +756,17 @@ private fun ConsoleFloatingNavigationDock(
             navItems.forEach { (tab, icon, label) ->
                 val isSelected = currentTab == tab
                 val scale by animateFloatAsState(
-                    targetValue = if (isSelected) 1.06f else 1f,
-                    animationSpec = tween(
-                        durationMillis = if (motionEnabled) 160 else 0,
-                        easing = FastOutSlowInEasing
-                    ),
+                    targetValue = if (isSelected) 1.04f else 1f,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                     label = "dock_item_scale"
                 )
                 val accentColor = if (tab == DashboardTab.SERVERS) DirectCyan else XboxNeonGreen
-                val iconTint by animateColorAsState(
-                    targetValue = if (isSelected) accentColor else Color(0xFFC8DDD0),
-                    animationSpec = tween(durationMillis = if (motionEnabled) 165 else 0),
-                    label = "dock_icon_tint"
-                )
-                val indicatorWidth by animateDpAsState(
-                    targetValue = if (isSelected) 22.dp else 0.dp,
-                    animationSpec = tween(
-                        durationMillis = if (motionEnabled) 165 else 0,
-                        easing = FastOutSlowInEasing
-                    ),
-                    label = "dock_indicator_width"
-                )
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 4.dp)
-                        .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        }
+                        .scale(scale)
                         .clip(RoundedCornerShape(16.dp))
                         .background(
                             if (isSelected) {
@@ -822,7 +797,7 @@ private fun ConsoleFloatingNavigationDock(
                         // Top glowing pill indicator
                         Box(
                             modifier = Modifier
-                                .width(indicatorWidth)
+                                .width(if (isSelected) 22.dp else 0.dp)
                                 .height(2.5.dp)
                                 .clip(CircleShape)
                                 .background(if (isSelected) accentColor else Color.Transparent)
@@ -832,7 +807,7 @@ private fun ConsoleFloatingNavigationDock(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
-                                tint = iconTint,
+                                tint = if (isSelected) accentColor else Color(0xFFC8DDD0),
                                 modifier = Modifier.size(21.dp)
                             )
                             if (tab == DashboardTab.LIBRARY && gamesCount > 0) {

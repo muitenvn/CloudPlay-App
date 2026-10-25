@@ -1,7 +1,5 @@
 package com.example.ui.tabs
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -84,10 +82,6 @@ import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.animateXboxIntAsState
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
-import com.example.ui.theme.xboxSlideFadeIn
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -183,10 +177,6 @@ fun SessionHistoryScreen(
     val allGames by GameLibraryRepository.games.collectAsState()
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
 
     var selectedSession by remember { mutableStateOf<PlaySessionRecord?>(null) }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
@@ -265,20 +255,14 @@ fun SessionHistoryScreen(
                 )
                 filterItems.forEach { (mode, label) ->
                     val isSelected = filterMode == mode
-                    val filterChipBg by animateColorAsState(
-                        targetValue = if (isSelected) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.85f),
-                        animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                        label = "history_filter_bg"
-                    )
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                             .clip(RoundedCornerShape(10.dp))
                             .clickable { filterMode = mode }
                             .testTag("history_filter_${mode.name.lowercase()}"),
                         shape = RoundedCornerShape(10.dp),
-                        color = filterChipBg,
+                        color = if (isSelected) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.85f),
                         border = BorderStroke(
                             0.9.dp,
                             if (isSelected) XboxNeonGreen else XboxCardBorder
@@ -469,20 +453,9 @@ private fun WeeklySummaryCard(
     isEn: Boolean,
     onClearAllClick: () -> Unit
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
-    val animatedAvgPing by animateXboxIntAsState(
-        targetValue = if (avgPingMs > 0) avgPingMs else 0,
-        motionEnabled = motionEnabled,
-        label = "weekly_avg_ping"
-    )
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = "weekly_summary_card", durationMillis = 170)
             .testTag("weekly_summary_card"),
         shape = RoundedCornerShape(16.dp),
         color = XboxSurface.copy(alpha = 0.95f),
@@ -564,7 +537,7 @@ private fun WeeklySummaryCard(
                 )
                 SummaryStatTile(
                     label = if (isEn) "Avg Ping" else "Ping TB",
-                    value = if (avgPingMs > 0) "${animatedAvgPing}ms" else "--",
+                    value = if (avgPingMs > 0) "${avgPingMs}ms" else "--",
                     valueColor = if (avgPingMs > 0) pingMetricColor(avgPingMs) else TextSecondary,
                     modifier = Modifier.weight(1f)
                 )
@@ -650,16 +623,9 @@ private fun SessionHistoryItemCard(
     onClick: () -> Unit,
     onPlayAgain: (() -> Unit)? = null
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = session.id, durationMillis = 165)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(16.dp))
             .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))
             .clickable { onClick() }
@@ -901,11 +867,6 @@ private fun SessionDetailDialog(
     onPlayAgain: (() -> Unit)? = null,
     onDelete: () -> Unit
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val chartSamples = remember(session.pingSamples, session.avgPingMs) {
         if (session.pingSamples.isNotEmpty()) session.pingSamples else listOf(session.avgPingMs.coerceAtLeast(25))
     }
@@ -919,13 +880,6 @@ private fun SessionDetailDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
-                .xboxSlideFadeIn(
-                    enabled = motionEnabled,
-                    key = "detail_${session.id}",
-                    durationMillis = 175,
-                    initialOffsetY = 8.dp,
-                    initialScale = 0.96f
-                )
                 .clip(RoundedCornerShape(22.dp))
                 .border(
                     1.2.dp,
@@ -1025,12 +979,6 @@ private fun SessionDetailDialog(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .xboxSlideFadeIn(
-                            enabled = motionEnabled,
-                            key = "verdict_${session.id}",
-                            delayMillis = 30,
-                            durationMillis = 175
-                        )
                         .testTag("session_verdict_banner"),
                     shape = RoundedCornerShape(14.dp),
                     color = verdictColor.copy(alpha = 0.14f),

@@ -1,9 +1,11 @@
 package com.example.ui.tabs
 
 import android.content.Context
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -92,10 +94,6 @@ import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceElevated
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.animateXboxIntAsState
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
-import com.example.ui.theme.xboxSlideFadeIn
 import com.example.vpn.NetworkMode
 import com.example.vpn.VpnConnectionState
 import com.example.vpn.VpnEngine
@@ -291,23 +289,25 @@ private fun HeroConsolePlayDeck(
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
-    val borderGlowAlpha by animateFloatAsState(
-        targetValue = if (vpnState.mode != NetworkMode.DISCONNECTED) 0.88f else 0.58f,
-        animationSpec = tween(
-            durationMillis = if (motionEnabled) 180 else 0,
-            easing = FastOutSlowInEasing
-        ),
-        label = "hero_border_glow_alpha"
-    )
+    val borderGlowAlpha = if (config.lowEndDeviceMode) {
+        0.65f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "hero_glow")
+        val animatedAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 0.92f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "border_glow_alpha"
+        )
+        animatedAlpha
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = "hero_deck", durationMillis = 170)
             .clip(RoundedCornerShape(24.dp))
             .border(
                 1.5.dp,
@@ -483,7 +483,6 @@ private fun HeroConsolePlayDeck(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                             .testTag("hero_launch_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxGreen,
@@ -523,7 +522,6 @@ private fun HeroConsolePlayDeck(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp)
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                             .testTag("hero_launch_fortnite_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EpicBlue,
@@ -572,18 +570,9 @@ private fun QuickNetworkCockpitCard(
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
     val directPing = vpnState.directLatencyMs
     val hasPing = directPing != null && directPing > 0
-    val animatedDirectPing by animateXboxIntAsState(
-        targetValue = directPing ?: 0,
-        motionEnabled = motionEnabled,
-        label = "cockpit_ping_counter"
-    )
     val activeBars = when {
         !hasPing -> 3
         directPing < 55 -> 4
@@ -591,22 +580,16 @@ private fun QuickNetworkCockpitCard(
         directPing < 150 -> 2
         else -> 1
     }
-    val targetSignalTint = when (activeBars) {
+    val signalTint = when (activeBars) {
         4 -> XboxNeonGreen
         3 -> DirectCyan
         2 -> WarningAmber
         else -> JapanRed
     }
-    val signalTint by animateColorAsState(
-        targetValue = targetSignalTint,
-        animationSpec = tween(durationMillis = if (motionEnabled) 175 else 0),
-        label = "cockpit_signal_tint"
-    )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = "network_cockpit", delayMillis = 25, durationMillis = 175)
             .clip(RoundedCornerShape(18.dp))
             .border(
                 1.dp,
@@ -632,7 +615,6 @@ private fun QuickNetworkCockpitCard(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onNavigateToServers() }
                     .padding(end = 8.dp),
@@ -698,7 +680,7 @@ private fun QuickNetworkCockpitCard(
                             }
                         }
                         Text(
-                            text = if (hasPing) "${animatedDirectPing}ms" else if (isEn) "Ready" else "Sẵn sàng",
+                            text = if (hasPing) "${directPing}ms" else if (isEn) "Ready" else "Sẵn sàng",
                             color = signalTint,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,
@@ -713,7 +695,6 @@ private fun QuickNetworkCockpitCard(
                 onClick = { if (isConnected) onDisconnectVpn() else onConnectVpn() },
                 modifier = Modifier
                     .height(38.dp)
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                     .testTag("quick_vpn_toggle_button"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isConnected) XboxSurfaceElevated else XboxGreen
@@ -753,10 +734,6 @@ private fun FeaturedGamesSection(
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -800,7 +777,6 @@ private fun FeaturedGamesSection(
                 color = XboxSurfaceVariant.copy(alpha = 0.9f),
                 border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f)),
                 modifier = Modifier
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onNavigateToLibrary() }
             ) {
@@ -830,7 +806,6 @@ private fun FeaturedGamesSection(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
                     .clip(RoundedCornerShape(16.dp))
                     .clickable { onLaunchBookmark(lastPlayedGame) }
                     .testTag("continue_last_game_button"),
@@ -1035,10 +1010,6 @@ private fun FeaturedGameCard(
     val config by SettingsRepository.config.collectAsState()
     val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
     val monogram = remember(game.title) {
@@ -1063,8 +1034,6 @@ private fun FeaturedGameCard(
     Card(
         modifier = Modifier
             .width(156.dp)
-            .xboxSlideFadeIn(enabled = motionEnabled, key = game.id, durationMillis = 165)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(18.dp))
             .border(
                 1.1.dp,

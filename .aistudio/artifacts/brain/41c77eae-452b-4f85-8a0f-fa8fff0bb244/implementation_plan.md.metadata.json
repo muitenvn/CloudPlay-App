@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch bổ sung hệ thống hiệu ứng chuyển động mượt dưới 220ms chuẩn Xbox Dashboard, chạy trên GPU (graphicsLayer) không gây lag hay tái bố cục, và tự động tắt khi bật Chế độ máy yếu hoặc đang trong trận game.",
-  "updatedAt":  "2026-10-25T12:40:56.824899924Z",
+  "summary":  "Kế hoạch chỉnh sửa chi tiết 9 mục giao diện và trải nghiệm (DashboardScreen, ServersScreen, GameLibraryScreen, HomeScreen, SessionHistoryScreen, SettingsScreen, FloatingHud, GameOptimizationProfile, GameBookmark) theo đánh giá video 34 giây và phản hồi người dùng, giữ nguyên phong cách neon xanh tối và kiểm soát chặt số dòng từng file.",
+  "updatedAt":  "2026-10-25T11:30:00.965957020Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

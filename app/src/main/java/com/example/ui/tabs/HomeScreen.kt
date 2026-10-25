@@ -331,13 +331,13 @@ private fun HeroConsolePlayDeck(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(294.dp)
+                    .height(236.dp)
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(294.dp)
+                    .height(236.dp)
                     .background(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
@@ -556,89 +556,7 @@ private fun HeroConsolePlayDeck(
                         }
                     }
                 }
-
-                // Thanh chỉnh nhanh theo thứ tự ưu tiên: Độ phân giải & Đồ họa (gộp 1) -> Nhịp FPS -> Điều khiển/Cài đặt
-                val regionCode = config.getEffectiveLocale().takeLast(2).uppercase()
-                val unifiedGraphicsRes = config.cellularMode.unifiedChipLabel(isEn)
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    HeroCapabilityChip(
-                        icon = "✨",
-                        label = unifiedGraphicsRes,
-                        accentColor = XboxNeonGreen,
-                        onClick = {
-                            val modes = com.example.data.CellularOptimizationMode.entries
-                            val nextIdx = (modes.indexOf(config.cellularMode) + 1) % modes.size
-                            SettingsRepository.updateCellularMode(modes[nextIdx])
-                        },
-                        modifier = Modifier.weight(1.25f)
-                    )
-                    HeroCapabilityChip(
-                        icon = "⚡",
-                        label = "${config.streamFpsCap.fps} FPS",
-                        accentColor = DirectCyan,
-                        onClick = {
-                            val caps = com.example.data.StreamFpsCap.entries
-                            val nextIdx = (caps.indexOf(config.streamFpsCap) + 1) % caps.size
-                            SettingsRepository.updateStreamFpsCap(caps[nextIdx])
-                        },
-                        modifier = Modifier.weight(0.95f)
-                    )
-                    HeroCapabilityChip(
-                        icon = if (gamepadStatus.hasPhysicalController) "🎮" else "⚙️",
-                        label = if (gamepadStatus.hasPhysicalController) {
-                            if (isEn) "Gamepad" else "Tay cầm"
-                        } else {
-                            if (isEn) "Region: $regionCode" else "Vùng: $regionCode"
-                        },
-                        accentColor = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else GoldStar,
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
-        }
-    }
-}
-
-@Composable
-private fun HeroCapabilityChip(
-    icon: String,
-    label: String,
-    accentColor: Color,
-    onClick: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = if (onClick != null) {
-            modifier
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { onClick() }
-        } else {
-            modifier
-        },
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xD908110C),
-        border = androidx.compose.foundation.BorderStroke(0.8.dp, accentColor.copy(alpha = 0.42f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(text = icon, fontSize = 10.sp)
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
-                color = accentColor,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
@@ -1186,6 +1104,8 @@ private fun FeaturedGameCard(
                         model = remember(game.imageUrl) {
                             ImageRequest.Builder(context)
                                 .data(game.imageUrl)
+                                .size(320, 440)
+                                .allowRgb565(true)
                                 .crossfade(true)
                                 .build()
                         },

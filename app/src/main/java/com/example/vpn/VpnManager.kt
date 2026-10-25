@@ -979,15 +979,25 @@ object VpnManager {
         }
     }
 
+    @Volatile
+    private var isInGameStreamActive: Boolean = false
+
+    fun setInGameStreamActive(active: Boolean) {
+        isInGameStreamActive = active
+    }
+
     private fun startLatencyMonitoring() {
         pingJob?.cancel()
         pingJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 val isDirect = _state.value.mode == NetworkMode.DIRECT_NETWORK
-                // When WebRTC stream is active and reporting real-time RTT, reuse WebRTC RTT instead of opening competing TCP sockets
+                // When WebRTC stream is active or user is inside CloudBrowserScreen, reuse WebRTC RTT instead of opening background TCP sockets
                 val liveWebRtcRtt = com.example.cloudplay.NetworkOptimizer.telemetry.value.rttMs
                 val ping = if (liveWebRtcRtt > 0) {
                     liveWebRtcRtt
+                } else if (isInGameStreamActive) {
+                    // Avoid opening competing TCP ping sockets while inside game session; wait for WebRTC getStats() RTT
+                    -1
                 } else if (isDirect) {
                     PingTester.measureDirectLatency()
                 } else {
@@ -1001,7 +1011,7 @@ object VpnManager {
                         _state.value = _state.value.copy(latencyMs = ping, pingHistory = newHistory)
                     }
                 }
-                delay(if (liveWebRtcRtt > 0) 6000L else 4500L)
+                delay(if (isInGameStreamActive || liveWebRtcRtt > 0) 7500L else 5000L)
             }
         }
     }

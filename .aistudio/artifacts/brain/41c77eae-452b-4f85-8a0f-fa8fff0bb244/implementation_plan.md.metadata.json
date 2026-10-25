@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch nâng cấp toàn diện ứng dụng: tinh gọn giao diện & gộp bớt thẻ/công tắc trùng lặp, tối ưu câu chữ tiếng Việt ngắn gọn, tăng tốc độ mở game & phản hồi điều khiển, và giảm tiêu thụ RAM/pin toàn hệ thống mà không thêm bất kỳ nút mới nào.",
-  "updatedAt":  "2026-10-25T07:35:13.270359577Z",
+  "summary":  "Kế hoạch thực hiện sửa lỗi đồng bộ công tắc Cài đặt, tinh chỉnh ngưỡng tải CloudBrowserScreen và nâng cấp bảo mật tải cập nhật APK xác thực SHA-256 trước khi cài đặt.",
+  "updatedAt":  "2026-10-25T07:50:48.049452085Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

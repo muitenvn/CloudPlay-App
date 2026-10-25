@@ -617,14 +617,36 @@ object SettingsRepository {
         val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
         prefs = sp
 
+        val hasMigratedUnifiedSwitches = sp.getBoolean("migrated_unified_switches_v1", false)
+        val rawSmartVpn = sp.getBoolean("smart_vpn_enabled", true)
+        val rawAutoBypass = sp.getBoolean("auto_bypass_enabled", true)
+        val rawLowEnd = sp.getBoolean("low_end_device_mode", false)
+        val rawGpuReduction = sp.getBoolean("gpu_load_reduction_enabled", true)
+
+        val effectiveSmartVpn = if (!hasMigratedUnifiedSwitches) (rawSmartVpn || rawAutoBypass) else rawSmartVpn
+        val effectiveAutoBypass = if (!hasMigratedUnifiedSwitches) (rawSmartVpn || rawAutoBypass) else rawAutoBypass
+        // Phản biện mục 1: gpu_load_reduction_enabled mặc định là true cho mọi máy, nếu dùng phép HOẶC sẽ ép mọi thiết bị bật lowEndDeviceMode (khóa 5 Mbps, 720p, tắt dịch). Do đó lấy theo rawLowEnd.
+        val effectiveLowEnd = rawLowEnd
+        val effectiveGpuReduction = if (!hasMigratedUnifiedSwitches) rawLowEnd else rawGpuReduction
+
+        if (!hasMigratedUnifiedSwitches) {
+            sp.edit()
+                .putBoolean("smart_vpn_enabled", effectiveSmartVpn)
+                .putBoolean("auto_bypass_enabled", effectiveAutoBypass)
+                .putBoolean("low_end_device_mode", effectiveLowEnd)
+                .putBoolean("gpu_load_reduction_enabled", effectiveGpuReduction)
+                .putBoolean("migrated_unified_switches_v1", true)
+                .apply()
+        }
+
         val loaded = AppConfig(
             appLanguage = try {
                 AppLanguage.valueOf(sp.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
             } catch (_: Exception) { AppLanguage.SYSTEM },
             useSystemLanguage = sp.getBoolean("use_system_language", true),
             customLocale = sp.getString("custom_locale", "en-US") ?: "en-US",
-            smartVpnEnabled = sp.getBoolean("smart_vpn_enabled", true),
-            autoBypassEnabled = sp.getBoolean("auto_bypass_enabled", true),
+            smartVpnEnabled = effectiveSmartVpn,
+            autoBypassEnabled = effectiveAutoBypass,
             autoBypassDelaySeconds = sp.getInt("auto_bypass_delay", 2),
             forceDesktopUserAgent = sp.getBoolean("force_desktop_ua", true),
             clarityBoostEnabled = sp.getBoolean("clarity_boost_enabled_v2", false),
@@ -670,7 +692,7 @@ object SettingsRepository {
                 NetworkTuningMode.valueOf(sp.getString("network_tuning_mode", NetworkTuningMode.AUTO.name) ?: NetworkTuningMode.AUTO.name)
             } catch (_: Exception) { NetworkTuningMode.AUTO },
             wifiSpeedFirstPriority = sp.getBoolean("wifi_speed_first", true),
-            lowEndDeviceMode = sp.getBoolean("low_end_device_mode", false),
+            lowEndDeviceMode = effectiveLowEnd,
             streamRenderScale = try {
                 StreamRenderScale.valueOf(
                     sp.getString("stream_render_scale", StreamRenderScale.NATIVE_100.name)
@@ -683,7 +705,7 @@ object SettingsRepository {
                         ?: StreamFpsCap.FPS_60.name
                 )
             } catch (_: Exception) { StreamFpsCap.FPS_60 },
-            gpuLoadReductionEnabled = sp.getBoolean("gpu_load_reduction_enabled", true),
+            gpuLoadReductionEnabled = effectiveGpuReduction,
             screenRecordQuality = try {
                 ScreenRecordQuality.valueOf(
                     sp.getString("screen_record_quality", ScreenRecordQuality.BALANCED_720P_30.name)

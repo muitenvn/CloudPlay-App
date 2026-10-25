@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -307,18 +308,13 @@ fun SettingsScreen(
                         }
                     }
                     SettingToggleRow(
-                        title = if (isEn) "Light Background Effects" else "Giảm hiệu ứng nền",
-                        subtitle = if (isEn) "Helps phone run cooler and smoother" else "Giúp máy đỡ nóng và đỡ giật hơn",
-                        checked = config.gpuLoadReductionEnabled,
-                        onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
-                        activeColor = DirectCyan
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Low-End Device Mode" else "Chế độ máy yếu",
-                        subtitle = if (isEn) "Uses light 720p stream to keep phone cool" else "Dùng mức 720p nhẹ, giữ máy mát và đỡ hao pin",
-                        checked = config.lowEndDeviceMode,
-                        onCheckedChange = { SettingsRepository.updateLowEndDeviceMode(it) },
+                        title = if (isEn) "Low-End & Battery Saver Mode" else "Chế độ máy yếu & Tiết kiệm pin",
+                        subtitle = if (isEn) "Light 720p stream & reduced effects to keep phone cool" else "Dùng mức 720p nhẹ và tắt hiệu ứng thừa giúp máy mát, đỡ hao pin",
+                        checked = config.lowEndDeviceMode && config.gpuLoadReductionEnabled,
+                        onCheckedChange = { enabled ->
+                            SettingsRepository.updateLowEndDeviceMode(enabled)
+                            SettingsRepository.updateGpuLoadReductionEnabled(enabled)
+                        },
                         switchTestTag = "settings_low_end_device_mode_switch"
                     )
                 }
@@ -406,19 +402,14 @@ fun SettingsScreen(
                 // 2.1 VPN thông minh
                 SettingsCard(title = if (isEn) "Smart VPN" else "VPN thông minh") {
                     SettingToggleRow(
-                        title = if (isEn) "Smart VPN (Auto On/Off)" else "VPN thông minh (Tự bật/tắt)",
-                        subtitle = if (isEn) "Auto connects to open game, disconnects inside" else "Tự bật khi mở game, tự tắt khi vào trận",
-                        checked = config.smartVpnEnabled,
-                        onCheckedChange = { SettingsRepository.updateSmartVpnEnabled(it) },
+                        title = if (isEn) "Smart VPN (Auto Unlock ➔ Auto Direct)" else "VPN thông minh (Tự mở khóa ➔ Tự tắt khi vào trận)",
+                        subtitle = if (isEn) "Auto connects to open game, then switches to direct network for lowest ping" else "Tự bật khi mở game, tự chuyển sang mạng trực tiếp khi vào trận để ping thấp nhất",
+                        checked = config.smartVpnEnabled && config.autoBypassEnabled,
+                        onCheckedChange = { enabled ->
+                            SettingsRepository.updateSmartVpnEnabled(enabled)
+                            SettingsRepository.updateAutoBypass(enabled)
+                        },
                         switchTestTag = "settings_switch_smart_vpn"
-                    )
-
-                    SettingToggleRow(
-                        title = if (isEn) "Auto disconnect VPN in game" else "Tự tắt VPN khi vào game",
-                        subtitle = if (isEn) "Uses direct network for lowest ping" else "Dùng mạng trực tiếp để giảm ping",
-                        checked = config.autoBypassEnabled,
-                        onCheckedChange = { SettingsRepository.updateAutoBypass(it) },
-                        switchTestTag = "settings_switch_auto_bypass"
                     )
 
                     if (config.autoBypassEnabled) {
@@ -727,13 +718,6 @@ fun SettingsScreen(
                     )
 
                     SettingToggleRow(
-                        title = if (isEn) "Keep original game titles" else "Giữ nguyên tên game gốc",
-                        subtitle = if (isEn) "Do not translate Fortnite, Forza, Halo..." else "Không dịch tên riêng (Fortnite, Forza, Halo...)",
-                        checked = config.preserveGameTitles,
-                        onCheckedChange = { SettingsRepository.updatePreserveGameTitles(it) }
-                    )
-
-                    SettingToggleRow(
                         title = if (isEn) "Bilingual mode (VI - EN)" else "Chế độ song ngữ (Việt - Anh)",
                         subtitle = if (isEn) "Shows original English in parentheses" else "Hiện kèm tiếng Anh gốc trong ngoặc",
                         checked = config.bilingualMode,
@@ -741,36 +725,43 @@ fun SettingsScreen(
                     )
                 }
 
-                // 4.2 Ngôn ngữ ứng dụng
+                // 4.2 Ngôn ngữ ứng dụng (Gộp 1 hàng 3 nút gọn gàng)
                 SettingsCard(title = if (isEn) "App Language" else "Ngôn ngữ ứng dụng") {
-                    listOf(
-                        Triple(AppLanguage.SYSTEM, "🌐 " + stringResource(R.string.lang_system_default), "app_lang_system_button"),
-                        Triple(AppLanguage.VIETNAMESE, "🇻🇳 " + stringResource(R.string.lang_vietnamese), "app_lang_vi_button"),
-                        Triple(AppLanguage.ENGLISH, "🇺🇸 " + stringResource(R.string.lang_english), "app_lang_en_button")
-                    ).forEach { (lang, label, tag) ->
-                        val isSelected = config.appLanguage == lang
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .border(1.dp, if (isSelected) XboxNeonGreen else XboxCardBorder, RoundedCornerShape(10.dp))
-                                .clickable { SettingsRepository.updateAppLanguage(lang) }
-                                .testTag(tag),
-                            color = if (isSelected) XboxSurfaceVariant else Color.Transparent
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            Triple(AppLanguage.SYSTEM, if (isEn) "🌐 System" else "🌐 Hệ thống", "app_lang_system_button"),
+                            Triple(AppLanguage.VIETNAMESE, "🇻🇳 Tiếng Việt", "app_lang_vi_button"),
+                            Triple(AppLanguage.ENGLISH, "🇺🇸 English", "app_lang_en_button")
+                        ).forEach { (lang, label, tag) ->
+                            val isSelected = config.appLanguage == lang
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateAppLanguage(lang) }
+                                    .testTag(tag),
+                                color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.55f)
                             ) {
-                                Text(
-                                    text = label,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                                if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                                Box(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
                         }
@@ -1054,16 +1045,7 @@ fun SettingsScreen(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(XboxNeonGreen.copy(alpha = 0.14f))
                                 .clickable {
-                                    try {
-                                        val intent = android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(st.releaseUrl)
-                                        ).apply {
-                                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        }
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {
-                                    }
+                                    com.example.data.UpdateChecker.openUpdateDialog()
                                 }
                                 .padding(horizontal = 10.dp, vertical = 7.dp)
                                 .testTag("update_check_status_text"),

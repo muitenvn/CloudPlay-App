@@ -124,8 +124,10 @@ fun CloudBrowserScreen(
     val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
 
     DisposableEffect(activity) {
+        VpnManager.setInGameStreamActive(true)
         (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
         onDispose {
+            VpnManager.setInGameStreamActive(false)
             com.example.cloudplay.ZeroLagScreenRecorder.stopRecording(context)
             gamepadDetector.release()
             bridgeInstance?.release()
@@ -588,7 +590,7 @@ fun CloudBrowserScreen(
 
         // Dedicated Game Loading Screen (Optimized for Portrait & Landscape)
         com.example.ui.components.InGameLoadingOverlay(
-            isLoading = isPageLoading && pageLoadingProgress < 0.92f,
+            isLoading = isPageLoading && pageLoadingProgress < 0.80f,
             progress = pageLoadingProgress,
             targetServerName = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
             hasGamepad = gamepadStatus.hasPhysicalController,

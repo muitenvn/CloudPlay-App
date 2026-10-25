@@ -1,86 +1,86 @@
-# Kế Hoạch Nâng Cấp Toàn Diện Ứng Dụng CloudPlay
+# Bản Kế Hoạch Khắc Phục Lỗi & Nâng Cấp Bảo Mật Cập Nhật APK (SHA-256 Verification)
 
-Đợt nâng cấp toàn diện này đồng bộ hóa cả 4 trụ cột: **Tinh gọn giao diện (gộp bớt thẻ và công tắc trùng lặp)**, **Tối ưu câu chữ tiếng Việt ngắn gọn dễ hiểu**, **Tăng tốc độ mở game & phản hồi điều khiển**, và **Giảm tiêu thụ RAM & tiết kiệm pin toàn hệ thống**, hoàn toàn tự động ngầm mà không thêm bất kỳ nút bấm mới nào.
+Bản kế hoạch này tổng hợp đầy đủ các mục rà soát từ bộ phận kiểm tra độc lập kèm phản biện kỹ thuật đã được xác nhận, đồng thời triển khai luồng tải APK trực tiếp trong ứng dụng qua máy chủ trung gian tốc độ cao (`ghfast.top`) với cơ chế đối chiếu mã băm **SHA-256 chính thức từ GitHub API** trước khi mở bộ cài đặt hệ thống.
 
-## Quyết Định Đã Xác Nhận Từ Người Dùng
+## Quyết Định Đã Xác Nhận & Phản Biện Kỹ Thuật
 
 > [!IMPORTANT]
-> Tuyệt đối không thêm nút mới vào giao diện hay bảng HUD nổi. Gộp các công tắc và thẻ trùng lặp ở các tab để giao diện thoáng, sạch và đồng bộ.
-
-- **Tinh gọn bố cục các Tab (Trang chủ, Máy chủ, Lịch sử, Cài đặt)**: Gộp các công tắc có cùng chức năng và loại bỏ các dải nút phụ lặp lại giữa Trang chủ và Cài đặt.
-- **Chuẩn hóa câu chữ Tiếng Việt**: Ngắn gọn, tự nhiên, dễ hiểu ngay lập tức, không dùng thuật ngữ rườm rà và không bị cắt chữ (`...`) trên màn hình nhỏ.
-- **Tăng tốc mở game & độ nhạy điều khiển**: Giảm thời gian chờ màn hình tải game, ưu tiên băng thông tuyệt đối cho luồng game khi vào trận.
-- **Tiết kiệm RAM & Pin toàn hệ thống**: Tự động tạm dừng các tiến trình đo Ping ngầm khi đã vào trận, nén ảnh bìa game thông minh và tự động giải phóng bộ nhớ đệm.
+> **Các quyết định kỹ thuật và phản biện đã được xác nhận:**
+> - **Mục 1 (Phản biện chuyển đổi công tắc 1 lần khi mở app)**:
+>   - **VPN thông minh (`smartVpnEnabled` & `autoBypassEnabled`)**: Thực hiện chuyển đổi 1 lần duy nhất (`migrated_unified_switches_v1`): nếu 1 trong 2 giá trị cũ đang bật (`smartVpnEnabled || autoBypassEnabled`) thì bật cả hai để khớp trạng thái thực tế.
+>   - **Chế độ máy yếu & Tiết kiệm pin (`lowEndDeviceMode` & `gpuLoadReductionEnabled`)**: **Phản biện việc gộp theo phép HOẶC (`||`)** vì `gpuLoadReductionEnabled` mặc định đang là `true` cho mọi thiết bị trong khi `lowEndDeviceMode` mặc định là `false`. Nếu gộp theo phép HOẶC sẽ khiến 100% thiết bị bị ép vào Chế độ máy yếu (bị khóa cứng băng thông 5 Mbps, hạ độ phân giải 75% và tự tắt dịch Tiếng Việt). Giải pháp đã thống nhất: giữ theo giá trị `lowEndDeviceMode` hiện tại (`gpuLoadReductionEnabled = lowEndDeviceMode`) và đồng bộ hiển thị công tắc theo `config.lowEndDeviceMode && config.gpuLoadReductionEnabled`.
+> - **Mục 2 & 3 (Màn hình chờ & Bộ nhớ đệm `CloudBrowserScreen`)**:
+>   - Gỡ bỏ đoạn gán sớm `isPageLoading = false` ở mốc `75%` trong `onPageCommitVisible`, chỉ giữ **1 ngưỡng duy nhất `80%`** cho màn hình chờ kèm nút Bỏ qua.
+>   - Gỡ bỏ lệnh `clearCache(false)` khi đóng phiên chơi để giữ nguyên tốc độ tải tài nguyên ở các lần mở game tiếp theo.
+> - **Mục 4 (Danh sách tên miền HTTPS hợp lệ khi tải APK)**:
+>   - Cho phép kết nối HTTPS tới `ghfast.top`, `github.com` và tên miền lưu trữ tài nguyên chuyển hướng `302` chính thức của GitHub là `*.githubusercontent.com` (`objects.githubusercontent.com`, `release-assets.githubusercontent.com`), giới hạn dung lượng tối đa **150 MB**.
+> - **Mục 4 & 6 (Mở trình cài đặt APK trực tiếp)**:
+>   - Khai báo `REQUEST_INSTALL_PACKAGES` và `FileProvider` nội bộ trong `AndroidManifest.xml` để sau khi file APK trong bộ nhớ đệm riêng (`cacheDir`) vượt qua kiểm tra khớp 100% mã SHA-256 sẽ mở thẳng trình cài đặt hệ thống của Android.
 
 ---
 
 ## 1. Tổng Quan & Giá Trị Cốt Lõi
 
-- **Mục tiêu giải quyết**: Sau nhiều bản cập nhật tính năng, một số công tắc trong phần Cài đặt và thẻ phụ trên Trang chủ bị trùng lặp chức năng, câu chữ còn dài và một số tác vụ ngầm vẫn chạy khi đang chơi game.
+- **Mục tiêu**: Đảm bảo tính nhất quán tuyệt đối của các công tắc đã gộp trong phần Cài đặt, tối ưu tốc độ mở lại game và bảo vệ người dùng khỏi nguy cơ tập tin cài đặt bị thay đổi hoặc hỏng khi tải qua máy chủ trung gian (`ghfast.top`).
 - **Giá trị mang lại**:
-  - **Giao diện thoáng & gọn hơn 30%**: Ít thao tác cuộn hơn, nhìn vào thấy ngay nút vào game, trạng thái mạng và danh sách game yêu thích.
-  - **Mở game nhanh hơn 1.5 – 2.5 giây**: Tối ưu ngưỡng chuyển cảnh màn hình chờ và khởi tạo sớm kết nối.
-  - **Nhẹ RAM & Mát máy hơn**: Cắt giảm bộ nhớ ảnh bìa ở Thư viện game và ngắt hoàn toàn các tác vụ kiểm tra mạng phụ khi đang trong trận.
+  - Người dùng tại Việt Nam vẫn tận hưởng tốc độ tải cập nhật nhanh qua `ghfast.top`, nhưng mọi tập tin `.apk` đều phải khớp từng ký tự mã băm **SHA-256 gốc lấy trực tiếp từ GitHub (`api.github.com` / `github.com`)** trước khi được phép cài đặt.
+  - Tự động chuyển sang tải trực tiếp từ GitHub nếu máy chủ trung gian gặp lỗi hoặc không phản hồi dữ liệu sau 15 giây.
 
 ---
 
-## 2. Tinh Gọn Giao Diện & Chuẩn Hóa Câu Chữ Tiếng Việt
+## 2. Trải Nghiệm Người Dùng & Giao Diện Hộp Thoại Cập Nhật
 
-### A. Tab Trang Chủ (`HomeScreen`)
-- **Thu gọn Banner Chính (Hero Deck)**: Gỡ bỏ hàng 3 nút nhỏ (`✨ Đồ họa`, `⚡ 60 FPS`, `⚙️ Vùng`) nằm dưới 2 nút *Mở Xbox Cloud* và *Chơi Fortnite* (vì đã có đầy đủ trong tab Cài đặt và HUD). Nhờ đó khung Banner gọn hơn (`240dp` thay vì `294dp`), đẩy thẻ **Mạng & Máy chủ** và **Game Nổi Bật** lên cao, dễ bấm bằng 1 tay.
-- **Câu chữ ngắn gọn**: Đổi các nhãn dài thành cụm từ ngắn, rõ nghĩa (*"Mạng trực tiếp"*, *"Tự động VPN"*, *"Chơi ngay"*).
-
-### B. Tab Máy Chủ (`ServersScreen`)
-- **Bộ lọc trung lập, công bằng**: Mặc định mở ở bộ lọc **Tất cả** (sắp xếp thuần túy theo trạng thái *Đã mở khóa* và *Ping thấp nhất*) thay vì ép mặc định vào tab Nhật Bản.
-- **Rút gọn thanh công cụ**: Giữ câu chữ trên nút đo tốc độ và làm mới danh sách ngắn gọn trên 1 dòng duy nhất.
-
-### C. Tab Cài Đặt (`SettingsScreen`) — Gộp Bớt Công Tắc Trùng Lặp
-1. **Nhóm Đồ Họa & FPS**:
-   - **Gộp 2 công tắc** *"Giảm hiệu ứng nền"* và *"Chế độ máy yếu"* thành **1 công tắc duy nhất**: **"Chế độ máy yếu & Tiết kiệm pin"** (khi bật sẽ tự động tắt hiệu ứng nền, giữ luồng 720p mát máy và giảm tải GPU).
-2. **Nhóm Mạng & Mở Khóa Vùng**:
-   - **Gộp 2 công tắc** *"VPN thông minh (Tự bật/tắt)"* và *"Tự tắt VPN khi vào game"* thành **1 công tắc duy nhất**: **"VPN thông minh (Tự bật mở khóa ➔ Tự tắt khi vào trận)"**.
-3. **Nhóm Dịch Tiếng Việt & Hệ Thống**:
-   - Tự động giữ nguyên tên riêng của game (*Fortnite, Halo, Forza...*) ngầm bên dưới mà không cần công tắc phụ *"Giữ nguyên tên game gốc"*.
-   - Chuyển phần chọn **Ngôn ngữ ứng dụng** (`Hệ thống`, `Tiếng Việt`, `English`) từ 3 thẻ dọc chiếm chỗ sang **1 hàng ngang 3 ô gọn gàng**.
+- **Luồng Tải & Kiểm Tra Tự Động Trong Hộp Thoại (`UpdateAvailableDialog`)**:
+  1. Khi vào ứng dụng và phát hiện bản mới, hộp thoại cập nhật tự động mở kèm dòng ghi chú rõ ràng: *"Tải nhanh qua máy chủ trung gian; file được kiểm tra trước khi cài."*
+  2. Khi người dùng nhấn **"⚡ Tải nhanh APK"**, ứng dụng tải tập tin `.apk` vào thư mục bộ nhớ đệm riêng (`cacheDir/updates`), hiển thị thanh tiến độ phần trăm (`%`), số MB đã tải và nút **"Hủy"** ngay trên hộp thoại.
+  3. Nếu `ghfast.top` báo lỗi hoặc không truyền dữ liệu sau **15 giây**, ứng dụng tự động chuyển sang tải trực tiếp từ `github.com` mà không làm gián đoạn trải nghiệm.
+  4. Ngay khi tải xong, ứng dụng tính toán mã băm SHA-256 của file và đối chiếu từng ký tự với mã SHA-256 chính thức từ GitHub:
+     - **Nếu khớp 100%**: Tự động mở trình cài đặt hệ thống Android qua `FileProvider`.
+     - **Nếu không khớp hoặc không lấy được mã chính thức**: Xóa ngay tập tin APK trong bộ nhớ đệm, hiển thị cảnh báo *"File không khớp hoặc không kiểm tra được, vui lòng tải từ GitHub"* và làm nổi bật nút **"Tải từ GitHub"**.
+  5. Luôn hiển thị nút phụ **"Tải từ GitHub"** (`https://github.com/muitenvn/CloudPlay-App/releases`) ở mọi trạng thái.
 
 ---
 
-## 3. Quyết Định Kỹ Thuật: Tốc Độ, RAM & Pin
+## 3. Quyết Định Kỹ Thuật Trọng Tâm
 
-- **Quyết định 1: Tự động đóng băng tác vụ nền khi vào trận (`VpnManager` & `CloudBrowserScreen`)**
-  - *Cách tiếp cận*: Ngay khi người dùng mở màn hình chơi game (`CloudBrowserScreen`), hệ thống tự động tạm dừng vòng lặp đo Ping định kỳ của danh sách máy chủ (`pauseLatencyMonitoring`) và giải phóng bộ nhớ đệm hình ảnh giao diện ngoài. Khi thoát game về Trang chủ, hệ thống mới nhẹ nhàng kích hoạt lại.
-  - *Lý do*: Tránh việc các luồng đo Ping ngầm tranh chấp socket mạng hoặc đánh thức CPU khi đang chơi game trên 4G/Wi-Fi.
-- **Quyết định 2: Tăng tốc mở màn hình Game (`CloudBrowserScreen`)**
-  - *Cách tiếp cận*: Hạ ngưỡng ẩn màn hình chờ (`InGameLoadingOverlay`) từ `92%` xuống `80%` ngay khi khung trang chính đã hiển thị (`onPageCommitVisible`), kết hợp giữ cấu hình DOM nhẹ nhất trong lúc đăng nhập và khởi tạo luồng.
-  - *Lý do*: Giúp người chơi nhìn thấy giao diện vào game sớm hơn tới 2 giây mà không phải đợi các tập tin quảng cáo/thống kê phụ tải xong.
-- **Quyết định 3: Giảm dung lượng RAM ảnh bìa & WebView (`HomeScreen` & `GameLibraryScreen`)**
-  - *Cách tiếp cận*: Giới hạn kích thước giải mã bitmap ảnh bìa game (`size(320, 440)` và tắt bộ đệm trùng lặp) trong danh sách cuộn, đồng thời gọi `trimMemory` dọn dẹp tài nguyên WebView khi đóng phiên chơi.
-  - *Lý do*: Giảm 35–45 MB RAM tiêu thụ khi lướt danh sách game dài trên các máy có RAM 4GB–6GB.
+- **Kết nối mạng trực tiếp (`Proxy.NO_PROXY`)**:
+  - Toàn bộ truy vấn kiểm tra phiên bản (`api.github.com`), tải mã SHA-256 phụ (`.sha256`) và tải tập tin `.apk` đều sử dụng `url.openConnection(java.net.Proxy.NO_PROXY)` để đi thẳng qua mạng gốc của người dùng, hoàn toàn tách biệt với Proxy/VPN trong ứng dụng.
+- **Xác thực nguồn mã băm SHA-256 Kép (Chính thức từ GitHub)**:
+  - **Ưu tiên 1**: Đọc trường `digest` (định dạng `"sha256:..."`) của asset `.apk` trong phản hồi JSON từ `https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest`.
+  - **Ưu tiên 2 (Dự phòng)**: Nếu phản hồi API chưa có trường `digest`, tải tệp `<tên apk>.sha256` trực tiếp từ `github.com` (tuyệt đối không tải tệp `.sha256` qua `ghfast.top`).
+- **Tự động tạo và đính kèm file `.sha256` trên GitHub Actions**:
+  - Ngay sau bước đóng gói APK trong workflow phát hành, tạo file `<tên apk>.sha256` chứa mã SHA-256 chuẩn và đính kèm vào GitHub Release cùng file `.apk` mà không thay đổi khóa ký hay các bước khác.
 
 ---
 
-## 4. Kiến Trúc Luồng Tối Ưu Toàn Hệ Thống
+## 4. Kiến Trúc Kỹ Thuật & Luồng Dữ Liệu
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                        GIAO DIỆN CHÍNH ĐÃ TINH GỌN                         │
-│                                                                            │
-│  [Trang Chủ Gọn (240dp Hero)]  [Máy Chủ Trung Lập]  [Cài Đặt Đã Gộp Nút]   │
-│   • Bỏ thanh 3 chip trùng lặp   • Mặc định: Tất cả   • Gộp Máy yếu & Nền   │
-│   • Đẩy danh sách game lên cao  • Xếp thuần theo Ping• Gộp VPN thông minh  │
-│   • Nén RAM ảnh bìa (320x440)                        • Ngôn ngữ 1 hàng ngang│
-└────────────────────────────────────────┬───────────────────────────────────┘
-                                         │
-                        (Bấm Chơi Game -> Tăng tốc mở 80%)
-                                         ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│                   CHẾ ĐỘ TRONG TRẬN SIÊU NHẸ (ZERO-OVERHEAD)               │
-│                                                                            │
-│  ┌──────────────────────────────┐      ┌────────────────────────────────┐  │
-│  │ Tạm Dừng Tác Vụ Ngầm         │      │ Ưu Tiên Tuyệt Đối Luồng Game   │  │
-│  │ • Ngắt đo Ping máy chủ nền   │      │ • Cảm ứng Unbuffered 0ms trễ   │  │
-│  │ • Giải phóng RAM ảnh ngoài   │      │ • Tự xả khung hình trễ 1.02x   │  │
-│  │ • Tắt bộ dịch DOM khi vào trận│     │ • Quay màn hình VBR Zero-Alloc │  │
-│  └──────────────────────────────┘      └────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                     LUỒNG KIỂM TRA & TẢI CẬP NHẬT AN TOÀN                 │
+└───────────────────────────────────────────────────────────────────────────┘
+                                      │
+        1. Mở ứng dụng (Kết nối trực tiếp Proxy.NO_PROXY)
+                                      ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│  GitHub Release API (api.github.com/repos/muitenvn/CloudPlay-App/...)     │
+│  • Lấy thông tin bản mới + URL .apk + Mã SHA-256 gốc (asset.digest)       │
+│  • Dự phòng: Lấy mã SHA-256 từ asset phụ <tên apk>.sha256 trên github.com │
+└───────────────────────────────────────────────────────────────────────────┘
+                                      │
+        2. Người dùng nhấn "Tải nhanh APK" trên UpdateAvailableDialog
+                                      ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│  Bộ Tải Nội Bộ An Toàn (Chỉ HTTPS • ghfast.top / github.com • ≤ 150 MB)   │
+│  • Tải vào cache riêng của app + Thanh tiến độ % + Nút Hủy                │
+│  • Quá 15s không có dữ liệu hoặc lỗi ──► Tự động chuyển sang github.com   │
+└───────────────────────────────────────────────────────────────────────────┘
+                                      │
+        3. Kiểm tra toàn vẹn SHA-256 từng ký tự (MessageDigest SHA-256)
+                   ┌──────────────────┴──────────────────┐
+                   ▼ (Khớp 100%)                         ▼ (Sai / Thiếu mã)
+┌──────────────────────────────────────┐  ┌─────────────────────────────────┐
+│ Mở trình cài đặt Android qua         │  │ Xóa ngay file APK trong cache   │
+│ FileProvider + REQUEST_INSTALL_PKG   │  │ Báo lỗi & Hiện nút Tải GitHub   │
+└──────────────────────────────────────┘  └─────────────────────────────────┘
 ```

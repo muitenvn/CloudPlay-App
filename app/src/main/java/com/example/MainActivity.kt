@@ -266,11 +266,7 @@ fun MainContent(
         val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
         if (showUpdateDialog && availableUpdate != null) {
             com.example.ui.components.UpdateAvailableDialog(
-                currentVersion = availableUpdate.currentVersion,
-                latestVersion = availableUpdate.latestVersion,
-                releaseUrl = availableUpdate.releaseUrl,
-                releaseNotes = availableUpdate.releaseNotes,
-                fastCdnApkUrl = availableUpdate.fastCdnApkUrl,
+                updateInfo = availableUpdate,
                 isEn = config.isEnglishUI(),
                 onDismiss = { com.example.data.UpdateChecker.dismissUpdateDialog() }
             )

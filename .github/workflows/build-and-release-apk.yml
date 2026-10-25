@@ -139,6 +139,12 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python3 scripts/generate_release_notes.py
+          for apk in release-output/CloudPlay-Xbox-v*.apk; do
+            if [ -f "$apk" ]; then
+              sha256sum "$apk" | awk '{print $1}' > "${apk}.sha256"
+              echo "Generated SHA-256 file: ${apk}.sha256 ($(cat "${apk}.sha256"))"
+            fi
+          done
 
       - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
@@ -146,6 +152,7 @@ jobs:
           name: CloudPlay-Xbox-APK
           path: |
             release-output/*.apk
+            release-output/*.apk.sha256
             release-output/RELEASE_NOTES.md
           retention-days: 30
           if-no-files-found: error
@@ -164,5 +171,6 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             release-output/CloudPlay-Xbox-v*.apk
+            release-output/CloudPlay-Xbox-v*.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

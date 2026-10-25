@@ -103,7 +103,7 @@ fun ServersScreen(
     val isEn = config.isEnglishUI()
     val scope = rememberCoroutineScope()
 
-    var selectedCategory by remember { mutableStateOf("JP") }
+    var selectedCategory by remember { mutableStateOf("ALL") }
     var isTestingAll by remember { mutableStateOf(false) }
     var isFetchingLive by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }

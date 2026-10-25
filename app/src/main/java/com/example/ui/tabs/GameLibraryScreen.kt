@@ -772,6 +772,8 @@ private fun LibraryGameCard(
                     model = remember(game.imageUrl) {
                         ImageRequest.Builder(context)
                             .data(game.imageUrl)
+                            .size(320, 440)
+                            .allowRgb565(true)
                             .crossfade(true)
                             .build()
                     },

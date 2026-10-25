@@ -123,12 +123,26 @@ fun CloudBrowserScreen(
 
     val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
 
+    LaunchedEffect(recorderState.isRecording) {
+        com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(recorderState.isRecording)
+    }
+
+    LaunchedEffect(streamUiState.isGameActive, streamUiState.isStreamConnected) {
+        com.example.audio.BackgroundMusicManager.onGameStreamStateChanged(
+            isGameActive = streamUiState.isGameActive,
+            isStreamConnected = streamUiState.isStreamConnected
+        )
+    }
+
     DisposableEffect(activity) {
+        com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = false)
         VpnManager.setInGameStreamActive(true)
         (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
         onDispose {
             VpnManager.setInGameStreamActive(false)
             com.example.cloudplay.ZeroLagScreenRecorder.stopRecording(context)
+            com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(false)
+            com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = true)
             gamepadDetector.release()
             bridgeInstance?.release()
             bridgeInstance = null

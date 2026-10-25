@@ -583,7 +583,9 @@ data class AppConfig(
     val publicWebPortalUrl: String = "https://muitenvn.github.io/CloudPlay-App/",
     val githubRepoSlug: String = "muitenvn/CloudPlay-App",
     val userAcceptedTerms: Boolean = false,
-    val autoCheckUpdatesOnLaunch: Boolean = true
+    val autoCheckUpdatesOnLaunch: Boolean = true,
+    val backgroundMusicEnabled: Boolean = true,
+    val backgroundMusicVolume: Float = 0.25f // 0.0f .. 1.0f (mặc định 25%)
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -736,7 +738,13 @@ object SettingsRepository {
                 "muitenvn/CloudPlay-App"
             ) ?: "muitenvn/CloudPlay-App",
             userAcceptedTerms = sp.getBoolean("user_accepted_terms", false),
-            autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true)
+            autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true),
+            backgroundMusicEnabled = if (effectiveLowEnd) {
+                sp.getBoolean("background_music_enabled_low_end", false)
+            } else {
+                sp.getBoolean("background_music_enabled", true)
+            },
+            backgroundMusicVolume = sp.getFloat("background_music_volume", 0.25f).coerceIn(0f, 1f)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -805,6 +813,13 @@ object SettingsRepository {
             putString("github_repo_slug_v2", c.githubRepoSlug)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             putBoolean("auto_check_updates_on_launch", c.autoCheckUpdatesOnLaunch)
+            putBoolean("background_music_enabled", c.backgroundMusicEnabled)
+            if (c.lowEndDeviceMode) {
+                putBoolean("background_music_enabled_low_end", c.backgroundMusicEnabled)
+            } else {
+                putBoolean("background_music_user_pref", c.backgroundMusicEnabled)
+            }
+            putFloat("background_music_volume", c.backgroundMusicVolume.coerceIn(0f, 1f))
             apply()
         }
     }
@@ -1116,9 +1131,15 @@ object SettingsRepository {
     }
 
     fun updateLowEndDeviceMode(enabled: Boolean) {
+        val restoredMusicPref = if (enabled) {
+            false
+        } else {
+            prefs?.getBoolean("background_music_user_pref", true) ?: true
+        }
         _config.update {
             it.copy(
                 lowEndDeviceMode = enabled,
+                backgroundMusicEnabled = restoredMusicPref,
                 streamRenderScale = if (enabled) StreamRenderScale.PERFORMANCE_75 else it.cellularMode.autoRenderScale
             )
         }
@@ -1259,6 +1280,16 @@ object SettingsRepository {
 
     fun updateAutoCheckUpdatesOnLaunch(enabled: Boolean) {
         _config.update { it.copy(autoCheckUpdatesOnLaunch = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateBackgroundMusicEnabled(enabled: Boolean) {
+        _config.update { it.copy(backgroundMusicEnabled = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateBackgroundMusicVolume(volume: Float) {
+        _config.update { it.copy(backgroundMusicVolume = volume.coerceIn(0f, 1f)) }
         persist(_config.value)
     }
 }

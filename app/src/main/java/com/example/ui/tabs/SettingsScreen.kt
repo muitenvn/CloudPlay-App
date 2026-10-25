@@ -955,13 +955,77 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 6: CẬP NHẬT ỨNG DỤNG & CHIA SẺ MÃ QR
+        // NHÓM 5.5: NHẠC NỀN (Tự tắt khi vào game & khi bật chế độ máy yếu)
+        // =========================================================================
+        item {
+            SettingsCard(title = if (isEn) "Background Music" else "Nhạc nền") {
+                SettingToggleRow(
+                    title = if (isEn) "Background Music" else "Nhạc nền",
+                    subtitle = if (config.lowEndDeviceMode) {
+                        if (isEn) {
+                            "Auto-muted while Low-End & Battery Saver Mode is active"
+                        } else {
+                            "Đang tự tắt do bật Chế độ máy yếu • Tự dừng hoàn toàn khi vào game"
+                        }
+                    } else {
+                        if (isEn) {
+                            "Plays in Home, Games, Servers & Settings • Auto-stops in game (800ms fade)"
+                        } else {
+                            "Phát ở Trang chủ, Game, Máy chủ, Cài đặt • Tự dừng hoàn toàn khi vào game"
+                        }
+                    },
+                    checked = config.backgroundMusicEnabled && !config.lowEndDeviceMode,
+                    onCheckedChange = { enabled ->
+                        if (config.lowEndDeviceMode && enabled) {
+                            SettingsRepository.updateLowEndDeviceMode(false)
+                            SettingsRepository.updateGpuLoadReductionEnabled(false)
+                        }
+                        SettingsRepository.updateBackgroundMusicEnabled(enabled)
+                    },
+                    activeColor = XboxNeonGreen,
+                    switchTestTag = "settings_background_music_switch"
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    LabeledSlider(
+                        label = if (isEn) "Background Music Volume" else "Âm lượng nhạc nền",
+                        valueText = "${(config.backgroundMusicVolume * 100).toInt()}%",
+                        value = config.backgroundMusicVolume,
+                        onValueChange = { SettingsRepository.updateBackgroundMusicVolume(it) },
+                        valueRange = 0f..1f,
+                        accentColor = XboxNeonGreen
+                    )
+                }
+
+                Text(
+                    text = if (isEn) {
+                        "🎵 Nhạc nền do AI tạo (Gemini) • Excluded from screen recording"
+                    } else {
+                        "🎵 Nhạc nền do AI tạo (Gemini) • Không thu vào video quay màn hình"
+                    },
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.testTag("settings_ai_music_attribution_text")
+                )
+            }
+        }
+
+        // =========================================================================
+        // NHÓM 6: CẬP NHẬT ỨNG DỤNG, GIỚI THIỆU & CHIA SẺ MÃ QR
         // =========================================================================
         item {
             val updateState by com.example.data.UpdateChecker.state.collectAsState()
             val currentVersionName = remember { com.example.data.UpdateChecker.getCurrentVersionName(context) }
 
-            SettingsCard(title = if (isEn) "App Updates & Share QR" else "Cập nhật ứng dụng & Chia sẻ QR") {
+            SettingsCard(title = if (isEn) "App Updates, About & Share QR" else "Cập nhật, Giới thiệu & Chia sẻ QR") {
                 SettingToggleRow(
                     title = if (isEn) "Check for updates on launch" else "Kiểm tra bản mới khi mở app",
                     subtitle = if (isEn) {
@@ -1090,6 +1154,13 @@ fun SettingsScreen(
                     }
                     else -> {}
                 }
+
+                Text(
+                    text = "Nhạc nền do AI tạo (Gemini)",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.testTag("about_ai_music_credit_text")
+                )
             }
         }
 

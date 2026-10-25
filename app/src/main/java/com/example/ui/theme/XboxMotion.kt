@@ -98,24 +98,37 @@ fun Modifier.xboxPressScale(
         label = "xboxPressScale"
     )
 
-    this
-        .graphicsLayer {
+    val scaleMod = if (scale != 1f) {
+        Modifier.graphicsLayer {
             scaleX = scale
             scaleY = scale
         }
+    } else {
+        Modifier
+    }
+
+    this
+        .then(scaleMod)
         .pointerInput(enabled) {
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
-                isPressed = true
-                waitForUpOrCancellation()
-                isPressed = false
+                // Chờ ngắn 45ms để phân biệt vuốt cuộn màn hình (scroll) với nhấn thật (tap),
+                // tránh việc chạm ngón tay để cuộn làm kích hoạt recomposition co giãn trên các thẻ.
+                val releasedOrMovedEarly = withTimeoutOrNull(45L) {
+                    waitForUpOrCancellation()
+                }
+                if (releasedOrMovedEarly == null) {
+                    isPressed = true
+                    waitForUpOrCancellation()
+                    isPressed = false
+                }
             }
         }
 }
 
 /**
  * Hiệu ứng xuất hiện nhanh trên tầng GPU (dành cho các khối tiêu đề cố định, chỉ chạy 1 lần).
- * Không gắn vào từng phần tử lặp của LazyColumn / LazyVerticalGrid để tránh tạo nhiều lớp الفا (offscreen layer).
+ * Khi hoàn tất (hasAnimated == true), gỡ hoàn toàn graphicsLayer để cuộn màn hình chính đạt 120 FPS.
  */
 fun Modifier.xboxSlideFadeIn(
     enabled: Boolean = true,
@@ -127,12 +140,14 @@ fun Modifier.xboxSlideFadeIn(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
+    var hasAnimated by remember(key) { mutableStateOf(false) }
+    if (hasAnimated) return@composed this
+
     val density = LocalDensity.current
     val offsetPx = remember(density, initialOffsetY) {
         with(density) { initialOffsetY.toPx() }
     }
-    var hasAnimated by remember(key) { mutableStateOf(false) }
-    val progress = remember(key) { Animatable(if (hasAnimated) 1f else 0f) }
+    val progress = remember(key) { Animatable(0f) }
 
     LaunchedEffect(key, enabled) {
         if (enabled && !hasAnimated) {
@@ -154,18 +169,11 @@ fun Modifier.xboxSlideFadeIn(
 
     this.graphicsLayer {
         val p = progress.value
-        if (p >= 0.999f) {
-            alpha = 1f
-            translationY = 0f
-            scaleX = 1f
-            scaleY = 1f
-        } else {
-            alpha = p
-            translationY = (1f - p) * offsetPx
-            val currentScale = initialScale + (1f - initialScale) * p
-            scaleX = currentScale
-            scaleY = currentScale
-        }
+        alpha = p
+        translationY = (1f - p) * offsetPx
+        val currentScale = initialScale + (1f - initialScale) * p
+        scaleX = currentScale
+        scaleY = currentScale
     }
 }
 

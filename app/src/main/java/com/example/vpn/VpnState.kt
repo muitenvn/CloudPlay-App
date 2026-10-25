@@ -1,5 +1,7 @@
 package com.example.vpn
 
+import androidx.compose.runtime.Immutable
+
 enum class NetworkMode {
     VPN_JAPAN,       // Traffic routing through Japan/Target region to pass Xbox region check
     DIRECT_NETWORK,  // Traffic routing directly through user's local ISP (low ping, zero-reload)
@@ -21,6 +23,7 @@ enum class RegionUnlockStatus(val labelVi: String, val labelEn: String) {
     fun localizedLabel(isEn: Boolean): String = if (isEn) labelEn else labelVi
 }
 
+@Immutable
 data class ServerUnlockRecord(
     val serverKey: String,
     val status: RegionUnlockStatus = RegionUnlockStatus.UNTESTED,
@@ -43,6 +46,7 @@ data class ServerUnlockRecord(
     }
 }
 
+@Immutable
 data class ServerLocation(
     val id: String,
     val name: String,
@@ -376,6 +380,7 @@ enum class SmartVpnPhase {
     DIRECT_SUPPORTED_REGION    // Người chơi ở sẵn khu vực hỗ trợ (Nhật, Hàn, Mỹ...), không cần bật VPN
 }
 
+@Immutable
 data class SmartVpnDecision(
     val checked: Boolean = false,
     val needsVpn: Boolean = true,
@@ -386,6 +391,7 @@ data class SmartVpnDecision(
     val actionSummary: String = "BẬT lúc mở game ➔ TẮT khi vào trận"
 )
 
+@Immutable
 data class StreamTelemetry(
     val isStreaming: Boolean = false,
     val fps: Int = 60,
@@ -400,6 +406,7 @@ data class StreamTelemetry(
     val qualityScore: Float = 4.9f
 )
 
+@Immutable
 data class SystemBenchmarkResult(
     val isRunning: Boolean = false,
     val completed: Boolean = false,
@@ -413,6 +420,7 @@ data class SystemBenchmarkResult(
     val summary: String = "Hệ thống tối ưu hoàn hảo • Đạt chuẩn 1080p60 Zero Lag"
 )
 
+@Immutable
 data class VpnConnectionState(
     val mode: NetworkMode = NetworkMode.DISCONNECTED,
     val engine: VpnEngine = VpnEngine.SMART_BYPASS,

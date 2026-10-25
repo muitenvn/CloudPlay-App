@@ -527,6 +527,7 @@ enum class RecordingCaptureEngine(
     fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
 }
 
+@androidx.compose.runtime.Immutable
 data class AppConfig(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val smartVpnEnabled: Boolean = true,

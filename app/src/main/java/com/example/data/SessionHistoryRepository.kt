@@ -9,6 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
+@androidx.compose.runtime.Immutable
 data class PlaySessionRecord(
     val id: String,
     val gameTitle: String,

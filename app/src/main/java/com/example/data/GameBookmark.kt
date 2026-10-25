@@ -25,6 +25,7 @@ enum class GameFilterTab {
     GAME_PASS
 }
 
+@androidx.compose.runtime.Immutable
 data class XboxCloudSyncStatus(
     val gamertag: String? = null,
     val avatarUrl: String? = null,
@@ -37,6 +38,7 @@ data class XboxCloudSyncStatus(
     val lastSyncTimeMs: Long = 0L
 )
 
+@androidx.compose.runtime.Immutable
 data class GameBookmark(
     val id: String,
     val title: String,
@@ -57,6 +59,40 @@ data class GameBookmark(
     val isPopular: Boolean = false,
     val isRecentlyAdded: Boolean = false
 ) {
+    val monogram: String = run {
+        var firstChar: Char? = null
+        var secondChar: Char? = null
+        var inWord = false
+        for (i in 0 until title.length) {
+            val c = title[i]
+            if (c.isLetterOrDigit()) {
+                if (!inWord) {
+                    inWord = true
+                    if (firstChar == null) {
+                        firstChar = c.uppercaseChar()
+                    } else if (secondChar == null) {
+                        secondChar = c.uppercaseChar()
+                        break
+                    }
+                }
+            } else if (c.isWhitespace()) {
+                inWord = false
+            }
+        }
+        when {
+            firstChar != null && secondChar != null -> "$firstChar$secondChar"
+            firstChar != null -> "$firstChar"
+            else -> "XB"
+        }
+    }
+
+    val secondaryColorHex: Long = when ((title.hashCode() and 0x7FFFFFFF) % 4) {
+        0 -> 0xFF00E5FFL
+        1 -> 0xFF107C10L
+        2 -> 0xFF7C4DFFL
+        else -> 0xFF00B4D8L
+    }
+
     fun localizedCategory(isEn: Boolean): String = if (isEn) {
         if (category == "Game tùy chỉnh") "Custom Game" else categoryEn
     } else category
@@ -644,6 +680,7 @@ object GameLibraryRepository {
                 }
 
                 val runningSynced = existingWithImages.toMutableList()
+                var emittedFirstPreviewBatch = runningSynced.isNotEmpty()
                 for (batch in idsToFetch.chunked(40)) {
                     if (isStreamActive) break
                     val batchResults = fetchDisplayCatalogProducts(
@@ -654,17 +691,21 @@ object GameLibraryRepository {
                     )
                     if (batchResults.isNotEmpty()) {
                         runningSynced.addAll(batchResults)
-                        val deduped = runningSynced
-                            .filter { !it.imageUrl.isNullOrBlank() }
-                            .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
-                        rebuildMergedGames(customList, deduped)
-                        _xboxStatus.value = _xboxStatus.value.copy(
-                            cloudServiceOnline = true,
-                            cloudLatencyMs = catalogRtt,
-                            totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
-                            syncedCatalogCount = _games.value.size
-                        )
+                        if (!emittedFirstPreviewBatch) {
+                            emittedFirstPreviewBatch = true
+                            val previewDeduped = runningSynced
+                                .filter { !it.imageUrl.isNullOrBlank() }
+                                .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                            rebuildMergedGames(customList, previewDeduped)
+                        }
                     }
+                }
+
+                if (runningSynced.isNotEmpty()) {
+                    val finalDeduped = runningSynced
+                        .filter { !it.imageUrl.isNullOrBlank() }
+                        .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                    rebuildMergedGames(customList, finalDeduped)
                 }
 
                 saveSyncedGames(_games.value)

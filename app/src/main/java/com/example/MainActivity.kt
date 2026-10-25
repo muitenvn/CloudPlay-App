@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
         com.example.data.SessionHistoryRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
+        enableHighRefreshRateDisplay(!SettingsRepository.config.value.lowEndDeviceMode)
 
         setContent {
             val config by SettingsRepository.config.collectAsState()
@@ -96,7 +97,9 @@ class MainActivity : ComponentActivity() {
             }
 
             val baseContext = androidx.compose.ui.platform.LocalContext.current
-            val (localizedConfiguration, localizedWrapper) = remember(targetLocale, baseContext.resources.configuration) {
+            val currentOrientation = baseContext.resources.configuration.orientation
+            val currentUiMode = baseContext.resources.configuration.uiMode
+            val (localizedConfiguration, localizedWrapper) = remember(targetLocale, currentOrientation, currentUiMode) {
                 val conf = android.content.res.Configuration(baseContext.resources.configuration)
                 conf.setLocale(targetLocale)
                 conf.setLayoutDirection(targetLocale)
@@ -152,13 +155,13 @@ class MainActivity : ComponentActivity() {
                     layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
             }
-            enableHighRefreshRateDisplay(true)
+            enableHighRefreshRateDisplay(!SettingsRepository.config.value.lowEndDeviceMode)
             WindowCompat.setDecorFitsSystemWindows(window, false)
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else {
-            enableHighRefreshRateDisplay(false)
+            enableHighRefreshRateDisplay(!SettingsRepository.config.value.lowEndDeviceMode)
             WindowCompat.setDecorFitsSystemWindows(window, true)
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_DEFAULT

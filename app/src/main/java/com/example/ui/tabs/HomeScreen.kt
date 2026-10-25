@@ -21,12 +21,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Bolt
@@ -180,113 +179,116 @@ fun HomeScreen(
         }.take(4)
     }
 
-    val scrollState = rememberScrollState()
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val updateState by com.example.data.UpdateChecker.state.collectAsState()
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 26.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
         if (availableUpdate != null) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                    .clickable {
-                        try {
-                            val intent = android.content.Intent(
-                                android.content.Intent.ACTION_VIEW,
-                                android.net.Uri.parse(availableUpdate.releaseUrl)
-                            ).apply {
-                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
-                        }
-                    }
-                    .testTag("home_update_available_banner"),
-                color = XboxNeonGreen.copy(alpha = 0.12f)
-            ) {
-                Row(
+            item(key = "home_update_banner") {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                        .clickable {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(availableUpdate.releaseUrl)
+                                ).apply {
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                            }
+                        }
+                        .testTag("home_update_available_banner"),
+                    color = XboxNeonGreen.copy(alpha = 0.12f)
                 ) {
-                    Text(
-                        text = if (isEn) {
-                            "New version ${availableUpdate.latestVersion} available · View"
-                        } else {
-                            "Có bản mới ${availableUpdate.latestVersion} · Xem"
-                        },
-                        color = XboxNeonGreen,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "↗",
-                        color = XboxNeonGreen,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "New version ${availableUpdate.latestVersion} available · View"
+                            } else {
+                                "Có bản mới ${availableUpdate.latestVersion} · Xem"
+                            },
+                            color = XboxNeonGreen,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "↗",
+                            color = XboxNeonGreen,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
                 }
             }
         }
 
         // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và thanh chỉnh nhanh Video 16:9 / Quay Luồng / Đồ họa
-        HeroConsolePlayDeck(
-            vpnState = vpnState,
-            gamepadStatus = gamepadStatus,
-            onOpenXboxCloud = onOpenXboxCloud,
-            onLaunchFortnite = {
-                val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
-                recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
-                localLastPlayedId = "fortnite"
-                GameLibraryRepository.recordLastPlayed("fortnite")
-                onLaunchGame(fortniteUrl)
-            },
-            onNavigateToSettings = onNavigateToSettings,
-            onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
-        )
+        item(key = "home_hero_deck") {
+            HeroConsolePlayDeck(
+                vpnState = vpnState,
+                gamepadStatus = gamepadStatus,
+                onOpenXboxCloud = onOpenXboxCloud,
+                onLaunchFortnite = {
+                    val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
+                    recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
+                    localLastPlayedId = "fortnite"
+                    GameLibraryRepository.recordLastPlayed("fortnite")
+                    onLaunchGame(fortniteUrl)
+                },
+                onNavigateToSettings = onNavigateToSettings,
+                onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
+            )
+        }
 
         // 2. Bảng điều khiển mạng UI 3.0: cột sóng + tên máy chủ + ping + nút bật/tắt VPN & đổi máy chủ
-        QuickNetworkCockpitCard(
-            vpnState = vpnState,
-            onConnectVpn = onConnectVpn,
-            onDisconnectVpn = onDisconnectVpn,
-            onNavigateToServers = onNavigateToServers
-        )
+        item(key = "home_network_cockpit") {
+            QuickNetworkCockpitCard(
+                vpnState = vpnState,
+                onConnectVpn = onConnectVpn,
+                onDisconnectVpn = onDisconnectVpn,
+                onNavigateToServers = onNavigateToServers
+            )
+        }
 
         // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho các game vừa chơi gần nhất
-        FeaturedGamesSection(
-            featuredGames = sortedFeaturedGames,
-            favoriteIds = favoriteIds,
-            lastPlayedGame = lastPlayedGame,
-            recentGames = recentQuickGames,
-            onLaunchBookmark = recordAndLaunch,
-            onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
-            onNavigateToLibrary = onNavigateToLibrary
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
+        item(key = "home_featured_games") {
+            FeaturedGamesSection(
+                featuredGames = sortedFeaturedGames,
+                favoriteIds = favoriteIds,
+                lastPlayedGame = lastPlayedGame,
+                recentGames = recentQuickGames,
+                onLaunchBookmark = recordAndLaunch,
+                onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
+                onNavigateToLibrary = onNavigateToLibrary
+            )
+        }
     }
 }
 
 @Composable
 private fun HeroConsolePlayDeck(
     vpnState: VpnConnectionState,
-    gamepadStatus: GamepadStatus,
+    @Suppress("UNUSED_PARAMETER") gamepadStatus: GamepadStatus,
     onOpenXboxCloud: () -> Unit,
     onLaunchFortnite: () -> Unit,
-    onNavigateToSettings: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onNavigateToSettings: () -> Unit,
     onOpenGuide: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
@@ -295,34 +297,37 @@ private fun HeroConsolePlayDeck(
         lowEndDeviceMode = config.lowEndDeviceMode,
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
-    val borderGlowAlpha by animateFloatAsState(
-        targetValue = if (vpnState.mode != NetworkMode.DISCONNECTED) 0.88f else 0.58f,
-        animationSpec = tween(
-            durationMillis = if (motionEnabled) 180 else 0,
-            easing = FastOutSlowInEasing
-        ),
-        label = "hero_border_glow_alpha"
-    )
+    val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
+    val heroBorderBrush = remember(isConnected) {
+        val glowAlpha = if (isConnected) 0.88f else 0.58f
+        Brush.linearGradient(
+            listOf(
+                XboxNeonGreen.copy(alpha = glowAlpha),
+                DirectCyan.copy(alpha = 0.65f),
+                XboxNeonGreen.copy(alpha = glowAlpha)
+            )
+        )
+    }
+    val heroScrimBrush = remember {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to Color(0x22040806),
+                0.30f to Color(0xA8050A07),
+                0.62f to Color(0xEB060B08),
+                1.0f to XboxSurface
+            )
+        )
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = "hero_deck", durationMillis = 170)
+            .xboxSlideFadeIn(enabled = motionEnabled, key = "hero_deck", durationMillis = 160)
             .clip(RoundedCornerShape(24.dp))
-            .border(
-                1.5.dp,
-                Brush.linearGradient(
-                    listOf(
-                        XboxNeonGreen.copy(alpha = borderGlowAlpha),
-                        DirectCyan.copy(alpha = 0.65f),
-                        XboxNeonGreen.copy(alpha = borderGlowAlpha)
-                    )
-                ),
-                RoundedCornerShape(24.dp)
-            )
+            .border(1.5.dp, heroBorderBrush, RoundedCornerShape(24.dp))
             .testTag("hero_console_play_deck"),
         colors = CardDefaults.cardColors(containerColor = XboxSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             Image(
@@ -338,16 +343,7 @@ private fun HeroConsolePlayDeck(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(236.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color(0x22040806),
-                                0.30f to Color(0xA8050A07),
-                                0.62f to Color(0xEB060B08),
-                                1.0f to XboxSurface
-                            )
-                        )
-                    )
+                    .background(heroScrimBrush)
             )
 
             Column(
@@ -603,24 +599,24 @@ private fun QuickNetworkCockpitCard(
         label = "cockpit_signal_tint"
     )
 
+    val cockpitBorderBrush = remember(isConnected) {
+        Brush.horizontalGradient(
+            listOf(
+                if (isConnected) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
+                DirectCyan.copy(alpha = 0.35f)
+            )
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = "network_cockpit", delayMillis = 25, durationMillis = 175)
+            .xboxSlideFadeIn(enabled = motionEnabled, key = "network_cockpit", delayMillis = 20, durationMillis = 160)
             .clip(RoundedCornerShape(18.dp))
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        if (isConnected) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
-                        DirectCyan.copy(alpha = 0.35f)
-                    )
-                ),
-                RoundedCornerShape(18.dp)
-            )
+            .border(1.dp, cockpitBorderBrush, RoundedCornerShape(18.dp))
             .testTag("network_cockpit_card"),
         colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.97f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
             modifier = Modifier
@@ -1008,14 +1004,21 @@ private fun FeaturedGamesSection(
                 }
             }
         } else {
+            val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(start = 2.dp, end = 12.dp)
             ) {
-                items(featuredGames, key = { it.id }) { game ->
+                items(
+                    items = featuredGames,
+                    key = { it.id },
+                    contentType = { "featured_game_card" }
+                ) { game ->
                     FeaturedGameCard(
                         game = game,
                         isFavorite = game.id in favoriteIds,
+                        isEn = isEn,
+                        isImportingCatalog = isImportingCatalog,
                         onToggleFavorite = { onToggleFavorite(game) },
                         onLaunch = { onLaunchBookmark(game) }
                     )
@@ -1029,33 +1032,38 @@ private fun FeaturedGamesSection(
 private fun FeaturedGameCard(
     game: GameBookmark,
     isFavorite: Boolean,
+    isEn: Boolean,
+    isImportingCatalog: Boolean,
     onToggleFavorite: () -> Unit,
     onLaunch: () -> Unit
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
-    val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
-    val monogram = remember(game.title) {
-        game.title.split(" ")
-            .filter { it.isNotBlank() && it.first().isLetterOrDigit() }
-            .take(2)
-            .joinToString("") { it.first().uppercaseChar().toString() }
-            .ifBlank { "XB" }
+    val monogram = game.monogram
+    val secondaryColorHex = game.secondaryColorHex
+    val cardBorderBrush = remember(game.accentColorHex) {
+        Brush.verticalGradient(
+            listOf(
+                Color(game.accentColorHex).copy(alpha = 0.65f),
+                XboxCardBorder,
+                DirectCyan.copy(alpha = 0.4f)
+            )
+        )
     }
-    val secondaryColorHex = remember(game.title, game.accentColorHex) {
-        val hash = game.title.hashCode()
-        when (kotlin.math.abs(hash) % 4) {
-            0 -> 0xFF00E5FFL
-            1 -> 0xFF107C10L
-            2 -> 0xFF7C4DFFL
-            else -> 0xFF00B4D8L
-        }
+    val fallbackBgBrush = remember(game.accentColorHex, secondaryColorHex) {
+        Brush.linearGradient(
+            listOf(
+                Color(game.accentColorHex).copy(alpha = 0.65f),
+                Color(secondaryColorHex).copy(alpha = 0.35f),
+                XboxDark
+            )
+        )
+    }
+    val bottomScrimBrush = remember {
+        Brush.verticalGradient(
+            listOf(Color.Transparent, XboxSurface.copy(alpha = 0.94f)),
+            startY = 115f
+        )
     }
     var coverImageLoaded by remember(game.id, game.imageUrl) {
         mutableStateOf(false)
@@ -1063,23 +1071,12 @@ private fun FeaturedGameCard(
     Card(
         modifier = Modifier
             .width(156.dp)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(18.dp))
-            .border(
-                1.1.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color(game.accentColorHex).copy(alpha = 0.65f),
-                        XboxCardBorder,
-                        DirectCyan.copy(alpha = 0.4f)
-                    )
-                ),
-                RoundedCornerShape(18.dp)
-            )
+            .border(1.1.dp, cardBorderBrush, RoundedCornerShape(18.dp))
             .clickable { onLaunch() }
             .testTag("featured_game_${game.id}"),
         colors = CardDefaults.cardColors(containerColor = XboxSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 7.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             Box(
@@ -1090,15 +1087,7 @@ private fun FeaturedGameCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    Color(game.accentColorHex).copy(alpha = 0.65f),
-                                    Color(secondaryColorHex).copy(alpha = 0.35f),
-                                    XboxDark
-                                )
-                            )
-                        ),
+                        .background(fallbackBgBrush),
                     contentAlignment = Alignment.Center
                 ) {
                     if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
@@ -1170,12 +1159,7 @@ private fun FeaturedGameCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, XboxSurface.copy(alpha = 0.94f)),
-                                startY = 115f
-                            )
-                        )
+                        .background(bottomScrimBrush)
                 )
 
                 if (localizedBadge != null) {

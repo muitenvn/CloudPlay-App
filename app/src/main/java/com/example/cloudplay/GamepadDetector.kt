@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class GamepadStatus(
     val hasPhysicalController: Boolean = false,
     val controllerName: String = "",

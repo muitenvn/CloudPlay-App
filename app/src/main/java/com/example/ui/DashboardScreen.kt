@@ -746,24 +746,31 @@ private fun ConsoleFloatingNavigationDock(
         Triple(DashboardTab.SETTINGS, Icons.Default.Tune, stringResource(R.string.tab_settings))
     )
 
+    val dockBorderBrush = remember {
+        Brush.horizontalGradient(
+            listOf(
+                XboxNeonGreen.copy(alpha = 0.48f),
+                XboxGlassBorder,
+                DirectCyan.copy(alpha = 0.48f)
+            )
+        )
+    }
+    val transparentItemBrush = remember {
+        Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .border(
                 1.dp,
-                Brush.horizontalGradient(
-                    listOf(
-                        XboxNeonGreen.copy(alpha = 0.48f),
-                        XboxGlassBorder,
-                        DirectCyan.copy(alpha = 0.48f)
-                    )
-                ),
+                dockBorderBrush,
                 RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
             )
             .testTag("bottom_navigation_bar"),
         color = XboxSurface.copy(alpha = 0.98f),
-        shadowElevation = 18.dp
+        shadowElevation = 8.dp
     ) {
         Row(
             modifier = Modifier
@@ -776,26 +783,34 @@ private fun ConsoleFloatingNavigationDock(
             navItems.forEach { (tab, icon, label) ->
                 val isSelected = currentTab == tab
                 val scale by animateFloatAsState(
-                    targetValue = if (isSelected) 1.06f else 1f,
+                    targetValue = if (isSelected) 1.05f else 1f,
                     animationSpec = tween(
-                        durationMillis = if (motionEnabled) 160 else 0,
+                        durationMillis = if (motionEnabled) 150 else 0,
                         easing = FastOutSlowInEasing
                     ),
                     label = "dock_item_scale"
                 )
                 val accentColor = if (tab == DashboardTab.SERVERS) DirectCyan else XboxNeonGreen
+                val selectedItemBrush = remember(accentColor) {
+                    Brush.verticalGradient(
+                        listOf(
+                            accentColor.copy(alpha = 0.24f),
+                            accentColor.copy(alpha = 0.07f)
+                        )
+                    )
+                }
                 val iconTint by animateColorAsState(
                     targetValue = if (isSelected) accentColor else Color(0xFFC8DDD0),
-                    animationSpec = tween(durationMillis = if (motionEnabled) 165 else 0),
+                    animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
                     label = "dock_icon_tint"
                 )
-                val indicatorWidth by animateDpAsState(
-                    targetValue = if (isSelected) 22.dp else 0.dp,
+                val indicatorScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0f,
                     animationSpec = tween(
-                        durationMillis = if (motionEnabled) 165 else 0,
+                        durationMillis = if (motionEnabled) 150 else 0,
                         easing = FastOutSlowInEasing
                     ),
-                    label = "dock_indicator_width"
+                    label = "dock_indicator_scale"
                 )
 
                 Box(
@@ -808,18 +823,7 @@ private fun ConsoleFloatingNavigationDock(
                             scaleY = scale
                         }
                         .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            if (isSelected) {
-                                Brush.verticalGradient(
-                                    listOf(
-                                        accentColor.copy(alpha = 0.24f),
-                                        accentColor.copy(alpha = 0.07f)
-                                    )
-                                )
-                            } else {
-                                Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
-                            }
-                        )
+                        .background(if (isSelected) selectedItemBrush else transparentItemBrush)
                         .border(
                             width = if (isSelected) 1.dp else 0.dp,
                             color = if (isSelected) accentColor.copy(alpha = 0.6f) else Color.Transparent,
@@ -834,13 +838,17 @@ private fun ConsoleFloatingNavigationDock(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        // Top glowing pill indicator
+                        // Top glowing pill indicator (pure GPU scaleX/alpha, 0 Layout pass)
                         Box(
                             modifier = Modifier
-                                .width(indicatorWidth)
+                                .width(22.dp)
                                 .height(2.5.dp)
+                                .graphicsLayer {
+                                    scaleX = indicatorScale
+                                    alpha = indicatorScale
+                                }
                                 .clip(CircleShape)
-                                .background(if (isSelected) accentColor else Color.Transparent)
+                                .background(accentColor)
                         )
 
                         Box(contentAlignment = Alignment.TopEnd) {

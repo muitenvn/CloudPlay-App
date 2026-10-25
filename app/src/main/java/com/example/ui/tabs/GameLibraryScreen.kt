@@ -659,10 +659,15 @@ fun GameLibraryScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        items(filteredGames, key = { it.id }) { game ->
+                        items(
+                            items = filteredGames,
+                            key = { it.id },
+                            contentType = { "library_game_card" }
+                        ) { game ->
                             LibraryGameCard(
                                 game = game,
                                 isFavorite = game.id in favoriteIds,
+                                isEn = isEn,
                                 isImportingCatalog = isSyncingCatalog,
                                 onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
                                 onShowDetail = { selectedDetailGame = game },
@@ -735,37 +740,45 @@ fun GameLibraryScreen(
 private fun LibraryGameCard(
     game: GameBookmark,
     isFavorite: Boolean,
+    isEn: Boolean = false,
     isImportingCatalog: Boolean = false,
     onToggleFavorite: () -> Unit,
     onShowDetail: () -> Unit,
     onPlay: () -> Unit,
     onDeleteCustom: (() -> Unit)? = null
 ) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
-    val monogram = remember(game.title) {
-        game.title.split(" ")
-            .filter { it.isNotBlank() && it.first().isLetterOrDigit() }
-            .take(2)
-            .joinToString("") { it.first().uppercaseChar().toString() }
-            .ifBlank { "XB" }
-    }
-    val secondaryGradientColor = remember(game.title, game.accentColorHex) {
-        val palette = listOf(
-            Color(0xFF00B4D8),
-            Color(0xFF107C10),
-            Color(0xFF7B2CBF),
-            Color(0xFFFF007A),
-            Color(0xFF0077B6),
-            Color(0xFF2D6A4F)
+    val monogram = game.monogram
+    val secondaryGradientColor = Color(game.secondaryColorHex)
+    val cardBorderBrush = remember(game.accentColorHex) {
+        Brush.verticalGradient(
+            listOf(XboxCardBorder, Color(game.accentColorHex).copy(alpha = 0.65f))
         )
-        palette[(game.title.hashCode() and 0x7FFFFFFF) % palette.size]
+    }
+    val fallbackBgBrush = remember(game.accentColorHex, game.secondaryColorHex) {
+        Brush.linearGradient(
+            listOf(
+                Color(game.accentColorHex).copy(alpha = 0.62f),
+                secondaryGradientColor.copy(alpha = 0.45f),
+                XboxDark
+            )
+        )
+    }
+    val monogramRingBrush = remember(game.accentColorHex) {
+        Brush.linearGradient(
+            listOf(Color(game.accentColorHex), DirectCyan)
+        )
+    }
+    val vignetteScrimBrush = remember {
+        Brush.verticalGradient(
+            colorStops = arrayOf(
+                0.0f to Color(0x4D000000),
+                0.45f to Color.Transparent,
+                0.78f to Color(0xD9060A08),
+                1.0f to Color(0xF7060A08)
+            )
+        )
     }
     var coverImageLoaded by remember(game.imageUrl) { mutableStateOf(false) }
 
@@ -773,33 +786,18 @@ private fun LibraryGameCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(210.dp)
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(20.dp))
-            .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(XboxCardBorder, Color(game.accentColorHex).copy(alpha = 0.65f))
-                ),
-                RoundedCornerShape(20.dp)
-            )
+            .border(1.dp, cardBorderBrush, RoundedCornerShape(20.dp))
             .clickable { onPlay() },
         colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Gradient + Initial Monogram fallback (always shown when cover URL is missing, importing, loading, or failed)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                Color(game.accentColorHex).copy(alpha = 0.62f),
-                                secondaryGradientColor.copy(alpha = 0.45f),
-                                XboxDark
-                            )
-                        )
-                    )
+                    .background(fallbackBgBrush)
             ) {
                 if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
                     Column(
@@ -814,9 +812,7 @@ private fun LibraryGameCard(
                             color = Color(0xAA060B08),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.4.dp,
-                                Brush.linearGradient(
-                                    listOf(Color(game.accentColorHex), DirectCyan)
-                                )
+                                monogramRingBrush
                             ),
                             modifier = Modifier.size(54.dp)
                         ) {
@@ -876,16 +872,7 @@ private fun LibraryGameCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color(0x4D000000),
-                                0.45f to Color.Transparent,
-                                0.78f to Color(0xD9060A08),
-                                1.0f to Color(0xF7060A08)
-                            )
-                        )
-                    )
+                    .background(vignetteScrimBrush)
             )
 
             // Top Badges Row

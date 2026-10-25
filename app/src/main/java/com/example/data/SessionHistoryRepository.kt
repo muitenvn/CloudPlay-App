@@ -21,7 +21,12 @@ data class PlaySessionRecord(
     val avgDecodeMs: Double,
     val isSlowDecode: Boolean,
     val isThermalHot: Boolean,
-    val pingSamples: List<Int>
+    val pingSamples: List<Int>,
+    val framesDropped: Int = 0,
+    val freezeCount: Int = 0,
+    val totalFreezesDuration: Double = 0.0,
+    val jitterMs: Int = 0,
+    val jitterBufferDelayMs: Double = 0.0
 ) {
     fun formattedNetworkLabel(isEn: Boolean): String {
         val modeLabel = if (isDirectNetwork) {
@@ -73,6 +78,8 @@ object SessionHistoryRepository {
                 }
 
                 val avgDecode = ((obj.optDouble("avgDecodeMs", 0.0) * 10.0).roundToInt()) / 10.0
+                val totalFreezesDur = ((obj.optDouble("totalFreezesDuration", 0.0) * 100.0).roundToInt()) / 100.0
+                val jbDelay = ((obj.optDouble("jitterBufferDelayMs", 0.0) * 10.0).roundToInt()) / 10.0
                 loaded.add(
                     PlaySessionRecord(
                         id = id,
@@ -86,7 +93,12 @@ object SessionHistoryRepository {
                         avgDecodeMs = avgDecode,
                         isSlowDecode = obj.optBoolean("isSlowDecode", avgDecode > 12.0),
                         isThermalHot = obj.optBoolean("isThermalHot", false),
-                        pingSamples = samples
+                        pingSamples = samples,
+                        framesDropped = obj.optInt("framesDropped", 0),
+                        freezeCount = obj.optInt("freezeCount", 0),
+                        totalFreezesDuration = totalFreezesDur,
+                        jitterMs = obj.optInt("jitterMs", 0),
+                        jitterBufferDelayMs = jbDelay
                     )
                 )
             }
@@ -118,6 +130,11 @@ object SessionHistoryRepository {
                     put("isSlowDecode", item.isSlowDecode)
                     put("isThermalHot", item.isThermalHot)
                     put("pingSamples", samplesJson)
+                    put("framesDropped", item.framesDropped)
+                    put("freezeCount", item.freezeCount)
+                    put("totalFreezesDuration", ((item.totalFreezesDuration * 100.0).roundToInt()) / 100.0)
+                    put("jitterMs", item.jitterMs)
+                    put("jitterBufferDelayMs", ((item.jitterBufferDelayMs * 10.0).roundToInt()) / 10.0)
                 }
                 arr.put(obj)
             }

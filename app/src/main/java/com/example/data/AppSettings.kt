@@ -624,7 +624,7 @@ object SettingsRepository {
         val rawGpuReduction = sp.getBoolean("gpu_load_reduction_enabled", true)
 
         val effectiveSmartVpn = if (!hasMigratedUnifiedSwitches) (rawSmartVpn || rawAutoBypass) else rawSmartVpn
-        val effectiveAutoBypass = if (!hasMigratedUnifiedSwitches) (rawSmartVpn || rawAutoBypass) else rawAutoBypass
+        val effectiveAutoBypass = rawAutoBypass
         // Phản biện mục 1: gpu_load_reduction_enabled mặc định là true cho mọi máy, nếu dùng phép HOẶC sẽ ép mọi thiết bị bật lowEndDeviceMode (khóa 5 Mbps, 720p, tắt dịch). Do đó lấy theo rawLowEnd.
         val effectiveLowEnd = rawLowEnd
         val effectiveGpuReduction = if (!hasMigratedUnifiedSwitches) rawLowEnd else rawGpuReduction

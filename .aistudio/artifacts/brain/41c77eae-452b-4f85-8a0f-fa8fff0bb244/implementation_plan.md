@@ -1,86 +1,95 @@
-# Bản Kế Hoạch Khắc Phục Lỗi & Nâng Cấp Bảo Mật Cập Nhật APK (SHA-256 Verification)
+# Khắc Phục Giật Lắc Luồng Game & Đo Chính Xác Chỉ Số WebRTC
 
-Bản kế hoạch này tổng hợp đầy đủ các mục rà soát từ bộ phận kiểm tra độc lập kèm phản biện kỹ thuật đã được xác nhận, đồng thời triển khai luồng tải APK trực tiếp trong ứng dụng qua máy chủ trung gian tốc độ cao (`ghfast.top`) với cơ chế đối chiếu mã băm **SHA-256 chính thức từ GitHub API** trước khi mở bộ cài đặt hệ thống.
+Kế hoạch điều tra và xử lý triệt để nguyên nhân gây giật/lắc luồng game trên máy yếu và máy chủ xa (như Tokyo, ping 94–267ms), khôi phục số liệu giải mã thực tế từ WebRTC và bổ sung bộ đo Rớt khung hình, Đứng hình, Jitter và Độ trễ bộ đệm.
 
-## Quyết Định Đã Xác Nhận & Phản Biện Kỹ Thuật
+## Quyết Định Đã Xác Nhận
 
 > [!IMPORTANT]
-> **Các quyết định kỹ thuật và phản biện đã được xác nhận:**
-> - **Mục 1 (Phản biện chuyển đổi công tắc 1 lần khi mở app)**:
->   - **VPN thông minh (`smartVpnEnabled` & `autoBypassEnabled`)**: Thực hiện chuyển đổi 1 lần duy nhất (`migrated_unified_switches_v1`): nếu 1 trong 2 giá trị cũ đang bật (`smartVpnEnabled || autoBypassEnabled`) thì bật cả hai để khớp trạng thái thực tế.
->   - **Chế độ máy yếu & Tiết kiệm pin (`lowEndDeviceMode` & `gpuLoadReductionEnabled`)**: **Phản biện việc gộp theo phép HOẶC (`||`)** vì `gpuLoadReductionEnabled` mặc định đang là `true` cho mọi thiết bị trong khi `lowEndDeviceMode` mặc định là `false`. Nếu gộp theo phép HOẶC sẽ khiến 100% thiết bị bị ép vào Chế độ máy yếu (bị khóa cứng băng thông 5 Mbps, hạ độ phân giải 75% và tự tắt dịch Tiếng Việt). Giải pháp đã thống nhất: giữ theo giá trị `lowEndDeviceMode` hiện tại (`gpuLoadReductionEnabled = lowEndDeviceMode`) và đồng bộ hiển thị công tắc theo `config.lowEndDeviceMode && config.gpuLoadReductionEnabled`.
-> - **Mục 2 & 3 (Màn hình chờ & Bộ nhớ đệm `CloudBrowserScreen`)**:
->   - Gỡ bỏ đoạn gán sớm `isPageLoading = false` ở mốc `75%` trong `onPageCommitVisible`, chỉ giữ **1 ngưỡng duy nhất `80%`** cho màn hình chờ kèm nút Bỏ qua.
->   - Gỡ bỏ lệnh `clearCache(false)` khi đóng phiên chơi để giữ nguyên tốc độ tải tài nguyên ở các lần mở game tiếp theo.
-> - **Mục 4 (Danh sách tên miền HTTPS hợp lệ khi tải APK)**:
->   - Cho phép kết nối HTTPS tới `ghfast.top`, `github.com` và tên miền lưu trữ tài nguyên chuyển hướng `302` chính thức của GitHub là `*.githubusercontent.com` (`objects.githubusercontent.com`, `release-assets.githubusercontent.com`), giới hạn dung lượng tối đa **150 MB**.
-> - **Mục 4 & 6 (Mở trình cài đặt APK trực tiếp)**:
->   - Khai báo `REQUEST_INSTALL_PACKAGES` và `FileProvider` nội bộ trong `AndroidManifest.xml` để sau khi file APK trong bộ nhớ đệm riêng (`cacheDir`) vượt qua kiểm tra khớp 100% mã SHA-256 sẽ mở thẳng trình cài đặt hệ thống của Android.
+> Các quyết định kỹ thuật và phản biện dưới đây đã được thống nhất dựa trên bằng chứng đối chiếu mã nguồn:
+
+- **Khôi phục số đo Giải mã thực tế & bỏ đổi tốc độ phát 1.02x**: Gỡ bỏ hoàn toàn công thức trừ ngược jitter và ép trần thời gian giải mã về ~9.1ms; trả về đúng thời gian giải mã phần cứng thực tế (`totalDecodeTime / framesDecoded`) để bộ điều tiết chất lượng tự động nhận biết chính xác khi máy yếu quá tải giải mã. Đồng thời bỏ việc bật/tắt `playbackRate = 1.02` mỗi 1.5 giây khi jitter cao.
+- **Tắt `requestUnbufferedDispatch` cho cảm ứng màn hình**: Gỡ bỏ `requestUnbufferedDispatch` trong `onTouchEvent` để hệ điều hành Android gom sự kiện chạm theo nhịp VSync 60Hz (tránh đẩy 120–240 sự kiện/giây làm nghẽn CPU máy yếu khi đang giải mã video); chỉ giữ cho tay cầm vật lý và thêm dòng ghi log debug đếm số sự kiện cảm ứng mỗi giây.
+- **Phản biện có bằng chứng cho mục (f) và (h)**:
+  - **Mục (f) — Đo ping khi vào trận**: Giá trị `-1` trong bộ quản lý VPN không gây lỗi vì đã có điều kiện chặn `if (ping > 0)`, nhưng lỗi thực sự nằm ở nhánh dự phòng của cầu nối WebRTC gửi `rttMs = 0` khi `currentRoundTripTime` chưa kịp có mặt, làm bộ điều tiết hiểu nhầm `rttOverloaded = false`. Sẽ sửa bằng cách lấy thêm `totalRoundTripTime / responsesReceived` và giữ nguyên mẫu RTT hợp lệ gần nhất thay vì ghi đè `0`.
+  - **Mục (h) — Ngưỡng tắt màn hình chờ 80%**: Giữ nguyên ngưỡng 80% kèm nút bỏ qua vì chỉ số này chỉ phản ánh tiến độ tải khung HTML ban đầu của trang SPA Xbox, trong khi màn hình chờ tàu vũ trụ của Xbox tự giữ cho đến khi thẻ `<video>` của luồng WebRTC phát hình.
 
 ---
 
-## 1. Tổng Quan & Giá Trị Cốt Lõi
+## 1. Tổng Quan & Mục Tiêu Cốt Lõi
 
-- **Mục tiêu**: Đảm bảo tính nhất quán tuyệt đối của các công tắc đã gộp trong phần Cài đặt, tối ưu tốc độ mở lại game và bảo vệ người dùng khỏi nguy cơ tập tin cài đặt bị thay đổi hoặc hỏng khi tải qua máy chủ trung gian (`ghfast.top`).
+- **Vấn đề giải quyết**: Người chơi gặp tình trạng giật/khựng hình và hiện cảnh báo "Giải mã" + "Ping" của Xbox khi chơi Fortnite ở máy chủ Tokyo trên máy yếu, nhưng ứng dụng vẫn báo "Giải mã 9.1ms • Mát & Ổn định" do số liệu giải mã bị ép trần và bộ đệm khung hình bị hạ quá thấp (trần 22–32ms) kèm chu kỳ co giãn liên tục 1.5 giây.
 - **Giá trị mang lại**:
-  - Người dùng tại Việt Nam vẫn tận hưởng tốc độ tải cập nhật nhanh qua `ghfast.top`, nhưng mọi tập tin `.apk` đều phải khớp từng ký tự mã băm **SHA-256 gốc lấy trực tiếp từ GitHub (`api.github.com` / `github.com`)** trước khi được phép cài đặt.
-  - Tự động chuyển sang tải trực tiếp từ GitHub nếu máy chủ trung gian gặp lỗi hoặc không phản hồi dữ liệu sau 15 giây.
+  1. **Đo đúng nguyên nhân gây giật**: Thu thập đầy đủ `framesDropped`, `freezeCount`, `totalFreezesDuration`, `jitter`, và `jitterBufferDelay / jitterBufferEmittedCount` từ chuẩn WebRTC `getStats()`.
+  2. **Khôi phục độ mượt luồng phát**: Trả lại trần bộ đệm 42–45ms, giữ bộ đệm ổn định có thời gian chờ hạ (cooldown), đặt bộ đệm ngay khi luồng video/audio bắt đầu, tính lại băng thông SDP theo tỷ lệ thu phóng và giới hạn khung hình, đồng thời loại bỏ hoàn toàn các tác vụ nền thừa của bộ quay màn hình khi không quay.
 
 ---
 
-## 2. Trải Nghiệm Người Dùng & Giao Diện Hộp Thoại Cập Nhật
+## 2. Trải Nghiệm Người Dùng & Giao Diện
 
-- **Luồng Tải & Kiểm Tra Tự Động Trong Hộp Thoại (`UpdateAvailableDialog`)**:
-  1. Khi vào ứng dụng và phát hiện bản mới, hộp thoại cập nhật tự động mở kèm dòng ghi chú rõ ràng: *"Tải nhanh qua máy chủ trung gian; file được kiểm tra trước khi cài."*
-  2. Khi người dùng nhấn **"⚡ Tải nhanh APK"**, ứng dụng tải tập tin `.apk` vào thư mục bộ nhớ đệm riêng (`cacheDir/updates`), hiển thị thanh tiến độ phần trăm (`%`), số MB đã tải và nút **"Hủy"** ngay trên hộp thoại.
-  3. Nếu `ghfast.top` báo lỗi hoặc không truyền dữ liệu sau **15 giây**, ứng dụng tự động chuyển sang tải trực tiếp từ `github.com` mà không làm gián đoạn trải nghiệm.
-  4. Ngay khi tải xong, ứng dụng tính toán mã băm SHA-256 của file và đối chiếu từng ký tự với mã SHA-256 chính thức từ GitHub:
-     - **Nếu khớp 100%**: Tự động mở trình cài đặt hệ thống Android qua `FileProvider`.
-     - **Nếu không khớp hoặc không lấy được mã chính thức**: Xóa ngay tập tin APK trong bộ nhớ đệm, hiển thị cảnh báo *"File không khớp hoặc không kiểm tra được, vui lòng tải từ GitHub"* và làm nổi bật nút **"Tải từ GitHub"**.
-  5. Luôn hiển thị nút phụ **"Tải từ GitHub"** (`https://github.com/muitenvn/CloudPlay-App/releases`) ở mọi trạng thái.
+- **Giữ nguyên bố cục giao diện**: Không thay đổi cấu trúc các màn hình hiện có ngoài việc hiển thị đúng một dòng thông tin chẩn đoán ngắn gọn trong hộp thoại Chi tiết phiên chơi.
+- **Hiển thị trong Chi tiết phiên chơi**:
+  - Bổ sung một dòng duy nhất hiển thị rõ ràng:
+    `Khung hình rớt: X • Đứng hình: Y lần • Jitter: Z ms`
+  - Nhãn trạng thái máy ("Giải mã chậm" / "Mát & Ổn định") phản ánh trung thực thời gian giải mã phần cứng thực tế.
 
 ---
 
-## 3. Quyết Định Kỹ Thuật Trọng Tâm
+## 3. Quyết Định Kỹ Thuật & Đánh Đổi (Bước 1 — Bảng Điều Tra)
 
-- **Kết nối mạng trực tiếp (`Proxy.NO_PROXY`)**:
-  - Toàn bộ truy vấn kiểm tra phiên bản (`api.github.com`), tải mã SHA-256 phụ (`.sha256`) và tải tập tin `.apk` đều sử dụng `url.openConnection(java.net.Proxy.NO_PROXY)` để đi thẳng qua mạng gốc của người dùng, hoàn toàn tách biệt với Proxy/VPN trong ứng dụng.
-- **Xác thực nguồn mã băm SHA-256 Kép (Chính thức từ GitHub)**:
-  - **Ưu tiên 1**: Đọc trường `digest` (định dạng `"sha256:..."`) của asset `.apk` trong phản hồi JSON từ `https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest`.
-  - **Ưu tiên 2 (Dự phòng)**: Nếu phản hồi API chưa có trường `digest`, tải tệp `<tên apk>.sha256` trực tiếp từ `github.com` (tuyệt đối không tải tệp `.sha256` qua `ghfast.top`).
-- **Tự động tạo và đính kèm file `.sha256` trên GitHub Actions**:
-  - Ngay sau bước đóng gói APK trong workflow phát hành, tạo file `<tên apk>.sha256` chứa mã SHA-256 chuẩn và đính kèm vào GitHub Release cùng file `.apk` mà không thay đổi khóa ký hay các bước khác.
+- **Mục (a) — Trần bộ đệm & chu kỳ điều chỉnh EMA 1.5 giây**:
+  - *Bằng chứng*: Trần bộ đệm trong JS bị khóa ở 32ms và trong bộ điều tiết khóa ở 22ms (Wi-Fi) / 28ms (4G); mặc định hạ xuống 14ms (4G) và 9ms (mạng tốt); mỗi nhịp 1.5 giây không có áp lực là lập tức trừ `-0.8ms` ngay lập tức.
+  - *Giải pháp*: Khôi phục trần bộ đệm lên 42ms (Wi-Fi) và 45ms (4G), mặc định 18ms (4G) / 10–12ms (Wi-Fi). Thêm cơ chế giữ ổn định tối thiểu 9 giây liên tiếp không có áp lực mới giảm dần bộ đệm, và chỉ gửi lệnh cập nhật sang WebView khi mức chênh lệch `>= 1.5ms`.
+- **Mục (b) — Khởi tạo bộ đệm tại sự kiện `'track'` cho Video & Audio**:
+  - *Bằng chứng*: Sự kiện `pc.addEventListener('track')` chỉ lưu tham chiếu track mà không cài `playoutDelayHint` / `jitterBufferTarget`, và hàm cập nhật bộ đệm bỏ qua kênh âm thanh (`audio`).
+  - *Giải pháp*: Cài đặt ngay `playoutDelayHint` và `jitterBufferTarget` ngay khi nhận sự kiện `'track'` cho cả `video` và `audio` để luồng ổn định ngay từ giây đầu tiên và không lệch tiếng.
+- **Mục (c) — Băng thông SDP, giới hạn FPS và H.264 Profile**:
+  - *Bằng chứng*: Hàm chỉnh sửa SDP đang gán cứng `b=AS` tối đa tới 20 Mbps mà không nhân hệ số tỷ lệ hiển thị (`renderScaleFactor`), không thêm `a=framerate`, và không ưu tiên H.264 profile nhẹ cho máy yếu.
+  - *Giải pháp*: Tính lại băng thông SDP theo `renderScaleFactor`, giới hạn trần an toàn cho máy yếu/mạng di động, chèn `a=framerate` theo cấu hình FPS và ưu tiên H.264 Constrained Baseline/Main (`42e01f`/`42001f`) khi bật Chế độ máy yếu.
+- **Mục (e) — Tách biệt công tắc tự tắt VPN khi vào trận**:
+  - *Bằng chứng*: Việc kiểm tra gộp `smartVpnEnabled || autoBypassEnabled` làm VPN tự ngắt giữa phiên ngay cả khi người chơi chỉ muốn bật VPN thông minh mà tắt tự ngắt.
+  - *Giải pháp*: Chỉ kích hoạt đếm ngược tự ngắt VPN khi cờ `autoBypassEnabled` thực sự bật.
+- **Mục (g) — Tác vụ nền của máy quay màn hình khi không quay**:
+  - *Bằng chứng*: Sự kiện `touchstart`/`pointerdown` mở khóa âm thanh chạy lặp lại ở mọi lần chạm cảm ứng, và các hàm `AudioNode.prototype.connect` / `HTMLMediaElement.prototype.play` tự động gắn nhánh thu âm (`GainNode` + `MediaStreamAudioDestinationNode`) ngay cả khi không quay.
+  - *Giải pháp*: Dùng tùy chọn `{ once: true }` để gỡ bỏ sự kiện chạm ngay sau lần chạm đầu tiên, và chỉ gắn nhánh thu âm khi người chơi thực sự bấm nút Bắt đầu quay.
 
 ---
 
 ## 4. Kiến Trúc Kỹ Thuật & Luồng Dữ Liệu
 
 ```
-┌───────────────────────────────────────────────────────────────────────────┐
-│                     LUỒNG KIỂM TRA & TẢI CẬP NHẬT AN TOÀN                 │
-└───────────────────────────────────────────────────────────────────────────┘
-                                      │
-        1. Mở ứng dụng (Kết nối trực tiếp Proxy.NO_PROXY)
-                                      ▼
-┌───────────────────────────────────────────────────────────────────────────┐
-│  GitHub Release API (api.github.com/repos/muitenvn/CloudPlay-App/...)     │
-│  • Lấy thông tin bản mới + URL .apk + Mã SHA-256 gốc (asset.digest)       │
-│  • Dự phòng: Lấy mã SHA-256 từ asset phụ <tên apk>.sha256 trên github.com │
-└───────────────────────────────────────────────────────────────────────────┘
-                                      │
-        2. Người dùng nhấn "Tải nhanh APK" trên UpdateAvailableDialog
-                                      ▼
-┌───────────────────────────────────────────────────────────────────────────┐
-│  Bộ Tải Nội Bộ An Toàn (Chỉ HTTPS • ghfast.top / github.com • ≤ 150 MB)   │
-│  • Tải vào cache riêng của app + Thanh tiến độ % + Nút Hủy                │
-│  • Quá 15s không có dữ liệu hoặc lỗi ──► Tự động chuyển sang github.com   │
-└───────────────────────────────────────────────────────────────────────────┘
-                                      │
-        3. Kiểm tra toàn vẹn SHA-256 từng ký tự (MessageDigest SHA-256)
-                   ┌──────────────────┴──────────────────┐
-                   ▼ (Khớp 100%)                         ▼ (Sai / Thiếu mã)
-┌──────────────────────────────────────┐  ┌─────────────────────────────────┐
-│ Mở trình cài đặt Android qua         │  │ Xóa ngay file APK trong cache   │
-│ FileProvider + REQUEST_INSTALL_PKG   │  │ Báo lỗi & Hiện nút Tải GitHub   │
-└──────────────────────────────────────┘  └─────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        WebRTC Inbound Video/Audio                        │
+│  • Sự kiện 'track' -> Đặt playoutDelayHint & jitterBufferTarget (V + A)  │
+│  • SDP Munging     -> Bitrate * renderScale + a=framerate + H.264 nhẹ    │
+└───────────────────────────────────┬──────────────────────────────────────┘
+                                    │ Chu kỳ getStats()
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     Bộ Thu Thập Chỉ Số Thực Tế (JS)                      │
+│  • decodeTimeMs thực (bỏ ép trần 9.1ms, bỏ đổi playbackRate 1.02x)       │
+│  • framesDropped, freezeCount, totalFreezesDuration                      │
+│  • jitter (ms), jitterBufferDelay / jitterBufferEmittedCount (ms)        │
+│  • rttMs thực (giữ mẫu hợp lệ gần nhất, không ghi đè 0ms)                │
+└─────────────────┬─────────────────────────────────────┬──────────────────┘
+                  │                                     │
+                  ▼                                     ▼
+┌───────────────────────────────────┐ ┌────────────────────────────────────┐
+│   Bộ Điều Tiết Chất Lượng & Đệm   │ │      Lưu Trữ Lịch Sử Phiên Chơi    │
+│ • Trần đệm 42–45ms (4G 18ms)      │ │ • Lưu framesDropped, freezeCount,  │
+│ • Giữ ổn định ≥9s mới giảm đệm    │ │   totalFreezesDuration, jitter,    │
+│ • Hạ bậc ngay khi decode > 15ms   │ │   jitterBufferDelayMs              │
+│   hoặc freezeCount / rớt hình tăng│ │ • Chi tiết phiên: "Khung hình rớt: │
+└───────────────────────────────────┘ │   X • Đứng hình: Y lần • Jitter:   │
+                                      │   Z ms"                            │
+                                      └────────────────────────────────────┘
 ```
+
+### Luồng Xử Lý Chi Tiết
+1. **Đo & Truyền Chỉ Số (`StreamTelemetry`)**:
+   - Mở rộng mô hình dữ liệu telemetry nhận từ WebRTC `getStats()` với 5 trường thực tế: tổng số khung hình rớt (`framesDropped`), số lần đứng hình (`freezeCount`), tổng thời gian đứng hình (`totalFreezesDurationSec`), độ chập chờn mạng (`jitterMs`), và độ trễ bộ đệm thực tế (`jitterBufferDelayMs`).
+   - Sử dụng trực tiếp các chỉ số này trong bộ điều tiết chất lượng để phát hiện chính xác hiện tượng đứng hình hoặc quá tải giải mã trên máy yếu.
+2. **Lưu Trữ & Hiển Thị Lịch Sử Phiên (`PlaySessionRecord`)**:
+   - Ghi nhận giá trị cuối phiên của `framesDropped`, `freezeCount`, `totalFreezesDuration`, cùng giá trị trung bình của `jitterMs` và `jitterBufferDelayMs` vào dữ liệu phiên chơi.
+   - Hiển thị dòng tóm tắt `"Khung hình rớt: X • Đứng hình: Y lần • Jitter: Z ms"` trong hộp thoại chi tiết phiên.
+3. **Đo Tần Suất Cảm Ứng Debug**:
+   - Đếm số lần `onTouchEvent` mỗi giây trên WebView và ghi ra `Log.d("CloudBrowserTouch", ...)` mỗi giây có thao tác chạm (chỉ ghi log hệ thống, không hiển thị lên giao diện).

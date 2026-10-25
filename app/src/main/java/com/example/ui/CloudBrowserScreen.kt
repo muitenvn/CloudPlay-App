@@ -376,20 +376,36 @@ fun CloudBrowserScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 object : WebView(ctx) {
+                    private var touchEventCountInSec = 0
+                    private var lastTouchCountLogMs = 0L
+                    private var lastUnbufferedMotionDeviceId = -1
+
                     override fun onTouchEvent(event: android.view.MotionEvent?): Boolean {
-                        if (event != null && event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
-                            try {
-                                requestUnbufferedDispatch(event)
-                            } catch (_: Exception) {}
+                        if (event != null) {
+                            touchEventCountInSec++
+                            val now = android.os.SystemClock.uptimeMillis()
+                            if (lastTouchCountLogMs == 0L) {
+                                lastTouchCountLogMs = now
+                            } else if (now - lastTouchCountLogMs >= 1000L) {
+                                android.util.Log.d("CloudBrowserTouch", "onTouchEvent/s: $touchEventCountInSec")
+                                touchEventCountInSec = 0
+                                lastTouchCountLogMs = now
+                            }
                         }
                         return super.onTouchEvent(event)
                     }
 
                     override fun onGenericMotionEvent(event: android.view.MotionEvent?): Boolean {
-                        if (event != null) {
-                            try {
-                                requestUnbufferedDispatch(event)
-                            } catch (_: Exception) {}
+                        if (event != null &&
+                            ((event.source and android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK ||
+                                (event.source and android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD)
+                        ) {
+                            if (event.deviceId != lastUnbufferedMotionDeviceId) {
+                                lastUnbufferedMotionDeviceId = event.deviceId
+                                try {
+                                    requestUnbufferedDispatch(event)
+                                } catch (_: Exception) {}
+                            }
                         }
                         return super.onGenericMotionEvent(event)
                     }

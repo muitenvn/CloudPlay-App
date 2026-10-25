@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch thực hiện sửa lỗi đồng bộ công tắc Cài đặt, tinh chỉnh ngưỡng tải CloudBrowserScreen và nâng cấp bảo mật tải cập nhật APK xác thực SHA-256 trước khi cài đặt.",
-  "updatedAt":  "2026-10-25T07:50:48.049452085Z",
+  "summary":  "Kế hoạch điều tra và khắc phục triệt để tình trạng giật/lắc luồng game, đo chính xác các chỉ số rớt khung hình/đứng hình/jitter từ WebRTC getStats() và khôi phục cơ chế điều tiết bộ đệm, SDP bitrate, cảm ứng trên máy yếu.",
+  "updatedAt":  "2026-10-25T10:32:14.823108456Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

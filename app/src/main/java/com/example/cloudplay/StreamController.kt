@@ -56,6 +56,13 @@ class StreamController(private val context: Context) {
     private var sessionFpsCount: Int = 0
     private var sessionDecodeSum: Double = 0.0
     private var sessionDecodeCount: Int = 0
+    private var sessionMaxFramesDropped: Int = 0
+    private var sessionMaxFreezeCount: Int = 0
+    private var sessionMaxFreezesDurationSec: Double = 0.0
+    private var sessionJitterSum: Long = 0L
+    private var sessionJitterCount: Int = 0
+    private var sessionJitterBufferDelaySum: Double = 0.0
+    private var sessionJitterBufferDelayCount: Int = 0
     private var sessionThermalHot: Boolean = false
     private val sessionPingSamples = mutableListOf<Int>()
 
@@ -141,7 +148,7 @@ class StreamController(private val context: Context) {
             val isEn = config.isEnglishUI()
             val vpnState = VpnManager.state.value
 
-            if (config.smartVpnEnabled || config.autoBypassEnabled) {
+            if (config.smartVpnEnabled) {
                 if (vpnState.mode != NetworkMode.VPN_JAPAN) {
                     VpnManager.autoTurnOnForLaunch(context)
                     showTemporaryBanner(
@@ -149,7 +156,7 @@ class StreamController(private val context: Context) {
                         BannerType.INFO,
                         3500
                     )
-                } else {
+                } else if (config.autoBypassEnabled) {
                     showTemporaryBanner(
                         if (isEn) "🚀 Launching game: VPN will auto-disconnect once stream connects..." else "🚀 Đang vào game: Sẽ tự động tắt VPN khi luồng game kết nối...",
                         BannerType.INFO,
@@ -198,7 +205,7 @@ class StreamController(private val context: Context) {
             val config = SettingsRepository.config.value
             val isEn = config.isEnglishUI()
 
-            if ((config.smartVpnEnabled || config.autoBypassEnabled) && !_uiState.value.autoBypassTriggered) {
+            if (config.autoBypassEnabled && !_uiState.value.autoBypassTriggered) {
                 val delaySec = config.autoBypassDelaySeconds.coerceIn(1, 15)
                 try {
                     android.widget.Toast.makeText(
@@ -210,7 +217,7 @@ class StreamController(private val context: Context) {
                 scheduleAutoBypass(delaySec, if (isEn) "Game stream connected" else "Luồng game đã kết nối")
             } else {
                 showTemporaryBanner(
-                    if (isEn) "✅ In-game! Using Direct ISP connection." else "✅ Đã vào game! Đang dùng mạng trực tiếp.",
+                    if (isEn) "✅ In-game! Stream connected." else "✅ Đã vào game! Luồng game đã kết nối.",
                     BannerType.SUCCESS,
                     5000
                 )
@@ -239,6 +246,13 @@ class StreamController(private val context: Context) {
         sessionFpsCount = 0
         sessionDecodeSum = 0.0
         sessionDecodeCount = 0
+        sessionMaxFramesDropped = 0
+        sessionMaxFreezeCount = 0
+        sessionMaxFreezesDurationSec = 0.0
+        sessionJitterSum = 0L
+        sessionJitterCount = 0
+        sessionJitterBufferDelaySum = 0.0
+        sessionJitterBufferDelayCount = 0
         sessionThermalHot = checkDeviceThermalModerateOrHigher()
         sessionPingSamples.clear()
 
@@ -275,6 +289,23 @@ class StreamController(private val context: Context) {
             sessionDecodeSum += t.decodeTimeMs
             sessionDecodeCount += 1
         }
+        if (t.framesDropped > sessionMaxFramesDropped) {
+            sessionMaxFramesDropped = t.framesDropped
+        }
+        if (t.freezeCount > sessionMaxFreezeCount) {
+            sessionMaxFreezeCount = t.freezeCount
+        }
+        if (t.totalFreezesDurationSec > sessionMaxFreezesDurationSec) {
+            sessionMaxFreezesDurationSec = t.totalFreezesDurationSec
+        }
+        if (t.jitterMs >= 0 && (t.fps > 0 || t.rttMs > 0 || t.jitterMs > 0)) {
+            sessionJitterSum += t.jitterMs
+            sessionJitterCount += 1
+        }
+        if (t.jitterBufferDelayMs > 0.0) {
+            sessionJitterBufferDelaySum += t.jitterBufferDelayMs
+            sessionJitterBufferDelayCount += 1
+        }
         if (!sessionThermalHot && checkDeviceThermalModerateOrHigher()) {
             sessionThermalHot = true
         }
@@ -304,10 +335,8 @@ class StreamController(private val context: Context) {
             return
         }
 
-        // Capture one last sample if none were recorded yet
-        if (sessionPingCount == 0 && sessionFpsCount == 0 && sessionDecodeCount == 0) {
-            captureTelemetrySample()
-        }
+        // Capture final telemetry snapshot so cumulative counters (framesDropped, freezeCount) are up to date
+        captureTelemetrySample()
 
         val vpn = VpnManager.state.value
         val fallbackPing = if (vpn.mode == NetworkMode.DIRECT_NETWORK) {
@@ -331,6 +360,17 @@ class StreamController(private val context: Context) {
             NetworkOptimizer.telemetry.value.decodeTimeMs
         }
         val avgDecode = ((rawAvgDecode * 10.0).toInt()) / 10.0
+        val avgJitter = if (sessionJitterCount > 0) {
+            (sessionJitterSum / sessionJitterCount).toInt()
+        } else {
+            NetworkOptimizer.telemetry.value.jitterMs.coerceAtLeast(0)
+        }
+        val rawAvgJbDelay = if (sessionJitterBufferDelayCount > 0) {
+            sessionJitterBufferDelaySum / sessionJitterBufferDelayCount
+        } else {
+            NetworkOptimizer.telemetry.value.jitterBufferDelayMs
+        }
+        val avgJbDelay = ((rawAvgJbDelay * 10.0).toInt()) / 10.0
         val samplesSnapshot = if (sessionPingSamples.isNotEmpty()) {
             sessionPingSamples.takeLast(60)
         } else if (avgPing > 0) {
@@ -357,7 +397,12 @@ class StreamController(private val context: Context) {
             avgDecodeMs = avgDecode,
             isSlowDecode = avgDecode > 12.0,
             isThermalHot = sessionThermalHot,
-            pingSamples = samplesSnapshot
+            pingSamples = samplesSnapshot,
+            framesDropped = sessionMaxFramesDropped,
+            freezeCount = sessionMaxFreezeCount,
+            totalFreezesDuration = sessionMaxFreezesDurationSec,
+            jitterMs = avgJitter,
+            jitterBufferDelayMs = avgJbDelay
         )
         com.example.data.SessionHistoryRepository.recordSession(record)
     }

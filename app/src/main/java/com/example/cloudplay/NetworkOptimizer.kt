@@ -59,6 +59,9 @@ data class StreamTelemetry(
     val jitterMs: Int = 0,
     val packetsLostPercent: Double = 0.0,
     val framesDropped: Int = 0,
+    val freezeCount: Int = 0,
+    val totalFreezesDurationSec: Double = 0.0,
+    val jitterBufferDelayMs: Double = 0.0,
     val speedPriorityActive: Boolean = true,
     val appliedProfile: String = "Tự Động",
     val estimatedDataSavedMb: Double = 0.0
@@ -347,10 +350,18 @@ object NetworkOptimizer {
             val fps = json.optInt("fps", 0)
             val bitrate = json.optDouble("bitrateMbps", 0.0)
             val decodeTime = json.optDouble("decodeTimeMs", 0.0)
-            val rtt = json.optInt("rttMs", 0)
+            val rawRtt = json.optInt("rttMs", 0)
+            val rtt = if (rawRtt > 0) {
+                rawRtt
+            } else {
+                _telemetry.value.rttMs.takeIf { it > 0 } ?: 0
+            }
             val jitter = json.optInt("jitterMs", 0)
             val loss = json.optDouble("packetsLostPercent", 0.0)
             val framesDropped = json.optInt("framesDropped", 0)
+            val freezeCount = json.optInt("freezeCount", 0)
+            val totalFreezesDurationSec = json.optDouble("totalFreezesDurationSec", 0.0)
+            val jitterBufferDelayMs = json.optDouble("jitterBufferDelayMs", 0.0)
 
             val nowMs = try {
                 val rt = SystemClock.elapsedRealtime()
@@ -382,6 +393,9 @@ object NetworkOptimizer {
                 jitterMs = jitter,
                 packetsLostPercent = loss,
                 framesDropped = framesDropped,
+                freezeCount = freezeCount,
+                totalFreezesDurationSec = totalFreezesDurationSec,
+                jitterBufferDelayMs = jitterBufferDelayMs,
                 speedPriorityActive = currentStatus.speedFirstPriority,
                 appliedProfile = currentStatus.activeProfileName,
                 estimatedDataSavedMb = totalDataSavedMegabytes

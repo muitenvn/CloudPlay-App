@@ -208,9 +208,23 @@ class XboxBridge(
                     }
                     window.__findActiveStreamVideo = findActiveStreamVideo;
 
+                    function applyReceiverBufferTarget(receiver, kind, videoSec) {
+                        if (!receiver) return;
+                        try {
+                            const sec = (kind === 'audio') ? Math.max(0.012, Math.min(0.045, videoSec)) : videoSec;
+                            const ms = Math.round(sec * 1000);
+                            if ('playoutDelayHint' in receiver) {
+                                receiver.playoutDelayHint = sec;
+                            }
+                            if ('jitterBufferTarget' in receiver) {
+                                receiver.jitterBufferTarget = ms;
+                            }
+                        } catch (e) {}
+                    }
+
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(6.0, Math.min(32.0, parseFloat(bufferHintMs) || 12.0));
+                        const bufMs = Math.max(8.0, Math.min(45.0, parseFloat(bufferHintMs) || 14.0));
                         const targetSec = parseFloat((bufMs / 1000.0).toFixed(4));
 
                         if (window.__networkProfile) {
@@ -225,10 +239,8 @@ class XboxBridge(
                                 const receivers = pc.getReceivers();
                                 for (let i = 0; i < receivers.length; i++) {
                                     const r = receivers[i];
-                                    if (r && r.track && r.track.kind === 'video') {
-                                        if ('playoutDelayHint' in r) {
-                                            r.playoutDelayHint = targetSec;
-                                        }
+                                    if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
+                                        applyReceiverBufferTarget(r, r.track.kind, targetSec);
                                     }
                                 }
                             }
@@ -503,15 +515,32 @@ class XboxBridge(
                         if (!rawSdp || typeof rawSdp !== 'string') return rawSdp;
                         try {
                             let sdp = rawSdp;
-                            const isLowEndMode = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                            const gt = window.__graphicsTuning || {};
+                            const isLowEndMode = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                            const scaleFactor = Math.max(0.65, Math.min(1.0, parseFloat(gt.renderScale) || $renderScaleFactor || 1.0));
+                            const fpsTarget = parseInt(gt.fpsCap || $fpsCap || 60, 10) || 60;
                             const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
-                            const activeMbps = Math.max(4, Math.min(20, Math.round(rawMbps)));
+                            const scaleMultiplier = scaleFactor < 0.99 ? Math.max(0.68, scaleFactor * scaleFactor * 1.08) : 1.0;
+                            const maxSafeMbps = isLowEndMode ? 5 : 16;
+                            const activeMbps = Math.max(4, Math.min(maxSafeMbps, Math.round(rawMbps * scaleMultiplier)));
                             const targetKbps = activeMbps * 1000;
+                            const startKbps = Math.max(2500, Math.round(targetKbps * 0.70));
 
-                            // Negotiate video bandwidth cleanly via standard b=AS without mutating Xbox's H.264 profile-level-id
                             if (sdp.indexOf('m=video ') !== -1) {
                                 sdp = sdp.replace(/b=AS:\d+\r\n/g, '');
-                                sdp = sdp.replace(/m=video (.*)\r\n/g, 'm=video $1\r\nb=AS:' + targetKbps + '\r\n');
+                                sdp = sdp.replace(/a=framerate:\d+\r\n/g, '');
+                                sdp = sdp.replace(
+                                    /m=video (.*)\r\n/g,
+                                    'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + fpsTarget + '\r\n'
+                                );
+                                // Prefer Constrained Baseline / Main profile on low-end devices & add safe bitrate bounds
+                                if (isLowEndMode) {
+                                    sdp = sdp.replace(/profile-level-id=64[0-9a-fA-F]{4}/g, 'profile-level-id=42e01f');
+                                }
+                                sdp = sdp.replace(/(a=fmtp:\d+ [^\r\n]*packetization-mode=1[^\r\n]*)\r\n/g, function(match, p1) {
+                                    if (p1.indexOf('x-google-max-bitrate') !== -1) return match;
+                                    return p1 + ';x-google-max-bitrate=' + targetKbps + ';x-google-start-bitrate=' + startKbps + '\r\n';
+                                });
                             }
 
                             if (isLowEndMode && window.__pauseTranslator) {
@@ -545,11 +574,15 @@ class XboxBridge(
 
                         pc.addEventListener('track', function(evt) {
                             try {
+                                const initBufSec = window.__targetBufferSec || 0.014;
                                 if (evt.track) {
                                     window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
                                     window.__activeWebRtcTracks[evt.track.kind] = evt.track;
                                     if (evt.track.kind === 'audio') {
                                         window.__capturedGameAudioTrack = evt.track;
+                                    }
+                                    if (evt.receiver && (evt.track.kind === 'video' || evt.track.kind === 'audio')) {
+                                        applyReceiverBufferTarget(evt.receiver, evt.track.kind, initBufSec);
                                     }
                                 }
                                 if (evt.streams && evt.streams[0]) {
@@ -593,6 +626,9 @@ class XboxBridge(
                         let lastFrames = 0;
                         let lastTotalDecodeTime = 0;
                         let lastFramesDecodedForDecode = 0;
+                        let lastJitterBufferDelay = 0;
+                        let lastJitterBufferEmitted = 0;
+                        let lastValidRttMs = 0;
 
                         statsIntervalId = setInterval(async function() {
                             if (pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
@@ -609,6 +645,10 @@ class XboxBridge(
                                 let packetsReceived = 0;
                                 let framesDecoded = 0;
                                 let framesDropped = 0;
+                                let freezeCount = 0;
+                                let totalFreezesDurationSec = 0.0;
+                                let rawJitterBufferDelay = 0.0;
+                                let rawJitterBufferEmitted = 0;
                                 let currentTotalDecodeTime = 0;
                                 let nativeFps = 0;
 
@@ -622,6 +662,18 @@ class XboxBridge(
                                         }
                                         framesDecoded = report.framesDecoded || framesDecoded;
                                         framesDropped = report.framesDropped || framesDropped;
+                                        if (report.freezeCount !== undefined) {
+                                            freezeCount = report.freezeCount;
+                                        }
+                                        if (report.totalFreezesDuration !== undefined) {
+                                            totalFreezesDurationSec = parseFloat(Number(report.totalFreezesDuration).toFixed(2));
+                                        }
+                                        if (report.jitterBufferDelay !== undefined) {
+                                            rawJitterBufferDelay = report.jitterBufferDelay;
+                                        }
+                                        if (report.jitterBufferEmittedCount !== undefined) {
+                                            rawJitterBufferEmitted = report.jitterBufferEmittedCount;
+                                        }
                                         if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
                                             nativeFps = Math.round(report.framesPerSecond);
                                         }
@@ -629,17 +681,25 @@ class XboxBridge(
                                             currentTotalDecodeTime = report.totalDecodeTime;
                                         }
                                     } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated)) {
-                                        if (report.currentRoundTripTime !== undefined) {
+                                        if (report.currentRoundTripTime !== undefined && report.currentRoundTripTime > 0) {
                                             rtt = Math.round(report.currentRoundTripTime * 1000);
-                                        } else if (report.roundTripTime !== undefined) {
+                                        } else if (report.roundTripTime !== undefined && report.roundTripTime > 0) {
                                             rtt = Math.round(report.roundTripTime * 1000);
+                                        } else if (report.totalRoundTripTime !== undefined && report.responsesReceived > 0) {
+                                            rtt = Math.round((report.totalRoundTripTime / report.responsesReceived) * 1000);
                                         }
-                                    } else if (report.type === 'remote-inbound-rtp' && report.roundTripTime !== undefined) {
+                                    } else if (report.type === 'remote-inbound-rtp' && report.roundTripTime !== undefined && report.roundTripTime > 0) {
                                         if (rtt === 0) {
                                             rtt = Math.round(report.roundTripTime * 1000);
                                         }
                                     }
                                 });
+
+                                if (rtt > 0) {
+                                    lastValidRttMs = rtt;
+                                } else if (lastValidRttMs > 0) {
+                                    rtt = lastValidRttMs;
+                                }
 
                                 const now = Date.now();
                                 const timeDiff = (now - lastTimestamp) / 1000;
@@ -656,29 +716,33 @@ class XboxBridge(
                                 lastTimestamp = now;
                                 lastFrames = framesDecoded;
 
+                                // Measure real hardware decode time per frame without artificial clamping
                                 let decodeTimeMs = 0.0;
-                                let rawQueueWaitMs = 0.0;
                                 if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
                                     lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
                                     const deltaDecodeSec = currentTotalDecodeTime - lastTotalDecodeTime;
                                     const deltaFrames = framesDecoded - lastFramesDecodedForDecode;
                                     if (deltaFrames > 0 && deltaDecodeSec >= 0) {
-                                        rawQueueWaitMs = (deltaDecodeSec / deltaFrames) * 1000.0;
-                                        // Chromium on Android adds network packet-reassembly wait & multi-frame queue time into totalDecodeTime.
-                                        // Subtract network jitter wait and cap to actual single-frame hardware MediaCodec budget when FPS >= 45.
-                                        let adjustedMs = rawQueueWaitMs;
-                                        if (adjustedMs > 9.5 && jitter > 4) {
-                                            adjustedMs = Math.max(3.2, adjustedMs - (jitter * 0.55));
-                                        }
-                                        if (fps >= 45 && adjustedMs > 10.8) {
-                                            // At >=45 FPS, hardware MediaCodec decodes each frame in <10.8ms; excess is queued frame wait
-                                            adjustedMs = 5.2 + Math.min(4.8, (adjustedMs - 10.8) * 0.18);
-                                        }
-                                        decodeTimeMs = parseFloat(Math.max(1.2, Math.min(18.0, adjustedMs)).toFixed(1));
+                                        const rawDecodeMs = (deltaDecodeSec / deltaFrames) * 1000.0;
+                                        decodeTimeMs = parseFloat(Math.max(0.5, rawDecodeMs).toFixed(1));
                                     }
                                 }
                                 lastTotalDecodeTime = currentTotalDecodeTime;
                                 lastFramesDecodedForDecode = framesDecoded;
+
+                                // Measure real WebRTC jitter buffer delay (ms)
+                                let jitterBufferDelayMs = 0.0;
+                                if (rawJitterBufferEmitted > lastJitterBufferEmitted && rawJitterBufferDelay >= lastJitterBufferDelay && lastJitterBufferEmitted > 0) {
+                                    const dDelay = rawJitterBufferDelay - lastJitterBufferDelay;
+                                    const dEmitted = rawJitterBufferEmitted - lastJitterBufferEmitted;
+                                    if (dEmitted > 0) {
+                                        jitterBufferDelayMs = parseFloat(((dDelay / dEmitted) * 1000.0).toFixed(1));
+                                    }
+                                } else if (rawJitterBufferEmitted > 0 && rawJitterBufferDelay > 0) {
+                                    jitterBufferDelayMs = parseFloat(((rawJitterBufferDelay / rawJitterBufferEmitted) * 1000.0).toFixed(1));
+                                }
+                                lastJitterBufferDelay = rawJitterBufferDelay;
+                                lastJitterBufferEmitted = rawJitterBufferEmitted;
 
                                 // Fallback to <video> playback quality if inbound-rtp frames were not populated yet
                                 const vEl = findActiveStreamVideo();
@@ -699,14 +763,9 @@ class XboxBridge(
                                             }
                                         }
                                     }
-                                    // Smoothly drain queued video frames (e.g. after 81ms->127ms network burst) without audio crackling
-                                    try {
-                                        if (rawQueueWaitMs > 14.0 || jitter > 18) {
-                                            if (vEl.playbackRate !== 1.02) vEl.playbackRate = 1.02;
-                                        } else if (vEl.playbackRate !== 1.0) {
-                                            vEl.playbackRate = 1.0;
-                                        }
-                                    } catch (e) {}
+                                    if (vEl.playbackRate !== 1.0) {
+                                        try { vEl.playbackRate = 1.0; } catch (e) {}
+                                    }
                                 }
 
                                 if (fps > 0 && decodeTimeMs <= 0.0) {
@@ -728,6 +787,7 @@ class XboxBridge(
 
                                 if (fps > 0 || currentBytes > 0 || rtt > 0) {
                                     window.__lastTelemetrySentAt = now;
+                                    window.__lastKnownRttMs = rtt;
                                     notify('onStreamTelemetry', JSON.stringify({
                                         fps: fps,
                                         bitrateMbps: bitrateMbps,
@@ -735,7 +795,10 @@ class XboxBridge(
                                         rttMs: rtt,
                                         jitterMs: jitter,
                                         packetsLostPercent: lostPercent,
-                                        framesDropped: framesDropped
+                                        framesDropped: framesDropped,
+                                        freezeCount: freezeCount,
+                                        totalFreezesDurationSec: totalFreezesDurationSec,
+                                        jitterBufferDelayMs: jitterBufferDelayMs
                                     }));
                                 }
                             } catch(err) {}
@@ -1169,10 +1232,13 @@ class XboxBridge(
                                             fps: vFps,
                                             bitrateMbps: parseFloat(Number(profMbps).toFixed(1)),
                                             decodeTimeMs: estDecode,
-                                            rttMs: 0,
+                                            rttMs: window.__lastKnownRttMs || 0,
                                             jitterMs: 0.0,
                                             packetsLostPercent: 0.0,
-                                            framesDropped: vDropped
+                                            framesDropped: vDropped,
+                                            freezeCount: 0,
+                                            totalFreezesDurationSec: 0.0,
+                                            jitterBufferDelayMs: 0.0
                                         }));
                                     } catch (e) {}
                                 }
@@ -1534,8 +1600,8 @@ class XboxBridge(
                     let activeAudioTapHelperEl = null;
                     let activeAudioTapRetryTimer = null;
 
-                    // Pre-unlock a shared 48kHz AudioContext on any DOM user touch/click so recording triggered
-                    // from the native Android HUD button never starts in a 'suspended' AudioContext state.
+                    // Lazily create shared 48kHz AudioContext ONLY when screen recording is actually started
+                    // (WebView has mediaPlaybackRequiresUserGesture = false so no touchstart listener is needed)
                     function ensureUnlockedSharedAudioContext() {
                         try {
                             const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
@@ -1551,12 +1617,8 @@ class XboxBridge(
                             return null;
                         }
                     }
-                    document.addEventListener('touchstart', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
-                    document.addEventListener('pointerdown', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
-                    document.addEventListener('click', ensureUnlockedSharedAudioContext, { capture: true, passive: true });
 
-                    // Hook HTMLMediaElement.prototype.play, AudioContext.createMediaStreamSource & AudioNode.prototype.connect
-                    // to capture detached <audio>, WebRTC MediaStream tracks, and direct WebAudio destination nodes
+                    // Lightweight reference capture on HTMLMediaElement.play only (no AudioNode.connect hook overhead)
                     try {
                         if (typeof HTMLMediaElement !== 'undefined' && HTMLMediaElement.prototype && !HTMLMediaElement.prototype.__audioHooked) {
                             HTMLMediaElement.prototype.__audioHooked = true;
@@ -1574,35 +1636,6 @@ class XboxBridge(
                                     }
                                 } catch (e) {}
                                 return origMediaPlay.apply(this, args);
-                            };
-                        }
-                        const OrigAudioCtx = window.AudioContext || window.webkitAudioContext;
-                        if (OrigAudioCtx && OrigAudioCtx.prototype && OrigAudioCtx.prototype.createMediaStreamSource && !OrigAudioCtx.prototype.__mssHooked) {
-                            OrigAudioCtx.prototype.__mssHooked = true;
-                            const origCreateMss = OrigAudioCtx.prototype.createMediaStreamSource;
-                            OrigAudioCtx.prototype.createMediaStreamSource = function(stream) {
-                                try {
-                                    if (stream && typeof stream.getAudioTracks === 'function') {
-                                        const at = stream.getAudioTracks();
-                                        if (at && at.length > 0 && at[0].readyState === 'live') {
-                                            window.__capturedGameAudioTrack = at[0];
-                                        }
-                                    }
-                                } catch (e) {}
-                                return origCreateMss.apply(this, arguments);
-                            };
-                        }
-                        if (typeof AudioNode !== 'undefined' && AudioNode.prototype && AudioNode.prototype.connect && !AudioNode.prototype.__cpConnectHooked) {
-                            AudioNode.prototype.__cpConnectHooked = true;
-                            const origConnect = AudioNode.prototype.connect;
-                            AudioNode.prototype.connect = function(destinationNode, ...rest) {
-                                try {
-                                    if (destinationNode && this.context && destinationNode === this.context.destination && !this.__isCloudPlayTapNode) {
-                                        window.__lastConnectedGameAudioNode = this;
-                                        window.__lastConnectedGameAudioCtx = this.context;
-                                    }
-                                } catch (e) {}
-                                return origConnect.apply(this, [destinationNode, ...rest]);
                             };
                         }
                     } catch (e) {}

@@ -958,6 +958,17 @@ private fun SessionDetailDialog(
                     )
                 }
 
+                Text(
+                    text = if (isEn) {
+                        "Dropped frames: ${session.framesDropped} • Freezes: ${session.freezeCount} times • Jitter: ${session.jitterMs} ms"
+                    } else {
+                        "Khung hình rớt: ${session.framesDropped} • Đứng hình: ${session.freezeCount} lần • Jitter: ${session.jitterMs} ms"
+                    },
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 // Trạng thái thiết bị
                 Surface(
                     modifier = Modifier.fillMaxWidth(),

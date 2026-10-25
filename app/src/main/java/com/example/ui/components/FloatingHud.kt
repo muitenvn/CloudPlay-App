@@ -102,6 +102,10 @@ import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
+import com.example.ui.theme.rememberXboxMotionEnabled
+import com.example.ui.theme.xboxHudCollapseExitTransition
+import com.example.ui.theme.xboxHudExpandEnterTransition
+import com.example.ui.theme.xboxPressScale
 import com.example.vpn.NetworkMode
 import com.example.vpn.VpnConnectionState
 import kotlin.math.roundToInt
@@ -248,6 +252,10 @@ fun FloatingHud(
 
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
+    val motionEnabled = rememberXboxMotionEnabled(
+        lowEndDeviceMode = lowEndDeviceMode || config.lowEndDeviceMode,
+        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
+    )
 
     // Phân loại biểu tượng nhiệt trên HUD: mát / ấm / nóng
     val thermalIcon = when {
@@ -578,6 +586,7 @@ fun FloatingHud(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
+                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
                             .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 markUserInteraction()
@@ -820,6 +829,7 @@ fun FloatingHud(
                             shape = RoundedCornerShape(6.dp),
                             color = if (hudMode == HudMode.EXPANDED) XboxNeonGreen.copy(alpha = 0.3f) else Color(0x33233A2D),
                             modifier = Modifier
+                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.92f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable {
                                     lastInteractionTime = System.currentTimeMillis()
@@ -872,12 +882,8 @@ fun FloatingHud(
 
                     AnimatedVisibility(
                         visible = hudMode == HudMode.EXPANDED,
-                        enter = if (lowEndDeviceMode) EnterTransition.None else expandVertically(
-                            expandFrom = Alignment.Top
-                        ) + fadeIn(),
-                        exit = if (lowEndDeviceMode) ExitTransition.None else shrinkVertically(
-                            shrinkTowards = Alignment.Top
-                        ) + fadeOut()
+                        enter = if (!motionEnabled) EnterTransition.None else xboxHudExpandEnterTransition(),
+                        exit = if (!motionEnabled) ExitTransition.None else xboxHudCollapseExitTransition()
                     ) {
                         Column(
                             modifier = Modifier

@@ -373,7 +373,25 @@ fun CloudBrowserScreen(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                WebView(ctx).apply {
+                object : WebView(ctx) {
+                    override fun onTouchEvent(event: android.view.MotionEvent?): Boolean {
+                        if (event != null && event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                            try {
+                                requestUnbufferedDispatch(event)
+                            } catch (_: Exception) {}
+                        }
+                        return super.onTouchEvent(event)
+                    }
+
+                    override fun onGenericMotionEvent(event: android.view.MotionEvent?): Boolean {
+                        if (event != null) {
+                            try {
+                                requestUnbufferedDispatch(event)
+                            } catch (_: Exception) {}
+                        }
+                        return super.onGenericMotionEvent(event)
+                    }
+                }.apply {
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT

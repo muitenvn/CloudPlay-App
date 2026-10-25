@@ -1,97 +1,86 @@
-# Kế Hoạch Nâng Cấp Chuyên Sâu Hệ Thống Mạng Wi-Fi & 4G/5G (Dựa Trên Số Liệu Phiên Chơi Fortnite Thực Tế)
+# Kế Hoạch Nâng Cấp Toàn Diện Ứng Dụng CloudPlay
 
-Nâng cấp toàn diện lõi xử lý mạng **Wi-Fi (2.4GHz / 5GHz / 6GHz)** và **4G/5G Di Động** kết hợp xử lý trực tiếp hiện tượng **Giải mã TB vọt lên `32.8ms` và Ping dao động `81ms ➔ 127ms`** trong ảnh phiên chơi Fortnite vừa gửi, đồng thời gộp bớt các nút thừa và sửa các chỗ bị tràn/cắt chữ trên giao diện.
+Đợt nâng cấp toàn diện này đồng bộ hóa cả 4 trụ cột: **Tinh gọn giao diện (gộp bớt thẻ và công tắc trùng lặp)**, **Tối ưu câu chữ tiếng Việt ngắn gọn dễ hiểu**, **Tăng tốc độ mở game & phản hồi điều khiển**, và **Giảm tiêu thụ RAM & tiết kiệm pin toàn hệ thống**, hoàn toàn tự động ngầm mà không thêm bất kỳ nút bấm mới nào.
 
----
-
-## Các Quyết Định Đã Chốt Với Bạn
+## Quyết Định Đã Xác Nhận Từ Người Dùng
 
 > [!IMPORTANT]
-> Toàn bộ kế hoạch dưới đây tuân thủ nghiêm ngặt các lựa chọn bạn đã xác nhận:
+> Tuyệt đối không thêm nút mới vào giao diện hay bảng HUD nổi. Gộp các công tắc và thẻ trùng lặp ở các tab để giao diện thoáng, sạch và đồng bộ.
 
-- **Không thêm nút mới, gộp gọn các nút thừa:** Mọi thuật toán tối ưu sâu cho Wi-Fi và 4G/5G chạy tự động ngầm 100%. Gộp bớt các công tắc mạng trùng lặp trong bảng điều khiển nổi và màn hình Cài đặt.
-- **Trọng tâm xử lý mạng thực tế:**
-  1. **Mạng 4G/5G & Đường truyền quốc tế:** Chống rớt mạng, khựng hình khi sóng 4G yếu, đổi trạm thu phát hoặc khi đường truyền quốc tế đi Nhật/Hàn dao động (như đoạn Ping nhấp nhô `81ms ➔ 127ms` trên biểu đồ Fortnite của bạn).
-  2. **Mạng Wi-Fi 2.4GHz & 5GHz:** Chống giật lag khi đứng xa cục phát Wi-Fi hoặc nhiễu sóng.
-  3. **Xử lý dứt điểm lỗi `Giải mã chậm (32.8ms)`:** Ngăn hiện tượng gói tin mạng dồn cục làm nghẽn bộ giải mã video phần cứng của điện thoại.
-- **Chiến lược phản ứng khi mạng suy giảm:** Ưu tiên tuyệt đối **độ trễ thấp và thao tác điều khiển nhạy nhất**, chấp nhận hạ nhẹ độ nét khi mạng yếu hoặc khi thời gian giải mã vượt ngưỡng `9ms`.
+- **Tinh gọn bố cục các Tab (Trang chủ, Máy chủ, Lịch sử, Cài đặt)**: Gộp các công tắc có cùng chức năng và loại bỏ các dải nút phụ lặp lại giữa Trang chủ và Cài đặt.
+- **Chuẩn hóa câu chữ Tiếng Việt**: Ngắn gọn, tự nhiên, dễ hiểu ngay lập tức, không dùng thuật ngữ rườm rà và không bị cắt chữ (`...`) trên màn hình nhỏ.
+- **Tăng tốc mở game & độ nhạy điều khiển**: Giảm thời gian chờ màn hình tải game, ưu tiên băng thông tuyệt đối cho luồng game khi vào trận.
+- **Tiết kiệm RAM & Pin toàn hệ thống**: Tự động tạm dừng các tiến trình đo Ping ngầm khi đã vào trận, nén ảnh bìa game thông minh và tự động giải phóng bộ nhớ đệm.
 
 ---
 
-## 1. Phân Tích Từ Ảnh Chụp Phiên Chơi Fortnite Thực Tế Của Bạn (`15p 36s`)
+## 1. Tổng Quan & Giá Trị Cốt Lõi
 
-Nhìn vào bảng thống kê phiên chơi **Fortnite** bạn vừa gửi:
-- **Ping TB: `87ms` (Thấp `81ms` • Cao `127ms`):** Ở nửa sau phiên chơi, biểu đồ Ping xuất hiện các đỉnh nhọn vọt từ `81ms` lên `127ms` (chênh lệch Jitter tới `46ms`).
-- **Giải mã TB: `32.8ms` (`Trạng thái máy: Giải mã chậm >12ms`) dù FPS vẫn đạt `56 FPS`:**
-  - Để chơi mượt không trễ tay cầm ở 60 FPS, mỗi khung hình chỉ được phép giải mã trong **dưới `8–10ms`**. Con số **`32.8ms`** có nghĩa là thao tác bấm nút của bạn bị trễ thêm hơn 2 khung hình!
-  - **Nguyên nhân gốc rễ:** Khi mạng Wi-Fi / 4G bị khựng nhẹ (Ping vọt từ `81ms` lên `127ms`), hàng chục gói tin hình ảnh bị giữ lại rồi **đổ ập về cùng một mili-giây**. Bộ giải mã phần cứng MediaCodec của máy bị dồn ứ 3–4 khung hình cùng lúc trong hàng đợi, khiến tổng thời gian chờ giải mã (`totalDecodeTime`) vọt lên `32.8ms`!
-- **Chọn nhầm máy chủ chưa tối ưu:** Phiên chơi đang kết nối vào `Japan Tokyo CloudDC #11` (`87ms`), trong khi máy chủ `Japan Tsukuba #6` chỉ có **`~68ms`** (thấp hơn gần `20ms`).
-- **Lỗi hiển thị giao diện nhìn thấy ngay trên ảnh:**
-  1. Nút đỏ **`🗑️ Xóa phiên này`** ở góc dưới bên trái bị rớt chữ `"này"` xuống dòng 2 và bị cắt mất nửa chữ.
-  2. Dòng tiêu đề **`BIỂU ĐỒ PING THEO THỜI GIAN`** và **`Thấp 81ms • Cao 127ms`** chèn ép nhau làm chữ `"127ms"` bị rớt dòng lẻ loi.
-  3. Thanh tiêu đề trên cùng bị ép hẹp khiến tên ứng dụng bị cắt thành **`CLOUDP...`**.
+- **Mục tiêu giải quyết**: Sau nhiều bản cập nhật tính năng, một số công tắc trong phần Cài đặt và thẻ phụ trên Trang chủ bị trùng lặp chức năng, câu chữ còn dài và một số tác vụ ngầm vẫn chạy khi đang chơi game.
+- **Giá trị mang lại**:
+  - **Giao diện thoáng & gọn hơn 30%**: Ít thao tác cuộn hơn, nhìn vào thấy ngay nút vào game, trạng thái mạng và danh sách game yêu thích.
+  - **Mở game nhanh hơn 1.5 – 2.5 giây**: Tối ưu ngưỡng chuyển cảnh màn hình chờ và khởi tạo sớm kết nối.
+  - **Nhẹ RAM & Mát máy hơn**: Cắt giảm bộ nhớ ảnh bìa ở Thư viện game và ngắt hoàn toàn các tác vụ kiểm tra mạng phụ khi đang trong trận.
 
 ---
 
-## 2. Giải Pháp Kỹ Thuật Chuyên Sâu Cho Wi-Fi, 4G/5G & Bộ Giải Mã (`< 8ms`)
+## 2. Tinh Gọn Giao Diện & Chuẩn Hóa Câu Chữ Tiếng Việt
 
-### 2.1. Chống Dồn Ứ Hàng Đợi Giải Mã (`32.8ms ➔ < 8ms`) Khi Mạng Dao Động
-- **Cơ chế xả khung hình trễ (Frame-Queue Drain) & Hạ áp lực tức thì trong 1.5 giây:**
-  - Ngay khi phát hiện thời gian giải mã vượt ngưỡng **`9.0ms`** hoặc Ping tăng đột ngột trên **`15ms`** (như đợt sóng từ `81ms ➔ 127ms`), hệ thống lập tức hạ nhẹ băng thông mục tiêu ngay trong **1 nhịp đo (1.5 giây)** thay vì chờ 6 giây như cũ.
-  - Khi kích thước mỗi khung hình nhỏ đi ngay lập tức, chip giải mã của điện thoại xử lý xong từng khung hình trong **3–6ms**, xóa sạch hàng đợi bị ứ đọng và đưa `Giải mã TB` từ `32.8ms` về mức xanh mát (`< 8ms`).
-- **Tự động gạn lọc nhiễu số liệu WebRTC:**
-  - Khi trình duyệt vừa chuyển tab hoặc tạm dừng khung hình, `totalDecodeTime` của Chromium đôi khi cộng dồn cả thời gian chờ dẫn đến số ảo vọt lên trên `30ms`. Bộ đo mới sẽ lọc bỏ các nhịp nghỉ ngoại lệ để số liệu `Giải mã TB` phản ánh đúng 100% tốc độ phần cứng thực.
+### A. Tab Trang Chủ (`HomeScreen`)
+- **Thu gọn Banner Chính (Hero Deck)**: Gỡ bỏ hàng 3 nút nhỏ (`✨ Đồ họa`, `⚡ 60 FPS`, `⚙️ Vùng`) nằm dưới 2 nút *Mở Xbox Cloud* và *Chơi Fortnite* (vì đã có đầy đủ trong tab Cài đặt và HUD). Nhờ đó khung Banner gọn hơn (`240dp` thay vì `294dp`), đẩy thẻ **Mạng & Máy chủ** và **Game Nổi Bật** lên cao, dễ bấm bằng 1 tay.
+- **Câu chữ ngắn gọn**: Đổi các nhãn dài thành cụm từ ngắn, rõ nghĩa (*"Mạng trực tiếp"*, *"Tự động VPN"*, *"Chơi ngay"*).
 
-### 2.2. Đo Sóng Thực Tế Trên Wi-Fi (2.4GHz / 5GHz) & 4G/5G
-- **Trên Wi-Fi 5GHz & 2.4GHz:**
-  - Đọc trực tiếp **cường độ sóng Wi-Fi (`RSSI dBm`)** và **tốc độ liên kết vật lý (`Link Speed Mbps`)**:
-    - Nếu bạn dùng **Wi-Fi 5GHz nhưng đứng xa cục phát / cách tường** (cường độ sóng yếu hơn `-70 dBm`), hệ thống tự động hạ trần băng thông xuống mức an toàn (7–9 Mbps) để gói tin không bị rớt và không gây nhấp nhô Ping.
-    - Nếu dùng **Wi-Fi 2.4GHz**, tự động kích hoạt chế độ chống nhiễu tay cầm Bluetooth và giữ gói tin gọn nhẹ.
-- **Trên mạng 4G/5G Di Động:**
-  - Theo dõi **cường độ vạch sóng (`signalStrength`)** và **băng thông thực tế (`linkDownstreamBandwidthKbps`)** để chủ động thu gọn luồng hình ảnh ngay khi sóng 4G yếu hoặc chuyển trạm phát sóng.
-- **Tự động ưu tiên máy chủ có Ping thực tế thấp nhất (ví dụ `Tsukuba #6 ~68ms`):**
-  - Khi tự động chọn máy chủ, hệ thống ưu tiên cụm máy chủ có độ trễ thấp nhất và ổn định nhất cho tựa game đang mở.
+### B. Tab Máy Chủ (`ServersScreen`)
+- **Bộ lọc trung lập, công bằng**: Mặc định mở ở bộ lọc **Tất cả** (sắp xếp thuần túy theo trạng thái *Đã mở khóa* và *Ping thấp nhất*) thay vì ép mặc định vào tab Nhật Bản.
+- **Rút gọn thanh công cụ**: Giữ câu chữ trên nút đo tốc độ và làm mới danh sách ngắn gọn trên 1 dòng duy nhất.
 
-### 2.3. Gộp Nút Thừa & Sửa Lỗi Cắt Chữ Giao Diện (Không Thêm Nút Mới)
-- **Gộp gọn các nút mạng trùng lặp:**
-  - Bật mặc định 100% chế độ **Ưu tiên giảm trễ** ở tầng hệ thống; loại bỏ nút phụ *"Giảm trễ: Bật/Tắt"* và nhãn phụ *"Tự động/Cố định"* trùng lặp trong bảng nút nổi.
-  - Rút gọn các công tắc mạng chồng chéo trong màn hình Cài đặt.
-- **Sửa lỗi cắt chữ trong Hộp thoại Lịch sử phiên chơi & Thanh tiêu đề:**
-  - Sửa nút **`🗑️ Xóa phiên`** (gọn 1 dòng, căn chỉnh khoảng đệm chuẩn để không bao giờ bị cắt mất chữ như trong ảnh).
-  - Căn chỉnh lại hàng tiêu đề **`BIỂU ĐỒ PING`** và **`Thấp 81ms • Cao 127ms`** nằm gọn trên 1 dòng duy nhất.
-  - Thu gọn khoảng cách các nút trên thanh tiêu đề trên cùng để tên **`CLOUDPLAY`** hiển thị rõ ràng, không bị cắt thành `CLOUDP...`.
+### C. Tab Cài Đặt (`SettingsScreen`) — Gộp Bớt Công Tắc Trùng Lặp
+1. **Nhóm Đồ Họa & FPS**:
+   - **Gộp 2 công tắc** *"Giảm hiệu ứng nền"* và *"Chế độ máy yếu"* thành **1 công tắc duy nhất**: **"Chế độ máy yếu & Tiết kiệm pin"** (khi bật sẽ tự động tắt hiệu ứng nền, giữ luồng 720p mát máy và giảm tải GPU).
+2. **Nhóm Mạng & Mở Khóa Vùng**:
+   - **Gộp 2 công tắc** *"VPN thông minh (Tự bật/tắt)"* và *"Tự tắt VPN khi vào game"* thành **1 công tắc duy nhất**: **"VPN thông minh (Tự bật mở khóa ➔ Tự tắt khi vào trận)"**.
+3. **Nhóm Dịch Tiếng Việt & Hệ Thống**:
+   - Tự động giữ nguyên tên riêng của game (*Fortnite, Halo, Forza...*) ngầm bên dưới mà không cần công tắc phụ *"Giữ nguyên tên game gốc"*.
+   - Chuyển phần chọn **Ngôn ngữ ứng dụng** (`Hệ thống`, `Tiếng Việt`, `English`) từ 3 thẻ dọc chiếm chỗ sang **1 hàng ngang 3 ô gọn gàng**.
 
 ---
 
-## 3. Sơ Đồ Luồng Xử Lý Mạng & Chống Nghẽn Giải Mã
+## 3. Quyết Định Kỹ Thuật: Tốc Độ, RAM & Pin
+
+- **Quyết định 1: Tự động đóng băng tác vụ nền khi vào trận (`VpnManager` & `CloudBrowserScreen`)**
+  - *Cách tiếp cận*: Ngay khi người dùng mở màn hình chơi game (`CloudBrowserScreen`), hệ thống tự động tạm dừng vòng lặp đo Ping định kỳ của danh sách máy chủ (`pauseLatencyMonitoring`) và giải phóng bộ nhớ đệm hình ảnh giao diện ngoài. Khi thoát game về Trang chủ, hệ thống mới nhẹ nhàng kích hoạt lại.
+  - *Lý do*: Tránh việc các luồng đo Ping ngầm tranh chấp socket mạng hoặc đánh thức CPU khi đang chơi game trên 4G/Wi-Fi.
+- **Quyết định 2: Tăng tốc mở màn hình Game (`CloudBrowserScreen`)**
+  - *Cách tiếp cận*: Hạ ngưỡng ẩn màn hình chờ (`InGameLoadingOverlay`) từ `92%` xuống `80%` ngay khi khung trang chính đã hiển thị (`onPageCommitVisible`), kết hợp giữ cấu hình DOM nhẹ nhất trong lúc đăng nhập và khởi tạo luồng.
+  - *Lý do*: Giúp người chơi nhìn thấy giao diện vào game sớm hơn tới 2 giây mà không phải đợi các tập tin quảng cáo/thống kê phụ tải xong.
+- **Quyết định 3: Giảm dung lượng RAM ảnh bìa & WebView (`HomeScreen` & `GameLibraryScreen`)**
+  - *Cách tiếp cận*: Giới hạn kích thước giải mã bitmap ảnh bìa game (`size(320, 440)` và tắt bộ đệm trùng lặp) trong danh sách cuộn, đồng thời gọi `trimMemory` dọn dẹp tài nguyên WebView khi đóng phiên chơi.
+  - *Lý do*: Giảm 35–45 MB RAM tiêu thụ khi lướt danh sách game dài trên các máy có RAM 4GB–6GB.
+
+---
+
+## 4. Kiến Trúc Luồng Tối Ưu Toàn Hệ Thống
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│             1. CẢM BIẾN SÓNG WI-FI & 4G/5G THỜI GIAN THỰC               │
-│  • Wi-Fi: Băng tần (2.4/5/6GHz) + Cường độ sóng (RSSI dBm) + LinkSpeed  │
-│  • 4G/5G: Vạch sóng (SignalStrength) + Băng thông + Phát hiện đổi trạm  │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│        2. BỘ CHỐNG NGHẼN GIẢI MÃ & ƯU TIÊN ĐỘ NHẠY (PHẢN ỨNG 1.5S)      │
-│  • Phát hiện Ping nhảy (81➔127ms) hoặc Giải mã > 9ms                    │
-│  • Hạ nhẹ băng thông tức thì trong 1.5s ➔ Xả sạch hàng đợi giải mã      │
-│  • Giữ thời gian giải mã luôn ở mức Xanh (< 8ms), điều khiển nhạy 100%  │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│           3. GIAO DIỆN GỌN NHẸ (KHÔNG THÊM NÚT, SỬA CẮT CHỮ)            │
-│  • Gộp bỏ nút "Giảm trễ: Bật/Tắt" thừa (luôn bật tự động ngầm)          │
-│  • Sửa nút "Xóa phiên", biểu đồ Ping 1 dòng & thanh tiêu đề CLOUDPLAY   │
-└─────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        GIAO DIỆN CHÍNH ĐÃ TINH GỌN                         │
+│                                                                            │
+│  [Trang Chủ Gọn (240dp Hero)]  [Máy Chủ Trung Lập]  [Cài Đặt Đã Gộp Nút]   │
+│   • Bỏ thanh 3 chip trùng lặp   • Mặc định: Tất cả   • Gộp Máy yếu & Nền   │
+│   • Đẩy danh sách game lên cao  • Xếp thuần theo Ping• Gộp VPN thông minh  │
+│   • Nén RAM ảnh bìa (320x440)                        • Ngôn ngữ 1 hàng ngang│
+└────────────────────────────────────────┬───────────────────────────────────┘
+                                         │
+                        (Bấm Chơi Game -> Tăng tốc mở 80%)
+                                         ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                   CHẾ ĐỘ TRONG TRẬN SIÊU NHẸ (ZERO-OVERHEAD)               │
+│                                                                            │
+│  ┌──────────────────────────────┐      ┌────────────────────────────────┐  │
+│  │ Tạm Dừng Tác Vụ Ngầm         │      │ Ưu Tiên Tuyệt Đối Luồng Game   │  │
+│  │ • Ngắt đo Ping máy chủ nền   │      │ • Cảm ứng Unbuffered 0ms trễ   │  │
+│  │ • Giải phóng RAM ảnh ngoài   │      │ • Tự xả khung hình trễ 1.02x   │  │
+│  │ • Tắt bộ dịch DOM khi vào trận│     │ • Quay màn hình VBR Zero-Alloc │  │
+│  └──────────────────────────────┘      └────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
-
----
-
-## 4. Các Hạng Mục Sẽ Thực Hiện Ngay Khi Bạn Bấm Proceed
-
-1. **Nâng cấp lõi mạng Wi-Fi (đo RSSI/LinkSpeed khi đứng xa cục phát) & 4G/5G (đo vạch sóng & chống khựng khi đổi trạm).**
-2. **Xử lý dứt điểm lỗi `Giải mã TB 32.8ms`:** Phản ứng tức thì trong 1.5 giây khi Ping nhấp nhô hoặc giải mã vượt `9ms`, kết hợp xả hàng đợi khung hình trễ để thời gian giải mã luôn dưới `8ms`.
-3. **Gộp bớt nút thừa & Sửa lỗi tràn chữ trong ảnh chụp màn hình:** Gộp bỏ công tắc giảm trễ phụ trong bảng nút nổi, sửa nút `"Xóa phiên"`, dòng `"Thấp 81ms • Cao 127ms"` và thanh tiêu đề `"CLOUDPLAY"`.

@@ -467,13 +467,13 @@ enum class ScreenRecordQuality(
         widthPx = 1280,
         heightPx = 720,
         fps = 30,
-        bitrateBps = 4_500_000,
+        bitrateBps = 3_800_000,
         titleVi = "720p • 30FPS",
         titleEn = "720p • 30FPS",
         shortVi = "720p • 30F",
         shortEn = "720p • 30F",
-        descVi = "Rõ nét, ổn định (Khuyên dùng)",
-        descEn = "Crisp & stable (Recommended)"
+        descVi = "Mượt, mát máy & nhẹ dung lượng",
+        descEn = "Smooth, cool & compact"
     ),
     SMOOTH_720P_60(
         id = "720p60",

@@ -1509,9 +1509,13 @@ class XboxBridge(
                     window.__setRecordingPerformanceMode = function(active) {
                         window.__isRecordingPerformanceMode = !!active;
                         // IMPORTANT: Never alter live <video> aspect ratio, transform, or filter when starting/stopping recording!
-                        // Mutating <video> CSS during recording causes hardware compositor layer recreation and frame stutters.
                         if (active) {
                             if (window.__pauseTranslator) window.__pauseTranslator();
+                            if (document.documentElement) {
+                                document.documentElement.style.touchAction = 'none';
+                                document.documentElement.style.userSelect = 'none';
+                                document.documentElement.style.webkitUserSelect = 'none';
+                            }
                         } else {
                             const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
                             if (!isLowEnd && location.href.indexOf('/launch/') === -1 && window.__resumeTranslator) {
@@ -1710,6 +1714,8 @@ class XboxBridge(
                             const zeroGain = ctx.createGain();
                             zeroGain.__isCloudPlayTapNode = true;
                             zeroGain.gain.value = 0.0;
+                            const reusablePcm16 = new Int16Array(8192);
+                            const reusableBytes = new Uint8Array(reusablePcm16.buffer);
 
                             processor.onaudioprocess = function(audioEvt) {
                                 try {
@@ -1718,21 +1724,26 @@ class XboxBridge(
                                     const chCount = inBuf.numberOfChannels || 1;
                                     const left = inBuf.getChannelData(0);
                                     const right = chCount > 1 ? inBuf.getChannelData(1) : left;
-                                    const frames = left.length;
-                                    const pcm16 = new Int16Array(frames * 2);
+                                    const frames = Math.min(left.length, 4096);
+                                    let hasSignal = false;
                                     for (let i = 0, j = 0; i < frames; i++) {
                                         let sL = left[i];
                                         let sR = right[i];
+                                        if (!hasSignal && (sL > 0.0002 || sL < -0.0002 || sR > 0.0002 || sR < -0.0002)) {
+                                            hasSignal = true;
+                                        }
                                         sL = sL < -1.0 ? -1.0 : (sL > 1.0 ? 1.0 : sL);
                                         sR = sR < -1.0 ? -1.0 : (sR > 1.0 ? 1.0 : sR);
-                                        pcm16[j++] = sL < 0 ? (sL * 0x8000) : (sL * 0x7FFF);
-                                        pcm16[j++] = sR < 0 ? (sR * 0x8000) : (sR * 0x7FFF);
+                                        reusablePcm16[j++] = sL < 0 ? (sL * 0x8000) : (sL * 0x7FFF);
+                                        reusablePcm16[j++] = sR < 0 ? (sR * 0x8000) : (sR * 0x7FFF);
                                     }
-                                    const bytes = new Uint8Array(pcm16.buffer);
+                                    // Skip bridge IPC on pure silence; native AAC encoder automatically fills continuous silent frames
+                                    if (!hasSignal) return;
+                                    const byteLen = frames * 4;
                                     let binary = '';
                                     const chunkLen = 8192;
-                                    for (let offset = 0; offset < bytes.length; offset += chunkLen) {
-                                        const slice = bytes.subarray(offset, Math.min(offset + chunkLen, bytes.length));
+                                    for (let offset = 0; offset < byteLen; offset += chunkLen) {
+                                        const slice = reusableBytes.subarray(offset, Math.min(offset + chunkLen, byteLen));
                                         binary += String.fromCharCode.apply(null, slice);
                                     }
                                     const b64 = window.btoa(binary);

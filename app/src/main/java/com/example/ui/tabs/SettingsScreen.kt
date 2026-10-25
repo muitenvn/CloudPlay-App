@@ -950,12 +950,14 @@ fun SettingsScreen(
                         }
                     }
 
-                    SettingToggleRow(
-                        title = if (isEn) "Keep gameplay smooth while recording" else "Giữ game mượt khi đang quay",
-                        subtitle = if (isEn) "Reduces background effects during recording" else "Tự giảm hiệu ứng phụ trong lúc ghi hình",
-                        checked = config.autoReduceLoadWhenRecording,
-                        onCheckedChange = { SettingsRepository.updateAutoReduceLoadWhenRecording(it) },
-                        activeColor = XboxNeonGreen
+                    Text(
+                        text = if (isEn) {
+                            "⚡ Hardware VBR encoding & background load reduction run automatically while recording."
+                        } else {
+                            "⚡ Tự động mã hóa phần cứng siêu nhẹ (VBR) & tắt hiệu ứng nền khi đang quay để chống nóng máy."
+                        },
+                        color = TextSecondary,
+                        fontSize = 10.5.sp
                     )
                 }
             }

@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch nâng cấp chuyên sâu Wi-Fi & 4G/5G kết hợp phân tích trực tiếp từ phiên chơi Fortnite 15 phút (Ping 81-127ms, Giải mã TB 32.8ms): chống nghẽn hàng đợi giải mã phần cứng khi mạng dao động, tự động chọn máy chủ ping thấp nhất (Tsukuba ~68ms), gộp bớt nút thừa và sửa lỗi tràn chữ nút \"Xóa phiên này\".",
-  "updatedAt":  "2026-10-24T14:50:26.297993569Z",
+  "summary":  "Kế hoạch nâng cấp toàn diện ứng dụng: tinh gọn giao diện & gộp bớt thẻ/công tắc trùng lặp, tối ưu câu chữ tiếng Việt ngắn gọn, tăng tốc độ mở game & phản hồi điều khiển, và giảm tiêu thụ RAM/pin toàn hệ thống mà không thêm bất kỳ nút mới nào.",
+  "updatedAt":  "2026-10-25T07:35:13.270359577Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -186,18 +186,20 @@ fun ServersScreen(
         }
     }
 
-    val rawFilteredServers = when (selectedCategory) {
-        "ALL" -> allServers.toList()
-        "CUSTOM" -> allServers.filter { it.isCustom }
-        else -> allServers.filter { it.countryCode.equals(selectedCategory, ignoreCase = true) }
+    val allServersSnapshot = allServers.toList()
+    val pingSnapshot = serverPings.toMap()
+    val filteredServers = remember(selectedCategory, allServersSnapshot, pingSnapshot, vpnState.unlockRecords) {
+        val rawFiltered = when (selectedCategory) {
+            "ALL" -> allServersSnapshot
+            "CUSTOM" -> allServersSnapshot.filter { it.isCustom }
+            else -> allServersSnapshot.filter { it.countryCode.equals(selectedCategory, ignoreCase = true) }
+        }
+        VpnManager.sortServersByUnlockAndPing(
+            servers = rawFiltered,
+            pingMap = pingSnapshot,
+            records = vpnState.unlockRecords
+        )
     }
-
-    // 4. SẮP XẾP: xếp "Đã mở khóa" lên đầu, rồi "Chưa thử" theo ping, "Không mở khóa" và "Sai vùng" xuống cuối
-    val filteredServers = VpnManager.sortServersByUnlockAndPing(
-        servers = rawFilteredServers,
-        pingMap = serverPings.toMap(),
-        records = vpnState.unlockRecords
-    )
 
     LazyColumn(
         modifier = modifier
@@ -752,7 +754,6 @@ private fun ServerCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = server.id, durationMillis = 165)
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(18.dp))
             .border(

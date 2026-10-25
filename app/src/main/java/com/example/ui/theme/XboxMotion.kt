@@ -44,24 +44,25 @@ import androidx.compose.ui.unit.dp
  *   Giảm tải GPU (gpuLoadReductionEnabled), hoặc khi hệ thống tắt hiệu ứng.
  */
 object XboxMotion {
-    const val PRESS_DOWN_MS = 105
-    const val PRESS_RELEASE_MS = 165
-    const val TAB_ENTER_MS = 180
-    const val TAB_EXIT_MS = 125
-    const val ITEM_ENTER_MS = 175
-    const val HUD_EXPAND_MS = 180
-    const val HUD_COLLAPSE_MS = 135
-    const val COUNTER_TWEEN_MS = 180
+    const val PRESS_DOWN_MS = 95
+    const val PRESS_RELEASE_MS = 150
+    const val TAB_ENTER_MS = 145
+    const val TAB_EXIT_MS = 65
+    const val ITEM_ENTER_MS = 155
+    const val HUD_EXPAND_MS = 165
+    const val HUD_COLLAPSE_MS = 120
+    const val COUNTER_TWEEN_MS = 160
 }
 
 /**
  * Kiểm tra xem thiết bị có cho phép chạy hiệu ứng mượt hay không.
- * Tự động tắt nếu người dùng bật Chế độ máy yếu, Giảm tải GPU, hoặc tắt ANIMATOR_DURATION_SCALE.
+ * Tự động tắt nếu người dùng bật Chế độ máy yếu (lowEndDeviceMode) hoặc tắt ANIMATOR_DURATION_SCALE.
+ * Lưu ý: gpuLoadReductionEnabled mặc định bật cho luồng WebRTC trong game nên không dùng để khóa hiệu ứng UI ngoài sảnh.
  */
 @Composable
 fun rememberXboxMotionEnabled(
     lowEndDeviceMode: Boolean = false,
-    gpuLoadReductionEnabled: Boolean = false
+    @Suppress("UNUSED_PARAMETER") gpuLoadReductionEnabled: Boolean = false
 ): Boolean {
     val context = LocalContext.current
     val systemAnimationsEnabled = remember(context) {
@@ -73,11 +74,11 @@ fun rememberXboxMotionEnabled(
             ) > 0f
         }.getOrDefault(true)
     }
-    return !lowEndDeviceMode && !gpuLoadReductionEnabled && systemAnimationsEnabled
+    return !lowEndDeviceMode && systemAnimationsEnabled
 }
 
 /**
- * Hiệu ứng phản hồi nhấn kiểu Xbox Dashboard (< 170ms) trên tầng GPU (graphicsLayer).
+ * Hiệu ứng phản hồi nhấn kiểu Xbox Dashboard (< 160ms) trên tầng GPU (graphicsLayer).
  * Sử dụng pointerInput không chặn sự kiện click/scroll của thẻ hoặc nút bên trong,
  * giúp thu nhẹ về pressedScale (mặc định 0.965f) khi chạm và nảy mượt về 1.0f khi nhả.
  */
@@ -113,16 +114,16 @@ fun Modifier.xboxPressScale(
 }
 
 /**
- * Hiệu ứng xuất hiện nhanh trên tầng GPU (trượt nhẹ từ dưới lên + mờ dần trong 175ms).
- * Không làm thay đổi kích thước phần tử nên không gây giật LazyColumn / LazyVerticalGrid.
+ * Hiệu ứng xuất hiện nhanh trên tầng GPU (dành cho các khối tiêu đề cố định, chỉ chạy 1 lần).
+ * Không gắn vào từng phần tử lặp của LazyColumn / LazyVerticalGrid để tránh tạo nhiều lớp الفا (offscreen layer).
  */
 fun Modifier.xboxSlideFadeIn(
     enabled: Boolean = true,
     key: Any? = Unit,
     delayMillis: Int = 0,
     durationMillis: Int = XboxMotion.ITEM_ENTER_MS,
-    initialOffsetY: Dp = 10.dp,
-    initialScale: Float = 0.985f
+    initialOffsetY: Dp = 8.dp,
+    initialScale: Float = 0.988f
 ): Modifier = composed {
     if (!enabled) return@composed this
 
@@ -130,36 +131,46 @@ fun Modifier.xboxSlideFadeIn(
     val offsetPx = remember(density, initialOffsetY) {
         with(density) { initialOffsetY.toPx() }
     }
-    val progress = remember(key) { Animatable(0f) }
+    var hasAnimated by remember(key) { mutableStateOf(false) }
+    val progress = remember(key) { Animatable(if (hasAnimated) 1f else 0f) }
 
     LaunchedEffect(key, enabled) {
-        if (enabled) {
+        if (enabled && !hasAnimated) {
             progress.snapTo(0f)
             progress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(
-                    durationMillis = durationMillis.coerceAtMost(220),
-                    delayMillis = delayMillis.coerceIn(0, 120),
+                    durationMillis = durationMillis.coerceAtMost(180),
+                    delayMillis = delayMillis.coerceIn(0, 80),
                     easing = FastOutSlowInEasing
                 )
             )
+            hasAnimated = true
         } else {
             progress.snapTo(1f)
+            hasAnimated = true
         }
     }
 
     this.graphicsLayer {
         val p = progress.value
-        alpha = p
-        translationY = (1f - p) * offsetPx
-        val currentScale = initialScale + (1f - initialScale) * p
-        scaleX = currentScale
-        scaleY = currentScale
+        if (p >= 0.999f) {
+            alpha = 1f
+            translationY = 0f
+            scaleX = 1f
+            scaleY = 1f
+        } else {
+            alpha = p
+            translationY = (1f - p) * offsetPx
+            val currentScale = initialScale + (1f - initialScale) * p
+            scaleX = currentScale
+            scaleY = currentScale
+        }
     }
 }
 
 /**
- * Bộ đếm số nhảy mượt dưới 180ms cho chỉ số Ping, FPS hoặc thống kê.
+ * Bộ đếm số nhảy mượt dưới 160ms cho chỉ số Ping, FPS hoặc thống kê.
  */
 @Composable
 fun animateXboxIntAsState(
@@ -181,37 +192,32 @@ fun animateXboxIntAsState(
 }
 
 /**
- * Chuyển cảnh ngang nhanh chuẩn Xbox Dashboard (180ms vào / 125ms ra) khi đổi tab.
+ * Chuyển cảnh thuần GPU (fadeIn + scaleIn trên RenderThread, KHÔNG dùng slideInHorizontally/slideOutHorizontally
+ * vốn ép hệ thống chạy lại pha Layout trên từng khung hình gây khựng khi đổi tab nặng).
  */
-fun xboxTabEnterTransition(direction: Int): EnterTransition {
-    val slideSign = if (direction >= 0) 1 else -1
+fun xboxTabEnterTransition(@Suppress("UNUSED_PARAMETER") direction: Int): EnterTransition {
     return fadeIn(
         animationSpec = tween(
             durationMillis = XboxMotion.TAB_ENTER_MS,
+            delayMillis = 25,
             easing = LinearOutSlowInEasing
         )
-    ) + slideInHorizontally(
+    ) + scaleIn(
+        initialScale = 0.986f,
         animationSpec = tween(
             durationMillis = XboxMotion.TAB_ENTER_MS,
+            delayMillis = 25,
             easing = FastOutSlowInEasing
-        ),
-        initialOffsetX = { fullWidth -> (fullWidth * 0.04f * slideSign).toInt() }
+        )
     )
 }
 
-fun xboxTabExitTransition(direction: Int): ExitTransition {
-    val slideSign = if (direction >= 0) -1 else 1
+fun xboxTabExitTransition(@Suppress("UNUSED_PARAMETER") direction: Int): ExitTransition {
     return fadeOut(
         animationSpec = tween(
             durationMillis = XboxMotion.TAB_EXIT_MS,
             easing = FastOutLinearInEasing
         )
-    ) + slideOutHorizontally(
-        animationSpec = tween(
-            durationMillis = XboxMotion.TAB_EXIT_MS,
-            easing = FastOutLinearInEasing
-        ),
-        targetOffsetX = { fullWidth -> (fullWidth * 0.03f * slideSign).toInt() }
     )
 }
 

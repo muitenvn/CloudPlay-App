@@ -658,7 +658,6 @@ private fun SessionHistoryItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxSlideFadeIn(enabled = motionEnabled, key = session.id, durationMillis = 165)
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(16.dp))
             .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))

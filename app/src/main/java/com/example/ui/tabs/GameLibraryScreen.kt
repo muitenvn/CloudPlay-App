@@ -773,7 +773,6 @@ private fun LibraryGameCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(210.dp)
-            .xboxSlideFadeIn(enabled = motionEnabled, key = game.id, durationMillis = 165)
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(20.dp))
             .border(
@@ -855,7 +854,7 @@ private fun LibraryGameCard(
                             .data(game.imageUrl)
                             .size(320, 440)
                             .allowRgb565(true)
-                            .crossfade(true)
+                            .crossfade(false)
                             .build()
                     },
                     contentDescription = game.title,

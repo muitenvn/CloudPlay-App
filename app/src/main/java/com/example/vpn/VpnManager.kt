@@ -637,7 +637,9 @@ object VpnManager {
             val isEnNow = com.example.data.SettingsRepository.config.value.isEnglishUI()
             when (_state.value.engine) {
                 VpnEngine.PROXY_TUNNEL -> {
-                    val isAlive = PingTester.isHostReachable(server.ip, server.port, 1000)
+                    val isAlive = withContext(Dispatchers.IO) {
+                        PingTester.isHostReachable(server.ip, server.port, 1000)
+                    }
                     var targetServer = server
 
                     if (!isAlive && !server.isCustom) {

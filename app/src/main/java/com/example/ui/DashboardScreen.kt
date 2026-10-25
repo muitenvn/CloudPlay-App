@@ -140,6 +140,21 @@ fun DashboardScreen(
     )
     val reduceMotion = !motionEnabled
 
+    // Giữ các ảnh bìa nội bộ trong bộ nhớ đệm của DashboardScreen để khi chuyển qua lại giữa các tab
+    // (Trang chủ ⇄ Game ⇄ Máy chủ ⇄ Cài đặt) luồng UI chính không phải giải mã lại Bitmap gây khựng.
+    val prewarmedHeroBanner = painterResource(id = R.drawable.gamepass_hub_banner_1791394609676)
+    val prewarmedFortnitePoster = painterResource(id = R.drawable.fortnite_cloud_poster_1791719536404)
+    val prewarmedForzaCover = painterResource(id = R.drawable.forza_cover_art_1791438033687)
+    val prewarmedCyberBanner = painterResource(id = R.drawable.cyber_gaming_banner_1791438050320)
+    val prewarmedCloudPlayHero = painterResource(id = R.drawable.cloudplay_hero_banner_1791392804712)
+    remember(
+        prewarmedHeroBanner,
+        prewarmedFortnitePoster,
+        prewarmedForzaCover,
+        prewarmedCyberBanner,
+        prewarmedCloudPlayHero
+    ) { true }
+
     fun handleConnect() {
         VpnManager.connect(context)
     }

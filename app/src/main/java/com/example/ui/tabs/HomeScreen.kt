@@ -1063,7 +1063,6 @@ private fun FeaturedGameCard(
     Card(
         modifier = Modifier
             .width(156.dp)
-            .xboxSlideFadeIn(enabled = motionEnabled, key = game.id, durationMillis = 165)
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.965f)
             .clip(RoundedCornerShape(18.dp))
             .border(
@@ -1150,7 +1149,7 @@ private fun FeaturedGameCard(
                                 .data(game.imageUrl)
                                 .size(320, 440)
                                 .allowRgb565(true)
-                                .crossfade(true)
+                                .crossfade(false)
                                 .build()
                         },
                         contentDescription = game.title,

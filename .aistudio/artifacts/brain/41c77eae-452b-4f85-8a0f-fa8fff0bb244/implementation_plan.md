@@ -1,36 +1,67 @@
-# Kế hoạch bổ sung Animation chuẩn Xbox Dashboard (< 220ms, Không Lag)
+# Cập Nhật Nhạc Nền (Mặc Định Tắt, Phát Tay, Phát Trong Game) & Xóa Dòng Ghi Nguồn Nhạc
 
-## 1. Nguyên tắc thiết kế chống lag (Zero-Lag Architecture)
-Để đảm bảo hiệu ứng mượt mà tuyệt đối và **không gây tụt FPS hay ăn CPU/GPU**, toàn bộ animation mới sẽ tuân thủ 4 nguyên tắc kỹ thuật:
-1. **Chỉ biến đổi trên tầng GPU (`Modifier.graphicsLayer`)**: Mọi hiệu ứng thu phóng, trượt nhẹ và mờ dần đều chạy ở bước Vẽ (Draw phase) qua `graphicsLayer { scaleX; scaleY; alpha; translationY }`, **không** làm thay đổi kích thước bố cục (Layout phase) nên không gây giật khi cuộn danh sách.
-2. **Không dùng vòng lặp vô hạn (`infiniteTransition`) tốn pin**: Tránh các hiệu ứng nhấp nháy chạy liên tục nền; chỉ kích hoạt animation khi có tương tác chạm, chuyển tab, hoặc dữ liệu thay đổi, và kết thúc dứt điểm trong **150ms – 220ms**.
-3. **Tự động tắt trên máy yếu & khi vào trận**: Tự động bỏ qua animation khi người dùng bật **Chế độ máy yếu (`lowEndDeviceMode`)**, bật **Giảm tải GPU (`gpuLoadReductionEnabled`)**, hoặc tắt hiệu ứng hệ thống Android (`ANIMATOR_DURATION_SCALE == 0f`).
-4. **Giữ nguyên 100% tính năng và bố cục**: Không xóa hay rút gọn bất kỳ tính năng, công tắc hay màn hình nào hiện có.
+Bản kế hoạch này thực hiện đầy đủ 2 nhóm yêu cầu kiểm duyệt: (1) Điều chỉnh hành vi mặc định của nhạc nền, thêm nút phát/dừng thủ công, công tắc phát nhạc khi đang chơi game không ảnh hưởng âm thanh WebRTC; và (2) Xóa toàn bộ dòng chữ ghi nguồn nhạc trong giao diện ứng dụng.
+
+## Quyết Định & Phản Biện Kỹ Thuật
+
+> [!IMPORTANT]
+> **Tất cả các mục trong yêu cầu đều hợp lý và sẽ được thực hiện đầy đủ, kèm 2 lưu ý kỹ thuật quan trọng để đảm bảo không lỗi:**
+> 1. **Giữ nguyên cấu hình cho người dùng cũ (Mục 1):** Để chỉ đổi mặc định (`Tự động bật nhạc = TẮT`, `Âm lượng = 8%`) cho người dùng mới mà không ghi đè lựa chọn của người dùng đã chỉnh trước đó, `SettingsRepository` sẽ kiểm tra khóa riêng hoặc chỉ khởi tạo giá trị mặc định mới khi khóa chưa được người dùng lưu thủ công.
+> 2. **Xử lý AudioFocus & Quay màn hình khi phát nhạc trong game (Mục 2 & 3):**
+>    - Khi dùng `AudioManager.AUDIOFOCUS_GAIN` chuẩn, Chromium `WebView` (chạy WebRTC xCloud) có thể tự động tạm dừng hoặc giảm tiếng game vì tưởng có trình phát nhạc chính chiếm quyền. Việc chuyển sang **`AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`** kết hợp `AudioAttributes.USAGE_MEDIA` giúp nhạc nền phát song song với âm thanh WebRTC của game mà không bao giờ làm mất tiếng game.
+>    - Với tính năng **Quay màn hình**: `AudioAttributes.ALLOW_CAPTURE_BY_NONE` (Android 10+) đã chặn hệ thống thu âm luồng `MediaPlayer` này vào file `.mp4`. Nhờ đó, kể cả khi người dùng bật *"Phát nhạc khi đang chơi"* và quay video màn hình, nhạc nền vẫn phát ở loa ngoài cho người chơi nghe nhưng **tệt đối không bị thu lẫn vào video quay màn hình**.
 
 ---
 
-## 2. Các hạng mục Animation sẽ bổ sung
+## 1. Tổng Quan Thay Đổi
 
-### A. Bộ công cụ chuyển động dùng chung (`ui/theme/XboxMotion.kt` - File mới)
-- **`Modifier.xboxPressScale(...)`**: Hiệu ứng phản hồi xúc giác chuẩn Xbox Dashboard — khi chạm giữ vào thẻ game, thẻ máy chủ hoặc nút hành động chính, phần tử thu nhẹ về `0.96f` trong `110ms` và nảy mượt về `1.0f` (`FastOutSlowInEasing` / lò xo không dao động thừa) khi thả tay.
-- **`Modifier.xboxSlideFadeIn(...)`**: Hiệu ứng xuất hiện nhanh (`180ms`, trượt dọc `12dp` + rõ dần `alpha`) chỉ chạy 1 lần khi phần tử vào khung hình, dùng `graphicsLayer` để không làm giật `LazyColumn` / `LazyVerticalGrid`.
-- **`rememberXboxMotionEnabled(lowEndMode)`**: Hàm kiểm tra tập trung giúp tắt tức thì mọi hiệu ứng nếu máy yếu hoặc hệ thống tắt animation.
+- **Mặc định mới cho người dùng mới (`AppSettings.kt`):**
+  - **Tự động bật nhạc khi mở app (`backgroundMusicEnabled`):** Mặc định **TẮT (`false`)** (giữ nguyên giá trị đã lưu nếu người dùng cũ đã từng chỉnh).
+  - **Âm lượng nhạc nền mặc định (`backgroundMusicVolume`):** Mặc định **8% (`0.08f`)** (giữ nguyên nếu người dùng cũ đã lưu).
+  - **Phát nhạc khi đang chơi (`backgroundMusicPlayInGame`):** Công tắc mới, mặc định **BẬT (`true`)**.
+- **Điều khiển phát/dừng thủ công & phát trong game (`BackgroundMusicManager.kt`):**
+  - Thêm trạng thái `isPlaying: StateFlow<Boolean>` và hàm bật/tắt thủ công (`toggleManualPlayback()` / `setManualPlayback()`), cho phép người dùng bấm nút **Phát / Dừng** ngay trong Cài đặt kể cả khi chưa bật công tắc *"Tự động bật nhạc khi mở app"*.
+  - Khi vào màn hình chơi game (`CloudBrowserScreen`) và khi stream bắt đầu:
+    - Nếu **Chế độ máy yếu** đang bật **HOẶC** công tắc *"Phát nhạc khi đang chơi"* đang **TẮT**: nhạc tự dừng mượt với hiệu ứng **fade-out 800ms** rồi giải phóng `MediaPlayer`.
+    - Nếu công tắc *"Phát nhạc khi đang chơi"* đang **BẬT** (và không ở chế độ máy yếu) và nhạc đang phát: giữ nguyên `MediaPlayer` phát tiếp ở đúng mức âm lượng hiện tại, không ngắt quãng.
+  - Đổi yêu cầu AudioFocus sang `AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` và giữ `AudioAttributes.ALLOW_CAPTURE_BY_NONE` để không cướp âm thanh WebRTC của game và không bị thu vào video quay màn hình.
+- **Giao diện Cài đặt & Xóa dòng ghi nguồn nhạc (`SettingsScreen.kt`):**
+  - Đổi nhãn công tắc thành **"Tự động bật nhạc khi mở app"** (kèm nút nhỏ **Phát / Dừng** ngay bên cạnh để bật/tắt tay tức thì).
+  - Thêm công tắc **"Phát nhạc khi đang chơi"** (mặc định BẬT, tự tắt khi ở Chế độ máy yếu).
+  - **Xóa cụm `"🎵 Nhạc nền do AI tạo (Gemini) • "`** ở thẻ Nhạc nền, chỉ giữ lại dòng thông tin hữu ích: `"Không thu vào video quay màn hình"` / `"Excluded from screen recording"`.
+  - **Xóa hoàn toàn dòng `"Nhạc nền do AI tạo (Gemini)"`** ở thẻ Cập nhật / Giới thiệu cuối màn hình Cài đặt.
+  - Kiểm tra toàn bộ dự án (`docs/index.html`, `assets/web/index.html`, strings) đảm bảo không còn chuỗi ghi nguồn nhạc nào và file thừa `public/assets/aistudio/window_seat_view_*.mp3` đã được dọn sạch.
 
-### B. Thanh điều hướng & Chuyển trang (`DashboardScreen.kt`)
-- **Chuyển tab kiểu Xbox (`180ms`)**: Kết hợp mờ dần (`fadeIn 180ms` / `fadeOut 120ms`) với dịch chuyển ngang rất nhẹ (`slideInHorizontally` / `slideOutHorizontally` 4% chiều rộng theo hướng tab) giúp cảm giác lướt qua lại giữa *Trang chủ – Thư viện – Máy chủ – Lịch sử – Cài đặt* liền mạch.
-- **Thanh điều hướng dưới (Bottom Navigation)**: Biểu tượng tab đang chọn phóng nhẹ lên `1.08f` (`160ms`) và đổi màu mượt (`animateColorAsState 180ms`).
-- **Chip Ping trên thanh đầu trang**: Số ms ping nhảy số mượt (`animateIntAsState 180ms`) và chấm màu trạng thái chuyển màu êm khi đổi vùng.
+---
 
-### C. Trang chủ (`HomeScreen.kt`) & Thư viện Game (`GameLibraryScreen.kt`)
-- **Thẻ Game nổi bật & Lưới thư viện game**: Áp dụng `xboxPressScale` khi chạm vào thẻ game và nút **"▶ Chơi ngay"**, kèm hiệu ứng xuất hiện mượt (`160ms`) khi lọc danh mục hoặc đổi từ khóa tìm kiếm.
-- **Nút "VÀO GAME NGAY" (Hero CTA)**: Phản hồi nhấn đàn hồi nhanh (`140ms`) và hiệu ứng chuyển trạng thái mượt khi đổi máy chủ hoặc chế độ mạng.
+## 2. Sơ Đồ Luồng Hoạt Động Nhạc Nền Mới
 
-### D. Trang Máy chủ (`ServersScreen.kt`) & Lịch sử phiên (`SessionHistoryScreen.kt`)
-- **Thẻ Máy chủ & Nút "Đo ping"**: Khi bấm đo ping hoặc chọn vùng máy chủ mới, thẻ máy chủ phản hồi nhấn `xboxPressScale`, viền thẻ đang chọn chuyển màu xanh neon mượt trong `180ms`, và thông số ping trung bình nhảy số mượt (`animateIntAsState`).
-- **Thẻ Lịch sử & Cửa sổ Chi tiết phiên**:
-  - Mở rộng/thu gọn danh sách hoặc bộ lọc mượt dưới `200ms`.
-  - Trong cửa sổ **Chi tiết phiên**, nhãn kết luận (*Mượt / Hơi giật / Giật nhiều*) và các thanh chỉ số hiệu năng xuất hiện với hiệu ứng trượt nhẹ `180ms`.
-
-### E. Bảng HUD nổi trong game (`FloatingHud.kt`)
-- **Mở rộng / Thu gọn HUD (`180ms`)**: Khi bấm mở bảng HUD từ viên thuốc thu gọn, khung HUD bung ra mượt mà bằng `scaleIn(initialScale = 0.92f) + fadeIn(180ms)` và thu lại trong `140ms`, tuyệt đối không gây khựng luồng WebRTC bên dưới.
-- **Chuyển tab con trong HUD**: Chuyển đổi mượt (`150ms`) giữa chế độ thu gọn và bảng điều khiển đầy đủ.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     KHỞI ĐỘNG APP (DashboardScreen)                      │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │
+                 ┌───────────────────┴───────────────────┐
+                 ▼                                       ▼
+   [Tự động bật nhạc = BẬT]                [Tự động bật nhạc = TẮT (Mặc định)]
+   & Không bật Chế độ máy yếu               Người dùng có thể bấm nút [▶ Phát]
+                 │                          nhỏ trong Cài đặt để nghe thủ công
+                 ▼                                       │
+       Fade-in 800ms (8% vol) ◄──────────────────────────┘
+       (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK + ALLOW_CAPTURE_BY_NONE)
+                 │
+                 ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│              VÀO MÀN CHƠI GAME (CloudBrowserScreen / Stream)             │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │
+        ┌────────────────────────────┴────────────────────────────┐
+        ▼                                                         ▼
+[Phát nhạc khi đang chơi = BẬT]                   [Phát nhạc khi đang chơi = TẮT]
+& Không bật Chế độ máy yếu                        HOẶC đang bật Chế độ máy yếu
+& Nhạc đang phát                                                  │
+        │                                                         ▼
+        ▼                                               Fade-out 800ms ➔
+Giữ nguyên nhạc phát tiếp ở cùng âm lượng               stop() & release()
+(Không làm giảm tiếng game, không lọt vào video quay)   Giải phóng RAM
+```

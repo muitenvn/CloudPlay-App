@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch bổ sung hệ thống hiệu ứng chuyển động mượt dưới 220ms chuẩn Xbox Dashboard, chạy trên GPU (graphicsLayer) không gây lag hay tái bố cục, và tự động tắt khi bật Chế độ máy yếu hoặc đang trong trận game.",
-  "updatedAt":  "2026-10-25T12:40:56.824899924Z",
+  "summary":  "Kế hoạch cập nhật cấu hình nhạc nền (mặc định tắt tự phát, âm lượng mặc định 8%, nút phát/dừng thủ công, công tắc phát nhạc khi đang chơi dùng AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) và xóa toàn bộ dòng ghi nguồn nhạc AI trong SettingsScreen.kt.",
+  "updatedAt":  "2026-10-25T23:31:39.603939711Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -1,67 +1,61 @@
-# Cập Nhật Nhạc Nền (Mặc Định Tắt, Phát Tay, Phát Trong Game) & Xóa Dòng Ghi Nguồn Nhạc
+# Cập Nhật Giao Diện Trang Web Theo Bản Mẫu (`CloudPlay-web-mau.html`)
 
-Bản kế hoạch này thực hiện đầy đủ 2 nhóm yêu cầu kiểm duyệt: (1) Điều chỉnh hành vi mặc định của nhạc nền, thêm nút phát/dừng thủ công, công tắc phát nhạc khi đang chơi game không ảnh hưởng âm thanh WebRTC; và (2) Xóa toàn bộ dòng chữ ghi nguồn nhạc trong giao diện ứng dụng.
+Bản kế hoạch này thay thế giao diện của cả hai file `docs/index.html` và `app/src/main/assets/web/index.html` (hai file giống hệt nhau) theo đúng chuẩn bản mẫu `CloudPlay-web-mau.html` đính kèm.
 
 ## Quyết Định & Phản Biện Kỹ Thuật
 
 > [!IMPORTANT]
-> **Tất cả các mục trong yêu cầu đều hợp lý và sẽ được thực hiện đầy đủ, kèm 2 lưu ý kỹ thuật quan trọng để đảm bảo không lỗi:**
-> 1. **Giữ nguyên cấu hình cho người dùng cũ (Mục 1):** Để chỉ đổi mặc định (`Tự động bật nhạc = TẮT`, `Âm lượng = 8%`) cho người dùng mới mà không ghi đè lựa chọn của người dùng đã chỉnh trước đó, `SettingsRepository` sẽ kiểm tra khóa riêng hoặc chỉ khởi tạo giá trị mặc định mới khi khóa chưa được người dùng lưu thủ công.
-> 2. **Xử lý AudioFocus & Quay màn hình khi phát nhạc trong game (Mục 2 & 3):**
->    - Khi dùng `AudioManager.AUDIOFOCUS_GAIN` chuẩn, Chromium `WebView` (chạy WebRTC xCloud) có thể tự động tạm dừng hoặc giảm tiếng game vì tưởng có trình phát nhạc chính chiếm quyền. Việc chuyển sang **`AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`** kết hợp `AudioAttributes.USAGE_MEDIA` giúp nhạc nền phát song song với âm thanh WebRTC của game mà không bao giờ làm mất tiếng game.
->    - Với tính năng **Quay màn hình**: `AudioAttributes.ALLOW_CAPTURE_BY_NONE` (Android 10+) đã chặn hệ thống thu âm luồng `MediaPlayer` này vào file `.mp4`. Nhờ đó, kể cả khi người dùng bật *"Phát nhạc khi đang chơi"* và quay video màn hình, nhạc nền vẫn phát ở loa ngoài cho người chơi nghe nhưng **tệt đối không bị thu lẫn vào video quay màn hình**.
+> **Tất cả 5 mục yêu cầu đều hợp lý và sẽ được thực hiện nguyên vẹn theo đúng bản mẫu, kèm 1 tinh chỉnh nhỏ ở mục 2 (`onerror` của ảnh chụp):**
+> - Trong bản mẫu `CloudPlay-web-mau.html`, mỗi ảnh chụp màn hình nằm trong thẻ `<figure class="shot"><img ...><figcaption>...</figcaption></figure>`.
+> - Khi thay `src` từ base64 sang `img/screenshot-1.png`, `img/screenshot-2.png`, `img/screenshot-3.png`: nếu 1 ảnh bị lỗi, ngoài việc ẩn thẻ `<img>`, hàm `onShotError(img)` sẽ ẩn luôn phần tử bao `<figure class="shot">` của ảnh đó (và chấm tròn tương ứng ở `#dots`) để không bị thừa khung trống chỉ có dòng chữ chú thích. Nếu cả 3 ảnh đều lỗi, toàn bộ khối `<section id="shots-sec">` ("Ảnh chụp") sẽ tự động ẩn (`hidden = true` / `display: none`).
 
 ---
 
-## 1. Tổng Quan Thay Đổi
+## 1. Chi Tiết Thực Hiện 5 Mục Yêu Cầu
 
-- **Mặc định mới cho người dùng mới (`AppSettings.kt`):**
-  - **Tự động bật nhạc khi mở app (`backgroundMusicEnabled`):** Mặc định **TẮT (`false`)** (giữ nguyên giá trị đã lưu nếu người dùng cũ đã từng chỉnh).
-  - **Âm lượng nhạc nền mặc định (`backgroundMusicVolume`):** Mặc định **8% (`0.08f`)** (giữ nguyên nếu người dùng cũ đã lưu).
-  - **Phát nhạc khi đang chơi (`backgroundMusicPlayInGame`):** Công tắc mới, mặc định **BẬT (`true`)**.
-- **Điều khiển phát/dừng thủ công & phát trong game (`BackgroundMusicManager.kt`):**
-  - Thêm trạng thái `isPlaying: StateFlow<Boolean>` và hàm bật/tắt thủ công (`toggleManualPlayback()` / `setManualPlayback()`), cho phép người dùng bấm nút **Phát / Dừng** ngay trong Cài đặt kể cả khi chưa bật công tắc *"Tự động bật nhạc khi mở app"*.
-  - Khi vào màn hình chơi game (`CloudBrowserScreen`) và khi stream bắt đầu:
-    - Nếu **Chế độ máy yếu** đang bật **HOẶC** công tắc *"Phát nhạc khi đang chơi"* đang **TẮT**: nhạc tự dừng mượt với hiệu ứng **fade-out 800ms** rồi giải phóng `MediaPlayer`.
-    - Nếu công tắc *"Phát nhạc khi đang chơi"* đang **BẬT** (và không ở chế độ máy yếu) và nhạc đang phát: giữ nguyên `MediaPlayer` phát tiếp ở đúng mức âm lượng hiện tại, không ngắt quãng.
-  - Đổi yêu cầu AudioFocus sang `AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` và giữ `AudioAttributes.ALLOW_CAPTURE_BY_NONE` để không cướp âm thanh WebRTC của game và không bị thu vào video quay màn hình.
-- **Giao diện Cài đặt & Xóa dòng ghi nguồn nhạc (`SettingsScreen.kt`):**
-  - Đổi nhãn công tắc thành **"Tự động bật nhạc khi mở app"** (kèm nút nhỏ **Phát / Dừng** ngay bên cạnh để bật/tắt tay tức thì).
-  - Thêm công tắc **"Phát nhạc khi đang chơi"** (mặc định BẬT, tự tắt khi ở Chế độ máy yếu).
-  - **Xóa cụm `"🎵 Nhạc nền do AI tạo (Gemini) • "`** ở thẻ Nhạc nền, chỉ giữ lại dòng thông tin hữu ích: `"Không thu vào video quay màn hình"` / `"Excluded from screen recording"`.
-  - **Xóa hoàn toàn dòng `"Nhạc nền do AI tạo (Gemini)"`** ở thẻ Cập nhật / Giới thiệu cuối màn hình Cài đặt.
-  - Kiểm tra toàn bộ dự án (`docs/index.html`, `assets/web/index.html`, strings) đảm bảo không còn chuỗi ghi nguồn nhạc nào và file thừa `public/assets/aistudio/window_seat_view_*.mp3` đã được dọn sạch.
+1. **Chuẩn bố cục, màu sắc, khoảng cách & thành phần theo bản mẫu:**
+   - Giữ nguyên 100% hệ màu sáng (`--bg:#ffffff`, `--surface:#f5f7f6`, `--accent:#107c10`, v.v.), font hệ thống, khoảng cách, thanh đầu trang cố định (`.top`) hiện logo khi cuộn, nút chuyển ngôn ngữ `EN | VI`, hàng 4 ô thông tin (`.facts`: Phiên bản, Dung lượng, Android `7.0+`, Giá `Miễn phí`), ô mã kiểm tra `SHA-256` kèm nút `Sao chép`, mục Tính năng, Cách cài, Câu hỏi thường gặp (`<details>`) và thanh tải dính ở đáy (`.bar`) khi cuộn qua vùng nút tải đầu trang.
+   - Không thêm màu, hiệu ứng hay bất kỳ thư viện ngoài nào.
+2. **Đường dẫn ảnh thật & xử lý `onerror`:**
+   - Thay chuỗi base64 của icon ở `.brand img` và `.hero img` bằng `src="img/icon.png"` kèm `onerror="this.style.display='none'"`.
+   - Thay chuỗi base64 của 3 ảnh chụp màn hình bằng `src="img/screenshot-1.png"`, `src="img/screenshot-2.png"`, `src="img/screenshot-3.png"` kèm `onerror="onShotError(this)"`:
+     - Nếu 1 ảnh lỗi: ẩn `<figure class="shot">` chứa ảnh đó.
+     - Nếu cả 3 ảnh lỗi: ẩn toàn bộ `<section id="shots-sec">`.
+   - Giữ nguyên các file ảnh hiện có trong `docs/img/` và `app/src/main/assets/web/img/`.
+3. **Link tải thật & đồng bộ GitHub Releases API:**
+   - Nút **Tải APK** (`#dl`, `#dl2`) và **Tải nhanh** (`#dlfast`) trỏ tới Release mới nhất của `muitenvn/CloudPlay-App` và tự động cập nhật phiên bản (`#f-ver`), dung lượng thực tế (`#f-size`), link `.apk` trực tiếp và mã `SHA-256` (`#hashv`) qua `https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest`.
+   - Không thêm số sao, lượt tải hay đánh giá giả.
+4. **Cảnh báo rủi ro & tuyên bố độc lập:**
+   - Giữ nguyên hộp `.notice` (cả tiếng Việt và tiếng Anh): *"Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro."*
+5. **Đảm bảo hiển thị chuẩn trên màn hình hẹp `360px`:**
+   - Không tràn ngang (`scrollWidth == clientWidth`), nút bấm chính cao tối thiểu `50px` (`>= 48px`), tiêu đề câu hỏi thường gặp cao tối thiểu `52px`, mã `SHA-256` tự cắt dấu `...` (`text-overflow: ellipsis`) không làm vỡ khung.
 
 ---
 
-## 2. Sơ Đồ Luồng Hoạt Động Nhạc Nền Mới
+## 2. Sơ Đồ Cấu Trúc Trang Web (`docs/index.html` & `assets/web/index.html`)
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                     KHỞI ĐỘNG APP (DashboardScreen)                      │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │
-                 ┌───────────────────┴───────────────────┐
-                 ▼                                       ▼
-   [Tự động bật nhạc = BẬT]                [Tự động bật nhạc = TẮT (Mặc định)]
-   & Không bật Chế độ máy yếu               Người dùng có thể bấm nút [▶ Phát]
-                 │                          nhỏ trong Cài đặt để nghe thủ công
-                 ▼                                       │
-       Fade-in 800ms (8% vol) ◄──────────────────────────┘
-       (AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK + ALLOW_CAPTURE_BY_NONE)
-                 │
-                 ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│              VÀO MÀN CHƠI GAME (CloudBrowserScreen / Stream)             │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │
-        ┌────────────────────────────┴────────────────────────────┐
-        ▼                                                         ▼
-[Phát nhạc khi đang chơi = BẬT]                   [Phát nhạc khi đang chơi = TẮT]
-& Không bật Chế độ máy yếu                        HOẶC đang bật Chế độ máy yếu
-& Nhạc đang phát                                                  │
-        │                                                         ▼
-        ▼                                               Fade-out 800ms ➔
-Giữ nguyên nhạc phát tiếp ở cùng âm lượng               stop() & release()
-(Không làm giảm tiếng game, không lọt vào video quay)   Giải phóng RAM
+┌──────────────────────────────────────────────────────────────────────┐
+│ Header (.top sticky) : [img/icon.png CloudPlay]            [EN | VI] │
+├──────────────────────────────────────────────────────────────────────┤
+│ Hero (.hero)         : [img/icon.png 96×96]  CloudPlay               │
+│                        Tagline mô tả ngắn gọn                        │
+│ CTA (#cta)           : [⬇ Tải APK (min-h 50px)] [⚡ Tải nhanh]       │
+│ SHA-256 (#hash)      : [SHA-256] [mã kiểm tra tự động...] [Sao chép] │
+│ Facts (.facts 4 cột) : [Phiên bản] | [Dung lượng] | [7.0+] | [Free]  │
+├──────────────────────────────────────────────────────────────────────┤
+│ Ảnh chụp (#shots-sec): [img/screenshot-1.png] [-2.png] [-3.png]      │
+│                        (Tự ẩn từng ảnh lỗi; ẩn cả khối nếu lỗi cả 3) │
+├──────────────────────────────────────────────────────────────────────┤
+│ Tính năng (.feats)   : 1. Theo dõi ping                              │
+│                        2. Tự điều chỉnh chất lượng                   │
+│                        3. Máy chủ và tay cầm ảo                      │
+├──────────────────────────────────────────────────────────────────────┤
+│ Cách cài (.steps)    : Bước 1 ➔ Bước 2 ➔ Bước 3                     │
+│ FAQ (<details>)      : 3 câu hỏi thường gặp (min-height 52px)        │
+│ Lưu ý (.notice)      : Không liên kết Microsoft, Xbox hay Epic Games │
+│ Footer               : CloudPlay cho Android · Các bản phát hành     │
+├──────────────────────────────────────────────────────────────────────┤
+│ Sticky Bar (#bar)    : [⬇ Tải APK (hiện khi cuộn qua cụm nút đầu)]  │
+└──────────────────────────────────────────────────────────────────────┘
 ```

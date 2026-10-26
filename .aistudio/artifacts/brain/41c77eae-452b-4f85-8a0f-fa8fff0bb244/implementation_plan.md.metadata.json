@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch cập nhật cấu hình nhạc nền (mặc định tắt tự phát, âm lượng mặc định 8%, nút phát/dừng thủ công, công tắc phát nhạc khi đang chơi dùng AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK) và xóa toàn bộ dòng ghi nguồn nhạc AI trong SettingsScreen.kt.",
-  "updatedAt":  "2026-10-25T23:31:39.603939711Z",
+  "summary":  "Kế hoạch thay giao diện trang web (docs/index.html và app/src/main/assets/web/index.html) theo đúng bản mẫu CloudPlay-web-mau.html, dùng đường dẫn ảnh thật kèm xử lý onerror ẩn ảnh/khối ảnh lỗi và cập nhật link/SHA-256 từ GitHub Releases API.",
+  "updatedAt":  "2026-10-26T09:21:43.839173028Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

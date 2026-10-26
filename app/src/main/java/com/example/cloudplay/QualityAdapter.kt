@@ -62,4 +62,27 @@ object QualityAdapter {
             }
         }
     }
+
+    /**
+     * Immediately flushes accumulated WebRTC jitter buffer delay and fast-forwards queued video frames
+     * to the live edge without reloading the stream.
+     */
+    fun flushStreamLagNow(targetBitrateMbps: Double = -1.0, bufferHintMs: Double = 10.0) {
+        val webView = webViewRef?.get() ?: return
+        if (targetBitrateMbps > 0) {
+            lastAppliedBitrateMbps = targetBitrateMbps
+        }
+        lastAppliedBufferMs = bufferHintMs
+        val safeMbps = if (targetBitrateMbps > 0) targetBitrateMbps else lastAppliedBitrateMbps.coerceAtLeast(5.0)
+        val js = "if (window.__flushStreamLagNow) window.__flushStreamLagNow($safeMbps, $bufferHintMs);"
+        webView.post {
+            try {
+                webView.evaluateJavascript(js) { res ->
+                    Log.d(TAG, "Flushed stream lag: bitrate=${safeMbps}Mbps, buffer=${bufferHintMs}ms (res=$res)")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to evaluate flushStreamLagNow javascript", e)
+            }
+        }
+    }
 }

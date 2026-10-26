@@ -146,7 +146,8 @@ class XboxBridge(
             virtualGamepadEnabled: Boolean = false,
             renderScaleFactor: Float = 1.0f,
             fpsCap: Int = 60,
-            gpuLoadReduction: Boolean = true
+            gpuLoadReduction: Boolean = true,
+            isCellular: Boolean = false
         ): String {
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
@@ -163,7 +164,7 @@ class XboxBridge(
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
                         if (window.__setXCloudTranslationConfig) window.__setXCloudTranslationConfig({ preserveTitles: $preserveTitles, bilingual: $bilingualMode, hideStats: $hideStreamStats });
                         if (window.__toggleStreamStatsOverlay) window.__toggleStreamStatsOverlay($hideStreamStats);
-                        if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode });
+                        if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode, isCellular: $isCellular });
                         if (window.__updateGraphicsTuning) window.__updateGraphicsTuning({ renderScale: $renderScaleFactor, fpsCap: $fpsCap, gpuLoadReduction: $gpuLoadReduction, lowEndDeviceMode: $lowEndDeviceMode });
                         if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($virtualGamepadEnabled);
                         if ($lowEndDeviceMode && window.__pauseTranslator) window.__pauseTranslator();
@@ -184,7 +185,8 @@ class XboxBridge(
                         networkTuningMode: "$networkTuningMode",
                         speedFirst: $speedFirstPriority,
                         targetBitrate: $effectiveBitrateMbps,
-                        lowEndDeviceMode: $lowEndDeviceMode
+                        lowEndDeviceMode: $lowEndDeviceMode,
+                        isCellular: $isCellular
                     };
 
                     window.__graphicsTuning = {
@@ -201,6 +203,7 @@ class XboxBridge(
                             window.__pauseTranslator();
                         }
                         if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
+                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                     };
 
                     function findActiveStreamVideo() {
@@ -211,7 +214,9 @@ class XboxBridge(
                     function applyReceiverBufferTarget(receiver, kind, videoSec) {
                         if (!receiver) return;
                         try {
-                            const sec = (kind === 'audio') ? Math.max(0.012, Math.min(0.045, videoSec)) : videoSec;
+                            const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                            const maxAudioSec = isCell ? 0.024 : 0.045;
+                            const sec = (kind === 'audio') ? Math.max(0.010, Math.min(maxAudioSec, videoSec)) : videoSec;
                             const ms = Math.round(sec * 1000);
                             if ('playoutDelayHint' in receiver) {
                                 receiver.playoutDelayHint = sec;
@@ -223,8 +228,10 @@ class XboxBridge(
                     }
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
+                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                        const maxAllowedBufMs = isCell ? 22.0 : 42.0;
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(8.0, Math.min(45.0, parseFloat(bufferHintMs) || 14.0));
+                        const bufMs = Math.max(8.0, Math.min(maxAllowedBufMs, parseFloat(bufferHintMs) || (isCell ? 12.0 : 14.0)));
                         const targetSec = parseFloat((bufMs / 1000.0).toFixed(4));
 
                         if (window.__networkProfile) {
@@ -245,6 +252,59 @@ class XboxBridge(
                                 }
                             }
                         } catch (e) {}
+                    };
+
+                    window.__flushStreamLagNow = function(optMbps, optBufMs) {
+                        try {
+                            const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                            const flushBufMs = Math.max(8.0, Math.min(14.0, parseFloat(optBufMs) || (isCell ? 10.0 : 8.0)));
+                            const flushSec = parseFloat((flushBufMs / 1000.0).toFixed(4));
+                            if (typeof optMbps === 'number' && optMbps > 0 && window.__networkProfile) {
+                                window.__networkProfile.targetBitrate = optMbps;
+                            }
+                            window.__targetBufferSec = flushSec;
+                            window.__currentBufferSec = flushSec;
+
+                            const pcs = window.__allPeerConnections || (window.__activePeerConnection ? [window.__activePeerConnection] : []);
+                            for (let p = pcs.length - 1; p >= 0; p--) {
+                                const pc = pcs[p];
+                                if (pc && typeof pc.getReceivers === 'function') {
+                                    const receivers = pc.getReceivers();
+                                    for (let i = 0; i < receivers.length; i++) {
+                                        const r = receivers[i];
+                                        if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
+                                            applyReceiverBufferTarget(r, r.track.kind, flushSec);
+                                        }
+                                    }
+                                }
+                            }
+
+                            const vEl = findActiveStreamVideo();
+                            if (vEl && !vEl.paused) {
+                                try {
+                                    if (vEl.buffered && vEl.buffered.length > 0) {
+                                        const endEdge = vEl.buffered.end(vEl.buffered.length - 1);
+                                        if (endEdge - vEl.currentTime > 0.040) {
+                                            vEl.currentTime = Math.max(vEl.currentTime, endEdge - 0.008);
+                                        }
+                                    }
+                                } catch (seekErr) {}
+                                try {
+                                    if (vEl.__cpCatchupTimer) clearTimeout(vEl.__cpCatchupTimer);
+                                    vEl.__cpCatchingUp = true;
+                                    vEl.playbackRate = 1.06;
+                                    vEl.__cpCatchupTimer = setTimeout(function() {
+                                        try { vEl.playbackRate = 1.0; } catch (e) {}
+                                        vEl.__cpCatchingUp = false;
+                                        vEl.__cpCatchupTimer = null;
+                                    }, 220);
+                                } catch (rateErr) {}
+                            }
+                            if (window.__touchGamepadTimestampNow) window.__touchGamepadTimestampNow();
+                            return "FLUSHED_OK";
+                        } catch (e) {
+                            return "FLUSH_ERR";
+                        }
                     };
 
                     function notify(method, arg) {
@@ -459,10 +519,11 @@ class XboxBridge(
                                         if (ct.indexOf('avc1.42') !== -1 || ct.indexOf('avc1.4d') !== -1 || ct.indexOf('h264') !== -1) {
                                             return { supported: true, smooth: true, powerEfficient: true };
                                         }
-                                        // Deprioritize heavy High Profile CABAC (avc1.64), VP9, and AV1 when Low-End or reduced render scale is active
+                                        // Deprioritize heavy High Profile CABAC (avc1.64), VP9, and AV1 when Low-End, 4G Cellular, or reduced render scale is active
                                         const gt = window.__graphicsTuning || {};
                                         const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
-                                        if ((isLowEnd || (parseFloat(gt.renderScale) || 1.0) < 0.90) &&
+                                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                                        if ((isLowEnd || isCell || (parseFloat(gt.renderScale) || 1.0) < 0.90) &&
                                             (ct.indexOf('avc1.64') !== -1 || ct.indexOf('vp9') !== -1 || ct.indexOf('av01') !== -1)) {
                                             return { supported: true, smooth: false, powerEfficient: false };
                                         }
@@ -517,11 +578,12 @@ class XboxBridge(
                             let sdp = rawSdp;
                             const gt = window.__graphicsTuning || {};
                             const isLowEndMode = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                            const isCellularMode = !!(window.__networkProfile && window.__networkProfile.isCellular);
                             const scaleFactor = Math.max(0.65, Math.min(1.0, parseFloat(gt.renderScale) || $renderScaleFactor || 1.0));
                             const fpsTarget = parseInt(gt.fpsCap || $fpsCap || 60, 10) || 60;
                             const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
                             const scaleMultiplier = scaleFactor < 0.99 ? Math.max(0.68, scaleFactor * scaleFactor * 1.08) : 1.0;
-                            const maxSafeMbps = isLowEndMode ? 5 : 16;
+                            const maxSafeMbps = isLowEndMode ? 5 : (isCellularMode ? 8 : 16);
                             const activeMbps = Math.max(4, Math.min(maxSafeMbps, Math.round(rawMbps * scaleMultiplier)));
                             const targetKbps = activeMbps * 1000;
                             const startKbps = Math.max(2500, Math.round(targetKbps * 0.70));
@@ -533,8 +595,8 @@ class XboxBridge(
                                     /m=video (.*)\r\n/g,
                                     'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + fpsTarget + '\r\n'
                                 );
-                                // Prefer Constrained Baseline / Main profile on low-end devices & add safe bitrate bounds
-                                if (isLowEndMode) {
+                                // Prefer Constrained Baseline (42e01f, 0 B-frames) on 4G cellular & low-end devices so packet loss never stalls dependent frames
+                                if (isLowEndMode || isCellularMode) {
                                     sdp = sdp.replace(/profile-level-id=64[0-9a-fA-F]{4}/g, 'profile-level-id=42e01f');
                                 }
                                 sdp = sdp.replace(/(a=fmtp:\d+ [^\r\n]*packetization-mode=1[^\r\n]*)\r\n/g, function(match, p1) {
@@ -763,7 +825,27 @@ class XboxBridge(
                                             }
                                         }
                                     }
-                                    if (vEl.playbackRate !== 1.0) {
+                                    const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                                    const catchupThresholdMs = isCell ? 20.0 : 26.0;
+                                    if (jitterBufferDelayMs > catchupThresholdMs && !vEl.__cpCatchingUp) {
+                                        try {
+                                            vEl.__cpCatchingUp = true;
+                                            vEl.playbackRate = 1.05;
+                                            const tightSec = window.__targetBufferSec || (isCell ? 0.011 : 0.012);
+                                            const recs = pc.getReceivers ? pc.getReceivers() : [];
+                                            for (let rIdx = 0; rIdx < recs.length; rIdx++) {
+                                                const r = recs[rIdx];
+                                                if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
+                                                    applyReceiverBufferTarget(r, r.track.kind, tightSec);
+                                                }
+                                            }
+                                            vEl.__cpCatchupTimer = setTimeout(function() {
+                                                try { vEl.playbackRate = 1.0; } catch (e) {}
+                                                vEl.__cpCatchingUp = false;
+                                                vEl.__cpCatchupTimer = null;
+                                            }, 240);
+                                        } catch (e) {}
+                                    } else if (!vEl.__cpCatchingUp && vEl.playbackRate !== 1.0) {
                                         try { vEl.playbackRate = 1.0; } catch (e) {}
                                     }
                                 }
@@ -783,6 +865,7 @@ class XboxBridge(
                                 if ((framesDecoded > 3 || (fps > 0 && currentBytes > 40000)) && !notifiedStreamConnection) {
                                     notifiedStreamConnection = true;
                                     notify('onStreamConnected', 'webrtc_frames_active');
+                                    if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                                 }
 
                                 if (fps > 0 || currentBytes > 0 || rtt > 0) {
@@ -1369,6 +1452,42 @@ class XboxBridge(
                             window.__cpStick(e.detail.xAxis, e.detail.xVal, e.detail.yAxis, e.detail.yVal);
                         }
                     });
+
+                    window.__touchGamepadTimestampNow = function() {
+                        virtualGamepadState.timestamp = nowTs();
+                        window.__lastUserControlPulseAt = Date.now();
+                    };
+
+                    // 4G Anti-DRX Uplink Pacer: keeps LTE RRC baseband in Continuous Reception state during active 4G gameplay
+                    // Prevents 25-45ms LTE short-DRX modem sleep wakeup delay when pressing gamepad buttons after brief pauses
+                    let antiDrxTimerId = null;
+                    window.__syncCellularAntiDrxPacer = function() {
+                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                        const isInStream = notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1;
+                        if (isCell && isInStream) {
+                            if (!antiDrxTimerId) {
+                                antiDrxTimerId = setInterval(function() {
+                                    const cellNow = !!(window.__networkProfile && window.__networkProfile.isCellular);
+                                    const streamNow = notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1;
+                                    if (!cellNow || !streamNow) {
+                                        clearInterval(antiDrxTimerId);
+                                        antiDrxTimerId = null;
+                                        return;
+                                    }
+                                    const nowMs = Date.now();
+                                    if (nowMs - (window.__lastUserControlPulseAt || 0) >= 26) {
+                                        if (window.__virtualGamepadEnabled || virtualGamepadActive) {
+                                            virtualGamepadState.timestamp = nowTs();
+                                        }
+                                        window.__lastUserControlPulseAt = nowMs;
+                                    }
+                                }, 28);
+                            }
+                        } else if (antiDrxTimerId) {
+                            clearInterval(antiDrxTimerId);
+                            antiDrxTimerId = null;
+                        }
+                    };
 
                     // Anti-AFK Keep-Alive trigger
                     if ($antiAfk) {

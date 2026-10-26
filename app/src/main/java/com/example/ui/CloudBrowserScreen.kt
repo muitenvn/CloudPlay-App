@@ -257,7 +257,8 @@ fun CloudBrowserScreen(
         config.showVirtualController,
         config.streamRenderScale,
         config.streamFpsCap,
-        config.gpuLoadReductionEnabled
+        config.gpuLoadReductionEnabled,
+        networkStatus.isCellular
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -277,7 +278,8 @@ fun CloudBrowserScreen(
             virtualGamepadEnabled = config.showVirtualController,
             renderScaleFactor = config.streamRenderScale.scaleFactor,
             fpsCap = config.streamFpsCap.fps,
-            gpuLoadReduction = config.gpuLoadReductionEnabled
+            gpuLoadReduction = config.gpuLoadReductionEnabled,
+            isCellular = networkStatus.isCellular
         )
     }
 
@@ -316,10 +318,10 @@ fun CloudBrowserScreen(
         }
     }
 
-    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, networkStatus.effectiveBitrateMbps, config.lowEndDeviceMode) {
+    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, networkStatus.effectiveBitrateMbps, config.lowEndDeviceMode, networkStatus.isCellular) {
         val targetMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps
         webViewInstance?.evaluateJavascript(
-            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: $targetMbps, lowEndDeviceMode: ${config.lowEndDeviceMode} });",
+            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: $targetMbps, lowEndDeviceMode: ${config.lowEndDeviceMode}, isCellular: ${networkStatus.isCellular} });",
             null
         )
     }
@@ -863,6 +865,15 @@ fun CloudBrowserScreen(
             recorderState = recorderState,
             onToggleRecording = {
                 com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
+            },
+            onFlushLag = {
+                com.example.cloudplay.AdaptiveQualityManager.flushLagNow()
+                val isEnNow = config.isEnglishUI()
+                android.widget.Toast.makeText(
+                    context,
+                    if (isEnNow) "⚡ Flushed buffer & synced live frame edge!" else "⚡ Đã xả bộ đệm & đồng bộ khung hình thời gian thực!",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         )
 

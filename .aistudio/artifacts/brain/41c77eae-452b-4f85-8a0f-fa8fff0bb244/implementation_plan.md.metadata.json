@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch thay giao diện trang web (docs/index.html và app/src/main/assets/web/index.html) theo đúng bản mẫu CloudPlay-web-mau.html, dùng đường dẫn ảnh thật kèm xử lý onerror ẩn ảnh/khối ảnh lỗi và cập nhật link/SHA-256 từ GitHub Releases API.",
-  "updatedAt":  "2026-10-26T09:21:43.839173028Z",
+  "summary":  "Kế hoạch tối ưu hiệu năng, khắc phục độ trễ cao trên mạng 4G/5G (chống nghẽn trạm phát LTE Bufferbloat, giữ thức modem 4G Anti-DRX, đồng bộ khung hình thời gian thực Live-Edge Sync) và nâng cấp trải nghiệm HUD với nút Xả Trễ 1 chạm.",
+  "updatedAt":  "2026-10-26T12:42:18.887292064Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

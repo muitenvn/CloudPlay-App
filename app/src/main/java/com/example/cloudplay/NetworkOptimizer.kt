@@ -289,19 +289,19 @@ object NetworkOptimizer {
                     else -> 9
                 }
                 profileName = when {
-                    isCellular && current.isWeakCellularSignal -> "Tự Động 4G Chống Rớt Sóng (${autoMbps}M)"
-                    isCellular -> "Tự Động 4G/5G (720p ⇄ 1080p • ${autoMbps}M)"
+                    isCellular && current.isWeakCellularSignal -> "Tự Động 4G Chống Nghẽn Trạm (${autoMbps}M)"
+                    isCellular -> "4G/5G Siêu Nhạy • Chống Trễ (${autoMbps}M)"
                     isWifi && current.isWeakWifiSignal -> "Tự Động Wi-Fi Xa Cục Phát (${autoMbps}M)"
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> "Tự Động Wi-Fi 2.4GHz Chống Nhiễu (${autoMbps}M)"
                     else -> "Tự Động Wi-Fi (720p ⇄ 1080p • ${autoMbps}M)"
                 }
                 bitrate = autoMbps
                 summary = when {
-                    isCellular -> "Ưu tiên độ trễ thấp nhất, tự hạ nhẹ độ nét trong 1.5s khi sóng 4G yếu hoặc đổi trạm phát."
+                    isCellular -> "Đang bật chống nghẽn trạm 4G (đệm 10-22ms), giữ thức modem Anti-DRX và tự xả khung hình trễ."
                     current.isWeakWifiSignal -> "Phát hiện sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự thu gọn luồng ${autoMbps}M để xuyên tường mượt mà."
                     else -> "Ưu tiên thao tác điều khiển nhạy nhất, tự động cân chỉnh độ nét và giải mã < 8ms."
                 }
-                badge = if (isCellular) "📶 Tự động 4G (${autoMbps}M)" else "⚡ Tự động (${autoMbps}M)"
+                badge = if (isCellular) "📶 4G Siêu Nhạy (${autoMbps}M)" else "⚡ Tự động (${autoMbps}M)"
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
                 profileName = "720p • Thấp (Cố Định • 5M)"

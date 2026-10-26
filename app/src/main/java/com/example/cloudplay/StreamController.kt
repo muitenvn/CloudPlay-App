@@ -113,22 +113,29 @@ class StreamController(private val context: Context) {
     }
 
     fun onGameLaunchInitiated(title: String) {
+        val existingTitle = _uiState.value.gameTitle
+        val isIncomingGeneric = title.isBlank() ||
+            title.equals("Xbox Cloud Game", ignoreCase = true) ||
+            title.equals("Xbox Game", ignoreCase = true)
+        val resolvedTitle = if (isIncomingGeneric && !existingTitle.isNullOrBlank() &&
+            !existingTitle.equals("Xbox Cloud Game", ignoreCase = true) &&
+            !existingTitle.equals("Xbox Game", ignoreCase = true)
+        ) {
+            existingTitle
+        } else {
+            com.example.data.SessionHistoryRepository.resolveCleanGameTitle(title, _uiState.value.currentUrl)
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isGameActive = true,
+            gameTitle = resolvedTitle,
+            isStreamConnected = false,
+            autoBypassTriggered = false
+        )
+
         scope.launch {
             launchFallbackJob?.cancel()
             countdownJob?.cancel()
-
-            val existingTitle = _uiState.value.gameTitle
-            val isIncomingGeneric = title.isBlank() ||
-                title.equals("Xbox Cloud Game", ignoreCase = true) ||
-                title.equals("Xbox Game", ignoreCase = true)
-            val resolvedTitle = if (isIncomingGeneric && !existingTitle.isNullOrBlank() &&
-                !existingTitle.equals("Xbox Cloud Game", ignoreCase = true) &&
-                !existingTitle.equals("Xbox Game", ignoreCase = true)
-            ) {
-                existingTitle
-            } else {
-                com.example.data.SessionHistoryRepository.resolveCleanGameTitle(title, _uiState.value.currentUrl)
-            }
 
             val syncedBookmark = com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
                 rawTitle = resolvedTitle,
@@ -139,9 +146,7 @@ class StreamController(private val context: Context) {
 
             _uiState.value = _uiState.value.copy(
                 isGameActive = true,
-                gameTitle = finalTitle,
-                isStreamConnected = false,
-                autoBypassTriggered = false
+                gameTitle = finalTitle
             )
 
             val config = SettingsRepository.config.value

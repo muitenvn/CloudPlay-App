@@ -156,6 +156,7 @@ fun FloatingHud(
     onSelectFortniteControlMode: (Boolean) -> Unit = {},
     recorderState: com.example.cloudplay.ScreenRecorderState = com.example.cloudplay.ScreenRecorderState(),
     onToggleRecording: () -> Unit = {},
+    onFlushLag: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -963,6 +964,11 @@ fun FloatingHud(
                                     onToggleVirtualController = {
                                         markUserInteraction()
                                         onToggleVirtualController()
+                                    },
+                                    adaptiveBufferMs = adaptiveQualityState.smoothBufferMs.roundToInt(),
+                                    onFlushLag = {
+                                        markUserInteraction()
+                                        onFlushLag()
                                     }
                                 )
 
@@ -984,6 +990,10 @@ fun FloatingHud(
                                     onToggleWifiSpeedFirst = { enabled ->
                                         markUserInteraction()
                                         onToggleWifiSpeedFirst(enabled)
+                                    },
+                                    onFlushLag = {
+                                        markUserInteraction()
+                                        onFlushLag()
                                     }
                                 )
 
@@ -1500,7 +1510,9 @@ private fun DenseCoreTelemetrySection(
     thermalLabel: String,
     thermalColor: Color,
     onToggleNetwork: () -> Unit,
-    onToggleVirtualController: () -> Unit
+    onToggleVirtualController: () -> Unit,
+    adaptiveBufferMs: Int = 12,
+    onFlushLag: () -> Unit = {}
 ) {
     val effectivePing = when {
         telemetry.rttMs > 0 -> telemetry.rttMs
@@ -1520,10 +1532,15 @@ private fun DenseCoreTelemetrySection(
         "-- Mbps"
     }
 
-    val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
-        String.format("%.1f ms", telemetry.decodeTimeMs)
+    val liveBufMs = if (telemetry.jitterBufferDelayMs > 1.0) {
+        telemetry.jitterBufferDelayMs.roundToInt().coerceIn(6, 60)
     } else {
-        "-- ms"
+        adaptiveBufferMs.coerceIn(8, 45)
+    }
+    val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
+        String.format("%.1fms • Đệm %dms", telemetry.decodeTimeMs, liveBufMs)
+    } else {
+        "-- ms • Đệm ${liveBufMs}ms"
     }
     val decodeColor = when {
         telemetry.decodeTimeMs <= 0.0 -> TextSecondary
@@ -1588,11 +1605,13 @@ private fun DenseCoreTelemetrySection(
                 valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
             )
 
-            // 3. Dòng Thời gian giải mã khung hình
+            // 3. Dòng Thời gian giải mã khung hình & Bộ đệm (chạm để Xả trễ ngay)
             DenseMetricRowItem(
                 label = if (isEn) "Decode" else "Giải mã",
-                value = decodeTimeText,
-                valueColor = decodeColor
+                value = if (isEn) decodeTimeText.replace("Đệm", "Buf") else decodeTimeText,
+                valueColor = decodeColor,
+                badgeText = if (isEn) "⚡ Flush" else "⚡ Xả trễ",
+                onRowClick = onFlushLag
             )
 
             // 4. Dòng Tay cầm (chạm để bật/tắt tay cầm ảo)
@@ -1689,11 +1708,13 @@ private fun DenseQualityModeSection(
     telemetry: com.example.cloudplay.StreamTelemetry,
     onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
     onToggleAutoAdapting: (Boolean) -> Unit,
-    onToggleWifiSpeedFirst: (Boolean) -> Unit
+    onToggleWifiSpeedFirst: (Boolean) -> Unit,
+    onFlushLag: () -> Unit = {}
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
+    val liveBufMs = adaptiveQualityState.smoothBufferMs.roundToInt().coerceIn(8, 45)
     val selectedMode = config.cellularMode
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1727,9 +1748,9 @@ private fun DenseQualityModeSection(
                     networkStatus.isWifi && networkStatus.wifiRssiDbm < 0 ->
                         "$wifiBandText • ${String.format("%.1f", liveMbps)}M"
                     networkStatus.isCellular ->
-                        "4G/5G • ${String.format("%.1f", liveMbps)}M"
+                        "📶 4G • ${String.format("%.1f", liveMbps)}M • ${liveBufMs}ms"
                     else ->
-                        "${String.format("%.1f", liveMbps)}M"
+                        "${String.format("%.1f", liveMbps)}M • ${liveBufMs}ms"
                 }
                 val warnAmber = Color(0xFFF59E0B)
                 Text(
@@ -1785,14 +1806,47 @@ private fun DenseQualityModeSection(
                 )
             }
 
+            // Nút 1 chạm "⚡ Xả Trễ" (Instant Lag Flush): làm rỗng hàng đợi khung hình & đưa đệm về 10ms tức thì
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { onFlushLag() }
+                    .testTag("hud_flush_lag_button"),
+                shape = RoundedCornerShape(6.dp),
+                color = DirectCyan.copy(alpha = 0.16f),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isEn) "⚡ Flush 4G/Stream Lag Now" else "⚡ Xả trễ & đồng bộ khung hình ngay",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = if (networkStatus.isCellular) "10ms" else "8ms",
+                        color = DirectCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1
+                    )
+                }
+            }
+
             if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) {
                 Text(
                     text = if (networkStatus.isWeakWifiSignal) {
                         if (isEn) "⚠️ Weak Wi-Fi: Auto-lowering bitrate"
                         else "⚠️ Sóng Wi-Fi yếu: Tự hạ độ nét chống giật"
                     } else {
-                        if (isEn) "⚠️ Weak 4G: Holding 720p stream"
-                        else "⚠️ Sóng 4G yếu: Giữ 720p ổn định"
+                        if (isEn) "⚠️ Weak 4G: Anti-Bufferbloat holding 720p"
+                        else "⚠️ Sóng 4G yếu: Chống nghẽn trạm giữ 720p nhạy"
                     },
                     color = Color(0xFFF59E0B),
                     fontSize = 11.sp,

@@ -68,7 +68,7 @@ private val DEFAULT_STEP = FULL_CONTINUOUS_SPECTRUM[9] // 10 Mbps starting point
 
 object AdaptiveQualityManager {
     private const val TAG = "AdaptiveQualityManager"
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(Dispatchers.Default)
 
     private val _state = MutableStateFlow(AdaptiveQualityState())
     val state: StateFlow<AdaptiveQualityState> = _state.asStateFlow()
@@ -196,8 +196,12 @@ object AdaptiveQualityManager {
             }
             val initialSeedMbps = savedNextSessionMbps?.toDouble()?.coerceAtMost(networkDefaultMbps) ?: networkDefaultMbps
             val initialBufMs = when {
-                current.isAutoAdapting && emaDecodeMs > 0.0 -> current.smoothBufferMs.coerceIn(8.0, 45.0)
-                isCellular -> 18.0
+                current.isAutoAdapting && emaDecodeMs > 0.0 -> {
+                    if (isCellular) current.smoothBufferMs.coerceIn(10.0, 22.0)
+                    else current.smoothBufferMs.coerceIn(8.0, 42.0)
+                }
+                isCellular && status.isWeakCellularSignal -> 14.0
+                isCellular -> 12.0
                 status.isWeakWifiSignal -> 16.0
                 initialSeedMbps >= 14.0 -> 10.0
                 initialSeedMbps >= 10.0 -> 12.0
@@ -212,7 +216,7 @@ object AdaptiveQualityManager {
                 targetBitrateMbps = roundedMbps,
                 bufferHintMs = initialBufMs.roundToInt(),
                 title = if (isEn) "Auto • ${roundedMbps.toInt()} Mbps" else "Tự Động • ${roundedMbps.toInt()} Mbps (${tier.title})",
-                description = if (isEn) "Adaptive buffer (up to 45ms) & bitrate for smooth streaming" else "Tự cân bằng bộ đệm (tới 45ms) và băng thông giữ mượt luồng game"
+                description = if (isEn) "Ultra-low latency 4G (10-22ms) & adaptive anti-bufferbloat" else "Siêu nhạy 4G (đệm 10-22ms) & tự chống nghẽn trạm phát"
             )
 
             _state.value = current.copy(
@@ -224,7 +228,11 @@ object AdaptiveQualityManager {
                 smoothBufferMs = formatOneDecimal(initialBufMs),
                 minAutoMbps = 1.0,
                 maxAutoMbps = 20.0,
-                qualityGrade = if (isEn) "Auto" else "Tự Động",
+                qualityGrade = if (isCellular) {
+                    if (isEn) "4G Low-Lag" else "4G Siêu Nhạy"
+                } else {
+                    if (isEn) "Auto" else "Tự Động"
+                },
                 qualityNotice = "${status.physicalType.icon} $nextSessionNote"
             )
 
@@ -236,11 +244,11 @@ object AdaptiveQualityManager {
         } else {
             val fixedMbps = cellularMode.bitrateMbps.toDouble()
             val fixedBuf = when (cellularMode) {
-                CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> 18.0
-                CellularOptimizationMode.MEDIUM -> 15.0
-                CellularOptimizationMode.HIGH -> 12.0
+                CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> 14.0
+                CellularOptimizationMode.MEDIUM -> 12.0
+                CellularOptimizationMode.HIGH -> 10.0
                 CellularOptimizationMode.MAX_SPEED_UNCAPPED -> 10.0
-                CellularOptimizationMode.AUTO -> 14.0
+                CellularOptimizationMode.AUTO -> 12.0
             }
             val tier = tierForMbps(fixedMbps)
             val fixedStep = BitrateLadderStep(
@@ -275,9 +283,9 @@ object AdaptiveQualityManager {
 
     /**
      * Đánh giá thông số luồng thực tế trên cả 4G và Wi-Fi:
-     * - Khi xảy ra đứng hình (freezeCount tăng), rớt khung hình, giải mã quá tải (>12ms), hoặc ping/jitter cao:
-     *   tăng bộ đệm lên tới 42–45ms và hạ bậc bitrate để chống khựng hình.
-     * - Chỉ giảm dần bộ đệm sau ít nhất 6 nhịp (9 giây) ổn định liên tiếp để tránh đổi playoutDelayHint liên tục.
+     * - Trên 4G (isCellular): ưu tiên chống nghẽn hàng đợi tại trạm phát LTE (Anti-Bufferbloat) bằng cách
+     *   hạ nhanh bitrate (4.0..8.0 Mbps) và khóa trần bộ đệm thu ở 10..22ms, thu hồi đệm sau 3 nhịp (4.5s).
+     * - Trên Wi-Fi: cho phép đệm thu 8..42ms và thu hồi sau 6 nhịp (9s) ổn định.
      */
     fun evaluateTelemetry(telemetry: StreamTelemetry) {
         val current = _state.value
@@ -322,16 +330,19 @@ object AdaptiveQualityManager {
         val isEn = SettingsRepository.config.value.isEnglishUI()
         val nextSessionNote = if (isEn) "Optimized for lowest control lag" else "Đã tối ưu ưu tiên độ nhạy điều khiển"
 
+        val netStatus = NetworkOptimizer.status.value
+        val isCellular = netStatus.isCellular || (!netStatus.isWifi && netStatus.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
+
         val grade = when {
             deltaFreezes > 0 || loss > 1.5 || effectiveDecode > 12.0 || effectiveJitter > 20.0 -> if (isEn) "Anti-Spike Active" else "Đang Chống Khựng Sóng"
             deltaDropped >= 3 || effectiveDecode > 9.0 || effectiveJitter > 11.0 || rttTrendDelta >= 15.0 -> if (isEn) "Low-Lag Stabilizing" else "Đang Giữ Nhạy Điều Khiển"
+            isCellular && effectiveDecode <= 8.0 && loss <= 0.4 && effectiveJitter <= 12.0 -> if (isEn) "4G Ultra Low-Lag" else "4G Siêu Nhạy • Trễ Thấp"
             effectiveDecode in 0.1..7.5 && loss <= 0.2 && effectiveRtt in 1.0..85.0 && effectiveJitter <= 8.0 -> if (isEn) "Ultra Low-Latency" else "Siêu Mượt • Trễ Cực Thấp"
             else -> if (isEn) "Stable" else "Ổn Định"
         }
 
         var steppedDownForNextSession = false
         var fixedDecodeSlowHint = false
-        val netStatus = NetworkOptimizer.status.value
         if (deltaFreezes > 0 || effectiveDecode > 12.0 || emaLossPercent > 1.0 || effectiveJitter > 16.0 || rttTrendDelta >= 20.0) {
             val now = System.currentTimeMillis()
             if (highDecodeStartMs == 0L) highDecodeStartMs = now
@@ -361,12 +372,12 @@ object AdaptiveQualityManager {
         }
 
         if (current.isAutoAdapting) {
-            val isCellular = netStatus.isCellular
-            val minBufMs = if (isCellular) 12.0 else 8.0
-            val maxBufMs = if (isCellular) 45.0 else 42.0
+            // Trên 4G: giới hạn chặt bộ đệm thu 10..22ms để không cộng dồn trễ điều khiển
+            val minBufMs = if (isCellular) 10.0 else 8.0
+            val maxBufMs = if (isCellular) 22.0 else 42.0
             val maxTargetMbps = when {
-                isCellular && netStatus.isWeakCellularSignal -> 6.0
-                isCellular -> 9.0
+                isCellular && netStatus.isWeakCellularSignal -> 5.0
+                isCellular -> 8.0
                 netStatus.isWeakWifiSignal -> 8.0
                 netStatus.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> 9.0
                 netStatus.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 15.0
@@ -374,8 +385,9 @@ object AdaptiveQualityManager {
                 else -> 12.0
             }
 
-            val rttAllowanceMs = if (effectiveRtt > 90.0) ((effectiveRtt - 90.0) * 0.08).coerceAtMost(10.0) else 0.0
-            val jitterMatchedTargetMs = (10.0 + effectiveJitter * 1.25 + emaLossPercent * 3.0 + (effectiveDecode * 0.40) + rttAllowanceMs)
+            val rttAllowanceMs = if (!isCellular && effectiveRtt > 90.0) ((effectiveRtt - 90.0) * 0.08).coerceAtMost(10.0) else 0.0
+            val jitterWeight = if (isCellular) 0.85 else 1.25
+            val jitterMatchedTargetMs = (10.0 + effectiveJitter * jitterWeight + emaLossPercent * 2.5 + (effectiveDecode * 0.35) + rttAllowanceMs)
                 .coerceIn(minBufMs, maxBufMs)
             var deltaBufferMs = 0.0
             var deltaBitrateMbps = 0.0
@@ -387,46 +399,53 @@ object AdaptiveQualityManager {
                 decodeTime > 14.0 ||
                 emaLossPercent > 0.8 ||
                 loss > 1.2 ||
-                rttTrendDelta >= 18.0 ||
-                effectiveJitter > 16.0 ||
+                rttTrendDelta >= (if (isCellular) 14.0 else 18.0) ||
+                effectiveJitter > (if (isCellular) 14.0 else 16.0) ||
                 (fps in 1..48 && (loss > 0.3 || effectiveDecode > 10.0))
 
             val isEarlyWarmup = deltaDropped in 2..3 ||
                 (effectiveDecode in 9.5..12.0) ||
                 (decodeTime >= 9.0 && decodeTrendDelta >= 1.5) ||
-                (effectiveJitter in 10.0..16.0) ||
+                (effectiveJitter in (if (isCellular) 9.0 else 10.0)..16.0) ||
                 (jitterTrendDelta >= 4.0 && jitter >= 8.0) ||
-                (rttTrendDelta >= 10.0) ||
+                (rttTrendDelta >= (if (isCellular) 8.0 else 10.0)) ||
                 (emaLossPercent in 0.3..0.8)
 
             if (isHeavyPressure) {
                 cleanRecoveryTicks = 0
-                deltaBufferMs = if (jitterMatchedTargetMs > current.smoothBufferMs) {
+                deltaBufferMs = if (isCellular) {
+                    (jitterMatchedTargetMs - current.smoothBufferMs).coerceIn(1.0, 2.5)
+                } else if (jitterMatchedTargetMs > current.smoothBufferMs) {
                     (jitterMatchedTargetMs - current.smoothBufferMs).coerceIn(2.0, 5.0)
                 } else {
                     +2.0
                 }
-                deltaBitrateMbps = if (isCellular || netStatus.isWeakWifiSignal || effectiveDecode > 13.0) -2.0 else -1.5
-                actionNote = if (isEn) "Expanding buffer & lowering bitrate to stop stutter" else "Tăng đệm & hạ nhẹ băng thông để chống khựng hình"
+                deltaBitrateMbps = if (isCellular) -2.2 else if (netStatus.isWeakWifiSignal || effectiveDecode > 13.0) -2.0 else -1.5
+                actionNote = if (isCellular) {
+                    if (isEn) "4G Anti-Bufferbloat: shedding bitrate to keep control snappy" else "Chống nghẽn trạm 4G: hạ nhanh gói tin để giữ nút bấm siêu nhạy"
+                } else {
+                    if (isEn) "Expanding buffer & lowering bitrate to stop stutter" else "Tăng đệm & hạ nhẹ băng thông để chống khựng hình"
+                }
             } else if (isEarlyWarmup) {
                 cleanRecoveryTicks = 0
-                deltaBufferMs = +1.5
-                deltaBitrateMbps = -0.8
+                deltaBufferMs = if (isCellular) +1.0 else +1.5
+                deltaBitrateMbps = if (isCellular) -1.2 else -0.8
                 actionNote = if (isEn) "Stabilizing Wi-Fi/4G frame queue" else "Ổn định hàng đợi khung hình khi mạng dao động"
             } else if (
                 deltaFreezes == 0 &&
                 deltaDropped == 0 &&
-                emaLossPercent <= 0.15 &&
+                emaLossPercent <= 0.20 &&
                 (effectiveDecode in 0.1..8.5 || effectiveDecode == 0.0) &&
-                decodeTrendDelta <= 0.5 &&
-                rttTrendDelta <= 5.0 &&
-                effectiveJitter <= 8.0
+                decodeTrendDelta <= 0.6 &&
+                rttTrendDelta <= 6.0 &&
+                effectiveJitter <= (if (isCellular) 10.0 else 8.0)
             ) {
                 cleanRecoveryTicks++
-                // Hold buffer stable; only tighten buffer after >=6 consecutive clean ticks (~9s)
-                if (cleanRecoveryTicks >= 6) {
+                // Trên 4G thu hồi bộ đệm nhanh gấp đôi (3 nhịp = 4.5s) để tránh giữ trễ lâu
+                val requiredCleanTicks = if (isCellular) 3 else 6
+                if (cleanRecoveryTicks >= requiredCleanTicks) {
                     if (current.smoothBufferMs > minBufMs) {
-                        deltaBufferMs = -1.5
+                        deltaBufferMs = if (isCellular) -2.0 else -1.5
                     }
                     if (current.smoothBitrateMbps < maxTargetMbps) {
                         deltaBitrateMbps = +0.5
@@ -442,7 +461,7 @@ object AdaptiveQualityManager {
             val nextBitrateMbps = formatOneDecimal(
                 (current.smoothBitrateMbps + deltaBitrateMbps).coerceIn(4.0, maxTargetMbps)
             )
-            val bufferChanged = abs(nextBufMs - current.smoothBufferMs) >= 1.5
+            val bufferChanged = abs(nextBufMs - current.smoothBufferMs) >= (if (isCellular) 1.0 else 1.5)
             val bitrateChanged = abs(nextBitrateMbps - current.smoothBitrateMbps) >= 0.5
             val gradeChanged = current.qualityGrade != grade
 
@@ -545,6 +564,55 @@ object AdaptiveQualityManager {
             isAutoAdapting = enabled,
             currentStep = updatedStep,
             qualityNotice = "📌 $nextSessionNote"
+        )
+    }
+
+    /**
+     * Xả ngay bộ đệm tích lũy (Instant Lag Flush) 1 chạm từ bảng HUD:
+     * Đưa bộ đệm thu về mức siêu nhạy (10.0ms trên 4G / 8.0ms trên Wi-Fi), xóa bộ đếm phạt trễ
+     * và gọi đồng bộ khung hình thời gian thực (Live-Edge Catch-up) trên WebView.
+     */
+    fun flushLagNow() {
+        val isEn = SettingsRepository.config.value.isEnglishUI()
+        val netStatus = NetworkOptimizer.status.value
+        val isCellular = netStatus.isCellular || (!netStatus.isWifi && netStatus.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
+        val current = _state.value
+        val targetBufMs = if (isCellular) 10.0 else 8.0
+        val targetMbps = if (isCellular && current.smoothBitrateMbps > 7.0) 6.0 else current.smoothBitrateMbps.coerceIn(4.0, 20.0)
+
+        cleanRecoveryTicks = 0
+        highDecodeTicks = 0
+        highDecodeStartMs = 0L
+
+        val updatedTier = tierForMbps(targetMbps)
+        val updatedStep = current.currentStep.copy(
+            tier = updatedTier,
+            targetBitrateMbps = targetMbps,
+            bufferHintMs = targetBufMs.roundToInt()
+        )
+        val flushGrade = if (isCellular) {
+            if (isEn) "4G Flushed (${targetBufMs.toInt()}ms)" else "4G Đã Xả Trễ (${targetBufMs.toInt()}ms)"
+        } else {
+            if (isEn) "Lag Flushed (${targetBufMs.toInt()}ms)" else "Đã Xả Trễ (${targetBufMs.toInt()}ms)"
+        }
+        val flushNotice = if (isEn) {
+            "⚡ Flushed receiver queue & synced live frame edge (${targetBufMs.toInt()}ms)"
+        } else {
+            "⚡ Đã xả sạch hàng đợi khung hình & đồng bộ thời gian thực (${targetBufMs.toInt()}ms)"
+        }
+
+        _state.value = current.copy(
+            currentStep = updatedStep,
+            smoothBitrateMbps = targetMbps,
+            smoothBufferMs = targetBufMs,
+            qualityGrade = flushGrade,
+            qualityNotice = flushNotice,
+            lastUpgradeReason = flushNotice
+        )
+
+        QualityAdapter.flushStreamLagNow(
+            targetBitrateMbps = targetMbps,
+            bufferHintMs = targetBufMs
         )
     }
 }

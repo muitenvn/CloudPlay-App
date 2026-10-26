@@ -56,7 +56,7 @@ data class ServerLocation(
     val protocol: String = "http", // "http", "socks5"
     val azureEndpoint: String = "japaneast.cloudapp.azure.com",
     val description: String = "Tokyo, Japan",
-    val speedMbps: Int = 200,
+    val speedMbps: Int = 0,
     val countryCode: String = "JP",
     val isCustom: Boolean = false,
     val lastPingMs: Int? = null,
@@ -88,7 +88,7 @@ data class ServerLocation(
     }
 }
 
-// Curated pool of 26+ High Quality Backup Servers with verified IP geolocations
+// Curated pool of 23 Backup Servers with verified IP geolocations (no hardcoded fake speedMbps)
 val DEFAULT_SERVERS = listOf(
     // === NHẬT BẢN (JAPAN) - 12 MÁY CHỦ DỰ PHÒNG CHUẨN IP TOKYO / OSAKA ===
     ServerLocation(
@@ -100,7 +100,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Tokyo Linode Datacenter • Đã xác minh IP Tokyo (Khuyên dùng #1)",
-        speedMbps = 350,
         countryCode = "JP"
     ),
     ServerLocation(
@@ -112,7 +111,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Tokyo Bay Cloud Backbone • Đã xác minh IP Tokyo (Dự phòng #2)",
-        speedMbps = 310,
         countryCode = "JP"
     ),
     ServerLocation(
@@ -124,7 +122,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Shizuoka Gotemba Gateway • Đã xác minh IP Nhật Bản (Dự phòng #3)",
-        speedMbps = 280,
         countryCode = "JP"
     ),
     ServerLocation(
@@ -136,7 +133,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Tokyo Enterprise Node • Đã xác minh IP Tokyo (Dự phòng #4)",
-        speedMbps = 260,
         countryCode = "JP"
     ),
     ServerLocation(
@@ -147,8 +143,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Đại học Tsukuba Academic • 209 Mbps, AS4713 Tokyo (Dự phòng #5)",
-        speedMbps = 210,
+        description = "Đại học Tsukuba Academic • AS4713 Tokyo (Dự phòng #5)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -159,8 +154,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Đại học Tsukuba Fiber • 333 Mbps, AS4713 Tokyo (Dự phòng #6)",
-        speedMbps = 330,
+        description = "Đại học Tsukuba Fiber • AS4713 Tokyo (Dự phòng #6)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -171,8 +165,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Đại học Tsukuba High-Speed • 187 Mbps, AS4713 Tokyo (Dự phòng #7)",
-        speedMbps = 190,
+        description = "Đại học Tsukuba Node • AS4713 Tokyo (Dự phòng #7)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -183,8 +176,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Đại học Tsukuba Backbone • 195 Mbps, AS4713 Tokyo (Dự phòng #8)",
-        speedMbps = 195,
+        description = "Đại học Tsukuba Backbone • AS4713 Tokyo (Dự phòng #8)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -195,8 +187,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Đại học Tsukuba Transit • 169 Mbps, AS4713 Tokyo (Dự phòng #9)",
-        speedMbps = 170,
+        description = "Đại học Tsukuba Transit • AS4713 Tokyo (Dự phòng #9)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -207,8 +198,7 @@ val DEFAULT_SERVERS = listOf(
         port = 1081,
         protocol = "socks5",
         azureEndpoint = "japanwest.cloudapp.azure.com",
-        description = "Kansai Osaka High-Speed • SOCKS5 tốc độ cao (Dự phòng #10)",
-        speedMbps = 220,
+        description = "Kansai Osaka • SOCKS5 (Dự phòng #10)",
         countryCode = "JP"
     ),
     ServerLocation(
@@ -220,7 +210,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Tokyo Central Cloud Backbone (Dự phòng #11)",
-        speedMbps = 210,
         countryCode = "JP"
     ),
     ServerLocation(
@@ -232,7 +221,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
         description = "Ibaraki / Chiba Research Gateway (Dự phòng #12)",
-        speedMbps = 195,
         countryCode = "JP"
     ),
 
@@ -246,7 +234,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Seoul KT Telecom Fiber Backbone (Khuyên dùng #1)",
-        speedMbps = 280,
         countryCode = "KR"
     ),
     ServerLocation(
@@ -258,7 +245,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Seoul KT Telecom Đường truyền phụ (Dự phòng #2)",
-        speedMbps = 260,
         countryCode = "KR"
     ),
     ServerLocation(
@@ -270,7 +256,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Seoul Hanaro Cloud Relay (Dự phòng #3)",
-        speedMbps = 240,
         countryCode = "KR"
     ),
     ServerLocation(
@@ -282,7 +267,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Seoul Hanaro Cloud Line #2 (Dự phòng #4)",
-        speedMbps = 230,
         countryCode = "KR"
     ),
     ServerLocation(
@@ -294,7 +278,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "socks5",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Incheon SOCKS5 Gateway Tuyến Biển (Dự phòng #5)",
-        speedMbps = 200,
         countryCode = "KR"
     ),
     ServerLocation(
@@ -306,7 +289,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
         description = "Busan South Coast Relay Node (Dự phòng #6)",
-        speedMbps = 180,
         countryCode = "KR"
     ),
 
@@ -320,7 +302,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "westus.cloudapp.azure.com",
         description = "California Silicon Valley • Kho game 100% đầy đủ",
-        speedMbps = 300,
         countryCode = "US"
     ),
     ServerLocation(
@@ -331,8 +312,7 @@ val DEFAULT_SERVERS = listOf(
         port = 4145,
         protocol = "socks5",
         azureEndpoint = "westus2.cloudapp.azure.com",
-        description = "Oregon Pacific Northwest Fast Route (Dự phòng #2)",
-        speedMbps = 220,
+        description = "Oregon Pacific Northwest Route (Dự phòng #2)",
         countryCode = "US"
     ),
     ServerLocation(
@@ -344,7 +324,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "socks5",
         azureEndpoint = "centralus.cloudapp.azure.com",
         description = "Iowa Central Azure Cloud Center (Dự phòng #3)",
-        speedMbps = 190,
         countryCode = "US"
     ),
     ServerLocation(
@@ -356,7 +335,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "eastus.cloudapp.azure.com",
         description = "Virginia East Coast Backbone (Dự phòng #4)",
-        speedMbps = 180,
         countryCode = "US"
     ),
     ServerLocation(
@@ -368,7 +346,6 @@ val DEFAULT_SERVERS = listOf(
         protocol = "http",
         azureEndpoint = "westus.cloudapp.azure.com",
         description = "Las Vegas Western Data Hub (Dự phòng #5)",
-        speedMbps = 175,
         countryCode = "US"
     )
 )
@@ -394,30 +371,30 @@ data class SmartVpnDecision(
 @Immutable
 data class StreamTelemetry(
     val isStreaming: Boolean = false,
-    val fps: Int = 60,
-    val bitrateMbps: Float = 14.2f,
-    val rttMs: Int = 28,
-    val jitterMs: Int = 2,
+    val fps: Int = 0,
+    val bitrateMbps: Float = 0.0f,
+    val rttMs: Int = 0,
+    val jitterMs: Int = 0,
     val packetsLostPercent: Float = 0.0f,
     val framesDropped: Int = 0,
-    val resolution: String = "1920x1080 (FHD)",
-    val codec: String = "H.264 High Profile",
+    val resolution: String = "1280x720",
+    val codec: String = "H.264",
     val audioCodec: String = "Opus Stereo 48kHz",
-    val qualityScore: Float = 4.9f
+    val qualityScore: Float = 0.0f
 )
 
 @Immutable
 data class SystemBenchmarkResult(
     val isRunning: Boolean = false,
     val completed: Boolean = false,
-    val dnsResolveMs: Int = 14,
-    val azureTokyoPingMs: Int = 68,
-    val directIspPingMs: Int = 26,
-    val jitterMs: Int = 3,
+    val dnsResolveMs: Int = 0,
+    val azureTokyoPingMs: Int = 0,
+    val directIspPingMs: Int = 0,
+    val jitterMs: Int = 0,
     val packetLossPercent: Float = 0.0f,
     val hardwareDecoderOk: Boolean = true,
-    val systemScore: Int = 98,
-    val summary: String = "Hệ thống tối ưu hoàn hảo • Đạt chuẩn 1080p60 Zero Lag"
+    val systemScore: Int = 0,
+    val summary: String = "Chưa chạy đo kiểm đường truyền"
 )
 
 @Immutable

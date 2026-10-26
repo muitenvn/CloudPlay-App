@@ -573,7 +573,11 @@ private fun QuickNetworkCockpitCard(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
     val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
-    val directPing = vpnState.directLatencyMs
+    val directPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+        vpnState.directLatencyMs ?: vpnState.latencyMs
+    } else {
+        vpnState.latencyMs ?: vpnState.directLatencyMs
+    }
     val hasPing = directPing != null && directPing > 0
     val animatedDirectPing by animateXboxIntAsState(
         targetValue = directPing ?: 0,
@@ -581,16 +585,17 @@ private fun QuickNetworkCockpitCard(
         label = "cockpit_ping_counter"
     )
     val activeBars = when {
-        !hasPing -> 3
-        directPing < 55 -> 4
-        directPing < 95 -> 3
-        directPing < 150 -> 2
+        !hasPing -> 0
+        directPing < 65 -> 4
+        directPing < 120 -> 3
+        directPing < 200 -> 2
         else -> 1
     }
-    val targetSignalTint = when (activeBars) {
-        4 -> XboxNeonGreen
-        3 -> DirectCyan
-        2 -> WarningAmber
+    val targetSignalTint = when {
+        !hasPing -> TextSecondary
+        activeBars == 4 -> XboxNeonGreen
+        activeBars == 3 -> DirectCyan
+        activeBars == 2 -> WarningAmber
         else -> JapanRed
     }
     val signalTint by animateColorAsState(

@@ -321,12 +321,12 @@ fun UpdateAvailableDialog(
                     }
                 }
 
-                // Dòng ghi chú nhỏ theo yêu cầu mục 7
+                // Dòng ghi chú minh bạch theo Mục 10 báo cáo kỹ thuật
                 Text(
                     text = if (isEn) {
-                        "Fast download via relay server; file is verified before installation."
+                        "Download from secondary server (SHA-256 verification recommended & auto-checked)."
                     } else {
-                        "Tải nhanh qua máy chủ trung gian; file được kiểm tra trước khi cài."
+                        "Tải từ máy chủ phụ (Khuyến nghị đối chiếu mã SHA-256; ứng dụng tự kiểm tra trước khi cài)."
                     },
                     color = TextSecondary,
                     fontSize = 10.5.sp,

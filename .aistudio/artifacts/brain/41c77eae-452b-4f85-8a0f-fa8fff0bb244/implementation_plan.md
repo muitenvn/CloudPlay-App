@@ -1,106 +1,123 @@
-# Tối Ưu Hiệu Năng, Khắc Phục Độ Trễ Cao Trên Mạng 4G & Nâng Cấp Trải Nghiệm Người Dùng
+# Tối Ưu Hóa Toàn Diện Hệ Thống Cloud Gaming Android WebView (Theo Báo Cáo Phân Tích Kỹ Thuật)
 
-Bản kế hoạch này giải quyết tận gốc hiện tượng **trễ điều khiển (input lag), nhảy ping (jitter) và trễ hình ảnh tích lũy** khi chơi Xbox Cloud Gaming qua mạng di động 4G/5G, đồng thời nâng cấp trải nghiệm điều khiển trực quan ngay trong màn hình chơi game.
+Triển khai đồng bộ cả 5 nhóm giải pháp kỹ thuật từ báo cáo phân tích chuyên sâu nhằm loại bỏ hiện tượng khựng hình do can thiệp sai chuẩn W3C trên luồng WebRTC, khóa tần số quét 60Hz chống lệch pha VSync và giảm nhiệt độ thiết bị, tự ngắt thông minh bộ điều tốc Anti-DRX theo nhiệt độ/vòng đời, tích hợp công cụ chẩn đoán 4 lớp **"Vì sao tôi bị lag?"**, chuẩn hóa toàn bộ hệ thống thuật ngữ trung thực và xác minh mã băm SHA-256 khi cập nhật APK.
 
----
-
-## Quyết Định Quan Trọng & Lựa Chọn Mặc Định
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Các cơ chế tối ưu 4G dưới đây hoạt động tự động ngầm 100% ngay khi phát hiện mạng di động 4G/5G, đồng thời cung cấp thêm nút "⚡ Xả Trễ" 1 chạm trên bảng HUD để người chơi chủ động làm mới luồng bất cứ lúc nào:**
-> - **Quyết định đã xác nhận 1 — Tự động chống nghẽn sóng 4G (LTE Anti-Bufferbloat):** Tự động giữ dải băng thông tối ưu **4.0 – 8.0 Mbps (720p60 không khung B-frame)** trên 4G để gói tin đi qua trạm thu phát LTE tức thì, không bị xếp hàng chờ tại trạm.
-> - **Quyết định đã xác nhận 2 — Giới hạn bộ đệm WebRTC ở mức siêu nhạy:** Giảm trần bộ đệm thu trên 4G từ `45ms` xuống **`10ms – 22ms`** (mặc định `12ms`) và rút ngắn thời gian thu hồi đệm từ `9 giây` xuống **`4.5 giây`**.
-> - **Quyết định đã xác nhận 3 — Tự động bám sát khung hình thực tế (Live-Edge Sync) & Nút "⚡ Xả Trễ" trên HUD:** Tự động xả độ trễ hình ảnh bị dồn cục sau mỗi nhịp sóng 4G chập chờn và bổ sung nút bấm 1 chạm ngay trên HUD để làm mới bộ đệm mà không cần tải lại trang game.
+> Các quyết định sản phẩm và kỹ thuật dưới đây đã được xác nhận trong Bước 1 và sẽ được áp dụng xuyên suốt toàn bộ hệ thống:
+
+- **Confirmed Decision 1 — Phạm vi triển khai**: Áp dụng đầy đủ cả 5 nhóm tối ưu hóa kỹ thuật và giao diện trong báo cáo phân tích (chuẩn hóa WebRTC W3C, khóa 60Hz + Wi-Fi Low Latency + `bindProcessToNetwork`, chuẩn hóa nhãn trung thực + ngưỡng màu ITU-T G.1072, tự ngắt Anti-DRX theo nhiệt độ/trạng thái nghỉ + nhắc ngắt VPN khi vào game, và xác minh SHA-256 + siết chặt `@JavascriptInterface`).
+- **Confirmed Decision 2 — Xử lý nút hỗ trợ & Chẩn đoán trên HUD**: Thay thế hoàn toàn cơ chế "Xả trễ tức thì" cũ bằng nút **"Đồng bộ lại khung hình"** (tuân thủ chuẩn W3C, không can thiệp `playbackRate` hay `currentTime`) và bổ sung mục **Chẩn đoán 4 lớp "Vì sao tôi bị lag?"** ngay trong bảng HUD mở rộng.
+- **Confirmed Decision 3 — Cơ chế khóa tần số quét 60Hz**: Tự động khóa tần số quét màn hình ở mức **60Hz** (`preferredDisplayModeId`) ngay khi vào màn hình chơi game để khớp nhịp 60fps của WebRTC, và tự động khôi phục tần số quét mặc định của hệ thống khi thoát về màn hình chính.
 
 ---
 
-## 1. Tổng Quan & Giá Trị Cốt Lõi
+## 1. Overview & Core Concept
 
-- **Mục tiêu giải quyết:** Khi chơi Cloud Gaming trên mạng 4G, độ trễ cao không chỉ đến từ khoảng cách máy chủ mà chủ yếu do **3 nguyên nhân đặc thù của sóng di động**:
-  1. **Nghẽn hàng đợi tại trạm phát 4G (LTE Bufferbloat) và bộ đệm thu phình to (`45ms`):** Cộng với ping 4G thực tế (`70–110ms`), tổng độ trễ từ lúc bấm nút đến lúc nhân vật phản hồi vọt lên `140–180ms`.
-  2. **Modem 4G rơi vào trạng thái ngủ ngắn (LTE RRC Connected DRX):** Khi luồng dữ liệu chiều lên (uplink) nghỉ vài chục mili-giây, chip modem 4G tự chuyển sang chế độ tiết kiệm năng lượng ngắn hạn, làm chậm thao tác bấm nút thêm `25–45ms`.
-  3. **Trễ hình ảnh tích lũy (Catch-up Lag):** Sau một nhịp sóng 4G khựng nhẹ, các khung hình cũ ứ đọng trong hàng đợi trình phát `<video>`, khiến hình ảnh hiển thị chậm hơn thực tế hàng trăm mili-giây.
-- **Đối tượng phục vụ:** Người chơi Xbox Cloud Gaming trên điện thoại Android qua mạng di động 4G/5G hoặc mạng Wi-Fi có độ dao động cao, cần phản hồi tay cầm tức thì và khung hình mượt mà.
-- **Giá trị mang lại:** Giảm **35ms – 65ms** tổng độ trễ đầu-cuối (end-to-end input lag) trên mạng 4G, loại bỏ hiện tượng trễ hình kéo dài sau khi rớt sóng nhẹ, và giữ giao diện đạt chuẩn 60/120fps không giật khựng.
-
----
-
-## 2. Trải Nghiệm Người Dùng & Thiết Kế Giao Diện (UX & Visual Design)
-
-- **Luồng trải nghiệm người dùng (Key User Flows):**
-  1. **Tự động kích hoạt khi vào game bằng 4G/5G:** Ngay khi vào màn hình chơi game, hệ thống tự động nhận diện kết nối di động, kích hoạt cấu hình **4G Siêu Nhạy** (ghim đường truyền trực tiếp sau khi mở khóa vùng, khóa codec phần cứng 0-B-frame và giữ thức modem 4G).
-  2. **Theo dõi độ trễ trực quan trên bảng HUD:** Khi mở bảng điều khiển nổi (Floating HUD), người chơi thấy ngay trạng thái mạng hiện tại (ví dụ: `📶 4G Siêu Nhạy • Đệm 12ms`) cùng phân tách độ trễ rõ ràng: **Mạng (Ping)** + **Giải mã (Decode)** + **Bộ đệm (Buffer)**.
-  3. **Thao tác 1 chạm "⚡ Xả Trễ" (Instant Lag Flush):** Khi người chơi đi vào vùng sóng 4G yếu khiến cảm giác bấm nút hơi nặng tay, chỉ cần bấm nút **"⚡ Xả Trễ"** trên bảng HUD. Hệ thống lập tức xả toàn bộ khung hình ứ đọng, đưa bộ đệm về `10ms`, đồng bộ lại nhịp tay cầm và hiện thông báo xác nhận ngay lập tức mà **không làm gián đoạn hay tải lại ván game**.
-
-- **Định hướng thẩm mỹ & Hệ màu (Visual Identity & Theme):**
-  - *Phong cách thiết kế:* **Xbox Dashboard Utilitarian Dark** — tối giản, sắc nét, độ tương phản cao, ưu tiên tốc độ phản hồi dưới `200ms`.
-  - *Bảng màu ngữ nghĩa:*
-    - Nền bề mặt HUD (`--background` / Surface): Đen bán trong suốt `#CC0E1318` kết hợp viền mảnh `#26FFFFFF` giúp nổi bật trên nền video game mà không gây chói.
-    - Màu nhấn chủ đạo (`--primary` / Xbox Emerald): Xanh lá `#107C10` và `#22C55E` cho trạng thái mạng ổn định / tối ưu 4G đang bật.
-    - Màu nhấn hành động nhanh (`--accent` / Instant Flush): Xanh lục lam / Vàng tia chớp `#00E5FF` / `#F59E0B` cho nút **"⚡ Xả Trễ"** và chỉ báo tự động thu hồi trễ.
-    - Cảnh báo độ trễ (`--warning` / `--danger`): Vàng hổ phách `#F59E0B` khi ping 4G dao động nhẹ và Đỏ `#EF4444` khi nghẽn trạm phát.
-  - *Bố cục & Tương tác:* Mọi nút bấm nhanh trên HUD tuân thủ kích thước chạm tối thiểu `48dp`, có phản hồi xúc giác (haptic feedback) nhẹ và hiệu ứng chuyển trạng thái mượt mà.
+- **What It Does**: Hệ thống tối ưu hóa chu trình truyền nhận và hiển thị luồng game đám mây trên Android WebView dựa trên các tiêu chuẩn W3C WebRTC, ITU-T G.1072 và đặc tả mạng di động 3GPP LTE, đồng thời cung cấp thông tin minh bạch, trung thực về tình trạng đường truyền và thiết bị.
+- **Target Audience / Persona**: Người chơi Xbox Cloud Gaming tại Việt Nam kết nối tới máy chủ Nhật Bản qua mạng di động 4G/LTE hoặc Wi-Fi, cần độ ổn định khung hình cao, kiểm soát nhiệt độ/pin tốt và hiểu rõ nguyên nhân khi mạng biến động.
+- **Key Value**:
+  - Chấm dứt hoàn toàn hiện tượng khựng hình, cạn bộ đệm (buffer underrun) và méo tiếng do việc ép `playbackRate = 1.05` / `currentTime` trước đây gây ra.
+  - Giảm 3–4°C nhiệt độ máy và loại bỏ hiện tượng giật vi mô (micro-stuttering) nhờ đồng bộ 60Hz VSync kết hợp `requestVideoFrameCallback()`.
+  - Bảo vệ pin và ngăn bóp xung nhiệt (Thermal Throttling) nhờ cơ chế tự ngắt xung Anti-DRX khi nhiệt độ tăng hoặc khi tạm dừng/xuống nền.
+  - Giúp người chơi tự xác định nguyên nhân gây trễ trong 3 giây qua bộ chẩn đoán 4 lớp (Thiết bị/Nhiệt độ, Mạng cục bộ, Tuyến cáp quốc tế, Trạng thái VPN).
 
 ---
 
-## 3. Quyết Định Sản Phẩm & Đánh Đổi Kỹ Thuật (Trade-Offs)
+## 2. User Experience & Visual Design
 
-- **Quyết định 1: Ưu tiên hạ nhanh Bitrate (4.0 – 8.0 Mbps) thay vì tăng bộ đệm thu trên mạng 4G**
-  - *Giải pháp lựa chọn:* Giữ trần bộ đệm thu (`jitterBufferTarget`) ở mức `10ms – 22ms` trên 4G và chủ động hạ bitrate xuống `4.0 – 6.0 Mbps` ngay khi phát hiện xu hướng ping tăng (`rttTrendDelta >= 12ms`).
-  - *Lý do:* Trên mạng 4G, khi sóng yếu, trạm phát LTE (eNodeB) tự động xếp hàng các gói tin lớn gây ra hiện tượng **Bufferbloat** (ping vọt lên 250–400ms). Việc tăng bộ đệm thu trên máy khách chỉ làm hình ảnh trễ thêm mà không giải quyết được tắc nghẽn tại trạm phát. Hạ nhẹ kích thước gói tin video giúp thông rỗng hàng đợi trạm 4G trong 1–2 giây, giữ thao tác điều khiển luôn nhạy.
-  - *Phương án đã loại bỏ:* Giữ bitrate cao (12–15 Mbps) và tăng bộ đệm lên 45–60ms (gây trễ nút bấm nặng nề, không thể chơi các game hành động/bắn súng).
+- **Key User Flows**:
+  1. **Vào phiên chơi & Nhắc ngắt VPN thông minh**: Khi luồng hình ảnh WebRTC bắt đầu giải mã thành công (`onStreamConnected`), nếu phát hiện VPN/Proxy vẫn đang bật, hệ thống hiển thị thanh thông báo nổi rõ ràng: *"Game đã tải thành công! Hãy ngắt VPN ngay để giảm độ trễ."*
+  2. **Giám sát chất lượng theo chuẩn ITU-T G.1072 trên HUD**:
+     - Thanh HUD hiển thị đèn trạng thái 3 màu tiêu chuẩn: **Xanh lá** (Ổn định), **Vàng** (Cảnh báo), **Đỏ** (Kém) kèm theo cấu trúc thông báo tự động: `[1 câu xác định nguyên nhân] + [1 câu gợi ý giải pháp]`.
+  3. **Đồng bộ lại khung hình (Thay cho "Xả trễ tức thì")**:
+     - Khi người chơi bấm nút **"Đồng bộ lại khung hình"** trên HUD, hệ thống thực hiện đồng bộ lại bộ đệm `jitterBufferTarget` an toàn cho cả hai kênh Audio và Video theo mức biến động mạng thực tế (`jitterMs`) và kích hoạt đồng bộ lại nhịp vẽ khung hình mà tuyệt đối không chạm vào `playbackRate` hay `currentTime`.
+  4. **Chẩn đoán nhanh 4 lớp "Vì sao tôi bị lag?"**:
+     - Khi người chơi nhấn nút **"Vì sao tôi bị lag?"** trên HUD, hệ thống thực thi kiểm tra 4 lớp (Môi trường nhiệt độ & tiết kiệm pin thiết bị, Kết nối cục bộ Wi-Fi/4G, Tuyến cáp quốc tế sang Nhật, và Trạng thái VPN) rồi hiển thị bảng kết quả trực quan kèm hướng khắc phục ngay lập tức.
 
-- **Quyết định 2: Cơ chế giữ thức Modem 4G (Anti-DRX Uplink Pacer) chỉ chạy khi đang trong luồng Stream trên mạng di động**
-  - *Giải pháp lựa chọn:* Phát xung nhịp đánh thức siêu nhẹ (chu kỳ `28ms` khi tay cầm đang nghỉ) trên kênh kết nối WebRTC khi phát hiện mạng 4G/5G và tự tắt ngay khi thoát game hoặc chuyển sang Wi-Fi.
-  - *Lý do:* Giữ chip modem 4G luôn ở trạng thái thức liên tục (Active Continuous Reception) trong suốt ván chơi để triệt tiêu `25–45ms` độ trễ đánh thức modem, nhưng không gây hao pin khi người dùng ở ngoài màn hình chính.
-
-- **Quyết định 3: Khóa Codec H.264 Constrained Baseline (`42e01f`) không khung B-frame khi dùng 4G**
-  - *Giải pháp lựa chọn:* Tự động sắp xếp ưu tiên SDP sang `42e01f` cho cả chế độ mạng 4G bên cạnh chế độ máy yếu.
-  - *Lý do:* Khung hình B-frame đòi hỏi bộ giải mã phải chờ các khung hình phía sau mới hiển thị được; nếu mạng 4G rớt 1 gói tin, cả cụm khung hình sẽ bị khựng. Loại bỏ B-frame giúp giải mã tức thì từng khung hình (`decodeTime < 4.5ms`) và chống khựng hình khi sóng 4G chập chờn.
+- **Visual Identity & Theme**:
+  - *Aesthetic Direction*: Phong cách **Utilitarian Dark** đặc trưng của bảng điều khiển kỹ thuật phòng máy (nền mờ `#CC0E1318`, viền mảnh `#26FFFFFF`), gọn gàng, không che khuất tầm nhìn trong trận.
+  - *Color Palette & Mood*:
+    - Trạng thái **Tốt (Xanh lá `#107C10` / `#2ECC71`)**: Ping `< 80ms`, Jitter `< 8ms`, Giải mã `< 8ms`, Rớt khung hình `< 0.5%`.
+    - Trạng thái **Cảnh báo (Vàng `#FFB300`)**: Ping `80–120ms`, Jitter `8–20ms`, Giải mã `8–16ms`, Rớt khung hình `0.5–2.0%`.
+    - Trạng thái **Báo động (Đỏ `#FF4D4F`)**: Ping `> 120ms`, Jitter `> 20ms`, Giải mã `> 16.6ms`, Rớt khung hình `> 2.0%`.
+  - *Typography & Honest Terminology*:
+    - Thay thế toàn bộ các cụm từ quảng cáo phóng đại bằng thuật ngữ kỹ thuật trung thực:
+      - `"4G Siêu Nhạy"` ➔ **`"Ưu tiên độ nhạy 4G"`** / **`"Chế độ phản hồi nhanh (4G)"`**
+      - `"Xả trễ tức thì"` / `"Xả trễ"` ➔ **`"Đồng bộ lại khung hình"`** / **`"Khôi phục luồng hình ảnh"`**
+      - `"Zero Lag"` / `"ZeroLagScreenRecorder"` (nhãn hiển thị) ➔ **`"Ghi màn hình tối ưu phần cứng"`**
+      - `"Tối ưu hoàn hảo"`, `"Chống nghẽn"` ➔ **`"Tự động thích ứng mạng"`**, **`"Hạn chế nghẽn đường truyền"`**
+      - `"Tải nhanh (qua máy chủ trung gian, nên kiểm tra mã)"` ➔ **`"Tải từ máy chủ phụ (Khuyến nghị đối chiếu mã SHA-256)"`**
+  - *Touch Targets & Ergonomics*:
+    - Mọi nút điều khiển tương tác đảm bảo vùng chạm tối thiểu `48dp x 48dp`, áp dụng bộ lọc vùng chết hình tròn (radial deadzone: vùng chết trong `10–12%`, vùng chết ngoài `90%`) và xung rung xúc giác ngắn `10–15ms`.
 
 ---
 
-## 4. Kiến Trúc Kỹ Thuật & Chiến Lược Dữ Liệu
+## 3. Key Product Decisions & Trade-Offs
 
-### Sơ Đồ Kiến Trúc Hệ Thống Chống Trễ 4G
+- **Decision 1: Loại bỏ hoàn toàn can thiệp `playbackRate` / `currentTime` và đồng bộ `jitterBufferTarget` kép (Audio + Video)**
+  - *Chosen Approach*: Xóa toàn bộ các đoạn mã gán `vEl.playbackRate = 1.05` / `1.06` và `vEl.currentTime = ...` trong luồng tự động lẫn nút bấm thủ công; khi điều chỉnh `jitterBufferTarget` và `playoutDelayHint`, luôn áp dụng đồng thời cho cả bộ thu `video` và `audio` với mức chặn dưới bám sát độ biến động thực tế (`max(20ms, jitterMs * 1.8)` trên 4G) thay vì ép cứng 8–10ms.
+  - *Why*: Tuân thủ đặc tả W3C Media Capture & Streams và cơ chế đồng bộ A/V của Chromium (NetEq + VCM), giúp loại bỏ triệt để hiện tượng cạn kiệt bộ đệm gây đứng hình và méo tiếng.
+- **Decision 2: Đo độ trễ RTT độc quyền từ `candidate-pair.currentRoundTripTime` kết hợp điều tốc Multiplicative Decrease / Additive Increase (AIMD)**
+  - *Chosen Approach*: Chỉ sử dụng `currentRoundTripTime` từ `selectedCandidatePair` của WebRTC (loại bỏ hoàn toàn mọi phép đo HTTP HEAD phụ tới tên miền web CDN). Khi phát hiện độ dốc trễ tăng (`rttTrendDelta >= 12ms`), lập tức hạ nhanh một bước lớn (Multiplicative Decrease) xuống dải `4.0–6.0 Mbps` để làm rỗng hàng đợi eNodeB, và chỉ tăng chậm từng bậc nhỏ (Additive Increase) kèm chu kỳ giữ ổn định (hysteresis) để tránh dao động liên tục (hunting effect).
+  - *Why*: Phản ánh chính xác 100% độ trễ UDP thực tế tới máy chủ game tại Nhật Bản và xả nhanh hàng đợi trạm phát LTE trong 1–2 giây.
+- **Decision 3: Khóa 60Hz VSync khi vào màn chơi và quản lý chặt vòng đời `onPause` / Nhiệt độ cho Anti-DRX**
+  - *Chosen Approach*: Chọn `Display.Mode` có cùng độ phân giải vật lý và tần số quét `60Hz` khi vào màn chơi game; tự động tạm dừng luồng WebView, dừng xung Anti-DRX ngay khi `onPause()` (xuống nền/cuộc gọi), khi người chơi nghỉ tay quá 20 giây, hoặc khi nhiệt độ máy đạt ngưỡng `THERMAL_STATUS_MODERATE` trở lên.
+  - *Why*: Triệt tiêu hiện tượng lệch pha 60fps trên màn 120Hz, tiết kiệm 15–20% pin, ngăn chặn tiêu tốn dữ liệu ngầm và chống bóp xung nhiệt.
+
+---
+
+## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+
+### Architecture & Component Diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                   BỘ QUẢN LÝ MẠNG 4G/5G (Network Layer)                    │
-│   • Phát hiện mạng di động (Cellular 4G/5G), đo băng thông & cường độ sóng │
-│   • Ghim thẳng tiến trình vào mạng di động trực tiếp sau khi mở khóa vùng  │
-└─────────────────────────────────────┬──────────────────────────────────────┘
-                                      │
-          ┌───────────────────────────┼───────────────────────────┐
-          ▼                           ▼                           ▼
-┌───────────────────┐       ┌───────────────────┐       ┌────────────────────┐
-│ 1. ĐIỀU PHỐI ĐỆM  │       │ 2. GIỮ THỨC MODEM │       │ 3. ĐỒNG BỘ THỰC TẾ │
-│ & BĂNG THÔNG 4G   │       │ 4G (ANTI-DRX)     │       │ (LIVE-EDGE SYNC)   │
-├───────────────────┤       ├───────────────────┤       ├────────────────────┤
-│ • Đệm thu: 10-22ms│       │ • Nhịp giữ thức   │       │ • Tự xả khung hình │
-│ • Cắt nhanh nghẽn │       │   uplink 28ms khi │       │   cũ tồn đọng khi  │
-│   trạm phát (4-8M)│       │   tay cầm nghỉ    │       │   trễ đệm > 26ms   │
-│ • Thu hồi đệm sau │       │ • Triệt tiêu 35ms │       │ • Ưu tiên phần cứng│
-│   3 nhịp (4.5s)   │       │   trễ ngủ modem   │       │   H.264 0-B-frame  │
-└─────────┬─────────┘       └─────────┬─────────┘       └─────────┬──────────┘
-          └───────────────────────────┼───────────────────────────┘
-                                      ▼
+│                        TẦNG HỆ ĐIỀU HÀNH ANDROID                           │
+│  ┌──────────────────────────┐  ┌────────────────────────┐  ┌────────────┐  │
+│  │ Khóa Màn Hình 60Hz VSync │  │ Wi-Fi Low Latency Lock │  │ Kiểm Nhiệt │  │
+│  │ (preferredDisplayModeId) │  │ + bindProcessToNetwork │  │ & PowerMgr │  │
+│  └────────────┬─────────────┘  └───────────┬────────────┘  └─────┬──────┘  │
+└───────────────┼────────────────────────────┼─────────────────────┼─────────┘
+                ▼                            ▼                     ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
-│               GIAO DIỆN ĐIỀU KHIỂN TRONG GAME (In-Game HUD)                │
-│   • Gom nhóm cập nhật Telemetry (1.5s/lần) chống giật luồng giao diện      │
-│   • Hiển thị trạng thái 4G Siêu Nhạy & độ trễ từng phần (Ping/Decode/Đệm)  │
-│   • Nút [⚡ Xả Trễ] 1 chạm: làm rỗng bộ đệm & đồng bộ khung hình tức thì    │
+│                     TẦNG ĐIỀU KHIỂN & TỐI ƯU MẠNG                          │
+│  ┌───────────────────────────────────┐  ┌────────────────────────────────┐ │
+│  │ Bộ Điều Tốc AIMD & Anti-DRX Pacer │  │ Bộ Chẩn Đoán 4 Lớp (3 Giây)    │ │
+│  │ • Hạ nhanh 4–6 Mbps khi phình trễ │  │ 1. Nhiệt độ & Tiết kiệm pin    │ │
+│  │ • Tự ngắt xung khi nóng / ngầm    │  │ 2. Sóng cục bộ (Wi-Fi/4G RSSI) │ │
+│  │ • Đồng bộ đệm Audio+Video an toàn │  │ 3. Tuyến cáp quốc tế sang Nhật │ │
+│  └─────────────────┬─────────────────┘  │ 4. Phát hiện VPN / Proxy bật   │ │
+│                    │                    └───────────────┬────────────────┘ │
+└────────────────────┼────────────────────────────────────┼──────────────────┘
+                     ▼                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                TẦNG GIAO DIỆN HUD & BẢO MẬT CẬP NHẬT APK                   │
+│  ┌───────────────────────────────────┐  ┌────────────────────────────────┐ │
+│  │ Thanh HUD Chuẩn ITU-T G.1072      │  │ Bảo Mật WebView & SHA-256      │ │
+│  │ • Đèn 3 màu: Xanh / Vàng / Đỏ     │  │ • Kiểm tra chặt origin xbox.com│ │
+│  │ • [Nguyên nhân] + [Giải pháp]     │  │ • Tạm dừng WebView khi onPause │ │
+│  │ • Nút "Đồng bộ lại khung hình"    │  │ • Xác minh SHA-256 file APK    │ │
+│  └───────────────────────────────────┘  └────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Mô Hình Trạng Thái & Ánh Xạ Tương Tác (State & Interactive Mapping)
+### Interactive Component & State Mapping
 
-- **Trạng thái điều phối chất lượng & độ trễ 4G:**
-  - `isCellular`: Cờ nhận diện kết nối 4G/5G thời gian thực từ hệ thống mạng Android, tự động chuyển dải bộ đệm mục tiêu sang `10.0ms – 22.0ms` (thay vì `12.0ms – 45.0ms`) và hạ ngưỡng thu hồi bộ đệm từ `6` chu kỳ (`9.0s`) xuống `3` chu kỳ ổn định (`4.5s`).
-  - `rttTrendDelta` & `jitterMs`: Khi `isCellular == true` và phát hiện `rttTrendDelta >= 12ms` hoặc `jitterMs >= 10ms`, lập tức giảm trần bitrate xuống `4.0 – 6.5 Mbps` để giải phóng hàng đợi gói tin tại trạm thu phát 4G trước khi ping kịp tăng vọt.
-- **Cơ chế Đồng bộ khung hình thời gian thực (Live-Edge Catch-up) & Xả trễ chủ động:**
-  - **Tự động (`Live-Edge Sync`):** Trong vòng lặp kiểm tra luồng phát, nếu phát hiện độ trễ bộ đệm (`jitterBufferDelayMs`) vượt `26ms` hoặc thời gian phát `<video>` bị tụt lại sau điểm thời gian thực (`buffered.end - currentTime > 0.045s`), hệ thống tự động kích hoạt nhịp bắt kịp `playbackRate = 1.05` trong `250ms` kết hợp ép `playoutDelayHint = 0.010` để đốt sạch khung hình trễ tồn đọng.
-  - **Chủ động qua nút `"⚡ Xả Trễ"` trên HUD:** Khi người chơi chạm nút **"⚡ Xả Trễ"**, sự kiện sẽ gọi đồng thời:
-    1. Đặt lại bộ đệm mục tiêu về mức thấp nhất (`10.0ms`) và xóa lịch sử phạt trễ.
-    2. Thực thi lệnh xả bộ đệm trực tiếp trên luồng WebRTC (`playoutDelayHint = 0.008`, `jitterBufferTarget = 10`, nhảy `currentTime` sát mép `buffered.end` và đồng bộ lại kênh tay cầm).
-    3. Hiển thị thông báo nhanh xác nhận đã xả độ trễ thành công trên màn hình.
+1. **Chu trình Khóa 60Hz & Vòng đời WebView**:
+   - Khi mở màn chơi game: Chọn `Display.Mode` khớp độ phân giải hiện tại với tần số quét gần `60.0Hz` nhất (`59.0f..61.0f`), kích hoạt `WIFI_MODE_FULL_LOW_LATENCY` (trên Wi-Fi) và gọi `ConnectivityManager.bindProcessToNetwork(activeNetwork)` (khi không bật VPN).
+   - Khi ứng dụng chuyển xuống nền (`onPause`): Gọi `webView.onPause()`, `webView.pauseTimers()` và tạm ngắt bộ phát xung Anti-DRX để không tiêu thụ dữ liệu 4G ngầm; khôi phục lại khi `onResume()`.
+2. **Chu trình Đồng bộ lại khung hình & Điều tốc WebRTC**:
+   - Xóa hoàn toàn mọi lệnh gán `playbackRate` và `currentTime` trên thẻ `<video>`.
+   - Nút **"Đồng bộ lại khung hình"** tính toán ngưỡng bộ đệm an toàn dựa trên `jitterMs` hiện tại, cập nhật đồng thời cho cả `RTCRtpReceiver` của `video` và `audio`, đồng thời đồng bộ lại khung hình hiển thị qua `requestVideoFrameCallback()`.
+   - Đo RTT độc quyền từ `candidate-pair.currentRoundTripTime` của cặp kết nối đang hoạt động (`selectedCandidatePairId` / `nominated`).
+3. **Chu trình Chẩn đoán 4 lớp "Vì sao tôi bị lag?"**:
+   - Thu thập tức thời 4 lớp dữ liệu thực tế:
+     1. *Lớp Thiết bị*: Trạng thái nhiệt độ (`PowerManager.currentThermalStatus`), chế độ tiết kiệm pin (`isPowerSaveMode`), và thời gian giải mã phần cứng (`decodeTimeMs`).
+     2. *Lớp Mạng cục bộ*: Loại mạng vật lý (Wi-Fi 2.4GHz/5GHz/6GHz kèm `RSSI dBm` hoặc 4G/LTE/3G kèm băng thông downlink và `jitterMs`).
+     3. *Lớp Tuyến quốc tế*: So sánh `rttMs` thực tế từ WebRTC sang máy chủ Nhật Bản để phát hiện nghẽn cáp biển hoặc bóp băng thông giờ cao điểm (`20:00–23:00`).
+     4. *Lớp VPN/Định tuyến*: Kiểm tra cờ `TRANSPORT_VPN` / trạng thái Proxy đang bật trong khi stream đã kết nối để nhắc tắt VPN ngay.
+4. **Chu trình Bảo mật `@JavascriptInterface` & Xác minh SHA-256 APK**:
+   - Kiểm tra nghiêm ngặt nguồn gọi `@JavascriptInterface` chỉ chấp nhận giao thức `https` trên tên miền chính thức `xbox.com` / `*.xbox.com`.
+   - Cung cấp bộ kiểm tra tính toàn vẹn tệp APK tải về bằng thuật toán băm mật mã `SHA-256`, đối chiếu khớp với mã SHA-256 công bố từ bản phát hành GitHub trước khi cho phép mở trình cài đặt hệ thống `PackageInstaller`.

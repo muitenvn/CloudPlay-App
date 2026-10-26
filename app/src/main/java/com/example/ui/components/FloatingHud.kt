@@ -572,9 +572,8 @@ fun FloatingHud(
                     val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
                         !hasValidPing -> Color.Gray
-                        rawPing < 50 -> DirectCyan
-                        rawPing < 90 -> XboxNeonGreen
-                        rawPing < 130 -> Color(0xFFFFB300)
+                        rawPing < 80 -> XboxNeonGreen
+                        rawPing <= 120 -> Color(0xFFFFB300)
                         else -> JapanRed
                     }
                     val pingText = if (!hasValidPing) {
@@ -620,13 +619,16 @@ fun FloatingHud(
                     // ==========================================
                     // COMPACT STATE: ULTRA-SLIM ROW WITH HOME BUTTON (~145dp)
                     // ==========================================
-                    val compactRawPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs
+                    val compactRawPing = when {
+                        telemetry.rttMs > 0 -> telemetry.rttMs
+                        vpnState.mode == NetworkMode.DIRECT_NETWORK -> vpnState.directLatencyMs
+                        else -> vpnState.latencyMs
+                    }
                     val compactHasValidPing = compactRawPing != null && compactRawPing > 0
                     val pingColor = when {
                         !compactHasValidPing -> Color.Gray
-                        compactRawPing < 50 -> DirectCyan
-                        compactRawPing < 90 -> XboxNeonGreen
-                        compactRawPing < 130 -> Color(0xFFFFB300)
+                        compactRawPing < 80 -> XboxNeonGreen
+                        compactRawPing <= 120 -> Color(0xFFFFB300)
                         else -> JapanRed
                     }
                     val compactPingText = if (!compactHasValidPing) {
@@ -979,6 +981,7 @@ fun FloatingHud(
                                     networkStatus = networkStatus,
                                     adaptiveQualityState = adaptiveQualityState,
                                     telemetry = telemetry,
+                                    isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
                                     onSelectCellularMode = { mode ->
                                         markUserInteraction()
                                         onSelectCellularMode(mode)
@@ -1538,14 +1541,22 @@ private fun DenseCoreTelemetrySection(
         adaptiveBufferMs.coerceIn(8, 45)
     }
     val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
-        String.format("%.1fms • Đệm %dms", telemetry.decodeTimeMs, liveBufMs)
+        String.format("%.1fms • Bộ đệm %dms", telemetry.decodeTimeMs, liveBufMs)
     } else {
-        "-- ms • Đệm ${liveBufMs}ms"
+        "-- ms • Bộ đệm ${liveBufMs}ms"
     }
+    // Chuẩn ITU-T G.1072 / 60Hz (16.6ms): < 8ms Xanh, 8-16ms Vàng, > 16ms Đỏ
     val decodeColor = when {
         telemetry.decodeTimeMs <= 0.0 -> TextSecondary
-        telemetry.decodeTimeMs <= 8.5 -> XboxNeonGreen
-        telemetry.decodeTimeMs <= 12.0 -> DirectCyan
+        telemetry.decodeTimeMs < 8.0 -> XboxNeonGreen
+        telemetry.decodeTimeMs <= 16.0 -> Color(0xFFFFB300)
+        else -> JapanRed
+    }
+
+    val pingMetricColor = when {
+        effectivePing == null || effectivePing <= 0 -> TextSecondary
+        effectivePing < 80 -> XboxNeonGreen
+        effectivePing <= 120 -> Color(0xFFFFB300)
         else -> JapanRed
     }
 
@@ -1575,6 +1586,58 @@ private fun DenseCoreTelemetrySection(
         else -> TextPrimary
     }
 
+    // Phân loại tự động 3 trạng thái theo chuẩn ITU-T G.1072: [1 câu nguyên nhân] + [1 câu gợi ý]
+    val pVal = effectivePing ?: 0
+    val jVal = telemetry.jitterMs
+    val dVal = telemetry.decodeTimeMs
+    val isRedState = pVal > 120 || jVal > 20 || dVal > 16.0
+    val isYellowState = !isRedState && (pVal in 80..120 || jVal in 8..20 || dVal in 8.0..16.0)
+    val statusAssessmentColor = when {
+        pVal <= 0 && dVal <= 0.0 -> TextSecondary
+        isRedState -> JapanRed
+        isYellowState -> Color(0xFFFFB300)
+        else -> XboxNeonGreen
+    }
+    val statusAssessmentText = when {
+        pVal <= 0 && dVal <= 0.0 -> if (isEn) {
+            "Waiting for WebRTC stream metrics..."
+        } else {
+            "Đang đồng bộ thông số luồng WebRTC..."
+        }
+        isRedState -> when {
+            vpnState.mode != NetworkMode.DIRECT_NETWORK && pVal > 120 -> if (isEn) {
+                "High network latency (Ping: ${pVal}ms). Tip: Turn off VPN now to route directly."
+            } else {
+                "Độ trễ mạng tăng cao (Ping: ${pVal}ms). Gợi ý: Tắt VPN ngay sau khi vào game để giảm trễ."
+            }
+            dVal > 16.0 -> if (isEn) {
+                "Slow hardware decode (${String.format("%.1f", dVal)}ms > 16.6ms). Tip: Switch to 720p or cool down device."
+            } else {
+                "Giải mã khung hình chậm (${String.format("%.1f", dVal)}ms > 16.6ms). Gợi ý: Chuyển về 720p hoặc để máy hạ nhiệt."
+            }
+            jVal > 20 -> if (isEn) {
+                "Unstable network (Jitter: ${jVal}ms). Tip: Move closer to Wi-Fi or stronger 4G area."
+            } else {
+                "Độ biến động mạng cao (Jitter: ${jVal}ms). Gợi ý: Di chuyển tới nơi sóng 4G mạnh hơn hoặc dùng Wi-Fi 5GHz."
+            }
+            else -> if (isEn) {
+                "High network latency (Ping: ${pVal}ms). Tip: Pause background downloads or check VPN."
+            } else {
+                "Độ trễ mạng tăng cao (Ping: ${pVal}ms). Gợi ý: Kiểm tra xem VPN đã tắt chưa hoặc tạm dừng tải ngầm."
+            }
+        }
+        isYellowState -> if (isEn) {
+            "Moderate connection (Ping: ${pVal}ms | Jitter: ${jVal}ms). Tip: Keep Auto quality enabled to limit congestion."
+        } else {
+            "Đường truyền biến động nhẹ (Ping: ${pVal}ms | Biến động: ${jVal}ms). Gợi ý: Giữ chế độ Tự động để hạn chế nghẽn trạm."
+        }
+        else -> if (isEn) {
+            "Stable stream (Ping: ${pVal}ms | Decode: ${String.format("%.1f", dVal)}ms)."
+        } else {
+            "Ổn định (Độ trễ: ${pVal}ms | Giải mã: ${String.format("%.1f", dVal)}ms)."
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -1585,11 +1648,11 @@ private fun DenseCoreTelemetrySection(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // 1. Dòng Độ trễ (chạm để chuyển nhanh Direct / VPN)
+            // 1. Dòng Độ trễ mạng (chạm để chuyển nhanh Direct / VPN)
             DenseMetricRowItem(
-                label = stringResource(R.string.hud_stream_latency),
+                label = if (isEn) "Network latency" else "Độ trễ mạng",
                 value = latencyDisplayText,
-                valueColor = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
+                valueColor = pingMetricColor,
                 badgeText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
                     if (isEn) "VPN" else "Đổi VPN"
                 } else {
@@ -1598,19 +1661,19 @@ private fun DenseCoreTelemetrySection(
                 onRowClick = onToggleNetwork
             )
 
-            // 2. Dòng FPS & tốc độ luồng
+            // 2. Dòng FPS & Chất lượng truyền tải
             DenseMetricRowItem(
                 label = "FPS",
                 value = "$fpsValueText ($bitrateValueText)",
                 valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
             )
 
-            // 3. Dòng Thời gian giải mã khung hình & Bộ đệm (chạm để Xả trễ ngay)
+            // 3. Dòng Thời gian giải mã & Bộ đệm dữ liệu (chạm để Đồng bộ lại khung hình)
             DenseMetricRowItem(
-                label = if (isEn) "Decode" else "Giải mã",
-                value = if (isEn) decodeTimeText.replace("Đệm", "Buf") else decodeTimeText,
+                label = if (isEn) "Decode time" else "Thời gian giải mã",
+                value = if (isEn) decodeTimeText.replace("Bộ đệm", "Buf") else decodeTimeText,
                 valueColor = decodeColor,
-                badgeText = if (isEn) "⚡ Flush" else "⚡ Xả trễ",
+                badgeText = if (isEn) "🔄 Resync" else "🔄 Đồng bộ",
                 onRowClick = onFlushLag
             )
 
@@ -1634,6 +1697,22 @@ private fun DenseCoreTelemetrySection(
                 valueColor = batteryColor,
                 badgeText = if (isThermalSupported) "$thermalIcon $thermalLabel" else null
             )
+
+            // 6. Hộp đánh giá tự động theo chuẩn ITU-T G.1072 ([Nguyên nhân] + [Gợi ý])
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(6.dp),
+                color = statusAssessmentColor.copy(alpha = 0.12f),
+                border = androidx.compose.foundation.BorderStroke(0.6.dp, statusAssessmentColor.copy(alpha = 0.45f))
+            ) {
+                Text(
+                    text = statusAssessmentText,
+                    color = Color.White,
+                    fontSize = 10.5.sp,
+                    lineHeight = 13.5.sp,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                )
+            }
         }
     }
 }
@@ -1699,23 +1778,27 @@ private fun DenseMetricRowItem(
 }
 
 /**
- * Nhóm 1: Độ phân giải & Mạng (cỡ chữ >= 11sp).
+ * Nhóm 1: Độ phân giải, Đồng bộ khung hình & Chẩn đoán 4 lớp "Vì sao tôi bị lag?" (cỡ chữ >= 11sp).
  */
 @Composable
 private fun DenseQualityModeSection(
     networkStatus: com.example.cloudplay.NetworkOptimizerStatus,
     adaptiveQualityState: com.example.cloudplay.AdaptiveQualityState,
     telemetry: com.example.cloudplay.StreamTelemetry,
+    isVpnActive: Boolean = false,
     onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
     onToggleAutoAdapting: (Boolean) -> Unit,
     onToggleWifiSpeedFirst: (Boolean) -> Unit,
     onFlushLag: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val liveMbps = adaptiveQualityState.smoothBitrateMbps.coerceIn(1.0, 20.0)
     val liveBufMs = adaptiveQualityState.smoothBufferMs.roundToInt().coerceIn(8, 45)
     val selectedMode = config.cellularMode
+    var showLagDiagnostic by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -1806,47 +1889,183 @@ private fun DenseQualityModeSection(
                 )
             }
 
-            // Nút 1 chạm "⚡ Xả Trễ" (Instant Lag Flush): làm rỗng hàng đợi khung hình & đưa đệm về 10ms tức thì
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable { onFlushLag() }
-                    .testTag("hud_flush_lag_button"),
-                shape = RoundedCornerShape(6.dp),
-                color = DirectCyan.copy(alpha = 0.16f),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
+            // Nút chuẩn W3C: "🔄 Đồng bộ lại khung hình" + nút Chẩn đoán 4 lớp "🩺 Vì sao tôi bị lag?"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { onFlushLag() }
+                        .testTag("hud_flush_lag_button"),
+                    shape = RoundedCornerShape(6.dp),
+                    color = DirectCyan.copy(alpha = 0.16f),
+                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
                 ) {
-                    Text(
-                        text = if (isEn) "⚡ Flush 4G/Stream Lag Now" else "⚡ Xả trễ & đồng bộ khung hình ngay",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEn) "🔄 Resync Frames" else "🔄 Đồng bộ lại khung hình",
+                            color = Color.White,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable { showLagDiagnostic = !showLagDiagnostic }
+                        .testTag("hud_why_lag_button"),
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (showLagDiagnostic) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF182A20),
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.8.dp,
+                        if (showLagDiagnostic) XboxNeonGreen else XboxCardBorder
                     )
-                    Text(
-                        text = if (networkStatus.isCellular) "10ms" else "8ms",
-                        color = DirectCyan,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1
-                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isEn) "🩺 Why lag?" else "🩺 Vì sao bị lag?",
+                            color = if (showLagDiagnostic) XboxNeonGreen else DirectCyan,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            // Bảng Chẩn đoán nhanh 4 lớp "Vì sao tôi bị lag?" (Mục 15 báo cáo kỹ thuật)
+            if (showLagDiagnostic) {
+                val powerManager = remember(context) {
+                    context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+                }
+                val isPowerSave = remember(showLagDiagnostic, telemetry.rttMs) {
+                    runCatching { powerManager?.isPowerSaveMode == true }.getOrDefault(false)
+                }
+                val currentHour = remember(showLagDiagnostic, telemetry.rttMs) {
+                    java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                }
+                val isPeakHour = currentHour in 20..23
+
+                // Lớp 1: Môi trường thiết bị (Tiết kiệm pin / Giải mã phần cứng)
+                val layer1Bad = isPowerSave || telemetry.decodeTimeMs > 16.0
+                val layer1Text = when {
+                    isPowerSave -> if (isEn) "1. Device: Battery Saver ON (throttles decoder)" else "1. Thiết bị: Đang bật Tiết kiệm pin (bóp xung giải mã)"
+                    telemetry.decodeTimeMs > 16.0 -> if (isEn) "1. Device: Slow decode (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)" else "1. Thiết bị: Giải mã quá tải (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)"
+                    else -> if (isEn) "1. Device: 60Hz VSync locked • Decode OK (${String.format("%.1f", telemetry.decodeTimeMs)}ms)" else "1. Thiết bị: Đã khóa 60Hz • Giải mã tốt (${String.format("%.1f", telemetry.decodeTimeMs)}ms)"
+                }
+
+                // Lớp 2: Kết nối cục bộ (Wi-Fi RSSI / 4G Jitter)
+                val layer2Bad = networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal || telemetry.jitterMs > 20
+                val layer2Text = when {
+                    networkStatus.isWifi -> {
+                        val band = if (networkStatus.physicalType == com.example.cloudplay.PhysicalNetworkType.WIFI_2_4GHZ) "2.4GHz" else "5GHz"
+                        if (networkStatus.isWeakWifiSignal) {
+                            if (isEn) "2. Local Net: Weak Wi-Fi $band (${networkStatus.wifiRssiDbm}dBm)" else "2. Mạng cục bộ: Sóng Wi-Fi $band yếu (${networkStatus.wifiRssiDbm}dBm)"
+                        } else {
+                            if (isEn) "2. Local Net: Wi-Fi $band Low-Latency OK (${networkStatus.wifiRssiDbm}dBm)" else "2. Mạng cục bộ: Wi-Fi $band ổn định (${networkStatus.wifiRssiDbm}dBm)"
+                        }
+                    }
+                    networkStatus.isCellular -> {
+                        if (telemetry.jitterMs > 18 || networkStatus.isWeakCellularSignal) {
+                            if (isEn) "2. Local Net: 4G queue fluctuation (Jitter ${telemetry.jitterMs}ms)" else "2. Mạng cục bộ: Sóng 4G dao động (Biến động ${telemetry.jitterMs}ms)"
+                        } else {
+                            if (isEn) "2. Local Net: 4G Direct active (Jitter ${telemetry.jitterMs}ms)" else "2. Mạng cục bộ: 4G ổn định (Biến động ${telemetry.jitterMs}ms)"
+                        }
+                    }
+                    else -> if (isEn) "2. Local Net: Active" else "2. Mạng cục bộ: Đang hoạt động"
+                }
+
+                // Lớp 3: Tuyến cáp quốc tế Việt Nam -> Nhật Bản
+                val layer3Bad = telemetry.rttMs > 150
+                val layer3Text = when {
+                    telemetry.rttMs > 160 && !layer2Bad -> if (isEn) {
+                        "3. Intl Route (JP): Congested (${telemetry.rttMs}ms)${if (isPeakHour) " • Peak hours 20h-23h" else ""}"
+                    } else {
+                        "3. Tuyến quốc tế (Nhật): Nghẽn (${telemetry.rttMs}ms)${if (isPeakHour) " • Giờ cao điểm 20h-23h" else ""}"
+                    }
+                    telemetry.rttMs > 0 -> if (isEn) {
+                        "3. Intl Route (JP): Normal (${telemetry.rttMs}ms)"
+                    } else {
+                        "3. Tuyến quốc tế (Nhật): Bình thường (${telemetry.rttMs}ms)"
+                    }
+                    else -> if (isEn) "3. Intl Route (JP): Measuring STUN RTT..." else "3. Tuyến quốc tế (Nhật): Đang đo STUN RTT..."
+                }
+
+                // Lớp 4: Trạng thái giao diện VPN (tun0 / TRANSPORT_VPN)
+                val layer4Bad = isVpnActive
+                val layer4Text = if (layer4Bad) {
+                    if (isEn) "4. VPN: Active (Adds +30~90ms latency — turn off after game loads!)" else "4. VPN: Đang bật (Làm tăng +30~90ms trễ — hãy tắt khi đã vào game!)"
+                } else {
+                    if (isEn) "4. VPN: Off (Direct low-latency routing)" else "4. VPN: Đã tắt (Truyền trực tiếp không đi vòng)"
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("hud_why_lag_panel"),
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFF0B1410),
+                    border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.45f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) "4-LAYER LATENCY DIAGNOSTICS" else "CHẨN ĐOÁN 4 LỚP: VÌ SAO TÔI BỊ LAG?",
+                            color = DirectCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = layer1Text,
+                            color = if (layer1Bad) JapanRed else XboxNeonGreen,
+                            fontSize = 10.5.sp,
+                            lineHeight = 13.sp
+                        )
+                        Text(
+                            text = layer2Text,
+                            color = if (layer2Bad) Color(0xFFFFB300) else XboxNeonGreen,
+                            fontSize = 10.5.sp,
+                            lineHeight = 13.sp
+                        )
+                        Text(
+                            text = layer3Text,
+                            color = if (layer3Bad) Color(0xFFFFB300) else XboxNeonGreen,
+                            fontSize = 10.5.sp,
+                            lineHeight = 13.sp
+                        )
+                        Text(
+                            text = layer4Text,
+                            color = if (layer4Bad) JapanRed else XboxNeonGreen,
+                            fontSize = 10.5.sp,
+                            lineHeight = 13.sp
+                        )
+                    }
                 }
             }
 
             if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) {
                 Text(
                     text = if (networkStatus.isWeakWifiSignal) {
-                        if (isEn) "⚠️ Weak Wi-Fi: Auto-lowering bitrate"
-                        else "⚠️ Sóng Wi-Fi yếu: Tự hạ độ nét chống giật"
+                        if (isEn) "⚠️ Weak Wi-Fi: Auto-adapting bitrate"
+                        else "⚠️ Sóng Wi-Fi yếu: Tự động thích ứng chất lượng truyền tải"
                     } else {
-                        if (isEn) "⚠️ Weak 4G: Anti-Bufferbloat holding 720p"
-                        else "⚠️ Sóng 4G yếu: Chống nghẽn trạm giữ 720p nhạy"
+                        if (isEn) "⚠️ Weak 4G: Auto-lowering bitrate to limit queue congestion"
+                        else "⚠️ Sóng 4G yếu: Tự động hạ bitrate hạn chế nghẽn đường truyền (720p)"
                     },
                     color = Color(0xFFF59E0B),
                     fontSize = 11.sp,

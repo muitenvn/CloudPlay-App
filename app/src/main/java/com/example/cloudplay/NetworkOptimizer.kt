@@ -149,6 +149,13 @@ object NetworkOptimizer {
      */
     fun setStreamActive(active: Boolean) {
         com.example.data.GameLibraryRepository.setStreamActive(active)
+        if (!active) {
+            lastTelemetryTimestampMs = 0L
+            _telemetry.value = StreamTelemetry(
+                speedPriorityActive = _status.value.speedFirstPriority,
+                appliedProfile = _status.value.activeProfileName
+            )
+        }
         try {
             val lock = wifiLowLatencyLock
             if (lock != null) {
@@ -158,11 +165,21 @@ object NetworkOptimizer {
                     if (lock.isHeld) lock.release()
                 }
             }
-            if (active && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val cm = connectivityManager
-                val net = cm?.activeNetwork
-                if (cm != null && net != null) {
-                    cm.reportNetworkConnectivity(net, true)
+                if (cm != null) {
+                    val net = cm.activeNetwork
+                    val isDirectMode = com.example.vpn.VpnManager.state.value.mode == com.example.vpn.NetworkMode.DIRECT_NETWORK
+                    if (active && net != null && isDirectMode) {
+                        val caps = cm.getNetworkCapabilities(net)
+                        val isVpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                        if (!isVpn) {
+                            cm.bindProcessToNetwork(net)
+                        }
+                        cm.reportNetworkConnectivity(net, true)
+                    } else {
+                        cm.bindProcessToNetwork(null)
+                    }
                 }
             }
         } catch (_: Exception) {
@@ -263,6 +280,7 @@ object NetworkOptimizer {
         val current = _status.value
         val isWifi = current.isWifi
         val isCellular = current.isCellular || (!isWifi && current.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
+        val is3gOrHPlus = isCellular && current.downstreamBandwidthKbps in 1..4500
 
         val cellularMode = config.cellularMode
 
@@ -284,24 +302,32 @@ object NetworkOptimizer {
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_6GHZ -> 14
                     isWifi && current.physicalType == PhysicalNetworkType.WIFI_5GHZ -> 12
                     isWifi -> 10
+                    is3gOrHPlus -> 4 // Mạng 3G / H+ băng thông hẹp
                     isCellular && current.isWeakCellularSignal -> 5 // Sóng 4G yếu / đang chuyển trạm
                     isCellular -> 6
                     else -> 9
                 }
                 profileName = when {
-                    isCellular && current.isWeakCellularSignal -> "Tự Động 4G Chống Nghẽn Trạm (${autoMbps}M)"
-                    isCellular -> "4G/5G Siêu Nhạy • Chống Trễ (${autoMbps}M)"
+                    is3gOrHPlus -> "Mạng 3G/H+ Sóng Yếu • Hạn Chế Nghẽn (${autoMbps}M)"
+                    isCellular && current.isWeakCellularSignal -> "Tự Động 4G Sóng Yếu • Hạn Chế Nghẽn (${autoMbps}M)"
+                    isCellular -> "Ưu Tiên Độ Nhạy 4G (${autoMbps}M)"
                     isWifi && current.isWeakWifiSignal -> "Tự Động Wi-Fi Xa Cục Phát (${autoMbps}M)"
-                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> "Tự Động Wi-Fi 2.4GHz Chống Nhiễu (${autoMbps}M)"
-                    else -> "Tự Động Wi-Fi (720p ⇄ 1080p • ${autoMbps}M)"
+                    isWifi && current.physicalType == PhysicalNetworkType.WIFI_2_4GHZ -> "Tự Động Wi-Fi 2.4GHz Hạn Chế Nhiễu (${autoMbps}M)"
+                    else -> "Tự Động Thích Ứng Mạng (720p ⇄ 1080p • ${autoMbps}M)"
                 }
                 bitrate = autoMbps
                 summary = when {
-                    isCellular -> "Đang bật chống nghẽn trạm 4G (đệm 10-22ms), giữ thức modem Anti-DRX và tự xả khung hình trễ."
-                    current.isWeakWifiSignal -> "Phát hiện sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự thu gọn luồng ${autoMbps}M để xuyên tường mượt mà."
-                    else -> "Ưu tiên thao tác điều khiển nhạy nhất, tự động cân chỉnh độ nét và giải mã < 8ms."
+                    is3gOrHPlus -> "Phát hiện sóng 3G/H+ băng thông thấp: hạ luồng xuống ${autoMbps}M để hạn chế nghẽn đường truyền."
+                    isCellular -> "Tự động thích ứng mạng 4G, duy trì kết nối modem và đồng bộ bộ đệm theo biến động thực tế."
+                    current.isWeakWifiSignal -> "Phát hiện sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự thu gọn luồng ${autoMbps}M để truyền ổn định hơn."
+                    else -> "Tự động thích ứng chất lượng truyền tải và duy trì thời gian giải mã < 8ms."
                 }
-                badge = if (isCellular) "📶 4G Siêu Nhạy (${autoMbps}M)" else "⚡ Tự động (${autoMbps}M)"
+                badge = when {
+                    is3gOrHPlus -> "📶 3G/H+ (${autoMbps}M)"
+                    isCellular && current.isWeakCellularSignal -> "📶 4G Yếu (${autoMbps}M)"
+                    isCellular -> "📶 Ưu tiên 4G (${autoMbps}M)"
+                    else -> "⚡ Tự động (${autoMbps}M)"
+                }
             }
             CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> {
                 profileName = "720p • Thấp (Cố Định • 5M)"
@@ -350,12 +376,7 @@ object NetworkOptimizer {
             val fps = json.optInt("fps", 0)
             val bitrate = json.optDouble("bitrateMbps", 0.0)
             val decodeTime = json.optDouble("decodeTimeMs", 0.0)
-            val rawRtt = json.optInt("rttMs", 0)
-            val rtt = if (rawRtt > 0) {
-                rawRtt
-            } else {
-                _telemetry.value.rttMs.takeIf { it > 0 } ?: 0
-            }
+            val rtt = json.optInt("rttMs", 0).coerceAtLeast(0)
             val jitter = json.optInt("jitterMs", 0)
             val loss = json.optDouble("packetsLostPercent", 0.0)
             val framesDropped = json.optInt("framesDropped", 0)

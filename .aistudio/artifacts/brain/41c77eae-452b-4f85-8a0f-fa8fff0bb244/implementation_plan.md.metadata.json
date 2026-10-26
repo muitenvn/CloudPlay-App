@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch tối ưu hiệu năng, khắc phục độ trễ cao trên mạng 4G/5G (chống nghẽn trạm phát LTE Bufferbloat, giữ thức modem 4G Anti-DRX, đồng bộ khung hình thời gian thực Live-Edge Sync) và nâng cấp trải nghiệm HUD với nút Xả Trễ 1 chạm.",
-  "updatedAt":  "2026-10-26T12:42:18.887292064Z",
+  "summary":  "Kế hoạch triển khai toàn diện 5 nhóm tối ưu hóa kỹ thuật, độ trễ truyền dẫn 4G/Wi-Fi, đồng bộ phần cứng 60Hz VSync, chuẩn hóa nhãn trung thực, công cụ chẩn đoán 4 lớp và bảo mật SHA-256 theo Báo cáo Phân tích Kỹ thuật.",
+  "updatedAt":  "2026-10-26T15:06:08.046998155Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

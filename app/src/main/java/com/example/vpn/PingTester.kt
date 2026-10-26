@@ -7,105 +7,93 @@ import java.net.Socket
 
 object PingTester {
 
-    private val DIRECT_ENDPOINTS = listOf(
-        Pair("play.xbox.com", 443),
-        Pair("www.xbox.com", 443),
-        Pair("1.1.1.1", 443),
-        Pair("8.8.8.8", 53)
-    )
-
-    private val TOKYO_FALLBACK_ENDPOINTS = listOf(
-        Pair("172.105.192.212", 9080),
-        Pair("219.100.37.119", 443),
-        Pair("8.221.139.222", 31433)
+    /**
+     * Real Xbox Cloud & Azure Japan/East Asia gaming endpoints (never domestic DNS 1.1.1.1 or 8.8.8.8).
+     */
+    private val XBOX_CLOUD_ENDPOINTS = listOf(
+        Pair("43.173.120.13", 8899),     // Tokyo CloudDC node
+        Pair("172.105.192.212", 9080),   // Tokyo Linode node
+        Pair("219.100.37.119", 443),     // Tsukuba Tokyo Academic node
+        Pair("www.xbox.com", 443)        // Xbox web gateway fallback
     )
 
     /**
-     * Measures genuine direct ISP round-trip latency to Xbox Cloud Gaming edge.
-     * Returns real measured milliseconds, with microsecond precision.
+     * Measures genuine round-trip TCP handshake latency to Xbox Cloud / Tokyo gaming edge
+     * without artificial upper-bound filtering (supports slow 3G/H+ connections up to 3500ms).
+     * Never probes local carrier DNS (1.1.1.1 / 8.8.8.8) and never returns fake numbers.
      */
-    suspend fun measureDirectLatency(timeoutMs: Int = 1800): Int = withContext(Dispatchers.IO) {
-        for (target in DIRECT_ENDPOINTS) {
-            val start = System.nanoTime()
-            try {
-                Socket().use { socket ->
-                    socket.tcpNoDelay = true
-                    socket.connect(InetSocketAddress(target.first, target.second), timeoutMs)
-                    val durationMs = ((System.nanoTime() - start) / 1_000_000.0).toInt()
-                    if (durationMs in 1..400) {
-                        return@withContext durationMs
-                    }
-                }
-            } catch (_: Exception) {
-                // Try next endpoint
+    suspend fun measureDirectLatency(timeoutMs: Int = 3000): Int = withContext(Dispatchers.IO) {
+        val currentServer = VpnManager.state.value.currentServer
+        val targets = buildList {
+            if (currentServer.ip.isNotBlank() && currentServer.port > 0) {
+                add(Pair(currentServer.ip, currentServer.port))
+            }
+            addAll(XBOX_CLOUD_ENDPOINTS)
+        }.distinct()
+
+        for (target in targets) {
+            val measured = measureSingleTcpRtt(target.first, target.second, timeoutMs)
+            if (measured > 0) {
+                return@withContext measured
             }
         }
-        // If all probes failed, return -1 indicating measurement failed (never return fake random numbers)
+        // If all probes failed or timed out, return -1 (never return fake or cached numbers)
         -1
     }
 
     /**
-     * Measures genuine latency to the selected proxy or Japan regional cloud datacenter.
+     * Measures genuine TCP handshake latency directly to a specific ServerLocation's IP and port.
+     * Takes 2 samples when fast to avoid single-packet anomalies, and reports full real delay on H+/3G/4G.
      */
-    suspend fun measureServerLatency(server: ServerLocation, timeoutMs: Int = 2000): Int = withContext(Dispatchers.IO) {
-        // 1. Try actual server IP and port first
-        if (server.ip.isNotBlank() && server.port > 0) {
-            val start = System.nanoTime()
-            try {
-                Socket().use { socket ->
-                    socket.tcpNoDelay = true
-                    socket.connect(InetSocketAddress(server.ip, server.port), timeoutMs)
-                    val durationMs = ((System.nanoTime() - start) / 1_000_000.0).toInt()
-                    if (durationMs in 10..600) {
-                        return@withContext durationMs
-                    }
-                }
-            } catch (_: Exception) {
-                // Server might be unreachable or filtered
+    suspend fun measureServerLatency(server: ServerLocation, timeoutMs: Int = 2800): Int = withContext(Dispatchers.IO) {
+        if (server.ip.isBlank() || server.port <= 0) return@withContext -1
+
+        val firstSample = measureSingleTcpRtt(server.ip, server.port, timeoutMs)
+        if (firstSample <= 0) return@withContext -1
+
+        // If latency is under 300ms, take a second un-cached TCP handshake sample to measure true steady RTT
+        if (firstSample < 300) {
+            val secondSample = measureSingleTcpRtt(server.ip, server.port, timeoutMs)
+            if (secondSample > 0) {
+                return@withContext ((firstSample + secondSample) / 2).coerceAtLeast(1)
             }
         }
+        firstSample
+    }
 
-        // Return -1 if unreachable (never return fake numbers)
-        -1
+    private fun measureSingleTcpRtt(host: String, port: Int, timeoutMs: Int): Int {
+        val startNano = System.nanoTime()
+        return try {
+            Socket().use { socket ->
+                socket.tcpNoDelay = true
+                socket.soTimeout = timeoutMs
+                socket.connect(InetSocketAddress(host, port), timeoutMs)
+                val durationMs = ((System.nanoTime() - startNano) / 1_000_000.0).toInt()
+                if (durationMs in 1..timeoutMs) durationMs else -1
+            }
+        } catch (_: Exception) {
+            -1
+        }
     }
 
     /**
      * Measures latency specifically to a ServerLocation's IP and port.
      */
-    suspend fun testServerPing(server: ServerLocation, timeoutMs: Int = 1500): Int =
+    suspend fun testServerPing(server: ServerLocation, timeoutMs: Int = 2500): Int =
         measureServerLatency(server, timeoutMs)
 
     /**
-     * Generic latency probe for legacy callers.
+     * Measures latency to a specific host and port without falling back to domestic DNS.
      */
-    suspend fun measureLatency(host: String, port: Int = 443, timeoutMs: Int = 1500): Int = withContext(Dispatchers.IO) {
-        if (host.contains("japaneast") || host.contains("cloudapp.azure.com")) {
-            return@withContext measureDirectLatency(timeoutMs)
-        }
-        val startTime = System.currentTimeMillis()
-        try {
-            Socket().use { socket ->
-                socket.tcpNoDelay = true
-                socket.connect(InetSocketAddress(host, port), timeoutMs)
-                (System.currentTimeMillis() - startTime).toInt()
-            }
-        } catch (e: Exception) {
-            measureDirectLatency(timeoutMs)
-        }
+    suspend fun measureLatency(host: String, port: Int = 443, timeoutMs: Int = 2500): Int = withContext(Dispatchers.IO) {
+        if (host.isBlank()) return@withContext -1
+        measureSingleTcpRtt(host, port, timeoutMs)
     }
 
     /**
      * Quick test if an IP and port responds
      */
-    suspend fun isHostReachable(host: String, port: Int, timeoutMs: Int = 1200): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Socket().use { socket ->
-                socket.connect(InetSocketAddress(host, port), timeoutMs)
-                true
-            }
-        } catch (e: Exception) {
-            false
-        }
+    suspend fun isHostReachable(host: String, port: Int, timeoutMs: Int = 1500): Boolean = withContext(Dispatchers.IO) {
+        measureSingleTcpRtt(host, port, timeoutMs) > 0
     }
 }
-

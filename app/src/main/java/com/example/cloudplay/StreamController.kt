@@ -209,20 +209,27 @@ class StreamController(private val context: Context) {
 
             val config = SettingsRepository.config.value
             val isEn = config.isEnglishUI()
+            val isVpnActive = VpnManager.state.value.mode == NetworkMode.VPN_JAPAN
 
-            if (config.autoBypassEnabled && !_uiState.value.autoBypassTriggered) {
+            if (config.autoBypassEnabled && !_uiState.value.autoBypassTriggered && isVpnActive) {
                 val delaySec = config.autoBypassDelaySeconds.coerceIn(1, 15)
                 try {
                     android.widget.Toast.makeText(
                         context,
-                        if (isEn) "⚡ In-game! Auto-disconnecting VPN in ${delaySec}s..." else "⚡ Đã vào game! Tự động tắt VPN sau ${delaySec}s...",
+                        if (isEn) "⚡ Game loaded! Auto-disconnecting VPN in ${delaySec}s to lower latency..." else "⚡ Game đã tải thành công! Tự động ngắt VPN sau ${delaySec}s để giảm độ trễ...",
                         android.widget.Toast.LENGTH_SHORT
                     ).show()
                 } catch (_: Exception) {}
                 scheduleAutoBypass(delaySec, if (isEn) "Game stream connected" else "Luồng game đã kết nối")
+            } else if (isVpnActive) {
+                showTemporaryBanner(
+                    if (isEn) "⚠️ Game loaded successfully! Disconnect VPN now to lower latency." else "⚠️ Game đã tải thành công! Hãy ngắt VPN ngay để giảm độ trễ.",
+                    BannerType.WARNING,
+                    9000
+                )
             } else {
                 showTemporaryBanner(
-                    if (isEn) "✅ In-game! Stream connected." else "✅ Đã vào game! Luồng game đã kết nối.",
+                    if (isEn) "✅ In-game! Direct stream connected." else "✅ Đã vào game! Đang kết nối trực tiếp ổn định.",
                     BannerType.SUCCESS,
                     5000
                 )
@@ -272,12 +279,7 @@ class StreamController(private val context: Context) {
 
     private fun captureTelemetrySample() {
         val t = NetworkOptimizer.telemetry.value
-        val vpn = VpnManager.state.value
-        val ping = when {
-            t.rttMs > 0 -> t.rttMs
-            vpn.mode == NetworkMode.DIRECT_NETWORK -> vpn.directLatencyMs ?: vpn.latencyMs ?: 0
-            else -> vpn.latencyMs ?: 0
-        }
+        val ping = t.rttMs
         if (ping > 0) {
             sessionPingSum += ping
             sessionPingCount += 1

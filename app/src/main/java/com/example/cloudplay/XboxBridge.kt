@@ -215,8 +215,12 @@ class XboxBridge(
                         if (!receiver) return;
                         try {
                             const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                            const maxAudioSec = isCell ? 0.024 : 0.045;
-                            const sec = (kind === 'audio') ? Math.max(0.010, Math.min(maxAudioSec, videoSec)) : videoSec;
+                            const liveJitterSec = Math.max(0.0, (window.__lastKnownJitterMs || 0) / 1000.0);
+                            const minSafeSec = isCell ? Math.max(0.015, liveJitterSec * 1.5) : Math.max(0.012, liveJitterSec * 1.3);
+                            const maxSafeSec = isCell ? 0.045 : 0.055;
+                            // Theo chuẩn W3C WebRTC & Chromium: Audio (NetEq) và Video (VCM) trong cùng nhóm đồng bộ
+                            // phải dùng chung cùng một mục tiêu jitterBufferTarget để trình duyệt không giữ khung hình đợi âm thanh
+                            const sec = Math.max(minSafeSec, Math.min(maxSafeSec, videoSec));
                             const ms = Math.round(sec * 1000);
                             if ('playoutDelayHint' in receiver) {
                                 receiver.playoutDelayHint = sec;
@@ -229,9 +233,9 @@ class XboxBridge(
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
                         const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                        const maxAllowedBufMs = isCell ? 22.0 : 42.0;
+                        const maxAllowedBufMs = isCell ? 40.0 : 50.0;
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(8.0, Math.min(maxAllowedBufMs, parseFloat(bufferHintMs) || (isCell ? 12.0 : 14.0)));
+                        const bufMs = Math.max(12.0, Math.min(maxAllowedBufMs, parseFloat(bufferHintMs) || (isCell ? 18.0 : 16.0)));
                         const targetSec = parseFloat((bufMs / 1000.0).toFixed(4));
 
                         if (window.__networkProfile) {
@@ -254,11 +258,13 @@ class XboxBridge(
                         } catch (e) {}
                     };
 
+                    // Đồng bộ lại khung hình (W3C Compliant Frame & Buffer Resync — tuyệt đối không can thiệp currentTime hay playbackRate)
                     window.__flushStreamLagNow = function(optMbps, optBufMs) {
                         try {
                             const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                            const flushBufMs = Math.max(8.0, Math.min(14.0, parseFloat(optBufMs) || (isCell ? 10.0 : 8.0)));
-                            const flushSec = parseFloat((flushBufMs / 1000.0).toFixed(4));
+                            const liveJitterMs = window.__lastKnownJitterMs || (isCell ? 12 : 8);
+                            const safeResyncMs = Math.max(15.0, Math.min(35.0, parseFloat(optBufMs) || (liveJitterMs * 1.5 + 8.0)));
+                            const flushSec = parseFloat((safeResyncMs / 1000.0).toFixed(4));
                             if (typeof optMbps === 'number' && optMbps > 0 && window.__networkProfile) {
                                 window.__networkProfile.targetBitrate = optMbps;
                             }
@@ -280,30 +286,15 @@ class XboxBridge(
                             }
 
                             const vEl = findActiveStreamVideo();
-                            if (vEl && !vEl.paused) {
+                            if (vEl && typeof vEl.requestVideoFrameCallback === 'function') {
                                 try {
-                                    if (vEl.buffered && vEl.buffered.length > 0) {
-                                        const endEdge = vEl.buffered.end(vEl.buffered.length - 1);
-                                        if (endEdge - vEl.currentTime > 0.040) {
-                                            vEl.currentTime = Math.max(vEl.currentTime, endEdge - 0.008);
-                                        }
-                                    }
-                                } catch (seekErr) {}
-                                try {
-                                    if (vEl.__cpCatchupTimer) clearTimeout(vEl.__cpCatchupTimer);
-                                    vEl.__cpCatchingUp = true;
-                                    vEl.playbackRate = 1.06;
-                                    vEl.__cpCatchupTimer = setTimeout(function() {
-                                        try { vEl.playbackRate = 1.0; } catch (e) {}
-                                        vEl.__cpCatchingUp = false;
-                                        vEl.__cpCatchupTimer = null;
-                                    }, 220);
-                                } catch (rateErr) {}
+                                    vEl.requestVideoFrameCallback(function() {});
+                                } catch (rvfcErr) {}
                             }
                             if (window.__touchGamepadTimestampNow) window.__touchGamepadTimestampNow();
-                            return "FLUSHED_OK";
+                            return "RESYNCED_OK";
                         } catch (e) {
-                            return "FLUSH_ERR";
+                            return "RESYNC_ERR";
                         }
                     };
 
@@ -690,7 +681,8 @@ class XboxBridge(
                         let lastFramesDecodedForDecode = 0;
                         let lastJitterBufferDelay = 0;
                         let lastJitterBufferEmitted = 0;
-                        let lastValidRttMs = 0;
+                        let lastStunResponses = 0;
+                        let lastTotalRttSec = 0.0;
 
                         statsIntervalId = setInterval(async function() {
                             if (pc.connectionState === 'closed' || pc.connectionState === 'failed' ||
@@ -702,6 +694,7 @@ class XboxBridge(
                                 const stats = await pc.getStats();
                                 let currentBytes = 0;
                                 let rtt = 0;
+                                let nominatedRtt = 0;
                                 let jitter = 0;
                                 let packetsLost = 0;
                                 let packetsReceived = 0;
@@ -713,6 +706,13 @@ class XboxBridge(
                                 let rawJitterBufferEmitted = 0;
                                 let currentTotalDecodeTime = 0;
                                 let nativeFps = 0;
+
+                                let selectedPairId = null;
+                                stats.forEach(report => {
+                                    if (report.type === 'transport' && report.selectedCandidatePairId) {
+                                        selectedPairId = report.selectedCandidatePairId;
+                                    }
+                                });
 
                                 stats.forEach(report => {
                                     if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video' || (!report.kind && report.framesDecoded !== undefined))) {
@@ -742,13 +742,34 @@ class XboxBridge(
                                         if (report.totalDecodeTime !== undefined) {
                                             currentTotalDecodeTime = report.totalDecodeTime;
                                         }
-                                    } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated)) {
+                                    } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated || (selectedPairId && report.id === selectedPairId))) {
+                                        const isActivePair = (selectedPairId && report.id === selectedPairId) || report.nominated === true;
+                                        let pairRtt = 0;
                                         if (report.currentRoundTripTime !== undefined && report.currentRoundTripTime > 0) {
-                                            rtt = Math.round(report.currentRoundTripTime * 1000);
+                                            pairRtt = Math.round(report.currentRoundTripTime * 1000);
+                                        } else if (report.responsesReceived !== undefined && report.totalRoundTripTime !== undefined &&
+                                            report.responsesReceived > lastStunResponses && lastStunResponses > 0 &&
+                                            report.totalRoundTripTime >= lastTotalRttSec) {
+                                            const deltaResp = report.responsesReceived - lastStunResponses;
+                                            const deltaRttSec = report.totalRoundTripTime - lastTotalRttSec;
+                                            if (deltaResp > 0 && deltaRttSec > 0) {
+                                                pairRtt = Math.round((deltaRttSec / deltaResp) * 1000);
+                                            }
                                         } else if (report.roundTripTime !== undefined && report.roundTripTime > 0) {
-                                            rtt = Math.round(report.roundTripTime * 1000);
-                                        } else if (report.totalRoundTripTime !== undefined && report.responsesReceived > 0) {
-                                            rtt = Math.round((report.totalRoundTripTime / report.responsesReceived) * 1000);
+                                            pairRtt = Math.round(report.roundTripTime * 1000);
+                                        }
+                                        if (isActivePair && report.responsesReceived !== undefined) {
+                                            lastStunResponses = report.responsesReceived;
+                                            if (report.totalRoundTripTime !== undefined) {
+                                                lastTotalRttSec = report.totalRoundTripTime;
+                                            }
+                                        }
+                                        if (pairRtt > 0) {
+                                            if (isActivePair) {
+                                                nominatedRtt = pairRtt;
+                                            } else if (rtt === 0) {
+                                                rtt = pairRtt;
+                                            }
                                         }
                                     } else if (report.type === 'remote-inbound-rtp' && report.roundTripTime !== undefined && report.roundTripTime > 0) {
                                         if (rtt === 0) {
@@ -757,10 +778,8 @@ class XboxBridge(
                                     }
                                 });
 
-                                if (rtt > 0) {
-                                    lastValidRttMs = rtt;
-                                } else if (lastValidRttMs > 0) {
-                                    rtt = lastValidRttMs;
+                                if (nominatedRtt > 0) {
+                                    rtt = nominatedRtt;
                                 }
 
                                 const now = Date.now();
@@ -778,7 +797,7 @@ class XboxBridge(
                                 lastTimestamp = now;
                                 lastFrames = framesDecoded;
 
-                                // Measure real hardware decode time per frame without artificial clamping
+                                // Measure real hardware decode time per frame without artificial clamping or fake fallback
                                 let decodeTimeMs = 0.0;
                                 if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
                                     lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
@@ -825,37 +844,6 @@ class XboxBridge(
                                             }
                                         }
                                     }
-                                    const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                                    const catchupThresholdMs = isCell ? 20.0 : 26.0;
-                                    if (jitterBufferDelayMs > catchupThresholdMs && !vEl.__cpCatchingUp) {
-                                        try {
-                                            vEl.__cpCatchingUp = true;
-                                            vEl.playbackRate = 1.05;
-                                            const tightSec = window.__targetBufferSec || (isCell ? 0.011 : 0.012);
-                                            const recs = pc.getReceivers ? pc.getReceivers() : [];
-                                            for (let rIdx = 0; rIdx < recs.length; rIdx++) {
-                                                const r = recs[rIdx];
-                                                if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
-                                                    applyReceiverBufferTarget(r, r.track.kind, tightSec);
-                                                }
-                                            }
-                                            vEl.__cpCatchupTimer = setTimeout(function() {
-                                                try { vEl.playbackRate = 1.0; } catch (e) {}
-                                                vEl.__cpCatchingUp = false;
-                                                vEl.__cpCatchupTimer = null;
-                                            }, 240);
-                                        } catch (e) {}
-                                    } else if (!vEl.__cpCatchingUp && vEl.playbackRate !== 1.0) {
-                                        try { vEl.playbackRate = 1.0; } catch (e) {}
-                                    }
-                                }
-
-                                if (fps > 0 && decodeTimeMs <= 0.0) {
-                                    decodeTimeMs = vEl && vEl.videoHeight >= 1080 ? 4.2 : 2.8;
-                                }
-                                if (fps > 0 && bitrateMbps <= 0.0) {
-                                    const profMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
-                                    bitrateMbps = parseFloat(Number(profMbps).toFixed(1));
                                 }
 
                                 const totalPackets = packetsReceived + packetsLost;
@@ -871,6 +859,7 @@ class XboxBridge(
                                 if (fps > 0 || currentBytes > 0 || rtt > 0) {
                                     window.__lastTelemetrySentAt = now;
                                     window.__lastKnownRttMs = rtt;
+                                    window.__lastKnownJitterMs = jitter;
                                     notify('onStreamTelemetry', JSON.stringify({
                                         fps: fps,
                                         bitrateMbps: bitrateMbps,
@@ -1453,35 +1442,73 @@ class XboxBridge(
                         }
                     });
 
-                    window.__touchGamepadTimestampNow = function() {
-                        virtualGamepadState.timestamp = nowTs();
-                        window.__lastUserControlPulseAt = Date.now();
+                    window.__lastRealUserInputAt = Date.now();
+                    window.__deviceThermalThrottled = false;
+                    window.__appInBackground = false;
+
+                    window.__setDeviceThermalThrottled = function(throttled) {
+                        window.__deviceThermalThrottled = !!throttled;
+                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                     };
 
-                    // 4G Anti-DRX Uplink Pacer: keeps LTE RRC baseband in Continuous Reception state during active 4G gameplay
-                    // Prevents 25-45ms LTE short-DRX modem sleep wakeup delay when pressing gamepad buttons after brief pauses
+                    window.__setAppInBackground = function(inBg) {
+                        window.__appInBackground = !!inBg;
+                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
+                    };
+
+                    window.__touchGamepadTimestampNow = function() {
+                        const nowMs = Date.now();
+                        virtualGamepadState.timestamp = nowTs();
+                        window.__lastUserControlPulseAt = nowMs;
+                        window.__lastRealUserInputAt = nowMs;
+                        if (!antiDrxTimerId && window.__syncCellularAntiDrxPacer) {
+                            window.__syncCellularAntiDrxPacer();
+                        }
+                    };
+
+                    window.addEventListener('pointerdown', function() {
+                        window.__lastRealUserInputAt = Date.now();
+                        if (!antiDrxTimerId && window.__syncCellularAntiDrxPacer) {
+                            window.__syncCellularAntiDrxPacer();
+                        }
+                    }, { passive: true });
+
+                    document.addEventListener('visibilitychange', function() {
+                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
+                    });
+
+                    // 4G Anti-DRX Uplink Pacer với cơ chế tự ngắt an toàn khi máy nóng, chạy ngầm hoặc nghỉ tay > 20s
                     let antiDrxTimerId = null;
                     window.__syncCellularAntiDrxPacer = function() {
                         const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                        const isInStream = notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1;
-                        if (isCell && isInStream) {
+                        const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
+                        const isInStream = !!notifiedStreamConnection;
+                        const isPausedOrHot = !!document.hidden || !!window.__appInBackground || !!window.__deviceThermalThrottled || isLowEnd;
+                        const isUserIdle = (Date.now() - (window.__lastRealUserInputAt || Date.now())) > 20000;
+
+                        if (isCell && isInStream && !isPausedOrHot && !isUserIdle) {
                             if (!antiDrxTimerId) {
                                 antiDrxTimerId = setInterval(function() {
                                     const cellNow = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                                    const streamNow = notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1;
-                                    if (!cellNow || !streamNow) {
+                                    const streamNow = !!notifiedStreamConnection;
+                                    const pausedOrHotNow = !!document.hidden || !!window.__appInBackground || !!window.__deviceThermalThrottled;
+                                    const nowMs = Date.now();
+                                    const idleNow = (nowMs - (window.__lastRealUserInputAt || nowMs)) > 20000;
+                                    const vEl = findActiveStreamVideo();
+                                    const videoPaused = vEl ? !!vEl.paused : false;
+
+                                    if (!cellNow || !streamNow || pausedOrHotNow || idleNow || videoPaused) {
                                         clearInterval(antiDrxTimerId);
                                         antiDrxTimerId = null;
                                         return;
                                     }
-                                    const nowMs = Date.now();
-                                    if (nowMs - (window.__lastUserControlPulseAt || 0) >= 26) {
+                                    if (nowMs - (window.__lastUserControlPulseAt || 0) >= 28) {
                                         if (window.__virtualGamepadEnabled || virtualGamepadActive) {
                                             virtualGamepadState.timestamp = nowTs();
                                         }
                                         window.__lastUserControlPulseAt = nowMs;
                                     }
-                                }, 28);
+                                }, 30);
                             }
                         } else if (antiDrxTimerId) {
                             clearInterval(antiDrxTimerId);
@@ -2183,7 +2210,7 @@ class XboxBridge(
     private fun isCallerTrusted(): Boolean {
         val url = currentNavigatedUrl
         if (url.isNullOrBlank()) return false
-        return isTrustedHost(url)
+        return isXboxHost(url)
     }
 
     @JavascriptInterface

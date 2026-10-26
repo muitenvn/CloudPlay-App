@@ -138,7 +138,7 @@ fun ServersScreen(
         scope.launch(Dispatchers.IO) {
             val deferreds = allServers.map { server ->
                 async {
-                    val ping = PingTester.measureLatency(server.azureEndpoint)
+                    val ping = PingTester.measureServerLatency(server, 2600)
                     val realPing = if (ping > 0) ping else -1
                     server.id to realPing
                 }
@@ -730,10 +730,10 @@ private fun ServerCard(
     )
 
     val activeBars = when {
-        pingMs <= 0 -> 2
-        pingMs < 60 -> 4
-        pingMs < 110 -> 3
-        pingMs < 170 -> 2
+        pingMs <= 0 -> 0
+        pingMs < 65 -> 4
+        pingMs < 120 -> 3
+        pingMs < 200 -> 2
         else -> 1
     }
 
@@ -940,9 +940,11 @@ private fun ServerCard(
                         }
                     } else {
                         val stabilityText = when {
-                            pingMs in 1..85 -> if (isEn) "Stable • ${server.speedMbps} Mbps" else "Ổn định • ${server.speedMbps} Mbps"
-                            pingMs in 86..150 -> if (isEn) "Good • ${server.speedMbps} Mbps" else "Khá • ${server.speedMbps} Mbps"
-                            else -> "${server.speedMbps} Mbps"
+                            pingMs <= 0 -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
+                            pingMs in 1..85 -> if (isEn) "Fast • :${server.port}" else "Phản hồi nhanh • :${server.port}"
+                            pingMs in 86..160 -> if (isEn) "Moderate • :${server.port}" else "Khá • :${server.port}"
+                            pingMs in 161..300 -> if (isEn) "High Ping • :${server.port}" else "Ping cao • :${server.port}"
+                            else -> if (isEn) "Very Slow • :${server.port}" else "Rất trễ • :${server.port}"
                         }
                         Text(
                             text = stabilityText,

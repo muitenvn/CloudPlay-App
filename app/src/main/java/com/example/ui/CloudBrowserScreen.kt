@@ -134,6 +134,62 @@ fun CloudBrowserScreen(
         )
     }
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, webViewInstance, context) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                    try {
+                        webViewInstance?.evaluateJavascript(
+                            "if (window.__setAppInBackground) window.__setAppInBackground(true);",
+                            null
+                        )
+                        webViewInstance?.onPause()
+                        webViewInstance?.pauseTimers()
+                    } catch (_: Exception) {}
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    try {
+                        webViewInstance?.onResume()
+                        webViewInstance?.resumeTimers()
+                        webViewInstance?.evaluateJavascript(
+                            "if (window.__setAppInBackground) window.__setAppInBackground(false);",
+                            null
+                        )
+                    } catch (_: Exception) {}
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+        val thermalListener = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && powerManager != null) {
+            val l = android.os.PowerManager.OnThermalStatusChangedListener { status ->
+                val isHot = status >= android.os.PowerManager.THERMAL_STATUS_MODERATE
+                try {
+                    webViewInstance?.evaluateJavascript(
+                        "if (window.__setDeviceThermalThrottled) window.__setDeviceThermalThrottled($isHot);",
+                        null
+                    )
+                } catch (_: Exception) {}
+            }
+            try {
+                powerManager.addThermalStatusListener(l)
+            } catch (_: Exception) {}
+            l
+        } else null
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q && powerManager != null && thermalListener != null) {
+                try {
+                    powerManager.removeThermalStatusListener(thermalListener)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     DisposableEffect(activity) {
         com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = false)
         VpnManager.setInGameStreamActive(true)
@@ -703,6 +759,19 @@ fun CloudBrowserScreen(
                                 color = Color.White
                             )
                         }
+                    } else if (streamUiState.bannerType == BannerType.WARNING && vpnState.mode == NetworkMode.VPN_JAPAN) {
+                        Button(
+                            onClick = { streamController.forceSwitchToDirectNetwork() },
+                            colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
+                            modifier = Modifier.testTag("disconnect_vpn_banner_button")
+                        ) {
+                            Text(
+                                text = if (config.isEnglishUI()) "Disconnect VPN" else "Ngắt VPN ngay",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -871,7 +940,7 @@ fun CloudBrowserScreen(
                 val isEnNow = config.isEnglishUI()
                 android.widget.Toast.makeText(
                     context,
-                    if (isEnNow) "⚡ Flushed buffer & synced live frame edge!" else "⚡ Đã xả bộ đệm & đồng bộ khung hình thời gian thực!",
+                    if (isEnNow) "🔄 Resynced video frames and Audio/Video buffer!" else "🔄 Đã đồng bộ lại khung hình và bộ đệm Audio/Video!",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
             }

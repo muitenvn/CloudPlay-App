@@ -307,11 +307,17 @@ fun MainContent(
 
     val streamUiState by streamController.uiState.collectAsState()
 
-    // Synchronize BackgroundMusicManager with settings (toggle, volume, low-end mode)
-    LaunchedEffect(config.backgroundMusicEnabled, config.backgroundMusicVolume, config.lowEndDeviceMode) {
+    // Synchronize BackgroundMusicManager with settings (auto-start, volume, play-in-game, low-end mode)
+    LaunchedEffect(
+        config.backgroundMusicEnabled,
+        config.backgroundMusicVolume,
+        config.backgroundMusicPlayInGame,
+        config.lowEndDeviceMode
+    ) {
         com.example.audio.BackgroundMusicManager.onSettingsUpdated(
-            enabled = config.backgroundMusicEnabled,
+            autoStartEnabled = config.backgroundMusicEnabled,
             volume = config.backgroundMusicVolume,
+            playInGameEnabled = config.backgroundMusicPlayInGame,
             lowEndMode = config.lowEndDeviceMode
         )
     }

@@ -955,23 +955,80 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 5.5: NHẠC NỀN (Tự tắt khi vào game & khi bật chế độ máy yếu)
+        // NHÓM 5.5: NHẠC NỀN (Tự phát, Phát thủ công & Phát khi đang chơi)
         // =========================================================================
         item {
+            val isMusicPlaying by com.example.audio.BackgroundMusicManager.isPlaying.collectAsState()
+
             SettingsCard(title = if (isEn) "Background Music" else "Nhạc nền") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(
+                            text = if (isEn) "Manual Playback" else "Phát / Dừng nhạc nền",
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (isMusicPlaying) {
+                                if (isEn) "Currently playing (${(config.backgroundMusicVolume * 100).toInt()}%)" else "Đang phát (${(config.backgroundMusicVolume * 100).toInt()}%)"
+                            } else {
+                                if (isEn) "Stopped • Tap to play manually" else "Đang dừng • Bấm để bật tay khi cần"
+                            },
+                            color = if (isMusicPlaying) XboxNeonGreen else TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            if (config.lowEndDeviceMode && !isMusicPlaying) {
+                                SettingsRepository.updateLowEndDeviceMode(false)
+                                SettingsRepository.updateGpuLoadReductionEnabled(false)
+                            }
+                            com.example.audio.BackgroundMusicManager.toggleManualPlayback()
+                        },
+                        modifier = Modifier.testTag("settings_background_music_manual_play_btn"),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isMusicPlaying) DirectCyan else XboxNeonGreen.copy(alpha = 0.7f)
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isMusicPlaying) DirectCyan.copy(alpha = 0.14f) else XboxNeonGreen.copy(alpha = 0.12f)
+                        )
+                    ) {
+                        Text(
+                            text = if (isMusicPlaying) {
+                                if (isEn) "⏹ Stop" else "⏹ Dừng"
+                            } else {
+                                if (isEn) "▶ Play" else "▶ Phát"
+                            },
+                            color = if (isMusicPlaying) DirectCyan else XboxNeonGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+
                 SettingToggleRow(
-                    title = if (isEn) "Background Music" else "Nhạc nền",
+                    title = if (isEn) "Auto-start music on app launch" else "Tự động bật nhạc khi mở app",
                     subtitle = if (config.lowEndDeviceMode) {
                         if (isEn) {
                             "Auto-muted while Low-End & Battery Saver Mode is active"
                         } else {
-                            "Đang tự tắt do bật Chế độ máy yếu • Tự dừng hoàn toàn khi vào game"
+                            "Đang tự tắt do bật Chế độ máy yếu"
                         }
                     } else {
                         if (isEn) {
-                            "Plays in Home, Games, Servers & Settings • Auto-stops in game (800ms fade)"
+                            "Default OFF • Plays automatically in Home, Games, Servers & Settings"
                         } else {
-                            "Phát ở Trang chủ, Game, Máy chủ, Cài đặt • Tự dừng hoàn toàn khi vào game"
+                            "Mặc định tắt • Tự phát khi mở ứng dụng ở Trang chủ, Game, Máy chủ, Cài đặt"
                         }
                     },
                     checked = config.backgroundMusicEnabled && !config.lowEndDeviceMode,
@@ -984,6 +1041,29 @@ fun SettingsScreen(
                     },
                     activeColor = XboxNeonGreen,
                     switchTestTag = "settings_background_music_switch"
+                )
+
+                SettingToggleRow(
+                    title = if (isEn) "Play music while in game" else "Phát nhạc khi đang chơi",
+                    subtitle = if (config.lowEndDeviceMode) {
+                        if (isEn) {
+                            "Auto-stops when entering game in Low-End Mode"
+                        } else {
+                            "Chế độ máy yếu: vẫn tự tắt nhạc khi vào game"
+                        }
+                    } else {
+                        if (isEn) {
+                            "Keeps playing at the same volume during gameplay if music is already on"
+                        } else {
+                            "Nếu nhạc đang phát sẽ tiếp tục phát cùng âm lượng khi vào game; tắt sẽ dừng (fade 800ms)"
+                        }
+                    },
+                    checked = config.backgroundMusicPlayInGame && !config.lowEndDeviceMode,
+                    onCheckedChange = { enabled ->
+                        SettingsRepository.updateBackgroundMusicPlayInGame(enabled)
+                    },
+                    activeColor = DirectCyan,
+                    switchTestTag = "settings_background_music_play_in_game_switch"
                 )
 
                 Column(
@@ -1006,14 +1086,14 @@ fun SettingsScreen(
 
                 Text(
                     text = if (isEn) {
-                        "🎵 Nhạc nền do AI tạo (Gemini) • Excluded from screen recording"
+                        "Excluded from screen recording"
                     } else {
-                        "🎵 Nhạc nền do AI tạo (Gemini) • Không thu vào video quay màn hình"
+                        "Không thu vào video quay màn hình"
                     },
                     color = TextSecondary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.testTag("settings_ai_music_attribution_text")
+                    modifier = Modifier.testTag("settings_music_capture_notice_text")
                 )
             }
         }
@@ -1154,13 +1234,6 @@ fun SettingsScreen(
                     }
                     else -> {}
                 }
-
-                Text(
-                    text = "Nhạc nền do AI tạo (Gemini)",
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    modifier = Modifier.testTag("about_ai_music_credit_text")
-                )
             }
         }
 

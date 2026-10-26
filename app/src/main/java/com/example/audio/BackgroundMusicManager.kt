@@ -13,21 +13,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
  * Manages ambient background music (window_seat_view.mp3) across Dashboard screens
- * (Home, Games, Servers, Settings).
+ * (Home, Games, Servers, Settings) and optionally during gameplay.
  *
  * Key guarantees:
- * 1. Loops seamlessly across Dashboard tabs using built-in Android MediaPlayer (no heavy external SDK).
- * 2. Fades in (800ms) when starting and fades out (800ms) before stopping/entering CloudBrowserScreen.
- * 3. Completely stops and releases MediaPlayer instance (null) when entering CloudBrowserScreen,
- *    when WebRTC game stream starts, when disabled in Settings, or when app goes to background.
- * 4. Sets AudioAttributes.ALLOW_CAPTURE_BY_NONE on Android 10+ (API 29+) so background music is
- *    NEVER recorded into screen recording videos, and never contends with WebRTC in-game audio latency.
- * 5. Handles AudioFocus (phone calls, other media apps) and lifecycle transitions automatically.
+ * 1. Loops seamlessly using built-in Android MediaPlayer (no heavy external SDK).
+ * 2. Auto-start on launch is OFF by default (volume 8% by default); users can start/stop manually
+ *    via the Play/Stop button in Settings or enable auto-start on launch.
+ * 3. Supports "Play music while in game" (default ON): if enabled and music is currently playing
+ *    (and Low-End Mode is OFF), music continues playing at the same volume when entering game
+ *    and when stream starts; if disabled (or Low-End Mode is ON), fades out over 800ms and releases.
+ * 4. Uses AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK and AudioAttributes.ALLOW_CAPTURE_BY_NONE (API 29+)
+ *    so background music never mutes/breaks WebRTC game audio and is NEVER recorded into screen
+ *    recording videos.
  */
 object BackgroundMusicManager {
 
@@ -43,12 +48,24 @@ object BackgroundMusicManager {
     private var mediaPlayer: MediaPlayer? = null
     private var fadeJob: Job? = null
 
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
     private var isAppInForeground: Boolean = false
     private var isOnDashboardScreen: Boolean = true
     private var isInGameOrStreamActive: Boolean = false
     private var isScreenRecordingActive: Boolean = false
     private var hasAudioFocus: Boolean = false
     private var pausedByAudioFocusLoss: Boolean = false
+
+    /**
+     * Tracks whether music is desired in the current app session (either initialized from
+     * auto-start setting `backgroundMusicEnabled`, or toggled manually via the Play/Stop button
+     * in Settings).
+     */
+    private var isSessionPlaybackDesired: Boolean = false
+    private var wasPlayingWhenEnteringGame: Boolean = false
+    private var lastObservedAutoStartSetting: Boolean? = null
 
     private var currentAppliedVolume: Float = 0f
 
@@ -57,10 +74,27 @@ object BackgroundMusicManager {
             AudioManager.AUDIOFOCUS_LOSS,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Stop when phone call arrives or another app takes audio focus; restore when focus returns
-                hasAudioFocus = false
-                pausedByAudioFocusLoss = true
-                fadeOutAndRelease(keepFocus = true)
+                val config = SettingsRepository.config.value
+                val am = audioManager
+                val inPhoneOrVoiceCall = am?.mode == AudioManager.MODE_IN_CALL ||
+                    am?.mode == AudioManager.MODE_RINGTONE ||
+                    am?.mode == AudioManager.MODE_IN_COMMUNICATION
+
+                // When inside CloudBrowserScreen, Chromium WebView requests AUDIOFOCUS_GAIN for WebRTC.
+                // If "Play music while in game" is enabled and there is no phone call, keep background
+                // music playing at the same volume alongside the game audio.
+                val shouldKeepPlayingWithWebRtc = isAppInForeground &&
+                    (!isOnDashboardScreen || isInGameOrStreamActive) &&
+                    config.backgroundMusicPlayInGame &&
+                    !config.lowEndDeviceMode &&
+                    !inPhoneOrVoiceCall &&
+                    focusChange != AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+
+                if (!shouldKeepPlayingWithWebRtc) {
+                    hasAudioFocus = false
+                    pausedByAudioFocusLoss = true
+                    fadeOutAndRelease(keepFocus = true)
+                }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 hasAudioFocus = true
@@ -76,12 +110,35 @@ object BackgroundMusicManager {
         if (appContext == null) {
             appContext = context.applicationContext
             audioManager = appContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            val config = SettingsRepository.config.value
+            lastObservedAutoStartSetting = config.backgroundMusicEnabled
+            isSessionPlaybackDesired = config.backgroundMusicEnabled && !config.lowEndDeviceMode
+        }
+    }
+
+    /**
+     * Manually toggles playback from the Play/Stop button in Settings without requiring
+     * "Auto-start music on launch" to be enabled.
+     */
+    fun toggleManualPlayback() {
+        val currentlyActive = _isPlaying.value || isSessionPlaybackDesired
+        setManualPlayback(!currentlyActive)
+    }
+
+    fun setManualPlayback(play: Boolean) {
+        isSessionPlaybackDesired = play
+        if (play) {
+            wasPlayingWhenEnteringGame = true
+            pausedByAudioFocusLoss = false
+            evaluatePlaybackState()
+        } else {
+            wasPlayingWhenEnteringGame = false
+            fadeOutAndRelease(keepFocus = false)
         }
     }
 
     fun onAppForeground() {
         isAppInForeground = true
-        // If focus was lost while another app/call was active and user returned to app, re-evaluate
         pausedByAudioFocusLoss = false
         evaluatePlaybackState()
     }
@@ -92,10 +149,14 @@ object BackgroundMusicManager {
     }
 
     fun onScreenChanged(isDashboard: Boolean) {
+        val wasOnDashboard = isOnDashboardScreen
         isOnDashboardScreen = isDashboard
         if (!isDashboard) {
+            if (wasOnDashboard) {
+                wasPlayingWhenEnteringGame = _isPlaying.value || isSessionPlaybackDesired
+            }
             isInGameOrStreamActive = true
-            fadeOutAndRelease(keepFocus = false)
+            evaluatePlaybackState()
         } else {
             isInGameOrStreamActive = false
             evaluatePlaybackState()
@@ -105,14 +166,11 @@ object BackgroundMusicManager {
     fun onGameStreamStateChanged(isGameActive: Boolean, isStreamConnected: Boolean) {
         val streamNowActive = isGameActive || isStreamConnected
         if (streamNowActive) {
-            isInGameOrStreamActive = true
-            // When actual WebRTC stream connects, cut any remaining fade and release immediately
-            // so WebRTC audio track has zero latency contention
-            if (isStreamConnected) {
-                stopAndReleaseImmediately()
-            } else {
-                fadeOutAndRelease(keepFocus = false)
+            if (!isInGameOrStreamActive) {
+                wasPlayingWhenEnteringGame = _isPlaying.value || isSessionPlaybackDesired
             }
+            isInGameOrStreamActive = true
+            evaluatePlaybackState()
         } else if (isOnDashboardScreen) {
             isInGameOrStreamActive = false
             evaluatePlaybackState()
@@ -121,17 +179,41 @@ object BackgroundMusicManager {
 
     fun onScreenRecordingStateChanged(isRecording: Boolean) {
         isScreenRecordingActive = isRecording
-        if (isRecording) {
-            stopAndReleaseImmediately()
+        // On Android 10+ (API 29+), AudioAttributes.ALLOW_CAPTURE_BY_NONE prevents screen recording
+        // from capturing background music. On older Android (< API 29) or in Low-End Mode, stop music.
+        if (isRecording && (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || SettingsRepository.config.value.lowEndDeviceMode)) {
+            fadeOutAndRelease(keepFocus = false)
         } else {
             evaluatePlaybackState()
         }
     }
 
-    fun onSettingsUpdated(enabled: Boolean, volume: Float, lowEndMode: Boolean) {
+    fun onSettingsUpdated(
+        autoStartEnabled: Boolean,
+        volume: Float,
+        playInGameEnabled: Boolean,
+        lowEndMode: Boolean
+    ) {
         val clampedVolume = volume.coerceIn(0f, 1f)
-        val shouldPlay = enabled && !lowEndMode && shouldPlayOnCurrentScreen()
-        if (!shouldPlay) {
+
+        // If user explicitly toggled the "Auto-start music on launch" switch in Settings,
+        // sync the current session playback state with their toggle action.
+        if (lastObservedAutoStartSetting != autoStartEnabled) {
+            lastObservedAutoStartSetting = autoStartEnabled
+            isSessionPlaybackDesired = autoStartEnabled && !lowEndMode
+            if (isSessionPlaybackDesired) {
+                wasPlayingWhenEnteringGame = true
+            }
+        }
+
+        if (lowEndMode) {
+            isSessionPlaybackDesired = false
+            wasPlayingWhenEnteringGame = false
+            fadeOutAndRelease(keepFocus = false)
+            return
+        }
+
+        if (!shouldPlayOnCurrentScreen()) {
             fadeOutAndRelease(keepFocus = false)
             return
         }
@@ -150,12 +232,17 @@ object BackgroundMusicManager {
 
     private fun shouldPlayOnCurrentScreen(): Boolean {
         val config = SettingsRepository.config.value
-        return isAppInForeground &&
-            isOnDashboardScreen &&
-            !isInGameOrStreamActive &&
-            !isScreenRecordingActive &&
-            config.backgroundMusicEnabled &&
-            !config.lowEndDeviceMode
+        if (!isAppInForeground || config.lowEndDeviceMode) return false
+        if (isScreenRecordingActive && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+
+        val inGameContext = !isOnDashboardScreen || isInGameOrStreamActive
+        return if (inGameContext) {
+            // In game: keep playing only if "Play music while in game" is ON and music was already playing
+            config.backgroundMusicPlayInGame && (isSessionPlaybackDesired || wasPlayingWhenEnteringGame)
+        } else {
+            // On Dashboard (Home, Games, Servers, Settings)
+            isSessionPlaybackDesired
+        }
     }
 
     fun evaluatePlaybackState() {
@@ -171,7 +258,7 @@ object BackgroundMusicManager {
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Prevents screen recording (AudioPlaybackCapture) from recording background music
+            // Strictly prevents screen recording (AudioPlaybackCapture) from recording background music
             builder.setAllowedCapturePolicy(AudioAttributes.ALLOW_CAPTURE_BY_NONE)
         }
         return builder.build()
@@ -181,11 +268,13 @@ object BackgroundMusicManager {
         val am = audioManager ?: return false
         if (hasAudioFocus) return true
 
+        // Use AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK so background music never mutes or interrupts
+        // WebRTC game stream audio in WebView or other media streams.
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val req = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            val req = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(buildAudioAttributes())
-                .setAcceptsDelayedFocusGain(true)
-                .setWillPauseWhenDucked(true)
+                .setAcceptsDelayedFocusGain(false)
+                .setWillPauseWhenDucked(false)
                 .setOnAudioFocusChangeListener(audioFocusChangeListener)
                 .build()
                 .also { audioFocusRequest = it }
@@ -195,7 +284,7 @@ object BackgroundMusicManager {
             am.requestAudioFocus(
                 audioFocusChangeListener,
                 AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
             )
         }
 
@@ -227,9 +316,15 @@ object BackgroundMusicManager {
         if (existingPlayer != null) {
             try {
                 if (existingPlayer.isPlaying) {
-                    // Already playing or mid-fade; ramp smoothly to target volume
+                    _isPlaying.value = true
+                    // Already playing at target volume or mid-fade; ensure smooth transition to target volume
                     val targetVolume = SettingsRepository.config.value.backgroundMusicVolume.coerceIn(0f, 1f)
-                    val startVolume = currentAppliedVolume.coerceIn(0f, targetVolume)
+                    if (kotlin.math.abs(currentAppliedVolume - targetVolume) <= 0.005f) {
+                        currentAppliedVolume = targetVolume
+                        existingPlayer.setVolume(targetVolume, targetVolume)
+                        return
+                    }
+                    val startVolume = currentAppliedVolume.coerceIn(0f, 1f)
                     fadeJob = scope.launch {
                         for (step in 1..FADE_STEPS) {
                             if (!isActive || !shouldPlayOnCurrentScreen()) break
@@ -250,9 +345,7 @@ object BackgroundMusicManager {
             }
         }
 
-        if (!requestAudioFocus()) {
-            return
-        }
+        requestAudioFocus()
 
         try {
             val afd = ctx.resources.openRawResourceFd(R.raw.window_seat_view) ?: return
@@ -266,6 +359,7 @@ object BackgroundMusicManager {
             player.setVolume(0f, 0f)
             player.start()
             mediaPlayer = player
+            _isPlaying.value = true
 
             fadeJob = scope.launch {
                 for (step in 1..FADE_STEPS) {
@@ -288,10 +382,11 @@ object BackgroundMusicManager {
 
     /**
      * Fades volume down over 800ms and then completely stops and releases MediaPlayer
-     * so no player instance is kept in memory when disabled, backgrounded, or in-game.
+     * so no player instance is kept in memory when disabled or stopped.
      */
     private fun fadeOutAndRelease(keepFocus: Boolean) {
         fadeJob?.cancel()
+        _isPlaying.value = false
         val player = mediaPlayer
         if (player == null) {
             if (!keepFocus) abandonAudioFocus()
@@ -299,7 +394,7 @@ object BackgroundMusicManager {
         }
 
         val startVol = currentAppliedVolume.coerceIn(0f, 1f)
-        if (startVol <= 0.01f) {
+        if (startVol <= 0.005f) {
             releasePlayerOnly()
             if (!keepFocus) abandonAudioFocus()
             return
@@ -329,17 +424,19 @@ object BackgroundMusicManager {
 
     /**
      * Immediately stops and releases MediaPlayer and abandons audio focus without waiting.
-     * Used when WebRTC game stream connects, screen recording starts, or Activity is destroyed.
+     * Used when Activity is destroyed.
      */
     fun stopAndReleaseImmediately() {
         fadeJob?.cancel()
         fadeJob = null
+        _isPlaying.value = false
         releasePlayerOnly()
         abandonAudioFocus()
     }
 
     private fun releasePlayerOnly() {
         currentAppliedVolume = 0f
+        _isPlaying.value = false
         val player = mediaPlayer ?: return
         mediaPlayer = null
         try {

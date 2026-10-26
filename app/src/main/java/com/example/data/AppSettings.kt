@@ -584,8 +584,9 @@ data class AppConfig(
     val githubRepoSlug: String = "muitenvn/CloudPlay-App",
     val userAcceptedTerms: Boolean = false,
     val autoCheckUpdatesOnLaunch: Boolean = true,
-    val backgroundMusicEnabled: Boolean = true,
-    val backgroundMusicVolume: Float = 0.25f // 0.0f .. 1.0f (mặc định 25%)
+    val backgroundMusicEnabled: Boolean = false, // Mặc định TẮT cho người dùng mới
+    val backgroundMusicVolume: Float = 0.08f, // 0.0f .. 1.0f (mặc định 8% cho người dùng mới)
+    val backgroundMusicPlayInGame: Boolean = true // Mặc định BẬT phát nhạc khi đang chơi
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -741,10 +742,17 @@ object SettingsRepository {
             autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true),
             backgroundMusicEnabled = if (effectiveLowEnd) {
                 sp.getBoolean("background_music_enabled_low_end", false)
+            } else if (sp.contains("background_music_user_explicit")) {
+                sp.getBoolean("background_music_user_explicit", false)
             } else {
-                sp.getBoolean("background_music_enabled", true)
+                false
             },
-            backgroundMusicVolume = sp.getFloat("background_music_volume", 0.25f).coerceIn(0f, 1f)
+            backgroundMusicVolume = if (sp.contains("background_music_volume_user_explicit")) {
+                sp.getFloat("background_music_volume_user_explicit", 0.08f).coerceIn(0f, 1f)
+            } else {
+                0.08f
+            },
+            backgroundMusicPlayInGame = sp.getBoolean("background_music_play_in_game", true)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -820,6 +828,7 @@ object SettingsRepository {
                 putBoolean("background_music_user_pref", c.backgroundMusicEnabled)
             }
             putFloat("background_music_volume", c.backgroundMusicVolume.coerceIn(0f, 1f))
+            putBoolean("background_music_play_in_game", c.backgroundMusicPlayInGame)
             apply()
         }
     }
@@ -1134,7 +1143,7 @@ object SettingsRepository {
         val restoredMusicPref = if (enabled) {
             false
         } else {
-            prefs?.getBoolean("background_music_user_pref", true) ?: true
+            prefs?.getBoolean("background_music_user_explicit", false) ?: false
         }
         _config.update {
             it.copy(
@@ -1284,12 +1293,20 @@ object SettingsRepository {
     }
 
     fun updateBackgroundMusicEnabled(enabled: Boolean) {
+        prefs?.edit()?.putBoolean("background_music_user_explicit", enabled)?.apply()
         _config.update { it.copy(backgroundMusicEnabled = enabled) }
         persist(_config.value)
     }
 
     fun updateBackgroundMusicVolume(volume: Float) {
-        _config.update { it.copy(backgroundMusicVolume = volume.coerceIn(0f, 1f)) }
+        val clamped = volume.coerceIn(0f, 1f)
+        prefs?.edit()?.putFloat("background_music_volume_user_explicit", clamped)?.apply()
+        _config.update { it.copy(backgroundMusicVolume = clamped) }
+        persist(_config.value)
+    }
+
+    fun updateBackgroundMusicPlayInGame(enabled: Boolean) {
+        _config.update { it.copy(backgroundMusicPlayInGame = enabled) }
         persist(_config.value)
     }
 }

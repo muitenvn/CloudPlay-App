@@ -418,5 +418,7 @@ data class VpnConnectionState(
     val telemetry: StreamTelemetry = StreamTelemetry(),
     val benchmark: SystemBenchmarkResult = SystemBenchmarkResult(),
     val unlockRecords: Map<String, ServerUnlockRecord> = emptyMap(),
-    val unlockFailPromptServer: ServerLocation? = null
+    val unlockFailPromptServer: ServerLocation? = null,
+    val serverPings: Map<String, Int> = emptyMap(),
+    val isTestingPings: Boolean = false
 )

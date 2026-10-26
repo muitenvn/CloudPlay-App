@@ -47,10 +47,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -93,8 +93,6 @@ import com.example.vpn.RegionUnlockStatus
 import com.example.vpn.ServerLocation
 import com.example.vpn.VpnManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 @Composable
@@ -114,7 +112,6 @@ fun ServersScreen(
     val scope = rememberCoroutineScope()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
-    var isTestingAll by remember { mutableStateOf(false) }
     var isFetchingLive by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
 
@@ -131,45 +128,31 @@ fun ServersScreen(
         }
     }
 
-    val serverPings = remember { mutableStateMapOf<String, Int>() }
+    val serverPings = vpnState.serverPings
+    val isTestingAll = vpnState.isTestingPings
+
+    // Tự động đo ping toàn bộ máy chủ ngay khi mở mục Máy chủ nếu chưa có dữ liệu đo
+    LaunchedEffect(Unit) {
+        if (serverPings.isEmpty() && !isTestingAll) {
+            VpnManager.testAllServers(autoPickBest = false, context = context)
+        }
+    }
 
     fun testAllServers(autoPickBest: Boolean = false) {
-        isTestingAll = true
-        scope.launch(Dispatchers.IO) {
-            val deferreds = allServers.map { server ->
-                async {
-                    val ping = PingTester.measureServerLatency(server, 2600)
-                    val realPing = if (ping > 0) ping else -1
-                    server.id to realPing
+        VpnManager.testAllServers(
+            autoPickBest = autoPickBest,
+            context = context,
+            onPickedBest = { best, bestPing ->
+                onSelectServer(best)
+                val pingSuffix = if (bestPing > 0) " (${bestPing}ms)" else ""
+                val msg = if (isEn) {
+                    "Selected best server: ${best.flag} ${best.name}$pingSuffix"
+                } else {
+                    "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name}$pingSuffix"
                 }
+                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             }
-            val results = deferreds.awaitAll()
-            results.forEach { (id, ping) ->
-                serverPings[id] = ping
-            }
-            isTestingAll = false
-            if (autoPickBest) {
-                val candidates = VpnManager.sortServersByUnlockAndPing(
-                    servers = allServers.toList(),
-                    pingMap = serverPings.toMap(),
-                    records = vpnState.unlockRecords
-                )
-                val best = candidates.firstOrNull { (serverPings[it.id] ?: -1) > 0 } ?: candidates.firstOrNull()
-                if (best != null) {
-                    kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        onSelectServer(best)
-                        val bestPing = serverPings[best.id] ?: -1
-                        val pingSuffix = if (bestPing > 0) " (${bestPing}ms)" else ""
-                        val msg = if (isEn) {
-                            "Selected best server: ${best.flag} ${best.name}$pingSuffix"
-                        } else {
-                            "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name}$pingSuffix"
-                        }
-                        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
+        )
     }
 
     fun fetchFreshLiveProxies(country: String) {
@@ -183,12 +166,12 @@ fun ServersScreen(
                 }
             }
             isFetchingLive = false
+            VpnManager.testAllServers(autoPickBest = false, context = context)
         }
     }
 
     val allServersSnapshot = allServers.toList()
-    val pingSnapshot = serverPings.toMap()
-    val filteredServers = remember(selectedCategory, allServersSnapshot, pingSnapshot, vpnState.unlockRecords) {
+    val filteredServers = remember(selectedCategory, allServersSnapshot, serverPings, vpnState.unlockRecords) {
         val rawFiltered = when (selectedCategory) {
             "ALL" -> allServersSnapshot
             "CUSTOM" -> allServersSnapshot.filter { it.isCustom }
@@ -196,7 +179,7 @@ fun ServersScreen(
         }
         VpnManager.sortServersByUnlockAndPing(
             servers = rawFiltered,
-            pingMap = pingSnapshot,
+            pingMap = serverPings,
             records = vpnState.unlockRecords
         )
     }
@@ -208,6 +191,72 @@ fun ServersScreen(
         contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        if (currentServer.countryCode.equals("US", ignoreCase = true)) {
+            item(key = "us_high_ping_warning_banner") {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("us_high_ping_warning_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFF1B1508),
+                    border = androidx.compose.foundation.BorderStroke(1.2.dp, WarningAmber.copy(alpha = 0.8f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "⚠️ US Server Selected (~12,500 km across Pacific • ~170–220ms Ping)"
+                            } else {
+                                "⚠️ Đang chọn máy chủ Mỹ (~12.500 km xuyên Thái Bình Dương • Ping ~170–220ms)"
+                            },
+                            color = WarningAmber,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = if (isEn) {
+                                "When you select a US server, Xbox allocates a physical console in California/US (WESTUS). Toggling VPN in-game cannot move a running console across the ocean. Switch to Japan (Tokyo) BEFORE launching the game to drop ping to ~60–90ms!"
+                            } else {
+                                "Khi chọn máy chủ Mỹ, Xbox cấp máy chủ vật lý tại California (WESTUS) nên cả Xbox lẫn ứng dụng đều đo Ping thực tế ~180ms và bật/tắt VPN lúc đang chơi không thể đổi vị trí máy chủ. Hãy đổi sang 🇯🇵 Nhật Bản (Tokyo) TRƯỚC khi vào game để giảm Ping còn ~60–90ms!"
+                            },
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp
+                        )
+                        Button(
+                            onClick = {
+                                val bestJp = VpnManager.sortServersByUnlockAndPing(
+                                    servers = allServers.filter { it.countryCode == "JP" },
+                                    pingMap = serverPings,
+                                    records = vpnState.unlockRecords
+                                ).firstOrNull() ?: DEFAULT_SERVERS.first()
+                                onSelectServer(bestJp)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .defaultMinSize(minHeight = 36.dp)
+                                .testTag("switch_to_japan_server_button")
+                        ) {
+                            Text(
+                                text = if (isEn) "🇯🇵 Switch to Japan Server (Tokyo ~65ms)" else "🇯🇵 Đổi ngay sang Nhật Bản (Tokyo ~65ms)",
+                                color = Color.White,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (vpnState.unlockFailPromptServer != null) {
             item(key = "unlock_fail_prompt_banner") {
                 Surface(
@@ -661,6 +710,7 @@ fun ServersScreen(
                 isSelected = isSelected,
                 isRecommended = isRecommended,
                 pingMs = ping,
+                isTestingPings = isTestingAll,
                 unlockStatus = unlockStatus,
                 isEn = isEn,
                 onClick = { onSelectServer(server) },
@@ -696,6 +746,7 @@ private fun ServerCard(
     isSelected: Boolean,
     isRecommended: Boolean = false,
     pingMs: Int,
+    isTestingPings: Boolean = false,
     unlockStatus: RegionUnlockStatus,
     isEn: Boolean = false,
     onClick: () -> Unit,
@@ -911,8 +962,8 @@ private fun ServerCard(
                         }
 
                         Text(
-                            text = if (pingMs > 0) "${animatedPingMs}ms" else "--ms",
-                            color = pingColor,
+                            text = if (pingMs > 0) "${animatedPingMs}ms" else if (isTestingPings) "..." else "--ms",
+                            color = if (pingMs > 0) pingColor else if (isTestingPings) DirectCyan else pingColor,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 12.sp
@@ -940,10 +991,11 @@ private fun ServerCard(
                         }
                     } else {
                         val stabilityText = when {
-                            pingMs <= 0 -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
+                            pingMs <= 0 && isTestingPings -> if (isEn) "Pinging... • :${server.port}" else "Đang đo... • :${server.port}"
+                            pingMs <= 0 -> if (isEn) "Unreachable • :${server.port}" else "Không phản hồi • :${server.port}"
                             pingMs in 1..85 -> if (isEn) "Fast • :${server.port}" else "Phản hồi nhanh • :${server.port}"
-                            pingMs in 86..160 -> if (isEn) "Moderate • :${server.port}" else "Khá • :${server.port}"
-                            pingMs in 161..300 -> if (isEn) "High Ping • :${server.port}" else "Ping cao • :${server.port}"
+                            pingMs in 86..155 -> if (isEn) "Moderate • :${server.port}" else "Khá • :${server.port}"
+                            pingMs in 156..300 -> if (isEn) "High Ping • :${server.port}" else "Ping cao • :${server.port}"
                             else -> if (isEn) "Very Slow • :${server.port}" else "Rất trễ • :${server.port}"
                         }
                         Text(

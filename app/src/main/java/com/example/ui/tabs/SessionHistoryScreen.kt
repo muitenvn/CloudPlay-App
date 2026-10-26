@@ -1214,7 +1214,7 @@ private fun SessionDetailDialog(
                             session.isThermalHot ->
                                 if (isEn) "Device Hot" else "Máy nóng"
                             session.isSlowDecode ->
-                                if (isEn) "Slow Decode (>12ms)" else "Giải mã chậm (>12ms)"
+                                if (isEn) "Slow Decode (>16ms)" else "Giải mã chậm (>16ms)"
                             else ->
                                 if (isEn) "Cool & Smooth" else "Mát & Ổn định"
                         }
@@ -1338,8 +1338,8 @@ private fun fpsMetricColor(fps: Int): Color = when {
 }
 
 private fun decodeMetricColor(decodeMs: Double): Color = when {
-    decodeMs <= 8.0 -> XboxNeonGreen
-    decodeMs <= 12.0 -> WarningAmber
+    decodeMs <= 10.0 -> XboxNeonGreen
+    decodeMs <= 16.0 -> WarningAmber
     else -> JapanRed
 }
 
@@ -1372,7 +1372,7 @@ private fun buildGlobalSmartTip(sessions: List<PlaySessionRecord>, isEn: Boolean
         return if (isEn) {
             "Tip: Keep Auto (720p ⇄ 1080p) quality mode enabled to prevent frame delay when Wi-Fi or 4G fluctuates."
         } else {
-            "Gợi ý: Giữ chế độ Tự động (720p ⇄ 1080p) để tự xả hàng đợi khung hình khi sóng Wi-Fi hoặc 4G dao động."
+            "Gợi ý: Giữ chế độ Tự động (720p ⇄ 1080p) để tự điều chỉnh bitrate êm ái khi sóng Wi-Fi hoặc 4G dao động."
         }
     }
     return null
@@ -1383,6 +1383,21 @@ private fun buildSessionSmartTip(
     @Suppress("UNUSED_PARAMETER") allSessions: List<PlaySessionRecord>,
     isEn: Boolean
 ): String? {
+    val isUsServer = session.serverName.contains("United States", ignoreCase = true) ||
+        session.serverName.contains("Silicon Valley", ignoreCase = true) ||
+        session.serverName.contains("Oregon", ignoreCase = true) ||
+        session.serverName.contains("Virginia", ignoreCase = true) ||
+        session.serverName.contains("Iowa", ignoreCase = true) ||
+        session.serverName.contains("Nevada", ignoreCase = true)
+
+    if (isUsServer && session.avgPingMs >= 140) {
+        return if (isEn) {
+            "Why Ping was ${session.avgPingMs}ms: You launched on a US server (~12,500 km across the Pacific). Switch to a 🇯🇵 Japan (Tokyo) server BEFORE starting the game to lower physical Ping to ~60–90ms!"
+        } else {
+            "Vì sao Ping ${session.avgPingMs}ms: Phiên này mở bằng máy chủ Mỹ (~12.500 km xuyên Thái Bình Dương). Hãy đổi sang máy chủ 🇯🇵 Nhật Bản (Tokyo) TRƯỚC khi vào game để giảm Ping vật lý xuống ~60–90ms!"
+        }
+    }
+
     val samples = session.pingSamples
     val pingSwing = if (samples.size >= 2) {
         (samples.maxOrNull() ?: session.avgPingMs) - (samples.minOrNull() ?: session.avgPingMs)
@@ -1392,17 +1407,17 @@ private fun buildSessionSmartTip(
 
     if (session.isSlowDecode || session.isThermalHot) {
         return if (isEn) {
-            "Tip: Auto frame-queue draining and Low-End Device Mode help reduce decode delay when signal fluctuates."
+            "Tip: 60Hz VSync lock & Auto (720p ⇄ 1080p) bitrate control help keep MediaCodec decode time under 16.6ms."
         } else {
-            "Gợi ý: Chế độ Tự động (720p ⇄ 1080p) sẽ tự hạ nhẹ bitrate và xả khung hình trễ khi sóng Wi-Fi / 4G dao động."
+            "Gợi ý: Khóa màn hình 60Hz và chế độ Tự động (720p ⇄ 1080p) giúp giữ thời gian giải mã dưới ngưỡng 16.6ms."
         }
     }
 
     if (pingSwing >= 35 || session.avgPingMs > 95) {
         return if (isEn) {
-            "Tip: Ping fluctuated by ${pingSwing}ms. Moving closer to your Wi-Fi router or using Auto 720p mode keeps controls responsive."
+            "Tip: Ping fluctuated by ${pingSwing}ms. Moving closer to your Wi-Fi router or choosing a Japan (Tokyo) server keeps controls responsive."
         } else {
-            "Gợi ý: Ping dao động ${pingSwing}ms trong phiên này. Ngồi gần cục phát Wi-Fi hơn hoặc dùng chế độ Tự động sẽ giúp điều khiển nhạy hơn."
+            "Gợi ý: Ping dao động ${pingSwing}ms trong phiên này. Chọn máy chủ Nhật Bản (Tokyo) hoặc ngồi gần Wi-Fi hơn sẽ giúp điều khiển nhạy hơn."
         }
     }
 

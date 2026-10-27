@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -29,23 +30,19 @@ data class ProbeStation(
 )
 
 /**
- * Hệ thống đo ping qua Trạm Test (Probe) khu vực gần người dùng nhất.
- * - Chỉ sử dụng trong mục Máy chủ (Servers tab) để đo ping tới các máy chủ VPN/Proxy.
+ * Hệ thống định vị Quốc gia hỗ trợ Xbox gần người dùng nhất & Đo ping qua Trạm Test (Probe) khu vực gần nhất.
+ * - Tự động tìm quốc gia được hỗ trợ Xbox gần vị trí người dùng nhất (VD: ở Việt Nam -> Nhật Bản / Hàn Quốc, không chọn nhầm Mỹ).
+ * - Chỉ sử dụng trong mục Máy chủ (Servers tab) để đo ping và xếp hạng máy chủ tối ưu.
  * - KHÔNG sử dụng để đo ping khi đang chơi game (ping trong game dùng 100% WebRTC RTT).
- * - Thứ tự ưu tiên ngầm (Silent Fallback):
- *   1. Trạm Test gần nhất theo vị trí người dùng (VD: TP. Hồ Chí Minh hoặc Hà Nội tại VN, hoặc trạm gần nhất theo Haversine).
- *   2. Trạm Test lân cận kế tiếp nếu trạm số 1 đang bận / không có node trực tuyến.
- *   3. Đo TCP trực tiếp từ thiết bị (với giới hạn 3 luồng đồng thời để chống nghẽn hàng đợi 100ms).
- * - Mọi hoạt động chọn trạm, chuyển trạm dự phòng và kết quả đo được ghi vào AppLogger (xem tại Cài đặt -> Nhật ký).
  */
 object RegionalProbeTester {
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
     private val probeHttpClient = OkHttpClient.Builder()
-        .connectTimeout(1800, TimeUnit.SECONDS.let { TimeUnit.MILLISECONDS })
-        .readTimeout(2200, TimeUnit.MILLISECONDS)
-        .writeTimeout(1800, TimeUnit.MILLISECONDS)
+        .connectTimeout(1600, TimeUnit.MILLISECONDS)
+        .readTimeout(2000, TimeUnit.MILLISECONDS)
+        .writeTimeout(1600, TimeUnit.MILLISECONDS)
         .build()
 
     // Giới hạn số yêu cầu đo qua API trạm test đồng thời để tránh vượt Rate Limit
@@ -56,7 +53,7 @@ object RegionalProbeTester {
     private val probeCache = ConcurrentHashMap<String, CachedProbePing>()
     private const val CACHE_TTL_MS = 45_000L
 
-    // Ngắt mạch tạm thời (25 giây) nếu dịch vụ API trạm đo toàn cầu bị chặn mạng hoặc hết hạn mức (HTTP 429)
+    // Ngắt mạch tạm thời (30 giây) nếu dịch vụ API trạm đo toàn cầu bị chặn mạng hoặc hết hạn mức (HTTP 429)
     private val remoteApiCooldownUntilMs = AtomicLong(0L)
     private val failedProbeIdsUntilMs = ConcurrentHashMap<String, Long>()
 
@@ -78,7 +75,7 @@ object RegionalProbeTester {
         ProbeStation("ph_mnl", "Manila (PH)", "PH", "Manila", 14.5995, 120.9842),
         ProbeStation("id_jkt", "Jakarta (ID)", "ID", "Jakarta", -6.2088, 106.8456),
 
-        // Đông Bắc Á
+        // Đông Bắc Á (Vùng Xbox Cloud chính cho Châu Á)
         ProbeStation("jp_tyo", "Tokyo (JP)", "JP", "Tokyo", 35.6762, 139.6503),
         ProbeStation("jp_osa", "Osaka (JP)", "JP", "Osaka", 34.6937, 135.5023),
         ProbeStation("kr_sel", "Seoul (KR)", "KR", "Seoul", 37.5665, 126.9780),
@@ -100,28 +97,30 @@ object RegionalProbeTester {
         ProbeStation("br_gru", "São Paulo (BR)", "BR", "Sao Paulo", -23.5505, -46.6333)
     )
 
-    // Tọa độ tâm tham chiếu cho các quốc gia (bao gồm các nước nhỏ không có trạm test nội địa)
+    // Tọa độ tâm tham chiếu cho các quốc gia
     private val COUNTRY_REFERENCE_COORDS = mapOf(
-        "VN" to Pair(10.8231, 106.6297), // Mặc định ưu tiên cụm phía Nam (TP.HCM) nếu chưa rõ tỉnh/thành
-        "LA" to Pair(17.9757, 102.6331), // Lào (Vientiane -> gần Hà Nội / Đà Nẵng / Bangkok)
-        "KH" to Pair(11.5564, 104.9282), // Campuchia (Phnom Penh -> gần TP.HCM nhất)
-        "MM" to Pair(16.8409, 96.1735),  // Myanmar (Yangon -> gần Bangkok nhất)
-        "BN" to Pair(4.9031, 114.9398),  // Brunei (-> gần Singapore / Kuala Lumpur)
+        "VN" to Pair(10.8231, 106.6297),
+        "LA" to Pair(17.9757, 102.6331),
+        "KH" to Pair(11.5564, 104.9282),
+        "MM" to Pair(16.8409, 96.1735),
+        "BN" to Pair(4.9031, 114.9398),
         "SG" to Pair(1.3521, 103.8198),
         "TH" to Pair(13.7563, 100.5018),
         "MY" to Pair(3.1390, 101.6869),
         "ID" to Pair(-6.2088, 106.8456),
         "PH" to Pair(14.5995, 120.9842),
         "HK" to Pair(22.3193, 114.1694),
-        "MO" to Pair(22.1987, 113.5439), // Macau (-> gần Hong Kong nhất)
+        "MO" to Pair(22.1987, 113.5439),
         "TW" to Pair(25.0330, 121.5654),
+        "CN" to Pair(31.2304, 121.4737),
         "JP" to Pair(35.6762, 139.6503),
         "KR" to Pair(37.5665, 126.9780),
         "IN" to Pair(19.0760, 72.8777),
         "AU" to Pair(-33.8688, 151.2093),
-        "NZ" to Pair(-36.8485, 174.7633), // New Zealand (-> gần Sydney nhất)
+        "NZ" to Pair(-36.8485, 174.7633),
         "DE" to Pair(50.1109, 8.6821),
         "GB" to Pair(51.5074, -0.1278),
+        "UK" to Pair(51.5074, -0.1278),
         "FR" to Pair(48.8566, 2.3522),
         "NL" to Pair(52.3676, 4.9041),
         "PL" to Pair(52.2297, 21.0122),
@@ -149,15 +148,18 @@ object RegionalProbeTester {
     }
 
     /**
-     * Xác định danh sách Trạm Test được sắp xếp từ gần người dùng nhất tới xa hơn
-     * dựa trên GeoIP thực tế (tọa độ vĩ độ/kinh độ, tên thành phố, hoặc mã quốc gia).
+     * Trả về tọa độ thực tế (hoặc tọa độ tâm vùng) của người dùng.
      */
-    fun selectOrderedProbes(geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp): List<ProbeStation> {
-        val realGeo = if (geo != null && !geo.isFromWebView) geo else GeoIpDetector.currentGeoIp.value
+    fun resolveUserCoordinates(geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp): Pair<Double, Double> {
+        val realGeo = if (geo != null && !geo.isFromWebView) {
+            geo
+        } else {
+            GeoIpDetector.currentGeoIp.value?.takeIf { !it.isFromWebView } ?: geo
+        }
         val country = (realGeo?.countryCode ?: "VN").trim().uppercase()
         val cityLower = (realGeo?.city ?: "").trim().lowercase()
 
-        val (userLat, userLon) = when {
+        return when {
             realGeo?.latitude != null && realGeo.longitude != null -> {
                 Pair(realGeo.latitude, realGeo.longitude)
             }
@@ -168,15 +170,15 @@ object RegionalProbeTester {
                         cityLower.contains("hải phòng") || cityLower.contains("quang ninh") ||
                         cityLower.contains("bac ninh") || cityLower.contains("nam dinh") ||
                         cityLower.contains("thai nguyen") || cityLower.contains("vinh") -> {
-                        Pair(21.0285, 105.8542) // Khu vực miền Bắc -> Hà Nội
+                        Pair(21.0285, 105.8542) // Miền Bắc -> Hà Nội
                     }
                     cityLower.contains("da nang") || cityLower.contains("đà nẵng") ||
                         cityLower.contains("hue") || cityLower.contains("huế") ||
                         cityLower.contains("quang nam") || cityLower.contains("quy nhon") -> {
-                        Pair(16.0544, 108.2022) // Khu vực miền Trung -> Đà Nẵng
+                        Pair(16.0544, 108.2022) // Miền Trung -> Đà Nẵng
                     }
                     else -> {
-                        Pair(10.8231, 106.6297) // Khu vực miền Nam / mặc định VN -> TP. Hồ Chí Minh
+                        Pair(10.8231, 106.6297) // Miền Nam / mặc định VN -> TP. Hồ Chí Minh
                     }
                 }
             }
@@ -184,12 +186,160 @@ object RegionalProbeTester {
                 COUNTRY_REFERENCE_COORDS[country] ?: Pair(10.8231, 106.6297)
             }
         }
+    }
+
+    /**
+     * Tính khoảng cách vật lý (km) từ vị trí người dùng tới một máy chủ hoặc quốc gia đích.
+     */
+    fun getDistanceToServerKm(
+        server: ServerLocation,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): Double {
+        val (userLat, userLon) = resolveUserCoordinates(geo)
+        val (srvLat, srvLon) = resolveServerCoordinates(server)
+        return haversineDistanceKm(userLat, userLon, srvLat, srvLon)
+    }
+
+    /**
+     * Tọa độ trung tâm dữ liệu thực tế của từng máy chủ theo vùng / thành phố.
+     */
+    fun resolveServerCoordinates(server: ServerLocation): Pair<Double, Double> {
+        val nameLower = (server.name + " " + server.description + " " + server.azureEndpoint).lowercase()
+        val code = server.countryCode.trim().uppercase()
+        return when {
+            code == "JP" -> when {
+                nameLower.contains("osaka") || nameLower.contains("japanwest") -> Pair(34.6937, 135.5023)
+                nameLower.contains("gotemba") || nameLower.contains("shizuoka") -> Pair(35.3086, 138.9344)
+                nameLower.contains("tsukuba") || nameLower.contains("chiba") -> Pair(36.0835, 140.0764)
+                else -> Pair(35.6762, 139.6503) // Tokyo
+            }
+            code == "KR" -> when {
+                nameLower.contains("busan") -> Pair(35.1796, 129.0756)
+                nameLower.contains("incheon") -> Pair(37.4563, 126.7052)
+                else -> Pair(37.5665, 126.9780) // Seoul
+            }
+            code == "US" -> when {
+                nameLower.contains("virginia") || nameLower.contains("eastus") -> Pair(39.0438, -77.4874)
+                nameLower.contains("iowa") || nameLower.contains("centralus") -> Pair(41.5868, -93.6250)
+                nameLower.contains("oregon") || nameLower.contains("westus2") -> Pair(45.5152, -122.6784)
+                nameLower.contains("nevada") || nameLower.contains("vegas") -> Pair(36.1699, -115.1398)
+                else -> Pair(37.3382, -121.8863) // Silicon Valley / California
+            }
+            else -> COUNTRY_REFERENCE_COORDS[code] ?: Pair(35.6762, 139.6503)
+        }
+    }
+
+    /**
+     * Tự động tìm danh sách các Quốc gia được hỗ trợ Xbox (có trong pool máy chủ)
+     * xếp theo khoảng cách địa lý gần người dùng nhất.
+     * Ví dụ: Người dùng ở Việt Nam -> ["JP", "KR", "US"] (hoặc ["KR", "JP", "US"]).
+     * Người dùng ở Mỹ -> ["US", "JP", "KR"].
+     */
+    fun getNearestSupportedCountriesForUser(
+        servers: List<ServerLocation> = DEFAULT_SERVERS,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): List<String> {
+        val (userLat, userLon) = resolveUserCoordinates(geo)
+        val distinctCountries = servers
+            .map { it.countryCode.trim().uppercase() }
+            .filter { it.isNotBlank() && GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
+            .distinct()
+
+        return distinctCountries.sortedBy { code ->
+            val (cLat, cLon) = COUNTRY_REFERENCE_COORDS[code] ?: Pair(35.6762, 139.6503)
+            haversineDistanceKm(userLat, userLon, cLat, cLon)
+        }
+    }
+
+    /**
+     * Phân tầng khoảng cách Quốc gia hỗ trợ Xbox so với người dùng (Nearest Country Tier):
+     * - Tầng 0 (Khu vực Xbox gần người dùng nhất): cách quốc gia hỗ trợ gần nhất không quá 1.800 km
+     *   (VD: khi ở Việt Nam, cả Nhật Bản JP và Hàn Quốc KR đều nằm ở Tầng 0 — khu vực Đông Á gần nhất).
+     * - Tầng 1 (Khu vực tầm trung): cách quốc gia gần nhất từ 1.800 km đến 5.500 km.
+     * - Tầng 2 (Khu vực xuyên lục địa / quá xa): cách quốc gia gần nhất > 5.500 km
+     *   (VD: Mỹ US cách Việt Nam ~12.500 km nằm ở Tầng 2, đảm bảo app KHÔNG BAO GIỜ chọn nhầm Mỹ khi đang ở Việt Nam).
+     */
+    fun getNearestSupportedCountryTier(
+        serverCountryCode: String,
+        servers: List<ServerLocation> = DEFAULT_SERVERS,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): Int {
+        val code = serverCountryCode.trim().uppercase()
+        if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) return 3
+
+        val (userLat, userLon) = resolveUserCoordinates(geo)
+        val supportedCodes = servers
+            .map { it.countryCode.trim().uppercase() }
+            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
+            .distinct()
+            .ifEmpty { listOf("JP", "KR", "US") }
+
+        val minCountryDistKm = supportedCodes.minOfOrNull { c ->
+            val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+            haversineDistanceKm(userLat, userLon, lat, lon)
+        } ?: 0.0
+
+        val (targetLat, targetLon) = COUNTRY_REFERENCE_COORDS[code] ?: Pair(35.6762, 139.6503)
+        val targetDistKm = haversineDistanceKm(userLat, userLon, targetLat, targetLon)
+        val deltaKm = (targetDistKm - minCountryDistKm).coerceAtLeast(0.0)
+
+        return when {
+            deltaKm <= 1800.0 -> 0 // Quốc gia hỗ trợ Xbox gần người dùng nhất (VD: JP & KR khi ở VN)
+            deltaKm <= 5500.0 -> 1 // Quốc gia tầm trung
+            else -> 2              // Quốc gia quá xa / xuyên đại dương (VD: US khi ở VN)
+        }
+    }
+
+    /**
+     * Tính ngưỡng Ping vật lý tối thiểu (Speed-of-Light Fiber RTT Floor) từ người dùng tới máy chủ.
+     * Ngăn chặn triệt để hiện tượng IP máy chủ Mỹ đi qua Cloudflare/Anycast tại Singapore trả về ping ảo 25–40ms
+     * khiến app chọn nhầm máy chủ Mỹ khi người dùng đang ở Việt Nam.
+     */
+    fun computeMinimumPhysicalRttMs(
+        server: ServerLocation,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): Int {
+        val distKm = getDistanceToServerKm(server, geo)
+        // Tốc độ truyền dẫn thực tế trong cáp quang biển (kể cả độ vòng tuyến cáp ~1.35x): ~110 km / 1ms RTT khứ hồi + 12ms chặng nội hạt
+        val fiberFloorMs = (distKm / 95.0).roundToInt() + 12
+        return fiberFloorMs.coerceIn(8, 260)
+    }
+
+    /**
+     * Hiệu chuẩn số ping đo được với khoảng cách vật lý thực tế:
+     * Nếu một máy chủ ở xa (như Mỹ cách VN 12.500km) trả về TCP handshake < ngưỡng vật lý (do Anycast/Cloudflare trả lời hộ ở trạm gần),
+     * cộng bù độ trễ đường truyền xuyên lục địa tới trung tâm dữ liệu thực tế của máy chủ đó.
+     */
+    fun calibrateMeasuredRttWithPhysicalDistance(
+        rawRttMs: Int,
+        server: ServerLocation,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): Int {
+        if (rawRttMs <= 0) return -1
+        val minPhysicalMs = computeMinimumPhysicalRttMs(server, geo)
+        return if (rawRttMs < minPhysicalMs) {
+            // Gói tin TCP bị Anycast kết thúc sớm ở trạm gần -> cộng độ trễ chặng cáp quang tới vùng thực của server
+            val anycastLocalRtt = rawRttMs.coerceIn(5, 60)
+            (minPhysicalMs + (anycastLocalRtt / 3)).coerceAtMost(320)
+        } else {
+            rawRttMs
+        }
+    }
+
+    /**
+     * Xác định danh sách Trạm Test được sắp xếp từ gần người dùng nhất tới xa hơn
+     * dựa trên GeoIP thực tế (tọa độ vĩ độ/kinh độ, tên thành phố, hoặc mã quốc gia).
+     */
+    fun selectOrderedProbes(geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp): List<ProbeStation> {
+        val realGeo = if (geo != null && !geo.isFromWebView) geo else GeoIpDetector.currentGeoIp.value
+        val country = (realGeo?.countryCode ?: "VN").trim().uppercase()
+        val cityLower = (realGeo?.city ?: "").trim().lowercase()
+        val (userLat, userLon) = resolveUserCoordinates(geo)
 
         val sorted = PROBE_STATIONS.sortedWith(
             Comparator { a, b ->
                 val distA = haversineDistanceKm(userLat, userLon, a.latitude, a.longitude)
                 val distB = haversineDistanceKm(userLat, userLon, b.latitude, b.longitude)
-                // Ưu tiên nhẹ cho trạm nằm cùng quốc gia nếu khoảng cách tương đương
                 val effectiveDistA = if (a.countryCode.equals(country, ignoreCase = true)) distA * 0.85 else distA
                 val effectiveDistB = if (b.countryCode.equals(country, ignoreCase = true)) distB * 0.85 else distB
                 effectiveDistA.compareTo(effectiveDistB)
@@ -199,11 +349,13 @@ object RegionalProbeTester {
         val primary = sorted.firstOrNull()
         if (primary != null && primary.id != lastLoggedPrimaryProbeId) {
             lastLoggedPrimaryProbeId = primary.id
+            val nearestXboxCountries = getNearestSupportedCountriesForUser(DEFAULT_SERVERS, geo).take(2).joinToString(", ")
             val backupNames = sorted.drop(1).take(2).joinToString(" -> ") { it.displayName }
             AppLogger.info(
                 "PROBE",
-                "Vị trí người dùng: $country ${if (cityLower.isNotBlank()) "($cityLower)" else ""} • " +
-                    "Trạm đo gần nhất: ${primary.displayName} (Dự phòng lân cận: $backupNames)"
+                "Vị trí: $country ${if (cityLower.isNotBlank()) "($cityLower)" else ""} • " +
+                    "Quốc gia Xbox gần nhất: [$nearestXboxCountries] • " +
+                    "Trạm đo: ${primary.displayName} (Dự phòng: $backupNames)"
             )
         }
         return sorted
@@ -211,9 +363,9 @@ object RegionalProbeTester {
 
     /**
      * Đo ping cho máy chủ trong mục Máy chủ theo đúng thứ tự:
-     * 1. Trạm Test gần nhất (chỉ lấy nguyên số ping từ trạm test tới server).
+     * 1. Trạm Test gần nhất (chỉ lấy nguyên số ping từ trạm test tới server, có kiểm tra ngưỡng vật lý chống Anycast ảo).
      * 2. Nếu trạm gần nhất bận/lỗi -> tự động thử trạm lân cận kế tiếp (không hiện thông báo trên UI, chỉ ghi Log).
-     * 3. Nếu các trạm từ xa đều không phản hồi -> trả về null để PingTester chuyển sang đo TCP trực tiếp từ máy.
+     * 3. Nếu các trạm từ xa không đo được cổng riêng của server -> trả về null để PingTester đo qua fallback đa cổng / cụm vùng.
      */
     suspend fun measureServerViaNearestProbe(
         server: ServerLocation,
@@ -240,37 +392,36 @@ object RegionalProbeTester {
                 return cached.rttMs
             }
 
-            val resultRtt = remoteProbeSemaphore.withPermit {
-                requestGlobalpingTcpRtt(probe, server, timeoutMs)
+            val rawRtt = remoteProbeSemaphore.withPermit {
+                requestGlobalpingRtt(probe, server, timeoutMs)
             }
 
-            if (resultRtt != null && resultRtt > 0) {
+            if (rawRtt != null && rawRtt > 0) {
+                val calibratedRtt = calibrateMeasuredRttWithPhysicalDistance(rawRtt, server)
                 probeCache[cacheKey] = CachedProbePing(
-                    rttMs = resultRtt,
+                    rttMs = calibratedRtt,
                     timestampMs = System.currentTimeMillis(),
                     probeName = probe.displayName
                 )
                 AppLogger.success(
                     "PROBE",
-                    "Trạm ${probe.displayName} -> ${server.name} (${server.ip}:${server.port}): ${resultRtt}ms"
+                    "Trạm ${probe.displayName} -> ${server.name} (${server.countryCode}): ${calibratedRtt}ms"
                 )
-                return resultRtt
-            } else if (resultRtt == -2) {
-                // -2: Đích đến (server.ip:port) đã được trạm đo xác nhận là không phản hồi (Packet Loss 100%)
-                AppLogger.warn(
-                    "PROBE",
-                    "Trạm ${probe.displayName} xác nhận máy chủ ${server.name} (${server.ip}:${server.port}) không phản hồi"
-                )
-                return -1
+                return calibratedRtt
             } else {
-                // null: Trạm đo hiện tại bận hoặc chưa có node rảnh -> đánh dấu tạm nghỉ 20s và thử trạm lân cận
-                failedProbeIdsUntilMs[probe.id] = System.currentTimeMillis() + 20_000L
-                val nextProbe = candidateProbes.getOrNull(index + 1)
-                if (nextProbe != null) {
-                    AppLogger.warn(
-                        "PROBE",
-                        "Trạm ${probe.displayName} đang bận -> Chuyển ngầm sang trạm lân cận: ${nextProbe.displayName}"
-                    )
+                // Nếu trạm đo hiện tại không lấy được RTT (do bận hoặc cổng TCP phụ bị chặn), thử trạm kế tiếp hoặc chuyển về PingTester đa cổng
+                if (rawRtt == null) {
+                    failedProbeIdsUntilMs[probe.id] = System.currentTimeMillis() + 20_000L
+                    val nextProbe = candidateProbes.getOrNull(index + 1)
+                    if (nextProbe != null) {
+                        AppLogger.warn(
+                            "PROBE",
+                            "Trạm ${probe.displayName} bận -> Chuyển ngầm sang trạm lân cận: ${nextProbe.displayName}"
+                        )
+                    }
+                } else {
+                    // rawRtt == -2: cổng riêng bị chặn trên probe -> thoát về PingTester để thử cổng 443/80 hoặc hạ tầng vùng
+                    return null
                 }
             }
         }
@@ -279,13 +430,9 @@ object RegionalProbeTester {
     }
 
     /**
-     * Gọi Globalping API để đo TCP RTT trực tiếp từ [probe] tới [server].
-     * Trả về:
-     * - `> 0`: Số ping thực tế (ms) từ trạm test tới server.
-     * - `-2`: Trạm test hoạt động bình thường nhưng server đích chết / đóng cổng.
-     * - `null`: Trạm test bận, lỗi mạng hoặc bị giới hạn tần suất (cần chuyển sang trạm lân cận / đo từ máy).
+     * Gọi Globalping API để đo RTT từ [probe] tới [server] (sử dụng ICMP ping để không bị chặn bởi cổng proxy tùy chỉnh).
      */
-    private suspend fun requestGlobalpingTcpRtt(
+    private suspend fun requestGlobalpingRtt(
         probe: ProbeStation,
         server: ServerLocation,
         timeoutMs: Int
@@ -308,8 +455,6 @@ object RegionalProbeTester {
                     "measurementOptions",
                     JSONObject().apply {
                         put("packets", 2)
-                        put("protocol", "TCP")
-                        put("port", server.port)
                     }
                 )
             }
@@ -327,8 +472,8 @@ object RegionalProbeTester {
             postResp.close()
 
             if (code == 429 || code >= 500) {
-                remoteApiCooldownUntilMs.set(System.currentTimeMillis() + 25_000L)
-                AppLogger.warn("PROBE", "API trạm đo báo mã $code -> Chuyển ngầm sang đo trực tiếp trên máy trong 25s")
+                remoteApiCooldownUntilMs.set(System.currentTimeMillis() + 30_000L)
+                AppLogger.warn("PROBE", "API trạm đo báo mã $code -> Chuyển ngầm sang đo trực tiếp trên máy")
                 return null
             }
             if (code == 422 || !postResp.isSuccessful) {
@@ -339,9 +484,9 @@ object RegionalProbeTester {
             val measurementId = postJson.optString("id", "")
             if (measurementId.isBlank()) return null
 
-            val deadline = System.currentTimeMillis() + timeoutMs.coerceIn(1200, 3000)
+            val deadline = System.currentTimeMillis() + timeoutMs.coerceIn(1200, 2600)
             while (System.currentTimeMillis() < deadline) {
-                delay(320)
+                delay(300)
                 val getReq = Request.Builder()
                     .url("https://api.globalping.io/v1/measurements/$measurementId")
                     .header("User-Agent", "CloudPlay-ProbeClient/1.0")
@@ -369,17 +514,16 @@ object RegionalProbeTester {
                     val stats = resultObj.optJSONObject("stats") ?: return -2
                     val avg = stats.optDouble("avg", -1.0)
                     val min = stats.optDouble("min", -1.0)
-                    val rtt = when {
+                    return when {
                         avg > 0.0 -> avg.toInt().coerceAtLeast(1)
                         min > 0.0 -> min.toInt().coerceAtLeast(1)
                         else -> -2
                     }
-                    return rtt
                 }
             }
             null
         } catch (_: Exception) {
-            remoteApiCooldownUntilMs.set(System.currentTimeMillis() + 25_000L)
+            remoteApiCooldownUntilMs.set(System.currentTimeMillis() + 30_000L)
             null
         }
     }

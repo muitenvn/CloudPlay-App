@@ -294,5 +294,59 @@ class ExampleRobolectricTest {
         )
         assertEquals(64, effPing)
     }
+
+    @Test
+    fun `verify two stage nearest xbox country selection and physical ping calibration`() {
+        val vnGeo = com.example.vpn.GeoIpResult(
+            ip = "113.161.72.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Ho Chi Minh City",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 10.8231,
+            longitude = 106.6297
+        )
+        VpnManager.updateSmartDecision(vnGeo)
+
+        val allServers = VpnManager.getAllServers()
+        val jpServer = allServers.first { it.countryCode == "JP" }
+        val krServer = allServers.first { it.countryCode == "KR" }
+        val usServer = allServers.first { it.countryCode == "US" }
+
+        // Stage 1: For Vietnam user, JP and KR are Tier 0 (nearest Xbox-supported countries), while US is Tier 2 (trans-oceanic)
+        val jpTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("JP", allServers, vnGeo)
+        val krTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("KR", allServers, vnGeo)
+        val usTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("US", allServers, vnGeo)
+        assertEquals(0, jpTier)
+        assertEquals(0, krTier)
+        assertTrue("US must be in a distant tier from Vietnam", usTier > 0)
+
+        // Physical distance calibration prevents fake 47ms Anycast ping on US server from Vietnam
+        val calibratedUsPing = com.example.vpn.RegionalProbeTester.calibrateMeasuredRttWithPhysicalDistance(
+            rawRttMs = 47,
+            server = usServer,
+            geo = vnGeo
+        )
+        assertTrue("Calibrated US ping from Vietnam must be >= 140ms (got $calibratedUsPing)", calibratedUsPing >= 140)
+
+        // Stage 2: Sorting prioritizes nearest Xbox-supported country and lowest ping within that region
+        val pingMap = mapOf(
+            usServer.id to calibratedUsPing,
+            jpServer.id to 88,
+            krServer.id to 72
+        )
+        val sorted = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(usServer, jpServer, krServer),
+            pingMap = pingMap,
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            sessions = emptyList()
+        )
+        assertEquals("Best server in nearest supported region (KR 72ms) must be first", krServer.id, sorted[0].id)
+        assertEquals("Second server in nearest supported region (JP 88ms) must be second", jpServer.id, sorted[1].id)
+        assertEquals("Distant US server must be ranked last", usServer.id, sorted[2].id)
+    }
 }
+
 

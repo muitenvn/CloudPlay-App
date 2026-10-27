@@ -299,9 +299,12 @@ object VpnManager {
     }
 
     /**
-     * 4. SẮP XẾP: chỉ dựa trên trạng thái mở khóa vùng hợp lệ và ping thật của chính máy chủ đó;
-     * máy chủ đo được xếp trước, không đo được xếp sau. Khi chưa có số đo trong pingMap ở SMART_BYPASS
-     * thì xếp theo trạng thái mở khóa rồi "ping lần chơi gần nhất". Khi chưa có bất kỳ số đo nào thì giữ thứ tự mặc định.
+     * 4. SẮP XẾP 2 TẦNG (Quốc gia hỗ trợ Xbox gần người dùng nhất -> Server ngon nhất):
+     * - Bước 1: Ưu tiên trạng thái mở khóa vùng hợp lệ (UNLOCKED / UNTESTED xếp trước FAILED / WRONG_REGION).
+     * - Bước 2: Máy chủ đo được ping thật (> 0) luôn xếp trước máy chủ không đo được.
+     * - Bước 3: Giữa các máy chủ đo được ping thật, ưu tiên nhóm Quốc gia được hỗ trợ Xbox gần vị trí người dùng nhất
+     *   (VD: ở Việt Nam ưu tiên cụm Đông Á JP/KR ở Tầng 0, xếp trên cụm xuyên đại dương US ở Tầng 2).
+     * - Bước 4: Trong cùng khu vực gần nhất, xếp máy chủ có ping thực tế thấp nhất lên đầu ("Server ngon nhất").
      */
     fun sortServersByUnlockAndPing(
         servers: List<ServerLocation>,
@@ -310,6 +313,7 @@ object VpnManager {
         engine: VpnEngine = _state.value.engine,
         sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
     ): List<ServerLocation> {
+        val currentGeo = _state.value.detectedGeoIp
         return servers.sortedWith(
             Comparator { a, b ->
                 val statusA = getServerUnlockStatus(a, records)
@@ -349,9 +353,18 @@ object VpnManager {
                     return@Comparator if (hasPingA) -1 else 1
                 }
 
-                // Nếu cả hai đều đo được ping thật của chính máy chủ đó, xếp theo ping thấp nhất trước
-                if (hasPingA && hasPingB && pingA != pingB) {
-                    return@Comparator pingA.compareTo(pingB)
+                // Nếu cả hai đều đo được ping thật:
+                // 1) Ưu tiên Quốc gia hỗ trợ Xbox gần vị trí người dùng nhất (tránh chọn nhầm US khi đang ở VN)
+                // 2) Trong nhóm quốc gia gần nhất, chọn Server có ping thấp nhất
+                if (hasPingA && hasPingB) {
+                    val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
+                    val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
+                    if (countryTierA != countryTierB) {
+                        return@Comparator countryTierA.compareTo(countryTierB)
+                    }
+                    if (pingA != pingB) {
+                        return@Comparator pingA.compareTo(pingB)
+                    }
                 }
 
                 val rankA = unlockSortRank(statusA)
@@ -385,8 +398,7 @@ object VpnManager {
 
     /**
      * Đo ping thực tế toàn bộ danh sách máy chủ (qua Trạm Test gần nhất -> Trạm lân cận -> Đo trực tiếp từ máy)
-     * và lưu vào VpnConnectionState.serverPings cho mục Máy chủ.
-     * Tuyệt đối chỉ phục vụ mục Máy chủ, không dùng để đo ping khi đang chơi game.
+     * và tự động ưu tiên Quốc gia hỗ trợ Xbox gần người dùng nhất + Server có ping ngon nhất.
      */
     fun testAllServers(
         autoPickBest: Boolean = false,
@@ -402,9 +414,10 @@ object VpnManager {
                 val currentEngine = _state.value.engine
                 val updatedMap = _state.value.serverPings.toMutableMap()
                 val nearestProbe = RegionalProbeTester.selectOrderedProbes().firstOrNull()
+                val nearestCountries = RegionalProbeTester.getNearestSupportedCountriesForUser(serversToTest)
                 com.example.data.AppLogger.info(
                     "PING",
-                    "Bắt đầu đo ping ${serversToTest.size} máy chủ (Trạm ưu tiên: ${nearestProbe?.displayName ?: "Mặc định"})"
+                    "Bắt đầu đo ${serversToTest.size} máy chủ • Trạm đo: ${nearestProbe?.displayName ?: "Mặc định"} • Vùng Xbox gần nhất: ${nearestCountries.take(2).joinToString("/")}"
                 )
 
                 val deferreds = serversToTest.map { server ->
@@ -431,8 +444,29 @@ object VpnManager {
                     isTestingPings = false
                 )
 
-                if (autoPickBest) {
-                    val records = _state.value.unlockRecords
+                val records = _state.value.unlockRecords
+                val currentSrv = _state.value.currentServer
+                val currentSrvCountryTier = RegionalProbeTester.getNearestSupportedCountryTier(
+                    currentSrv.countryCode,
+                    serversToTest,
+                    _state.value.detectedGeoIp
+                )
+                val currentSrvPing = finalPings[currentSrv.id] ?: -1
+                val currentSrvStatus = getServerUnlockStatus(currentSrv, records)
+
+                // Tự động chuyển sang Quốc gia hỗ trợ Xbox gần nhất & Server ngon nhất nếu:
+                // 1) Người dùng bấm "Chọn tối ưu" (autoPickBest == true), HOẶC
+                // 2) Máy chủ đang chọn nằm ở quốc gia quá xa (VD: đang chọn Mỹ US khi ở Việt Nam, currentSrvCountryTier > 0), HOẶC
+                // 3) Máy chủ đang chọn không phản hồi (ping <= 0) hoặc bị đánh dấu lỗi vùng.
+                val shouldAutoSwitchToOptimal = autoPickBest ||
+                    (!currentSrv.isCustom && (
+                        currentSrvCountryTier > 0 ||
+                            currentSrvPing <= 0 ||
+                            currentSrvStatus == RegionUnlockStatus.FAILED ||
+                            currentSrvStatus == RegionUnlockStatus.WRONG_REGION
+                        ))
+
+                if (shouldAutoSwitchToOptimal) {
                     val validPool = serversToTest.filter {
                         val st = getServerUnlockStatus(it, records)
                         st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
@@ -459,15 +493,19 @@ object VpnManager {
                         } else {
                             -1
                         }
-                        com.example.data.AppLogger.success(
-                            "VPN",
-                            "Tự động chọn máy chủ tối ưu: ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Chưa đo"})"
-                        )
-                        withContext(Dispatchers.Main) {
-                            selectServer(best, context ?: appContext)
-                            onPickedBest?.invoke(best, bestPing)
+                        if (best.id != currentSrv.id || autoPickBest) {
+                            com.example.data.AppLogger.success(
+                                "VPN",
+                                "Thuật toán chọn vùng Xbox gần nhất (${best.countryCode}) & server ngon nhất: ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Sẵn sàng"})"
+                            )
+                            withContext(Dispatchers.Main) {
+                                selectServer(best, context ?: appContext)
+                                if (autoPickBest) {
+                                    onPickedBest?.invoke(best, bestPing)
+                                }
+                            }
                         }
-                    } else {
+                    } else if (autoPickBest) {
                         withContext(Dispatchers.Main) {
                             onPickedBest?.invoke(_state.value.currentServer, -1)
                         }
@@ -685,6 +723,37 @@ object VpnManager {
             clearWebViewProxy()
         }
 
+        // Giai đoạn 1: Tự động chuyển sang quốc gia hỗ trợ Xbox gần người dùng nhất nếu server hiện tại
+        // đang nằm ở quốc gia xa (ví dụ người dùng ở VN nhưng server cũ đang lưu là US).
+        var updatedCurrentServer = _state.value.currentServer
+        if (!currentGeo.isFromWebView && !updatedCurrentServer.isCustom) {
+            val allServers = getAllServers()
+            val records = _state.value.unlockRecords
+            val currentCountryTier = RegionalProbeTester.getNearestSupportedCountryTier(
+                serverCountryCode = updatedCurrentServer.countryCode,
+                servers = allServers,
+                geo = currentGeo
+            )
+            if (currentCountryTier > 0) {
+                val nearestCountryCandidates = sortServersByUnlockAndPing(
+                    servers = allServers.filter {
+                        val st = getServerUnlockStatus(it, records)
+                        RegionalProbeTester.getNearestSupportedCountryTier(it.countryCode, allServers, currentGeo) == 0 &&
+                            st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+                    }
+                )
+                val bestInNearestCountry = nearestCountryCandidates.firstOrNull()
+                if (bestInNearestCountry != null && bestInNearestCountry.id != updatedCurrentServer.id) {
+                    updatedCurrentServer = bestInNearestCountry
+                    persistCustomServers(null, _state.value.customServers, bestInNearestCountry)
+                    com.example.data.AppLogger.info(
+                        "SmartSelect",
+                        "Tự động đổi máy chủ từ ${_state.value.currentServer.countryCode} sang quốc gia hỗ trợ Xbox gần nhất (${bestInNearestCountry.countryCode}): ${bestInNearestCountry.name}"
+                    )
+                }
+            }
+        }
+
         val nextPhase = when {
             isSupported -> SmartVpnPhase.DIRECT_SUPPORTED_REGION
             _state.value.mode == NetworkMode.VPN_JAPAN -> SmartVpnPhase.BYPASS_ACTIVE
@@ -693,6 +762,7 @@ object VpnManager {
         }
 
         _state.value = _state.value.copy(
+            currentServer = updatedCurrentServer,
             detectedGeoIp = currentGeo,
             smartDecision = decision,
             smartVpnPhase = nextPhase,

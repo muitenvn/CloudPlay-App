@@ -263,15 +263,46 @@ object VpnManager {
         _state.value = _state.value.copy(unlockFailPromptServer = null)
     }
 
+    fun getLastSessionPingForServer(
+        server: ServerLocation,
+        sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
+    ): Int {
+        val sameRegionNames = getAllServers()
+            .filter { it.countryCode.equals(server.countryCode, ignoreCase = true) }
+            .map { it.name }
+            .toSet()
+        return com.example.data.SessionHistoryRepository.getAverageRttForServerOrRegion(
+            serverName = server.name,
+            countryCode = server.countryCode,
+            sameRegionServerNames = sameRegionNames,
+            sessionsList = sessions
+        )
+    }
+
+    fun getEffectiveServerPing(
+        server: ServerLocation,
+        engine: VpnEngine = _state.value.engine,
+        pingMap: Map<String, Int> = _state.value.serverPings,
+        sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
+    ): Int {
+        return if (engine == VpnEngine.SMART_BYPASS) {
+            getLastSessionPingForServer(server, sessions)
+        } else {
+            pingMap[server.id] ?: -1
+        }
+    }
+
     /**
-     * 4. SẮP XẾP: chỉ xếp hạng máy chủ theo trạng thái mở khóa và ping thật đo được của chính máy chủ đó;
-     * các máy chủ đo được ping thật (ping > 0) luôn xếp trước, máy chủ không đo được (ping <= 0) xếp sau,
-     * đẩy "Không mở khóa" và "Sai vùng" xuống cuối.
+     * 4. SẮP XẾP: chỉ dựa trên trạng thái mở khóa vùng hợp lệ và ping thật của chính máy chủ đó;
+     * máy chủ đo được xếp trước, không đo được xếp sau. Ở SMART_BYPASS xếp theo trạng thái mở khóa
+     * rồi "ping lần chơi gần nhất", không theo ping TCP. Khi chưa đo ping thì giữ thứ tự mặc định trong danh sách.
      */
     fun sortServersByUnlockAndPing(
         servers: List<ServerLocation>,
         pingMap: Map<String, Int> = _state.value.serverPings,
-        records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords
+        records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords,
+        engine: VpnEngine = _state.value.engine,
+        sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
     ): List<ServerLocation> {
         return servers.sortedWith(
             Comparator { a, b ->
@@ -281,6 +312,25 @@ object VpnManager {
                 val tierB = unlockEligibilityTier(statusB)
                 if (tierA != tierB) {
                     return@Comparator tierA.compareTo(tierB)
+                }
+
+                if (engine == VpnEngine.SMART_BYPASS) {
+                    val rankA = unlockSortRank(statusA)
+                    val rankB = unlockSortRank(statusB)
+                    if (rankA != rankB) {
+                        return@Comparator rankA.compareTo(rankB)
+                    }
+                    val lastPlayA = getLastSessionPingForServer(a, sessions)
+                    val lastPlayB = getLastSessionPingForServer(b, sessions)
+                    val hasPlayA = lastPlayA > 0
+                    val hasPlayB = lastPlayB > 0
+                    if (hasPlayA != hasPlayB) {
+                        return@Comparator if (hasPlayA) -1 else 1
+                    }
+                    if (hasPlayA && hasPlayB && lastPlayA != lastPlayB) {
+                        return@Comparator lastPlayA.compareTo(lastPlayB)
+                    }
+                    return@Comparator 0
                 }
 
                 val pingA = pingMap[a.id] ?: -1
@@ -304,13 +354,8 @@ object VpnManager {
                     return@Comparator rankA.compareTo(rankB)
                 }
 
-                val geoRankA = countryProximityRank(a.countryCode)
-                val geoRankB = countryProximityRank(b.countryCode)
-                if (geoRankA != geoRankB) {
-                    return@Comparator geoRankA.compareTo(geoRankB)
-                }
-
-                b.speedMbps.compareTo(a.speedMbps)
+                // Giữ thứ tự mặc định trong danh sách khi chưa có số đo
+                0
             }
         )
     }
@@ -320,16 +365,6 @@ object VpnManager {
             RegionUnlockStatus.UNLOCKED, RegionUnlockStatus.UNTESTED -> 0
             RegionUnlockStatus.FAILED -> 1
             RegionUnlockStatus.WRONG_REGION -> 2
-        }
-    }
-
-    private fun countryProximityRank(countryCode: String): Int {
-        return when (countryCode.trim().uppercase()) {
-            "JP", "SG", "TW", "HK" -> 0
-            "KR" -> 1
-            "AU", "IN" -> 2
-            "US", "CA" -> 3
-            else -> 2
         }
     }
 
@@ -357,19 +392,24 @@ object VpnManager {
         batchPingJob = scope.launch(Dispatchers.IO) {
             try {
                 val serversToTest = getAllServers()
+                val currentEngine = _state.value.engine
                 val updatedMap = _state.value.serverPings.toMutableMap()
-                val deferreds = serversToTest.map { server ->
-                    async {
-                        val measured = PingTester.measureServerLatency(server, 2400)
-                        val realPing = if (measured > 0) measured else -1
-                        synchronized(updatedMap) {
-                            updatedMap[server.id] = realPing
-                            _state.value = _state.value.copy(serverPings = updatedMap.toMap())
+
+                if (currentEngine != VpnEngine.SMART_BYPASS) {
+                    val deferreds = serversToTest.map { server ->
+                        async {
+                            val measured = PingTester.measureServerLatency(server, 2400)
+                            val realPing = if (measured > 0) measured else -1
+                            synchronized(updatedMap) {
+                                updatedMap[server.id] = realPing
+                                _state.value = _state.value.copy(serverPings = updatedMap.toMap())
+                            }
+                            server.id to realPing
                         }
-                        server.id to realPing
                     }
+                    deferreds.awaitAll()
                 }
-                deferreds.awaitAll()
+
                 val finalPings = updatedMap.toMap()
                 _state.value = _state.value.copy(
                     serverPings = finalPings,
@@ -377,15 +417,29 @@ object VpnManager {
                 )
 
                 if (autoPickBest) {
+                    val records = _state.value.unlockRecords
+                    val validPool = serversToTest.filter {
+                        val st = getServerUnlockStatus(it, records)
+                        st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+                    }
                     val candidates = sortServersByUnlockAndPing(
-                        servers = serversToTest,
+                        servers = validPool,
                         pingMap = finalPings,
-                        records = _state.value.unlockRecords
+                        records = records,
+                        engine = currentEngine
                     )
-                    // Chỉ tự chọn máy chủ theo ping thật đo được của chính máy chủ đó (ping > 0)
-                    val best = candidates.firstOrNull { (finalPings[it.id] ?: -1) > 0 }
+                    val best = if (currentEngine == VpnEngine.SMART_BYPASS) {
+                        candidates.firstOrNull { getLastSessionPingForServer(it) > 0 }
+                            ?: candidates.firstOrNull()
+                    } else {
+                        candidates.firstOrNull { (finalPings[it.id] ?: -1) > 0 }
+                    }
                     if (best != null) {
-                        val bestPing = finalPings[best.id] ?: -1
+                        val bestPing = if (currentEngine == VpnEngine.SMART_BYPASS) {
+                            getLastSessionPingForServer(best)
+                        } else {
+                            finalPings[best.id] ?: -1
+                        }
                         withContext(Dispatchers.Main) {
                             selectServer(best, context ?: appContext)
                             onPickedBest?.invoke(best, bestPing)
@@ -513,6 +567,9 @@ object VpnManager {
     fun setEngine(engine: VpnEngine, context: Context? = null) {
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
         _state.value = _state.value.copy(engine = engine)
+        if (engine == VpnEngine.PROXY_TUNNEL && _state.value.serverPings.isEmpty()) {
+            testAllServers(autoPickBest = false, context = context ?: appContext)
+        }
         if (wasConnected && context != null) {
             connect(context, _state.value.currentServer)
         }
@@ -598,14 +655,28 @@ object VpnManager {
             }
         )
 
+        // Khi vùng của người dùng đã được Xbox hỗ trợ (!currentGeo.isFromWebView && isSupported):
+        // mặc định đi mạng trực tiếp (DIRECT_NETWORK), không tự bật VPN.
+        val isRealSupportedRegion = isSupported && !currentGeo.isFromWebView
+        if (isRealSupportedRegion && _state.value.mode != NetworkMode.VPN_JAPAN) {
+            clearWebViewProxy()
+        }
+
+        val nextMode = if (isRealSupportedRegion && _state.value.mode == NetworkMode.DISCONNECTED) {
+            NetworkMode.DIRECT_NETWORK
+        } else {
+            _state.value.mode
+        }
+
         val nextPhase = when {
             isSupported -> SmartVpnPhase.DIRECT_SUPPORTED_REGION
-            _state.value.mode == NetworkMode.VPN_JAPAN -> SmartVpnPhase.BYPASS_ACTIVE
-            _state.value.mode == NetworkMode.DIRECT_NETWORK -> SmartVpnPhase.DIRECT_GAMING
+            nextMode == NetworkMode.VPN_JAPAN -> SmartVpnPhase.BYPASS_ACTIVE
+            nextMode == NetworkMode.DIRECT_NETWORK -> SmartVpnPhase.DIRECT_GAMING
             else -> SmartVpnPhase.IDLE
         }
 
         _state.value = _state.value.copy(
+            mode = nextMode,
             detectedGeoIp = currentGeo,
             smartDecision = decision,
             smartVpnPhase = nextPhase,
@@ -635,7 +706,7 @@ object VpnManager {
         if (geo != null && !geo.isFromWebView) {
             return !geo.isXboxSupported
         }
-        return true
+        return _state.value.smartDecision.needsVpn
     }
 
     /**
@@ -838,7 +909,7 @@ object VpnManager {
         XboxCloudVpnService.stopVpn(context)
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
         _state.value = _state.value.copy(
-            mode = NetworkMode.DISCONNECTED,
+            mode = if (needsVpnToPlay()) NetworkMode.DISCONNECTED else NetworkMode.DIRECT_NETWORK,
             isConnecting = false,
             isBypassActiveInBrowser = false,
             smartVpnPhase = if (needsVpnToPlay()) SmartVpnPhase.IDLE else SmartVpnPhase.DIRECT_SUPPORTED_REGION,
@@ -861,15 +932,21 @@ object VpnManager {
     }
 
     /**
-     * Finds and connects to the fastest responding server in the selected country.
+     * Finds and connects to the best valid server in the selected country.
      * Không tự chọn máy chủ "Không mở khóa" (FAILED) hoặc "Sai vùng" (WRONG_REGION).
+     * Nếu vùng người dùng đã hỗ trợ Xbox (needsVpnToPlay() == false), giữ mạng trực tiếp.
      */
     fun autoSelectBestServer(countryCode: String, context: Context) {
+        if (!needsVpnToPlay()) {
+            ensureDirectNetwork()
+            return
+        }
         scope.launch {
             val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
+            val currentEngine = _state.value.engine
             _state.value = _state.value.copy(
                 isConnecting = true,
-                statusMessage = if (isEn) "Testing and finding fastest $countryCode server..." else "Đang kiểm tra và tìm máy chủ $countryCode có tốc độ tốt nhất..."
+                statusMessage = if (isEn) "Finding optimal $countryCode server..." else "Đang tìm máy chủ $countryCode tối ưu..."
             )
 
             val records = _state.value.unlockRecords
@@ -877,7 +954,32 @@ object VpnManager {
             val eligible = allInCountry.filter {
                 val st = getServerUnlockStatus(it, records)
                 st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
-            }.ifEmpty { allInCountry.filter { getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED } }
+            }
+
+            if (currentEngine == VpnEngine.SMART_BYPASS) {
+                val sortedCandidates = sortServersByUnlockAndPing(
+                    servers = eligible,
+                    pingMap = emptyMap(),
+                    records = records,
+                    engine = VpnEngine.SMART_BYPASS
+                )
+                val best = sortedCandidates.firstOrNull()
+                if (best != null) {
+                    val lastPlayPing = getLastSessionPingForServer(best)
+                    val pingSuffix = if (lastPlayPing > 0) " (${lastPlayPing}ms)" else ""
+                    _state.value = _state.value.copy(
+                        currentServer = best,
+                        statusMessage = if (isEn) "⚡ Selected server: ${best.name}$pingSuffix" else "⚡ Đã chọn máy chủ: ${best.name}$pingSuffix"
+                    )
+                    connect(context, best)
+                } else {
+                    _state.value = _state.value.copy(
+                        isConnecting = false,
+                        statusMessage = if (isEn) "⚠️ No valid unlock server found in $countryCode" else "⚠️ Không tìm thấy máy chủ mở khóa hợp lệ trong vùng $countryCode"
+                    )
+                }
+                return@launch
+            }
 
             val tested: List<Pair<ServerLocation, Int>> = kotlinx.coroutines.coroutineScope {
                 eligible.map { s ->
@@ -889,15 +991,19 @@ object VpnManager {
             }
 
             val pingMap = tested.toMap().mapKeys { it.key.id }
+            val updatedServerPings = _state.value.serverPings.toMutableMap().apply { putAll(pingMap) }
+            _state.value = _state.value.copy(serverPings = updatedServerPings)
+
             val responsive = tested.filter { it.second > 0 }.map { it.first }
             val sortedCandidates = sortServersByUnlockAndPing(
-                if (responsive.isNotEmpty()) responsive else eligible,
-                pingMap,
-                records
+                servers = responsive,
+                pingMap = pingMap,
+                records = records,
+                engine = currentEngine
             )
             val best: ServerLocation? = sortedCandidates.firstOrNull()
             if (best != null) {
-                val bestPing = pingMap[best.id]?.takeIf { it > 0 } ?: best.lastPingMs ?: 65
+                val bestPing = pingMap[best.id] ?: -1
                 _state.value = _state.value.copy(
                     currentServer = best,
                     statusMessage = if (isEn) "⚡ Selected best server: ${best.name} (${bestPing}ms)" else "⚡ Đã chọn máy chủ tốt nhất: ${best.name} (${bestPing}ms)"
@@ -906,7 +1012,7 @@ object VpnManager {
             } else {
                 _state.value = _state.value.copy(
                     isConnecting = false,
-                    statusMessage = if (isEn) "⚠️ No valid unlock server found in $countryCode" else "⚠️ Không tìm thấy máy chủ mở khóa hợp lệ trong vùng $countryCode"
+                    statusMessage = if (isEn) "⚠️ No reachable proxy server found in $countryCode" else "⚠️ Không đo được proxy phản hồi trong vùng $countryCode"
                 )
             }
         }
@@ -919,7 +1025,7 @@ object VpnManager {
                 getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
                 getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
         }
-        val candidates = sortServersByUnlockAndPing(rawCandidates, emptyMap(), records)
+        val candidates = sortServersByUnlockAndPing(rawCandidates, _state.value.serverPings, records)
         for (server in candidates) {
             if (PingTester.isHostReachable(server.ip, server.port, 800)) {
                 return@withContext server
@@ -955,15 +1061,9 @@ object VpnManager {
 
         scope.launch(Dispatchers.IO) {
             val directPing = PingTester.measureDirectLatency()
-            if (directPing > 0) {
-                val updatedHistory = (_state.value.pingHistory + directPing).takeLast(16)
-                _state.value = _state.value.copy(
-                    directLatencyMs = directPing,
-                    pingHistory = updatedHistory
-                )
-            } else {
-                _state.value = _state.value.copy(directLatencyMs = null)
-            }
+            _state.value = _state.value.copy(
+                directLatencyMs = if (directPing > 0) directPing else null
+            )
             startLatencyMonitoring()
         }
     }
@@ -973,16 +1073,14 @@ object VpnManager {
         _state.value = _state.value.copy(currentServer = server, unlockFailPromptServer = null)
         persistCustomServers(context, _state.value.customServers, server)
         preCheckProxyRegion(server)
-        scope.launch(Dispatchers.IO) {
-            val measured = PingTester.measureServerLatency(server, 2200)
-            if (measured > 0) {
+        if (_state.value.engine != VpnEngine.SMART_BYPASS) {
+            scope.launch(Dispatchers.IO) {
+                val measured = PingTester.measureServerLatency(server, 2200)
                 val updatedMap = _state.value.serverPings.toMutableMap()
-                updatedMap[server.id] = measured
-                val newHistory = (_state.value.pingHistory + measured).takeLast(16)
+                updatedMap[server.id] = if (measured > 0) measured else -1
+                // Chỉ cập nhật serverPings, KHÔNG ghi số đo thử vào latencyMs và pingHistory của phiên
                 _state.value = _state.value.copy(
-                    serverPings = updatedMap,
-                    latencyMs = measured,
-                    pingHistory = newHistory
+                    serverPings = updatedMap
                 )
             }
         }
@@ -1041,7 +1139,7 @@ object VpnManager {
                             getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
                             getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
                     },
-                    emptyMap(),
+                    _state.value.serverPings,
                     records
                 ).take(3)
 
@@ -1110,24 +1208,31 @@ object VpnManager {
         pingJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
                 val isDirect = _state.value.mode == NetworkMode.DIRECT_NETWORK
-                // When WebRTC stream is active or user is inside CloudBrowserScreen, reuse WebRTC RTT instead of opening background TCP sockets
+                val currentEngine = _state.value.engine
                 val liveWebRtcRtt = com.example.cloudplay.NetworkOptimizer.telemetry.value.rttMs
-                val ping = if (liveWebRtcRtt > 0) {
-                    liveWebRtcRtt
-                } else if (isInGameStreamActive) {
-                    // Avoid opening competing TCP ping sockets while inside game session; wait for WebRTC getStats() RTT
-                    -1
-                } else if (isDirect) {
-                    PingTester.measureDirectLatency()
-                } else {
-                    PingTester.measureServerLatency(_state.value.currentServer)
-                }
-                if (ping > 0) {
-                    val newHistory = (_state.value.pingHistory + ping).takeLast(16)
+
+                if (liveWebRtcRtt > 0) {
+                    // pingHistory chỉ lấy từ WebRTC khi đang chơi
+                    val newHistory = (_state.value.pingHistory + liveWebRtcRtt).takeLast(16)
                     if (isDirect) {
-                        _state.value = _state.value.copy(directLatencyMs = ping, pingHistory = newHistory)
+                        _state.value = _state.value.copy(directLatencyMs = liveWebRtcRtt, pingHistory = newHistory)
                     } else {
-                        _state.value = _state.value.copy(latencyMs = ping, pingHistory = newHistory)
+                        _state.value = _state.value.copy(latencyMs = liveWebRtcRtt, pingHistory = newHistory)
+                    }
+                } else if (!isInGameStreamActive) {
+                    if (isDirect) {
+                        val tcpPing = PingTester.measureDirectLatency()
+                        if (tcpPing > 0) {
+                            _state.value = _state.value.copy(directLatencyMs = tcpPing)
+                        }
+                    } else if (currentEngine == VpnEngine.PROXY_TUNNEL) {
+                        val srv = _state.value.currentServer
+                        val tcpPing = PingTester.measureServerLatency(srv)
+                        if (tcpPing > 0) {
+                            val updatedMap = _state.value.serverPings.toMutableMap()
+                            updatedMap[srv.id] = tcpPing
+                            _state.value = _state.value.copy(latencyMs = tcpPing, serverPings = updatedMap)
+                        }
                     }
                 }
                 delay(if (isInGameStreamActive || liveWebRtcRtt > 0) 7500L else 5000L)

@@ -165,6 +165,52 @@ object SessionHistoryRepository {
     }
 
     /**
+     * Returns the average WebRTC RTT (ms) of saved sessions for a given server or its region/country.
+     * Used in SMART_BYPASS mode to display "Ping lần chơi gần nhất" instead of TCP ping to server.ip.
+     * Returns -1 if no valid session RTT exists yet ("Chưa có dữ liệu").
+     */
+    fun getAverageRttForServerOrRegion(
+        serverName: String,
+        countryCode: String,
+        sameRegionServerNames: Set<String> = emptySet(),
+        sessionsList: List<PlaySessionRecord> = _sessions.value
+    ): Int {
+        val validSessions = sessionsList.filter { it.avgPingMs > 0 }
+        if (validSessions.isEmpty()) return -1
+
+        val exactServerMatches = validSessions.filter {
+            it.serverName.equals(serverName.trim(), ignoreCase = true)
+        }
+        if (exactServerMatches.isNotEmpty()) {
+            return exactServerMatches.map { it.avgPingMs }.average().roundToInt()
+        }
+
+        val regionMatches = validSessions.filter { rec ->
+            val recName = rec.serverName.trim()
+            sameRegionServerNames.any { it.equals(recName, ignoreCase = true) } ||
+                matchesCountryKeyword(recName, countryCode)
+        }
+        if (regionMatches.isNotEmpty()) {
+            return regionMatches.map { it.avgPingMs }.average().roundToInt()
+        }
+
+        return -1
+    }
+
+    private fun matchesCountryKeyword(serverName: String, countryCode: String): Boolean {
+        val lower = serverName.lowercase()
+        return when (countryCode.trim().uppercase()) {
+            "JP" -> lower.contains("japan") || lower.contains("tokyo") || lower.contains("osaka") || lower.contains("tsukuba") || lower.contains("chiba")
+            "KR" -> lower.contains("korea") || lower.contains("seoul") || lower.contains("incheon") || lower.contains("busan")
+            "US" -> lower.contains("united states") || lower.contains("silicon") || lower.contains("oregon") || lower.contains("iowa") || lower.contains("virginia") || lower.contains("nevada")
+            "SG" -> lower.contains("singapore")
+            "TW" -> lower.contains("taiwan") || lower.contains("taipei")
+            "HK" -> lower.contains("hong kong")
+            else -> false
+        }
+    }
+
+    /**
      * Resolves a clean human-readable game title from onGameLaunchInitiated title or active URL.
      */
     fun resolveCleanGameTitle(rawTitle: String?, currentUrl: String?): String {

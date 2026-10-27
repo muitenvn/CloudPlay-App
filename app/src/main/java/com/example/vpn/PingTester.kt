@@ -16,32 +16,33 @@ object PingTester {
     private val probeSemaphore = Semaphore(8)
 
     /**
-     * Measures reference TCP handshake latency to the currently selected server (median of 3 samples).
-     * Uses the exact [timeoutMs] passed by the caller without clamping to 1400ms, and never falls back
-     * to www.xbox.com, www.microsoft.com, or any other domain/server.
+     * Measures reference TCP handshake latency to the currently selected server (median of up to 3 samples).
+     * Exits the current port immediately if the first probe fails (avoiding 3x timeout on dead ports),
+     * uses a short ~1000ms timeout for fallback ports (:443/:80), and never falls back to www.xbox.com
+     * or any other domain/server.
      */
     suspend fun measureDirectLatency(timeoutMs: Int = 3500): Int = withContext(Dispatchers.IO) {
         val currentServer = VpnManager.state.value.currentServer
         if (currentServer.ip.isBlank() || currentServer.port <= 0) return@withContext -1
         val safeTimeout = timeoutMs.coerceAtLeast(500)
+        val fallbackTimeout = safeTimeout.coerceAtMost(1000)
 
         probeSemaphore.withPermit {
             val portsToTry = listOf(currentServer.port, 443, 80).distinct()
             for (port in portsToTry) {
-                val samples = mutableListOf<Int>()
-                repeat(3) { attempt ->
-                    val rtt = measureSingleTcpRtt(currentServer.ip, port, safeTimeout)
-                    if (rtt > 0) {
-                        samples.add(rtt)
-                    } else if (attempt == 0 && samples.isEmpty()) {
-                        // First probe to this port timed out or was refused; try next port on the same IP
-                        return@repeat
-                    }
+                val portTimeout = if (port == currentServer.port) safeTimeout else fallbackTimeout
+                val first = measureSingleTcpRtt(currentServer.ip, port, portTimeout)
+                if (first <= 0) {
+                    // Exit this dead/unreachable port immediately without repeating 2 more times
+                    continue
                 }
-                if (samples.isNotEmpty()) {
-                    samples.sort()
-                    return@withPermit samples[samples.size / 2]
-                }
+                val samples = mutableListOf(first)
+                val second = measureSingleTcpRtt(currentServer.ip, port, portTimeout)
+                if (second > 0) samples.add(second)
+                val third = measureSingleTcpRtt(currentServer.ip, port, portTimeout)
+                if (third > 0) samples.add(third)
+                samples.sort()
+                return@withPermit samples[samples.size / 2]
             }
             -1
         }
@@ -49,28 +50,29 @@ object PingTester {
 
     /**
      * Measures TCP handshake latency strictly to [server]'s own IP address (`server.ip:port`, `:443`, `:80`).
-     * Never probes any other server in the same country, regional datacenter probe lists, or Anycast domains
-     * (`www.xbox.com` / `www.microsoft.com`). If `server.ip:port`, `:443`, and `:80` all fail to respond,
-     * returns -1 so the UI displays "Không đo được".
+     * Exits a port immediately when the first probe fails, uses ~1000ms timeout for `:443`/`:80` fallback ports,
+     * and never probes any other server or Anycast domain. If all candidate ports fail, returns -1.
      */
     suspend fun measureServerLatency(server: ServerLocation, timeoutMs: Int = 2500): Int = withContext(Dispatchers.IO) {
         if (server.ip.isBlank() || server.port <= 0) return@withContext -1
         val safeTimeout = timeoutMs.coerceAtLeast(500)
+        val fallbackTimeout = safeTimeout.coerceAtMost(1000)
 
         probeSemaphore.withPermit {
             val candidatePorts = listOf(server.port, 443, 80).distinct()
             for (port in candidatePorts) {
-                val samples = mutableListOf<Int>()
-                val first = measureSingleTcpRtt(server.ip, port, safeTimeout)
-                if (first > 0) {
-                    samples.add(first)
-                    val second = measureSingleTcpRtt(server.ip, port, safeTimeout)
-                    if (second > 0) samples.add(second)
-                    val third = measureSingleTcpRtt(server.ip, port, safeTimeout)
-                    if (third > 0) samples.add(third)
-                    samples.sort()
-                    return@withPermit samples[samples.size / 2]
+                val portTimeout = if (port == server.port) safeTimeout else fallbackTimeout
+                val first = measureSingleTcpRtt(server.ip, port, portTimeout)
+                if (first <= 0) {
+                    continue
                 }
+                val samples = mutableListOf(first)
+                val second = measureSingleTcpRtt(server.ip, port, portTimeout)
+                if (second > 0) samples.add(second)
+                val third = measureSingleTcpRtt(server.ip, port, portTimeout)
+                if (third > 0) samples.add(third)
+                samples.sort()
+                return@withPermit samples[samples.size / 2]
             }
             -1
         }
@@ -103,19 +105,15 @@ object PingTester {
     suspend fun measureLatency(host: String, port: Int = 443, timeoutMs: Int = 2500): Int = withContext(Dispatchers.IO) {
         if (host.isBlank()) return@withContext -1
         val safeTimeout = timeoutMs.coerceAtLeast(500)
-        val samples = mutableListOf<Int>()
-        repeat(3) { attempt ->
-            val rtt = measureSingleTcpRtt(host, port, safeTimeout)
-            if (rtt > 0) {
-                samples.add(rtt)
-            } else if (attempt == 0 && samples.isEmpty()) {
-                return@withContext -1
-            }
-        }
-        if (samples.isEmpty()) -1 else {
-            samples.sort()
-            samples[samples.size / 2]
-        }
+        val first = measureSingleTcpRtt(host, port, safeTimeout)
+        if (first <= 0) return@withContext -1
+        val samples = mutableListOf(first)
+        val second = measureSingleTcpRtt(host, port, safeTimeout)
+        if (second > 0) samples.add(second)
+        val third = measureSingleTcpRtt(host, port, safeTimeout)
+        if (third > 0) samples.add(third)
+        samples.sort()
+        samples[samples.size / 2]
     }
 
     /**

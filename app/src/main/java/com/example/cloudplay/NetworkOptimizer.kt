@@ -118,20 +118,22 @@ object NetworkOptimizer {
             // Initial evaluation
             evaluateCurrentNetwork(appCtx, cm.activeNetwork)
 
-            // Register reactive network callback (tự động gỡ/gắn lại bindProcessToNetwork khi đổi Wi-Fi ↔ 4G hoặc mất mạng)
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-
+            // Register default network callback so only the system's active default network (Wi-Fi vs 4G) triggers binding
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    evaluateCurrentNetwork(appCtx, network)
-                    updateProcessNetworkBinding(network)
+                    val activeNet = cm.activeNetwork ?: network
+                    if (network == activeNet) {
+                        evaluateCurrentNetwork(appCtx, activeNet)
+                        updateProcessNetworkBinding(activeNet)
+                    }
                 }
 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                    evaluateCurrentNetwork(appCtx, network)
-                    updateProcessNetworkBinding(network)
+                    val activeNet = cm.activeNetwork ?: network
+                    if (network == activeNet) {
+                        evaluateCurrentNetwork(appCtx, activeNet)
+                        updateProcessNetworkBinding(activeNet)
+                    }
                 }
 
                 override fun onLost(network: Network) {
@@ -141,12 +143,20 @@ object NetworkOptimizer {
                         }
                         currentBoundNetwork = null
                     }
-                    evaluateCurrentNetwork(appCtx, null)
-                    updateProcessNetworkBinding(null)
+                    val nextActive = cm.activeNetwork
+                    evaluateCurrentNetwork(appCtx, nextActive)
+                    updateProcessNetworkBinding(nextActive)
                 }
             }
 
-            cm.registerNetworkCallback(request, networkCallback!!)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                cm.registerDefaultNetworkCallback(networkCallback!!)
+            } else {
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                cm.registerNetworkCallback(request, networkCallback!!)
+            }
 
             // Observe user configuration changes to re-tune immediately
             scope.launch {
@@ -162,7 +172,7 @@ object NetworkOptimizer {
     /**
      * Đồng bộ hóa `ConnectivityManager.bindProcessToNetwork`:
      * - Khi đang stream (`isStreamCurrentlyActive == true`) và ở chế độ mạng trực tiếp (`DIRECT_NETWORK`),
-     *   gắn tiến trình vào mạng vật lý đang hoạt động (Wi-Fi hoặc 4G) và tự gắn lại khi chuyển mạng Wi-Fi ↔ 4G.
+     *   chỉ gắn tiến trình vào mạng mặc định đang hoạt động (`network == cm.activeNetwork`) và tự gắn lại khi chuyển mạng mặc định Wi-Fi ↔ 4G.
      * - Khi kết thúc stream (`isStreamCurrentlyActive == false`), bật VPN hoặc mất mạng, gỡ gắn kết (`bindProcessToNetwork(null)`).
      */
     private fun updateProcessNetworkBinding(candidateNetwork: Network? = null) {
@@ -180,7 +190,12 @@ object NetworkOptimizer {
                 return
             }
 
-            val net = candidateNetwork ?: cm.activeNetwork
+            val activeNet = cm.activeNetwork
+            if (candidateNetwork != null && activeNet != null && candidateNetwork != activeNet) {
+                // Ignore non-default network callbacks (e.g., background 4G while on Wi-Fi)
+                return
+            }
+            val net = activeNet ?: candidateNetwork
             val caps = if (net != null) cm.getNetworkCapabilities(net) else null
             val isVpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
             val isValidPhysical = caps != null && !isVpn && (

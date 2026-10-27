@@ -76,7 +76,7 @@ class XboxCloudVpnService : Service() {
         val action = intent?.action
         when (action) {
             ACTION_CONNECT -> {
-                val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "Japan (Tokyo)"
+                val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "CloudPlay"
                 startOptimizer(serverName)
             }
             ACTION_DISCONNECT, null -> {
@@ -95,9 +95,9 @@ class XboxCloudVpnService : Service() {
         try {
             val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
             val notifText = if (isEn) {
-                "Optimizing xCloud connection via $serverName"
+                "Keeping connection stable while gaming"
             } else {
-                "Đang tối ưu kết nối xCloud qua máy chủ $serverName"
+                "Đang giữ kết nối ổn định khi chơi game"
             }
             val notification = buildNotification(notifText)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -111,7 +111,7 @@ class XboxCloudVpnService : Service() {
             }
             isRunning.set(true)
             isServiceActive.set(true)
-            Log.d(TAG, "Foreground Stream Optimizer service active for $serverName")
+            Log.d(TAG, "Foreground service active ($serverName)")
         } catch (e: Exception) {
             Log.d(TAG, "Foreground promotion skipped: ${e.message}")
             stopSelf()
@@ -150,7 +150,7 @@ class XboxCloudVpnService : Service() {
                 "CloudPlay Stream Status",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = if (isEn) "Displays active Cloud Gaming stream optimization status" else "Hiển thị trạng thái duy trì luồng truyền Cloud Gaming"
+                description = if (isEn) "Keeps connection stable while gaming" else "Đang giữ kết nối ổn định khi chơi game"
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)

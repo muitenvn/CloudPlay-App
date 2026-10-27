@@ -156,7 +156,6 @@ fun FloatingHud(
     onSelectFortniteControlMode: (Boolean) -> Unit = {},
     recorderState: com.example.cloudplay.ScreenRecorderState = com.example.cloudplay.ScreenRecorderState(),
     onToggleRecording: () -> Unit = {},
-    onFlushLag: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -564,11 +563,7 @@ fun FloatingHud(
             ) {
                 // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + Controller icon only)
                 if (hudMode == HudMode.MINIMIZED) {
-                    val rawPing = when {
-                        telemetry.rttMs > 0 -> telemetry.rttMs
-                        vpnState.mode == NetworkMode.DIRECT_NETWORK -> vpnState.directLatencyMs
-                        else -> vpnState.latencyMs
-                    }
+                    val rawPing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
                     val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
                         !hasValidPing -> Color.Gray
@@ -577,7 +572,7 @@ fun FloatingHud(
                         else -> JapanRed
                     }
                     val pingText = if (!hasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--ms" else "${vpnState.currentServer.flag}--ms"
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--" else "${vpnState.currentServer.flag}--"
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
@@ -619,11 +614,7 @@ fun FloatingHud(
                     // ==========================================
                     // COMPACT STATE: ULTRA-SLIM ROW WITH HOME BUTTON (~145dp)
                     // ==========================================
-                    val compactRawPing = when {
-                        telemetry.rttMs > 0 -> telemetry.rttMs
-                        vpnState.mode == NetworkMode.DIRECT_NETWORK -> vpnState.directLatencyMs
-                        else -> vpnState.latencyMs
-                    }
+                    val compactRawPing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
                     val compactHasValidPing = compactRawPing != null && compactRawPing > 0
                     val pingColor = when {
                         !compactHasValidPing -> Color.Gray
@@ -632,7 +623,7 @@ fun FloatingHud(
                         else -> JapanRed
                     }
                     val compactPingText = if (!compactHasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡-- ms" else "${vpnState.currentServer.flag}-- ms"
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--" else "${vpnState.currentServer.flag}--"
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${compactRawPing}ms" else "${vpnState.currentServer.flag}${compactRawPing}ms"
                     }
@@ -967,11 +958,7 @@ fun FloatingHud(
                                         markUserInteraction()
                                         onToggleVirtualController()
                                     },
-                                    adaptiveBufferMs = adaptiveQualityState.smoothBufferMs.roundToInt(),
-                                    onFlushLag = {
-                                        markUserInteraction()
-                                        onFlushLag()
-                                    }
+                                    adaptiveBufferMs = adaptiveQualityState.smoothBufferMs.roundToInt()
                                 )
 
                                 // ========================================================
@@ -993,10 +980,6 @@ fun FloatingHud(
                                     onToggleWifiSpeedFirst = { enabled ->
                                         markUserInteraction()
                                         onToggleWifiSpeedFirst(enabled)
-                                    },
-                                    onFlushLag = {
-                                        markUserInteraction()
-                                        onFlushLag()
                                     }
                                 )
 
@@ -1514,18 +1497,14 @@ private fun DenseCoreTelemetrySection(
     thermalColor: Color,
     onToggleNetwork: () -> Unit,
     onToggleVirtualController: () -> Unit,
-    adaptiveBufferMs: Int = 12,
-    onFlushLag: () -> Unit = {}
+    adaptiveBufferMs: Int = 12
 ) {
-    val effectivePing = when {
-        telemetry.rttMs > 0 -> telemetry.rttMs
-        compactHasValidPing -> compactRawPing
-        else -> null
-    }
+    // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair; nếu không có thì hiện "--", không rơi về ping TCP/VPN
+    val effectivePing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
     val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
-        if (effectivePing != null) "Direct • ${effectivePing}ms" else "Direct • -- ms"
+        if (effectivePing != null) "Direct • ${effectivePing}ms" else "Direct • --"
     } else {
-        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms" else "VPN ${vpnState.currentServer.flag} • -- ms"
+        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms" else "VPN ${vpnState.currentServer.flag} • --"
     }
 
     val fpsValueText = if (telemetry.fps > 0) "${telemetry.fps} FPS" else "-- FPS"
@@ -1668,13 +1647,11 @@ private fun DenseCoreTelemetrySection(
                 valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
             )
 
-            // 3. Dòng Thời gian giải mã & Bộ đệm dữ liệu (chạm để Đồng bộ lại khung hình)
+            // 3. Dòng Thời gian giải mã & Bộ đệm dữ liệu
             DenseMetricRowItem(
                 label = if (isEn) "Decode time" else "Thời gian giải mã",
                 value = if (isEn) decodeTimeText.replace("Bộ đệm", "Buf") else decodeTimeText,
-                valueColor = decodeColor,
-                badgeText = if (isEn) "🔄 Resync" else "🔄 Đồng bộ",
-                onRowClick = onFlushLag
+                valueColor = decodeColor
             )
 
             // 4. Dòng Tay cầm (chạm để bật/tắt tay cầm ảo)
@@ -1778,7 +1755,7 @@ private fun DenseMetricRowItem(
 }
 
 /**
- * Nhóm 1: Độ phân giải, Đồng bộ khung hình & Chẩn đoán 4 lớp "Vì sao tôi bị lag?" (cỡ chữ >= 11sp).
+ * Nhóm 1: Trần SDP (phiên sau), Đệm nhận tự động & Chẩn đoán 4 lớp "Vì sao tôi bị lag?" (cỡ chữ >= 11sp).
  */
 @Composable
 private fun DenseQualityModeSection(
@@ -1788,8 +1765,7 @@ private fun DenseQualityModeSection(
     isVpnActive: Boolean = false,
     onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
     onToggleAutoAdapting: (Boolean) -> Unit,
-    onToggleWifiSpeedFirst: (Boolean) -> Unit,
-    onFlushLag: () -> Unit = {}
+    onToggleWifiSpeedFirst: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val config by com.example.data.SettingsRepository.config.collectAsState()
@@ -1815,9 +1791,9 @@ private fun DenseQualityModeSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEn) "Resolution" else "Độ phân giải",
+                    text = if (isEn) "SDP Cap (next) & Buffer" else "Trần SDP (phiên sau) & Đệm",
                     color = XboxNeonGreen,
-                    fontSize = 11.5.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1
                 )
@@ -1829,17 +1805,17 @@ private fun DenseQualityModeSection(
                 }
                 val signalInfo = when {
                     networkStatus.isWifi && networkStatus.wifiRssiDbm < 0 ->
-                        "$wifiBandText • ${String.format("%.1f", liveMbps)}M"
+                        "$wifiBandText • Đệm ${liveBufMs}ms • SDP ${String.format("%.1f", liveMbps)}M"
                     networkStatus.isCellular ->
-                        "📶 4G • ${String.format("%.1f", liveMbps)}M • ${liveBufMs}ms"
+                        "📶 4G • Đệm ${liveBufMs}ms • SDP ${String.format("%.1f", liveMbps)}M"
                     else ->
-                        "${String.format("%.1f", liveMbps)}M • ${liveBufMs}ms"
+                        "Đệm ${liveBufMs}ms • SDP ${String.format("%.1f", liveMbps)}M"
                 }
                 val warnAmber = Color(0xFFF59E0B)
                 Text(
                     text = signalInfo,
                     color = if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) warnAmber else DirectCyan,
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
@@ -1889,60 +1865,32 @@ private fun DenseQualityModeSection(
                 )
             }
 
-            // Nút chuẩn W3C: "🔄 Đồng bộ lại khung hình" + nút Chẩn đoán 4 lớp "🩺 Vì sao tôi bị lag?"
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // Nút Chẩn đoán 4 lớp "🩺 Vì sao tôi bị lag?" (đã bỏ nút "Đồng bộ lại khung hình" theo mục 5)
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable { showLagDiagnostic = !showLagDiagnostic }
+                    .testTag("hud_why_lag_button"),
+                shape = RoundedCornerShape(6.dp),
+                color = if (showLagDiagnostic) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF182A20),
+                border = androidx.compose.foundation.BorderStroke(
+                    0.8.dp,
+                    if (showLagDiagnostic) XboxNeonGreen else XboxCardBorder
+                )
             ) {
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onFlushLag() }
-                        .testTag("hud_flush_lag_button"),
-                    shape = RoundedCornerShape(6.dp),
-                    color = DirectCyan.copy(alpha = 0.16f),
-                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
+                Row(
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isEn) "🔄 Resync Frames" else "🔄 Đồng bộ lại khung hình",
-                            color = Color.White,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { showLagDiagnostic = !showLagDiagnostic }
-                        .testTag("hud_why_lag_button"),
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (showLagDiagnostic) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF182A20),
-                    border = androidx.compose.foundation.BorderStroke(
-                        0.8.dp,
-                        if (showLagDiagnostic) XboxNeonGreen else XboxCardBorder
+                    Text(
+                        text = if (isEn) "🩺 Why am I lagging? (4-Layer Check)" else "🩺 Vì sao tôi bị lag? (Chẩn đoán 4 lớp)",
+                        color = if (showLagDiagnostic) XboxNeonGreen else DirectCyan,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (isEn) "🩺 Why lag?" else "🩺 Vì sao bị lag?",
-                            color = if (showLagDiagnostic) XboxNeonGreen else DirectCyan,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                    }
                 }
             }
 
@@ -2061,14 +2009,14 @@ private fun DenseQualityModeSection(
             if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) {
                 Text(
                     text = if (networkStatus.isWeakWifiSignal) {
-                        if (isEn) "⚠️ Weak Wi-Fi: Auto-adapting bitrate"
-                        else "⚠️ Sóng Wi-Fi yếu: Tự động thích ứng chất lượng truyền tải"
+                        if (isEn) "⚠️ Weak Wi-Fi: Adjusting receiver buffer (${liveBufMs}ms); SDP cap (${String.format("%.1f", liveMbps)}M) applies next session"
+                        else "⚠️ Sóng Wi-Fi yếu: Tự chỉnh bộ đệm nhận (${liveBufMs}ms); trần SDP (${String.format("%.1f", liveMbps)}M) áp dụng phiên sau"
                     } else {
-                        if (isEn) "⚠️ Weak 4G: Auto-lowering bitrate to limit queue congestion"
-                        else "⚠️ Sóng 4G yếu: Tự động hạ bitrate hạn chế nghẽn đường truyền (720p)"
+                        if (isEn) "⚠️ Weak 4G: Adjusting receiver buffer (${liveBufMs}ms); SDP cap (${String.format("%.1f", liveMbps)}M) applies next session"
+                        else "⚠️ Sóng 4G yếu: Tự chỉnh bộ đệm nhận (${liveBufMs}ms); trần SDP (${String.format("%.1f", liveMbps)}M) áp dụng phiên sau"
                     },
                     color = Color(0xFFF59E0B),
-                    fontSize = 11.sp,
+                    fontSize = 10.5.sp,
                     maxLines = 2
                 )
             }

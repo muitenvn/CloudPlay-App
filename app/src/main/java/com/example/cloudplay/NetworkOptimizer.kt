@@ -47,6 +47,7 @@ data class NetworkOptimizerStatus(
     val downstreamBandwidthKbps: Int = 0,
     val isWeakWifiSignal: Boolean = false,
     val isWeakCellularSignal: Boolean = false,
+    val isLowLatencyStreamActive: Boolean = false,
     val summaryText: String = "Đang tối ưu hóa đồ họa và hiệu năng thiết bị...",
     val profileBadge: String = "⚡ Tự Động"
 )
@@ -82,6 +83,12 @@ object NetworkOptimizer {
     private var wifiLowLatencyLock: WifiManager.WifiLock? = null
     private var isInitialized = false
 
+    @Volatile
+    private var isStreamCurrentlyActive: Boolean = false
+
+    @Volatile
+    private var currentBoundNetwork: Network? = null
+
     // Telemetry tracking for estimated data savings using actual elapsed time
     private var streamSecondsTracked = 0.0
     private var totalDataSavedMegabytes = 0.0
@@ -111,7 +118,7 @@ object NetworkOptimizer {
             // Initial evaluation
             evaluateCurrentNetwork(appCtx, cm.activeNetwork)
 
-            // Register reactive network callback
+            // Register reactive network callback (tự động gỡ/gắn lại bindProcessToNetwork khi đổi Wi-Fi ↔ 4G hoặc mất mạng)
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
@@ -119,14 +126,23 @@ object NetworkOptimizer {
             networkCallback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     evaluateCurrentNetwork(appCtx, network)
+                    updateProcessNetworkBinding(network)
                 }
 
                 override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                     evaluateCurrentNetwork(appCtx, network)
+                    updateProcessNetworkBinding(network)
                 }
 
                 override fun onLost(network: Network) {
+                    if (currentBoundNetwork == network) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            runCatching { connectivityManager?.bindProcessToNetwork(null) }
+                        }
+                        currentBoundNetwork = null
+                    }
                     evaluateCurrentNetwork(appCtx, null)
+                    updateProcessNetworkBinding(null)
                 }
             }
 
@@ -144,10 +160,56 @@ object NetworkOptimizer {
     }
 
     /**
-     * Activates hardware WIFI_MODE_FULL_LOW_LATENCY lock when streaming on Wi-Fi (prevents DTIM radio sleep spikes)
-     * and pauses background catalog requests on both 4G and Wi-Fi so 100% of bandwidth serves the game stream.
+     * Đồng bộ hóa `ConnectivityManager.bindProcessToNetwork`:
+     * - Khi đang stream (`isStreamCurrentlyActive == true`) và ở chế độ mạng trực tiếp (`DIRECT_NETWORK`),
+     *   gắn tiến trình vào mạng vật lý đang hoạt động (Wi-Fi hoặc 4G) và tự gắn lại khi chuyển mạng Wi-Fi ↔ 4G.
+     * - Khi kết thúc stream (`isStreamCurrentlyActive == false`), bật VPN hoặc mất mạng, gỡ gắn kết (`bindProcessToNetwork(null)`).
+     */
+    private fun updateProcessNetworkBinding(candidateNetwork: Network? = null) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val cm = connectivityManager ?: return
+        try {
+            val isDirectMode = com.example.vpn.VpnManager.state.value.mode == com.example.vpn.NetworkMode.DIRECT_NETWORK
+            if (!isStreamCurrentlyActive || !isDirectMode) {
+                if (currentBoundNetwork != null) {
+                    cm.bindProcessToNetwork(null)
+                    currentBoundNetwork = null
+                } else {
+                    cm.bindProcessToNetwork(null)
+                }
+                return
+            }
+
+            val net = candidateNetwork ?: cm.activeNetwork
+            val caps = if (net != null) cm.getNetworkCapabilities(net) else null
+            val isVpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            val isValidPhysical = caps != null && !isVpn && (
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                )
+
+            if (net != null && isValidPhysical) {
+                if (currentBoundNetwork != net) {
+                    cm.bindProcessToNetwork(net)
+                    currentBoundNetwork = net
+                }
+                cm.reportNetworkConnectivity(net, true)
+            } else {
+                cm.bindProcessToNetwork(null)
+                currentBoundNetwork = null
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Activates hardware WIFI_MODE_FULL_LOW_LATENCY lock when streaming on Wi-Fi (prevents DTIM radio sleep spikes),
+     * manages process network binding via updateProcessNetworkBinding(), and pauses background catalog requests.
      */
     fun setStreamActive(active: Boolean) {
+        isStreamCurrentlyActive = active
+        _status.value = _status.value.copy(isLowLatencyStreamActive = active)
         com.example.data.GameLibraryRepository.setStreamActive(active)
         if (!active) {
             lastTelemetryTimestampMs = 0L
@@ -165,23 +227,7 @@ object NetworkOptimizer {
                     if (lock.isHeld) lock.release()
                 }
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val cm = connectivityManager
-                if (cm != null) {
-                    val net = cm.activeNetwork
-                    val isDirectMode = com.example.vpn.VpnManager.state.value.mode == com.example.vpn.NetworkMode.DIRECT_NETWORK
-                    if (active && net != null && isDirectMode) {
-                        val caps = cm.getNetworkCapabilities(net)
-                        val isVpn = caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-                        if (!isVpn) {
-                            cm.bindProcessToNetwork(net)
-                        }
-                        cm.reportNetworkConnectivity(net, true)
-                    } else {
-                        cm.bindProcessToNetwork(null)
-                    }
-                }
-            }
+            updateProcessNetworkBinding(null)
         } catch (_: Exception) {
         }
     }
@@ -317,10 +363,10 @@ object NetworkOptimizer {
                 }
                 bitrate = autoMbps
                 summary = when {
-                    is3gOrHPlus -> "Phát hiện sóng 3G/H+ băng thông thấp: hạ luồng xuống ${autoMbps}M để hạn chế nghẽn đường truyền."
-                    isCellular -> "Tự động thích ứng mạng 4G, duy trì kết nối modem và đồng bộ bộ đệm theo biến động thực tế."
-                    current.isWeakWifiSignal -> "Phát hiện sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự thu gọn luồng ${autoMbps}M để truyền ổn định hơn."
-                    else -> "Tự động thích ứng chất lượng truyền tải và duy trì thời gian giải mã < 8ms."
+                    is3gOrHPlus -> "Sóng 3G/H+: điều chỉnh bộ đệm nhận trong phiên và đặt trần SDP ${autoMbps}M cho phiên kế tiếp."
+                    isCellular -> "Mạng 4G: điều chỉnh bộ đệm nhận (jitterBufferTarget) theo biến động sóng; trần SDP (${autoMbps}M) áp dụng khi khởi tạo phiên."
+                    current.isWeakWifiSignal -> "Sóng Wi-Fi yếu (${current.wifiRssiDbm} dBm): tự động nới bộ đệm nhận trong phiên; trần SDP (${autoMbps}M) áp dụng khi vào phiên."
+                    else -> "Tự động điều chỉnh bộ đệm nhận WebRTC trong phiên và giữ thời gian giải mã < 8ms."
                 }
                 badge = when {
                     is3gOrHPlus -> "📶 3G/H+ (${autoMbps}M)"

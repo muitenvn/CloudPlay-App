@@ -573,10 +573,20 @@ private fun QuickNetworkCockpitCard(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
     val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
-    val directPing = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
-        vpnState.directLatencyMs ?: vpnState.latencyMs
+    val optimizerStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
+    val streamTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
+    val isStreaming = optimizerStatus.isLowLatencyStreamActive
+
+    // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair; nếu không có thì hiện "--", không rơi về ping TCP/VPN
+    val directPing: Int? = if (isStreaming) {
+        streamTelemetry.rttMs.takeIf { it > 0 }
     } else {
-        vpnState.latencyMs ?: vpnState.directLatencyMs
+        val rawTcp = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+            vpnState.directLatencyMs ?: vpnState.latencyMs
+        } else {
+            vpnState.latencyMs ?: vpnState.directLatencyMs
+        }
+        rawTcp?.takeIf { it > 0 }
     }
     val hasPing = directPing != null && directPing > 0
     val animatedDirectPing by animateXboxIntAsState(
@@ -656,7 +666,11 @@ private fun QuickNetworkCockpitCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = if (isEn) "Tap to switch server" else "Chạm để đổi máy chủ",
+                        text = if (isStreaming) {
+                            if (isEn) "WebRTC RTT • Tap to switch" else "RTT WebRTC • Chạm để đổi"
+                        } else {
+                            if (isEn) "TCP Ping to server (ref)" else "Ping TCP tới máy chủ"
+                        },
                         color = TextSecondary,
                         fontSize = 9.5.sp,
                         maxLines = 1,
@@ -699,7 +713,7 @@ private fun QuickNetworkCockpitCard(
                             }
                         }
                         Text(
-                            text = if (hasPing) "${animatedDirectPing}ms" else if (isEn) "Ready" else "Sẵn sàng",
+                            text = if (hasPing) "${animatedDirectPing}ms" else "--",
                             color = signalTint,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 10.sp,

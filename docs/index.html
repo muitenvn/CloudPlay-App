@@ -244,7 +244,7 @@
   window.addEventListener("scroll",onScroll,{passive:true});onScroll();
   // screenshot dots
   var sh=document.getElementById("shots"),dots=document.querySelectorAll("#dots i");
-  sh.addEventListener("scroll",function(){if(!sh.firstElementChild)return;var w=sh.firstElementChild.offsetWidth+12;var i=Math.min(dots.length-1,Math.round(sh.scrollLeft/w));[].forEach.call(dots,function(d,k){d.classList.toggle("on",k===i);});},{passive:true});
+  sh.addEventListener("scroll",function(){var figs=sh.querySelectorAll("figure"),fg=null,vis=0;for(var m=0;m<figs.length;m++){if(figs[m].getAttribute("data-err")!=="1"&&figs[m].style.display!=="none"&&figs[m].offsetWidth>0){if(!fg)fg=figs[m];vis++;}}if(!fg)return;var w=fg.offsetWidth+12;var maxIdx=Math.max(0,(vis||dots.length)-1);var i=Math.min(maxIdx,Math.round(sh.scrollLeft/w));[].forEach.call(dots,function(d,k){d.classList.toggle("on",k===i);});},{passive:true});
   // copy hash
   var cp=document.getElementById("copy");
   cp.addEventListener("click",function(){try{navigator.clipboard.writeText(hashHex);cp.textContent=D[lang].copied;setTimeout(function(){cp.textContent=D[lang].copy;},1500);}catch(e){}});

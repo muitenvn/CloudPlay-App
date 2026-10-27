@@ -264,8 +264,8 @@ object VpnManager {
     }
 
     /**
-     * 4. SẮP XẾP: xếp máy chủ hợp lệ (Đã mở khóa / Chưa thử) lên đầu theo độ trễ thực tế và vị trí địa lý
-     * (ưu tiên cụm máy chủ châu Á JP/KR gần Việt Nam hơn máy chủ Mỹ US xuyên Thái Bình Dương ~180ms),
+     * 4. SẮP XẾP: chỉ xếp hạng máy chủ theo trạng thái mở khóa và ping thật đo được của chính máy chủ đó;
+     * các máy chủ đo được ping thật (ping > 0) luôn xếp trước, máy chủ không đo được (ping <= 0) xếp sau,
      * đẩy "Không mở khóa" và "Sai vùng" xuống cuối.
      */
     fun sortServersByUnlockAndPing(
@@ -283,39 +283,31 @@ object VpnManager {
                     return@Comparator tierA.compareTo(tierB)
                 }
 
-                // Với các máy chủ hợp lệ (UNLOCKED hoặc UNTESTED), ưu tiên vùng châu Á (JP/KR) trước Mỹ (US)
-                // trừ khi người dùng có số đo ping thực tế chứng minh ngược lại.
-                val geoRankA = countryProximityRank(a.countryCode)
-                val geoRankB = countryProximityRank(b.countryCode)
+                val pingA = pingMap[a.id] ?: -1
+                val pingB = pingMap[b.id] ?: -1
+                val hasPingA = pingA > 0
+                val hasPingB = pingB > 0
 
-                val pingA = pingMap[a.id] ?: a.lastPingMs ?: -1
-                val pingB = pingMap[b.id] ?: b.lastPingMs ?: -1
-
-                // Nếu cả hai đã đo được ping thực tế, so sánh theo điểm độ trễ hiệu dụng
-                // (máy chủ UNLOCKED được cộng thưởng 15ms ổn định nhưng không vượt mặt máy chủ gần hơn hàng trăm ms)
-                if (pingA > 0 && pingB > 0) {
-                    val effectiveA = pingA - if (statusA == RegionUnlockStatus.UNLOCKED) 15 else 0
-                    val effectiveB = pingB - if (statusB == RegionUnlockStatus.UNLOCKED) 15 else 0
-                    if (effectiveA != effectiveB) {
-                        return@Comparator effectiveA.compareTo(effectiveB)
-                    }
-                } else if (pingA > 0 || pingB > 0) {
-                    // Nếu 1 bên có ping tốt (<140ms) thì ưu tiên bên đã xác thực phản hồi sống
-                    val knownPing = if (pingA > 0) pingA else pingB
-                    if (knownPing < 140) {
-                        return@Comparator if (pingA > 0) -1 else 1
-                    }
+                // Máy chủ đo được ping thật luôn xếp trước máy chủ không đo được
+                if (hasPingA != hasPingB) {
+                    return@Comparator if (hasPingA) -1 else 1
                 }
 
-                // Khi chưa đo ping hoặc ping ngang nhau: ưu tiên khu vực gần (JP/KR trước US), sau đó ưu tiên UNLOCKED
-                if (geoRankA != geoRankB) {
-                    return@Comparator geoRankA.compareTo(geoRankB)
+                // Nếu cả hai đều đo được ping thật của chính máy chủ đó, xếp theo ping thấp nhất trước
+                if (hasPingA && hasPingB && pingA != pingB) {
+                    return@Comparator pingA.compareTo(pingB)
                 }
 
                 val rankA = unlockSortRank(statusA)
                 val rankB = unlockSortRank(statusB)
                 if (rankA != rankB) {
                     return@Comparator rankA.compareTo(rankB)
+                }
+
+                val geoRankA = countryProximityRank(a.countryCode)
+                val geoRankB = countryProximityRank(b.countryCode)
+                if (geoRankA != geoRankB) {
+                    return@Comparator geoRankA.compareTo(geoRankB)
                 }
 
                 b.speedMbps.compareTo(a.speedMbps)
@@ -390,13 +382,17 @@ object VpnManager {
                         pingMap = finalPings,
                         records = _state.value.unlockRecords
                     )
+                    // Chỉ tự chọn máy chủ theo ping thật đo được của chính máy chủ đó (ping > 0)
                     val best = candidates.firstOrNull { (finalPings[it.id] ?: -1) > 0 }
-                        ?: candidates.firstOrNull()
                     if (best != null) {
                         val bestPing = finalPings[best.id] ?: -1
                         withContext(Dispatchers.Main) {
                             selectServer(best, context ?: appContext)
                             onPickedBest?.invoke(best, bestPing)
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            onPickedBest?.invoke(_state.value.currentServer, -1)
                         }
                     }
                 }
@@ -977,6 +973,19 @@ object VpnManager {
         _state.value = _state.value.copy(currentServer = server, unlockFailPromptServer = null)
         persistCustomServers(context, _state.value.customServers, server)
         preCheckProxyRegion(server)
+        scope.launch(Dispatchers.IO) {
+            val measured = PingTester.measureServerLatency(server, 2200)
+            if (measured > 0) {
+                val updatedMap = _state.value.serverPings.toMutableMap()
+                updatedMap[server.id] = measured
+                val newHistory = (_state.value.pingHistory + measured).takeLast(16)
+                _state.value = _state.value.copy(
+                    serverPings = updatedMap,
+                    latencyMs = measured,
+                    pingHistory = newHistory
+                )
+            }
+        }
         if (wasConnected && context != null) {
             connect(context, server)
         }

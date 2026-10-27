@@ -419,22 +419,25 @@ object AdaptiveQualityManager {
                 } else {
                     +2.0
                 }
-                // Multiplicative Decrease (cắt giảm 40-50% về dải 4.0-6.0 Mbps) để làm rỗng hàng đợi eNodeB trong 1-2 giây
+                // Lưu ý kỹ thuật WebRTC: Máy khách (receiver) không thể ép máy chủ Xbox đổi bitrate mã hóa
+                // ngay giữa phiên nếu không thương lượng lại SDP. Do đó trong phiên hiện tại, bộ điều khiển
+                // chỉ điều chỉnh tức thì bộ đệm nhận (jitterBufferTarget / playoutDelayHint), còn mức trần
+                // bitrate (×0.55 về 4.0-6.0 Mbps trên 4G) sẽ áp dụng vào SDP (b=AS:) ở lần kết nối/phiên kế tiếp.
                 if (isCellular) {
                     multiplicativeTargetMbps = (current.smoothBitrateMbps * 0.55).coerceIn(4.0, 6.0)
                 } else {
                     deltaBitrateMbps = if (netStatus.isWeakWifiSignal || effectiveDecode > 13.0) -2.5 else -2.0
                 }
                 actionNote = if (isCellular) {
-                    if (isEn) "4G queue delay detected: lowering bitrate to clear radio queue" else "Phát hiện phình hàng đợi 4G: hạ nhanh bitrate (4-6M) để giảm trễ"
+                    if (isEn) "4G jitter: adjusting receiver buffer now; SDP cap (4-6M) applies next session" else "Sóng 4G dao động: điều chỉnh đệm nhận ngay; trần SDP (4-6M) áp dụng phiên sau"
                 } else {
-                    if (isEn) "Expanding buffer & lowering bitrate to prevent frame drop" else "Tăng đệm & hạ nhẹ băng thông để giữ khung hình ổn định"
+                    if (isEn) "Expanding receiver buffer now; new SDP bitrate cap applies next session" else "Tăng bộ đệm nhận trong phiên; trần bitrate SDP mới áp dụng phiên sau"
                 }
             } else if (isEarlyWarmup) {
                 cleanRecoveryTicks = 0
                 deltaBufferMs = +1.5
                 deltaBitrateMbps = if (isCellular) -1.2 else -0.8
-                actionNote = if (isEn) "Stabilizing Wi-Fi/4G frame queue" else "Ổn định hàng đợi khung hình khi mạng dao động"
+                actionNote = if (isEn) "Adjusting WebRTC receiver buffer for network jitter" else "Điều chỉnh bộ đệm nhận WebRTC khi mạng dao động"
             } else if (
                 deltaFreezes == 0 &&
                 deltaDropped == 0 &&
@@ -445,7 +448,7 @@ object AdaptiveQualityManager {
                 effectiveJitter <= (if (isCellular) 10.0 else 8.0)
             ) {
                 cleanRecoveryTicks++
-                // Additive Increase kèm chu kỳ trễ (hysteresis 5-6 nhịp) để tránh dao động bitrate liên tục (hunting effect)
+                // Additive Increase kèm chu kỳ trễ (hysteresis 5-6 nhịp) để tránh dao động bộ đệm liên tục
                 val requiredCleanTicks = if (isCellular) 5 else 6
                 if (cleanRecoveryTicks >= requiredCleanTicks) {
                     if (current.smoothBufferMs > minBufMs) {
@@ -455,7 +458,7 @@ object AdaptiveQualityManager {
                         deltaBitrateMbps = +0.5
                     }
                     cleanRecoveryTicks = 0
-                    actionNote = if (isEn) "Stream stable: gradually restoring clarity" else "Đường truyền ổn định: nâng dần chất lượng hình ảnh"
+                    actionNote = if (isEn) "Stream stable: tightening receiver buffer" else "Đường truyền ổn định: thu gọn dần bộ đệm nhận"
                 }
             }
 
@@ -478,13 +481,13 @@ object AdaptiveQualityManager {
                     targetBitrateMbps = nextBitrateMbps,
                     bufferHintMs = nextBufMs.roundToInt(),
                     title = if (isEn) {
-                        "Auto • ${updatedTier.resolutionTag} (${nextBitrateMbps.roundToInt()} Mbps)"
+                        "Buffer ${nextBufMs.roundToInt()}ms • SDP next: ${nextBitrateMbps.roundToInt()}M"
                     } else {
-                        "Tự động • ${updatedTier.title} (${nextBitrateMbps.roundToInt()} Mbps)"
+                        "Đệm ${nextBufMs.roundToInt()}ms • Trần SDP phiên sau: ${nextBitrateMbps.roundToInt()}M"
                     }
                 )
                 val notice = when {
-                    actionNote != null && (bufferChanged || bitrateChanged) -> "⚡ $actionNote (${updatedTier.resolutionTag} • ${nextBufMs.roundToInt()}ms)"
+                    actionNote != null && (bufferChanged || bitrateChanged) -> "⚡ $actionNote (Đệm ${nextBufMs.roundToInt()}ms)"
                     steppedDownForNextSession -> "📌 $nextSessionNote"
                     else -> "⚡ $nextSessionNote"
                 }
@@ -511,11 +514,11 @@ object AdaptiveQualityManager {
             return
         }
 
-        val fixedGrade = if (isEn) "Fixed (${current.smoothBitrateMbps.toInt()}M)" else "Cố Định (${current.smoothBitrateMbps.toInt()}M)"
+        val fixedGrade = if (isEn) "SDP Cap (${current.smoothBitrateMbps.toInt()}M)" else "Trần SDP (${current.smoothBitrateMbps.toInt()}M)"
         val fixedSuggestion = if (isEn) {
-            "💡 Device is busy, consider choosing a lower quality level"
+            "💡 Device is busy, consider choosing a lower quality level for next session"
         } else {
-            "💡 Máy hơi quá tải, gợi ý chọn mức chất lượng thấp hơn"
+            "💡 Máy hơi quá tải, gợi ý chọn mức trần thấp hơn cho phiên sau"
         }
         if (current.qualityGrade != fixedGrade || fixedDecodeSlowHint) {
             _state.value = current.copy(
@@ -527,14 +530,14 @@ object AdaptiveQualityManager {
 
     fun setStepManually(index: Int) {
         val isEn = SettingsRepository.config.value.isEnglishUI()
-        val nextSessionNote = if (isEn) "New level takes effect next session" else "Mức mới có tác dụng ở lần chơi sau"
+        val nextSessionNote = if (isEn) "Buffer updated now; SDP bitrate cap applies next session" else "Đã chỉnh bộ đệm nhận; trần bitrate SDP áp dụng ở phiên chơi sau"
         val ladder = _state.value.ladderSteps
         if (index in ladder.indices) {
             val step = ladder[index]
             _state.value = _state.value.copy(
                 isAutoAdapting = false,
                 currentStepIndex = index,
-                currentStep = step.copy(title = if (isEn) "Fixed • ${step.targetBitrateMbps.toInt()} Mbps" else "Cố Định • ${step.targetBitrateMbps.toInt()} Mbps"),
+                currentStep = step.copy(title = if (isEn) "SDP Cap • ${step.targetBitrateMbps.toInt()} Mbps" else "Trần SDP • ${step.targetBitrateMbps.toInt()} Mbps"),
                 smoothBitrateMbps = step.targetBitrateMbps,
                 smoothBufferMs = step.bufferHintMs.toDouble(),
                 qualityNotice = "📌 $nextSessionNote"
@@ -554,67 +557,21 @@ object AdaptiveQualityManager {
 
     fun toggleAutoAdapting(enabled: Boolean) {
         val isEn = SettingsRepository.config.value.isEnglishUI()
-        val nextSessionNote = if (isEn) "New level takes effect next session" else "Mức mới có tác dụng ở lần chơi sau"
+        val nextSessionNote = if (isEn) "Auto receiver buffer active; SDP bitrate cap applies next session" else "Tự động chỉnh bộ đệm nhận trong phiên; trần bitrate SDP áp dụng phiên sau"
         val current = _state.value
         val tier = tierForMbps(current.smoothBitrateMbps)
         val updatedStep = current.currentStep.copy(
             targetBitrateMbps = current.smoothBitrateMbps,
             title = if (enabled) {
-                if (isEn) "Auto • ${current.smoothBitrateMbps.roundToInt()} Mbps" else "Tự Động • ${current.smoothBitrateMbps.roundToInt()} Mbps (${tier.title})"
+                if (isEn) "Auto Buffer • SDP ${current.smoothBitrateMbps.roundToInt()}M" else "Tự Động Đệm • Trần SDP ${current.smoothBitrateMbps.roundToInt()}M (${tier.title})"
             } else {
-                if (isEn) "Fixed • ${current.smoothBitrateMbps.roundToInt()} Mbps" else "Cố Định • ${current.smoothBitrateMbps.roundToInt()} Mbps (${tier.title})"
+                if (isEn) "Fixed • SDP ${current.smoothBitrateMbps.roundToInt()}M" else "Cố Định • Trần SDP ${current.smoothBitrateMbps.roundToInt()}M (${tier.title})"
             }
         )
         _state.value = current.copy(
             isAutoAdapting = enabled,
             currentStep = updatedStep,
             qualityNotice = "📌 $nextSessionNote"
-        )
-    }
-
-    /**
-     * Đồng bộ lại khung hình & bộ đệm (W3C Compliant Frame & Buffer Resync):
-     * Căn chỉnh lại bộ đệm jitter cho cả Audio và Video theo mức biến động mạng thực tế
-     * và đồng bộ nhịp vẽ khung hình qua requestVideoFrameCallback() mà không can thiệp playbackRate hay currentTime.
-     */
-    fun flushLagNow() {
-        val isEn = SettingsRepository.config.value.isEnglishUI()
-        val netStatus = NetworkOptimizer.status.value
-        val isCellular = netStatus.isCellular || (!netStatus.isWifi && netStatus.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
-        val current = _state.value
-        val liveJitter = if (emaJitterMs > 0.0) emaJitterMs else (if (isCellular) 12.0 else 8.0)
-        val targetBufMs = formatOneDecimal((liveJitter * 1.5 + 8.0).coerceIn(15.0, 32.0))
-        val targetMbps = if (isCellular && current.smoothBitrateMbps > 6.0) 5.0 else current.smoothBitrateMbps.coerceIn(4.0, 20.0)
-
-        cleanRecoveryTicks = 0
-        highDecodeTicks = 0
-        highDecodeStartMs = 0L
-
-        val updatedTier = tierForMbps(targetMbps)
-        val updatedStep = current.currentStep.copy(
-            tier = updatedTier,
-            targetBitrateMbps = targetMbps,
-            bufferHintMs = targetBufMs.roundToInt()
-        )
-        val flushGrade = if (isEn) "Frames Resynced (${targetBufMs.toInt()}ms)" else "Đã Đồng Bộ Khung Hình (${targetBufMs.toInt()}ms)"
-        val flushNotice = if (isEn) {
-            "⚡ Resynced Audio/Video receiver buffers & frame pacing (${targetBufMs.toInt()}ms)"
-        } else {
-            "⚡ Đã đồng bộ lại bộ đệm Audio/Video & nhịp vẽ khung hình (${targetBufMs.toInt()}ms)"
-        }
-
-        _state.value = current.copy(
-            currentStep = updatedStep,
-            smoothBitrateMbps = targetMbps,
-            smoothBufferMs = targetBufMs,
-            qualityGrade = flushGrade,
-            qualityNotice = flushNotice,
-            lastUpgradeReason = flushNotice
-        )
-
-        QualityAdapter.flushStreamLagNow(
-            targetBitrateMbps = targetMbps,
-            bufferHintMs = targetBufMs
         )
     }
 }

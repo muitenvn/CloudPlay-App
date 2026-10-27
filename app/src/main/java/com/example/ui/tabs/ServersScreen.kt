@@ -103,6 +103,8 @@ fun ServersScreen(
 ) {
     val context = LocalContext.current
     val vpnState by VpnManager.state.collectAsState()
+    val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
+    val streamTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val motionEnabled = rememberXboxMotionEnabled(
@@ -143,14 +145,22 @@ fun ServersScreen(
             autoPickBest = autoPickBest,
             context = context,
             onPickedBest = { best, bestPing ->
-                onSelectServer(best)
-                val pingSuffix = if (bestPing > 0) " (${bestPing}ms)" else ""
-                val msg = if (isEn) {
-                    "Selected best server: ${best.flag} ${best.name}$pingSuffix"
+                if (bestPing > 0) {
+                    onSelectServer(best)
+                    val msg = if (isEn) {
+                        "Selected best server: ${best.flag} ${best.name} (${bestPing}ms)"
+                    } else {
+                        "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name} (${bestPing}ms)"
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else {
-                    "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name}$pingSuffix"
+                    val msg = if (isEn) {
+                        "Could not measure TCP ping to any server"
+                    } else {
+                        "Không đo được ping TCP tới máy chủ nào"
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 }
-                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -431,7 +441,13 @@ fun ServersScreen(
                     }
 
                     // Compact Selected Server & Unlock Telemetry Strip (fixes missing weight(1f) vertical squeeze)
-                    val currentPingMs = serverPings[currentServer.id] ?: currentServer.lastPingMs ?: -1
+                    val isGameActiveNow = networkStatus.isLowLatencyStreamActive
+                    val hasTriedCurrentPing = serverPings.containsKey(currentServer.id)
+                    val currentPingMs = if (isGameActiveNow) {
+                        if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
+                    } else {
+                        serverPings[currentServer.id] ?: -1
+                    }
                     val currentUnlockStatus = VpnManager.getServerUnlockStatus(currentServer, vpnState.unlockRecords)
                     val currentUnlockText = when (currentUnlockStatus) {
                         RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
@@ -446,9 +462,17 @@ fun ServersScreen(
                         RegionUnlockStatus.WRONG_REGION -> WarningAmber
                     }
                     val currentPingText = when {
-                        isTestingAll -> if (isEn) "Testing ping..." else "Đang đo ping..."
-                        currentPingMs > 0 -> "Ping ${currentPingMs}ms"
-                        else -> if (isEn) "Not tested" else "Chưa đo ping"
+                        isGameActiveNow -> {
+                            if (streamTelemetry.rttMs > 0) {
+                                "RTT WebRTC: ${streamTelemetry.rttMs}ms"
+                            } else {
+                                "RTT WebRTC: --"
+                            }
+                        }
+                        isTestingAll -> if (isEn) "Testing TCP ping..." else "Đang đo ping TCP..."
+                        currentPingMs > 0 -> if (isEn) "TCP ping to server: ${currentPingMs}ms" else "Ping TCP tới máy chủ: ${currentPingMs}ms"
+                        hasTriedCurrentPing -> if (isEn) "TCP ping to server: Unreachable" else "Ping TCP tới máy chủ: Không đo được"
+                        else -> if (isEn) "TCP ping to server: Not tested" else "Ping TCP tới máy chủ: Chưa đo"
                     }
 
                     Surface(
@@ -694,14 +718,20 @@ fun ServersScreen(
 
         // Servers list
         val recommendedServerId = filteredServers.firstOrNull { server ->
-            val p = serverPings[server.id] ?: server.lastPingMs ?: -1
+            val p = serverPings[server.id] ?: -1
             val st = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
             p > 0 && st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
-        }?.id ?: filteredServers.firstOrNull()?.id
+        }?.id
 
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
-            val ping = serverPings[server.id] ?: server.lastPingMs ?: -1
+            val isGameActiveNow = networkStatus.isLowLatencyStreamActive
+            val hasTriedPing = serverPings.containsKey(server.id)
+            val ping = if (isGameActiveNow && isSelected) {
+                if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
+            } else {
+                serverPings[server.id] ?: -1
+            }
             val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
             val isRecommended = server.id == recommendedServerId
 
@@ -710,6 +740,8 @@ fun ServersScreen(
                 isSelected = isSelected,
                 isRecommended = isRecommended,
                 pingMs = ping,
+                hasTriedPing = hasTriedPing,
+                isGameActiveNow = isGameActiveNow && isSelected,
                 isTestingPings = isTestingAll,
                 unlockStatus = unlockStatus,
                 isEn = isEn,
@@ -746,6 +778,8 @@ private fun ServerCard(
     isSelected: Boolean,
     isRecommended: Boolean = false,
     pingMs: Int,
+    hasTriedPing: Boolean = false,
+    isGameActiveNow: Boolean = false,
     isTestingPings: Boolean = false,
     unlockStatus: RegionUnlockStatus,
     isEn: Boolean = false,
@@ -962,7 +996,13 @@ private fun ServerCard(
                         }
 
                         Text(
-                            text = if (pingMs > 0) "${animatedPingMs}ms" else if (isTestingPings) "..." else "--ms",
+                            text = when {
+                                pingMs > 0 -> "${animatedPingMs}ms"
+                                isGameActiveNow -> "--"
+                                isTestingPings -> "..."
+                                hasTriedPing -> if (isEn) "Unreachable" else "Không đo được"
+                                else -> "--"
+                            },
                             color = if (pingMs > 0) pingColor else if (isTestingPings) DirectCyan else pingColor,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.ExtraBold,
@@ -992,11 +1032,12 @@ private fun ServerCard(
                     } else {
                         val stabilityText = when {
                             pingMs <= 0 && isTestingPings -> if (isEn) "Pinging... • :${server.port}" else "Đang đo... • :${server.port}"
-                            pingMs <= 0 -> if (isEn) "Unreachable • :${server.port}" else "Không phản hồi • :${server.port}"
-                            pingMs in 1..85 -> if (isEn) "Fast • :${server.port}" else "Phản hồi nhanh • :${server.port}"
-                            pingMs in 86..155 -> if (isEn) "Moderate • :${server.port}" else "Khá • :${server.port}"
-                            pingMs in 156..300 -> if (isEn) "High Ping • :${server.port}" else "Ping cao • :${server.port}"
-                            else -> if (isEn) "Very Slow • :${server.port}" else "Rất trễ • :${server.port}"
+                            pingMs <= 0 && hasTriedPing -> if (isEn) "Unreachable • :${server.port}" else "Không đo được • :${server.port}"
+                            pingMs <= 0 -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
+                            pingMs in 1..85 -> if (isEn) "TCP ping • :${server.port}" else "Ping TCP • :${server.port}"
+                            pingMs in 86..155 -> if (isEn) "TCP ping • :${server.port}" else "Ping TCP • :${server.port}"
+                            pingMs in 156..300 -> if (isEn) "High TCP ping • :${server.port}" else "Ping TCP cao • :${server.port}"
+                            else -> if (isEn) "Slow TCP ping • :${server.port}" else "Ping TCP trễ • :${server.port}"
                         }
                         Text(
                             text = stabilityText,

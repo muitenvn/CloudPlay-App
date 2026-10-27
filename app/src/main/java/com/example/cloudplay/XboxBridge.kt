@@ -203,7 +203,6 @@ class XboxBridge(
                             window.__pauseTranslator();
                         }
                         if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
-                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                     };
 
                     function findActiveStreamVideo() {
@@ -256,46 +255,6 @@ class XboxBridge(
                                 }
                             }
                         } catch (e) {}
-                    };
-
-                    // Đồng bộ lại khung hình (W3C Compliant Frame & Buffer Resync — tuyệt đối không can thiệp currentTime hay playbackRate)
-                    window.__flushStreamLagNow = function(optMbps, optBufMs) {
-                        try {
-                            const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                            const liveJitterMs = window.__lastKnownJitterMs || (isCell ? 12 : 8);
-                            const safeResyncMs = Math.max(15.0, Math.min(35.0, parseFloat(optBufMs) || (liveJitterMs * 1.5 + 8.0)));
-                            const flushSec = parseFloat((safeResyncMs / 1000.0).toFixed(4));
-                            if (typeof optMbps === 'number' && optMbps > 0 && window.__networkProfile) {
-                                window.__networkProfile.targetBitrate = optMbps;
-                            }
-                            window.__targetBufferSec = flushSec;
-                            window.__currentBufferSec = flushSec;
-
-                            const pcs = window.__allPeerConnections || (window.__activePeerConnection ? [window.__activePeerConnection] : []);
-                            for (let p = pcs.length - 1; p >= 0; p--) {
-                                const pc = pcs[p];
-                                if (pc && typeof pc.getReceivers === 'function') {
-                                    const receivers = pc.getReceivers();
-                                    for (let i = 0; i < receivers.length; i++) {
-                                        const r = receivers[i];
-                                        if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
-                                            applyReceiverBufferTarget(r, r.track.kind, flushSec);
-                                        }
-                                    }
-                                }
-                            }
-
-                            const vEl = findActiveStreamVideo();
-                            if (vEl && typeof vEl.requestVideoFrameCallback === 'function') {
-                                try {
-                                    vEl.requestVideoFrameCallback(function() {});
-                                } catch (rvfcErr) {}
-                            }
-                            if (window.__touchGamepadTimestampNow) window.__touchGamepadTimestampNow();
-                            return "RESYNCED_OK";
-                        } catch (e) {
-                            return "RESYNC_ERR";
-                        }
                     };
 
                     function notify(method, arg) {
@@ -853,7 +812,6 @@ class XboxBridge(
                                 if ((framesDecoded > 3 || (fps > 0 && currentBytes > 40000)) && !notifiedStreamConnection) {
                                     notifiedStreamConnection = true;
                                     notify('onStreamConnected', 'webrtc_frames_active');
-                                    if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                                 }
 
                                 if (fps > 0 || currentBytes > 0 || rtt > 0) {
@@ -1448,12 +1406,10 @@ class XboxBridge(
 
                     window.__setDeviceThermalThrottled = function(throttled) {
                         window.__deviceThermalThrottled = !!throttled;
-                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                     };
 
                     window.__setAppInBackground = function(inBg) {
                         window.__appInBackground = !!inBg;
-                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
                     };
 
                     window.__touchGamepadTimestampNow = function() {
@@ -1461,60 +1417,11 @@ class XboxBridge(
                         virtualGamepadState.timestamp = nowTs();
                         window.__lastUserControlPulseAt = nowMs;
                         window.__lastRealUserInputAt = nowMs;
-                        if (!antiDrxTimerId && window.__syncCellularAntiDrxPacer) {
-                            window.__syncCellularAntiDrxPacer();
-                        }
                     };
 
                     window.addEventListener('pointerdown', function() {
                         window.__lastRealUserInputAt = Date.now();
-                        if (!antiDrxTimerId && window.__syncCellularAntiDrxPacer) {
-                            window.__syncCellularAntiDrxPacer();
-                        }
                     }, { passive: true });
-
-                    document.addEventListener('visibilitychange', function() {
-                        if (window.__syncCellularAntiDrxPacer) window.__syncCellularAntiDrxPacer();
-                    });
-
-                    // 4G Anti-DRX Uplink Pacer với cơ chế tự ngắt an toàn khi máy nóng, chạy ngầm hoặc nghỉ tay > 20s
-                    let antiDrxTimerId = null;
-                    window.__syncCellularAntiDrxPacer = function() {
-                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                        const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
-                        const isInStream = !!notifiedStreamConnection;
-                        const isPausedOrHot = !!document.hidden || !!window.__appInBackground || !!window.__deviceThermalThrottled || isLowEnd;
-                        const isUserIdle = (Date.now() - (window.__lastRealUserInputAt || Date.now())) > 20000;
-
-                        if (isCell && isInStream && !isPausedOrHot && !isUserIdle) {
-                            if (!antiDrxTimerId) {
-                                antiDrxTimerId = setInterval(function() {
-                                    const cellNow = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                                    const streamNow = !!notifiedStreamConnection;
-                                    const pausedOrHotNow = !!document.hidden || !!window.__appInBackground || !!window.__deviceThermalThrottled;
-                                    const nowMs = Date.now();
-                                    const idleNow = (nowMs - (window.__lastRealUserInputAt || nowMs)) > 20000;
-                                    const vEl = findActiveStreamVideo();
-                                    const videoPaused = vEl ? !!vEl.paused : false;
-
-                                    if (!cellNow || !streamNow || pausedOrHotNow || idleNow || videoPaused) {
-                                        clearInterval(antiDrxTimerId);
-                                        antiDrxTimerId = null;
-                                        return;
-                                    }
-                                    if (nowMs - (window.__lastUserControlPulseAt || 0) >= 28) {
-                                        if (window.__virtualGamepadEnabled || virtualGamepadActive) {
-                                            virtualGamepadState.timestamp = nowTs();
-                                        }
-                                        window.__lastUserControlPulseAt = nowMs;
-                                    }
-                                }, 30);
-                            }
-                        } else if (antiDrxTimerId) {
-                            clearInterval(antiDrxTimerId);
-                            antiDrxTimerId = null;
-                        }
-                    };
 
                     // Anti-AFK Keep-Alive trigger
                     if ($antiAfk) {

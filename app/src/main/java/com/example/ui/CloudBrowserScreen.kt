@@ -934,15 +934,6 @@ fun CloudBrowserScreen(
             recorderState = recorderState,
             onToggleRecording = {
                 com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
-            },
-            onFlushLag = {
-                com.example.cloudplay.AdaptiveQualityManager.flushLagNow()
-                val isEnNow = config.isEnglishUI()
-                android.widget.Toast.makeText(
-                    context,
-                    if (isEnNow) "🔄 Resynced video frames and Audio/Video buffer!" else "🔄 Đã đồng bộ lại khung hình và bộ đệm Audio/Video!",
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
             }
         )
 

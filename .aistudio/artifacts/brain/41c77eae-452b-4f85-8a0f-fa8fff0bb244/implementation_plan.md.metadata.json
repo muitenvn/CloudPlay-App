@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch triển khai toàn diện 5 nhóm tối ưu hóa kỹ thuật, độ trễ truyền dẫn 4G/Wi-Fi, đồng bộ phần cứng 60Hz VSync, chuẩn hóa nhãn trung thực, công cụ chẩn đoán 4 lớp và bảo mật SHA-256 theo Báo cáo Phân tích Kỹ thuật.",
-  "updatedAt":  "2026-10-26T15:06:08.046998155Z",
+  "summary":  "Cập nhật kế hoạch: Không hiện thông báo/nhãn đổi trạm đo trên giao diện Máy chủ, thay vào đó thêm nút xem Nhật ký (Log) trong mục Cài đặt để theo dõi toàn bộ hoạt động đo ping, chuyển trạm và trạng thái của ứng dụng.",
+  "updatedAt":  "2026-10-27T14:01:25.589684379Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -18,7 +18,9 @@ data class GeoIpResult(
     val flagEmoji: String,
     val isXboxSupported: Boolean,
     val isFromWebView: Boolean = false,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 object GeoIpDetector {
@@ -99,50 +101,29 @@ object GeoIpDetector {
     }
 
     /**
-     * Checks current IP from device network
+     * Checks current IP from device network (including city & coordinates for nearest regional probe selection)
      */
     suspend fun checkCurrentIp(): GeoIpResult? = withContext(Dispatchers.IO) {
         _isChecking.value = true
         var result: GeoIpResult? = null
 
-        // 1. Try api.country.is first (fastest, lightweight)
+        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates (e.g. Ho Chi Minh City vs Hanoi)
         try {
             val req = Request.Builder()
-                .url("https://api.country.is/")
+                .url("https://ipwho.is/")
                 .header("User-Agent", "Mozilla/5.0")
                 .build()
             val resp = httpClient.newCall(req).execute()
             if (resp.isSuccessful) {
                 val bodyStr = resp.body?.string() ?: ""
                 val json = JSONObject(bodyStr)
-                val ip = json.optString("ip", "")
-                val countryCode = json.optString("country", "VN").uppercase()
-                val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
-
-                result = GeoIpResult(
-                    ip = ip,
-                    countryCode = countryCode,
-                    countryName = getCountryDisplayName(countryCode),
-                    city = "",
-                    flagEmoji = getFlagEmoji(countryCode),
-                    isXboxSupported = isSupported
-                )
-            }
-        } catch (_: Exception) {
-            // Fallback 1: ipwho.is over HTTPS (prevents Cleartext/MixedContent errors)
-            try {
-                val req = Request.Builder()
-                    .url("https://ipwho.is/")
-                    .header("User-Agent", "Mozilla/5.0")
-                    .build()
-                val resp = httpClient.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: ""
-                    val json = JSONObject(bodyStr)
+                if (json.optBoolean("success", true)) {
                     val ip = json.optString("ip", "")
                     val countryCode = json.optString("country_code", "VN").uppercase()
                     val countryName = json.optString("country", getCountryDisplayName(countryCode))
                     val city = json.optString("city", "")
+                    val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                    val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
                     val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
                     result = GeoIpResult(
@@ -151,38 +132,87 @@ object GeoIpDetector {
                         countryName = countryName,
                         city = city,
                         flagEmoji = getFlagEmoji(countryCode),
+                        isXboxSupported = isSupported,
+                        latitude = lat,
+                        longitude = lon
+                    )
+                }
+            }
+            resp.close()
+        } catch (_: Exception) {
+        }
+
+        // 2. Fallback 1: api.country.is (fast, lightweight)
+        if (result == null) {
+            try {
+                val req = Request.Builder()
+                    .url("https://api.country.is/")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val bodyStr = resp.body?.string() ?: ""
+                    val json = JSONObject(bodyStr)
+                    val ip = json.optString("ip", "")
+                    val countryCode = json.optString("country", "VN").uppercase()
+                    val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+
+                    result = GeoIpResult(
+                        ip = ip,
+                        countryCode = countryCode,
+                        countryName = getCountryDisplayName(countryCode),
+                        city = "",
+                        flagEmoji = getFlagEmoji(countryCode),
                         isXboxSupported = isSupported
                     )
                 }
+                resp.close()
             } catch (_: Exception) {
-                // Fallback 2: ipapi.co
-                try {
-                    val req = Request.Builder()
-                        .url("https://ipapi.co/json/")
-                        .header("User-Agent", "Mozilla/5.0")
-                        .build()
-                    val resp = httpClient.newCall(req).execute()
-                    if (resp.isSuccessful) {
-                        val bodyStr = resp.body?.string() ?: ""
-                        val json = JSONObject(bodyStr)
-                        val ip = json.optString("ip", "")
-                        val countryCode = json.optString("country_code", "VN").uppercase()
-                        val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
-                        val city = json.optString("city", "")
-                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
-
-                        result = GeoIpResult(
-                            ip = ip,
-                            countryCode = countryCode,
-                            countryName = countryName,
-                            city = city,
-                            flagEmoji = getFlagEmoji(countryCode),
-                            isXboxSupported = isSupported
-                        )
-                    }
-                } catch (_: Exception) {
-                }
             }
+        }
+
+        // 3. Fallback 2: ipapi.co
+        if (result == null) {
+            try {
+                val req = Request.Builder()
+                    .url("https://ipapi.co/json/")
+                    .header("User-Agent", "Mozilla/5.0")
+                    .build()
+                val resp = httpClient.newCall(req).execute()
+                if (resp.isSuccessful) {
+                    val bodyStr = resp.body?.string() ?: ""
+                    val json = JSONObject(bodyStr)
+                    val ip = json.optString("ip", "")
+                    val countryCode = json.optString("country_code", "VN").uppercase()
+                    val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
+                    val city = json.optString("city", "")
+                    val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                    val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                    val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+
+                    result = GeoIpResult(
+                        ip = ip,
+                        countryCode = countryCode,
+                        countryName = countryName,
+                        city = city,
+                        flagEmoji = getFlagEmoji(countryCode),
+                        isXboxSupported = isSupported,
+                        latitude = lat,
+                        longitude = lon
+                    )
+                }
+                resp.close()
+            } catch (_: Exception) {
+            }
+        }
+
+        if (result != null) {
+            com.example.data.AppLogger.info(
+                "VPN",
+                "Phát hiện vị trí mạng: ${result.ip} • ${result.countryCode} ${result.city.ifBlank { "(Chưa rõ tỉnh/thành)" }}"
+            )
+        } else {
+            com.example.data.AppLogger.warn("VPN", "Không lấy được thông tin GeoIP từ mạng hiện tại")
         }
 
         _isChecking.value = false

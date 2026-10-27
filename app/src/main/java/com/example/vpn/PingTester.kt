@@ -10,10 +10,10 @@ import java.net.Socket
 object PingTester {
 
     /**
-     * Limits concurrent outbound TCP SYN probes during "Đo ping" across servers
-     * so mobile carriers (4G/H+) and home routers do not drop packets due to SYN flood protection.
+     * Limits concurrent local outbound TCP SYN probes during direct-device fallback to 3
+     * so mobile carriers (4G/H+), home routers, and OS socket queues never add artificial queuing latency (~100ms).
      */
-    private val probeSemaphore = Semaphore(8)
+    private val probeSemaphore = Semaphore(3)
 
     /**
      * Measures reference TCP handshake latency to the currently selected server (median of up to 3 samples).
@@ -49,12 +49,24 @@ object PingTester {
     }
 
     /**
-     * Measures TCP handshake latency strictly to [server]'s own IP address (`server.ip:port`, `:443`, `:80`).
-     * Exits a port immediately when the first probe fails, uses ~1000ms timeout for `:443`/`:80` fallback ports,
-     * and never probes any other server or Anycast domain. If all candidate ports fail, returns -1.
+     * Measures server latency for the Server tab (Mục máy chủ):
+     * 1. Queries the Nearest Regional Test Probe (e.g. Ho Chi Minh City or Hanoi in Vietnam, or closest global probe)
+     *    for raw probe-to-server latency.
+     * 2. If the primary probe is busy, RegionalProbeTester silently tries the next neighboring probe.
+     * 3. If all remote probes are unavailable/unreachable, silently falls back to direct TCP measurement on the device
+     *    strictly to [server]'s own IP address (`server.ip:port`, `:443`, `:80`) with a 3-permit concurrency limit.
+     * Never used for in-game streaming ping (which uses WebRTC RTT exclusively).
      */
     suspend fun measureServerLatency(server: ServerLocation, timeoutMs: Int = 2500): Int = withContext(Dispatchers.IO) {
         if (server.ip.isBlank() || server.port <= 0) return@withContext -1
+
+        // Bước 1 & 2: Đo qua Trạm Test gần nhất (kèm dự phòng ngầm sang trạm lân cận)
+        val probeMeasured = RegionalProbeTester.measureServerViaNearestProbe(server, timeoutMs)
+        if (probeMeasured != null) {
+            return@withContext if (probeMeasured > 0) probeMeasured else -1
+        }
+
+        // Bước 3: Dự phòng đo trực tiếp từ thiết bị (chỉ chạy tối đa 3 luồng đồng thời để tránh nghẽn 100ms)
         val safeTimeout = timeoutMs.coerceAtLeast(500)
         val fallbackTimeout = safeTimeout.coerceAtMost(1000)
 
@@ -72,8 +84,17 @@ object PingTester {
                 val third = measureSingleTcpRtt(server.ip, port, portTimeout)
                 if (third > 0) samples.add(third)
                 samples.sort()
-                return@withPermit samples[samples.size / 2]
+                val median = samples[samples.size / 2]
+                com.example.data.AppLogger.info(
+                    "PING",
+                    "Đo trực tiếp từ máy -> ${server.name} (${server.ip}:$port): ${median}ms"
+                )
+                return@withPermit median
             }
+            com.example.data.AppLogger.warn(
+                "PING",
+                "Máy chủ không phản hồi: ${server.name} (${server.ip}:${server.port})"
+            )
             -1
         }
     }

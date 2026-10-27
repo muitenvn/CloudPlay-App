@@ -100,6 +100,7 @@ fun SettingsScreen(
     }
     var showTermsDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
+    var showAppLogDialog by remember { mutableStateOf(false) }
 
     // 5 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
@@ -881,6 +882,25 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    Button(
+                        onClick = { showAppLogDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_app_log_advanced_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Tune, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = if (isEn) "System Activity Log (Track Probe & App)" else "Nhật ký hệ thống (Log theo dõi App & Trạm đo)",
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1234,6 +1254,31 @@ fun SettingsScreen(
                     }
                     else -> {}
                 }
+                OutlinedButton(
+                    onClick = { showAppLogDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("open_app_log_settings_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.7f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = DirectCyan.copy(alpha = 0.12f)
+                    )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
+                        Text(
+                            text = if (isEn) "📋 View App Log (Track Probe & Ping)" else "📋 Xem Log Hệ Thống (Theo dõi App & Trạm đo)",
+                            color = DirectCyan,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
         }
 
@@ -1252,6 +1297,13 @@ fun SettingsScreen(
     if (showWebPortalDialog) {
         com.example.ui.components.WebDownloadPortalDialog(
             onDismiss = { showWebPortalDialog = false }
+        )
+    }
+
+    if (showAppLogDialog) {
+        com.example.ui.components.AppLogDialog(
+            isEn = isEn,
+            onDismiss = { showAppLogDialog = false }
         )
     }
 }

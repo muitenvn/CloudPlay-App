@@ -136,9 +136,9 @@ fun ServersScreen(
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // Chỉ tự động đo ping TCP khi dùng chế độ Proxy (không đo ping TCP giả của server.ip ở SMART_BYPASS)
-    LaunchedEffect(vpnState.engine) {
-        if (!isSmartBypassEngine && serverPings.isEmpty() && !isTestingAll) {
+    // Tự động đo ping danh sách máy chủ trong mục Máy chủ khi chưa có dữ liệu đo
+    LaunchedEffect(Unit) {
+        if (serverPings.isEmpty() && !isTestingAll) {
             VpnManager.testAllServers(autoPickBest = false, context = context)
         }
     }
@@ -148,21 +148,20 @@ fun ServersScreen(
             autoPickBest = autoPickBest,
             context = context,
             onPickedBest = { best, bestPing ->
-                if (isSmartBypassEngine) {
-                    onSelectServer(best)
-                    val suffix = if (bestPing > 0) " (${bestPing}ms)" else ""
-                    val msg = if (isEn) {
-                        "Selected optimal server: ${best.flag} ${best.name}$suffix"
-                    } else {
-                        "Đã chọn máy chủ tối ưu: ${best.flag} ${best.name}$suffix"
-                    }
-                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                } else if (bestPing > 0) {
+                if (bestPing > 0) {
                     onSelectServer(best)
                     val msg = if (isEn) {
                         "Selected best server: ${best.flag} ${best.name} (${bestPing}ms)"
                     } else {
                         "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name} (${bestPing}ms)"
+                    }
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                } else if (isSmartBypassEngine) {
+                    onSelectServer(best)
+                    val msg = if (isEn) {
+                        "Selected optimal server: ${best.flag} ${best.name}"
+                    } else {
+                        "Đã chọn máy chủ tối ưu: ${best.flag} ${best.name}"
                     }
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else {
@@ -188,9 +187,7 @@ fun ServersScreen(
                 }
             }
             isFetchingLive = false
-            if (!isSmartBypassEngine) {
-                VpnManager.testAllServers(autoPickBest = false, context = context)
-            }
+            VpnManager.testAllServers(autoPickBest = false, context = context)
         }
     }
 
@@ -487,9 +484,10 @@ fun ServersScreen(
                     }
 
                     // Compact Selected Server & Unlock Telemetry Strip
-                    val isGameActiveNow = networkStatus.isLowLatencyStreamActive
+                    val isGameActiveOnSelected = networkStatus.isLowLatencyStreamActive &&
+                        vpnState.activeStreamServerId == currentServer.id
                     val hasTriedCurrentPing = serverPings.containsKey(currentServer.id)
-                    val currentPingMs = if (isGameActiveNow) {
+                    val currentPingMs = if (isGameActiveOnSelected) {
                         if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
                     } else {
                         VpnManager.getEffectiveServerPing(
@@ -513,35 +511,33 @@ fun ServersScreen(
                         RegionUnlockStatus.WRONG_REGION -> WarningAmber
                     }
                     val currentPingText = when {
-                        isGameActiveNow -> {
+                        isGameActiveOnSelected -> {
                             if (streamTelemetry.rttMs > 0) {
                                 "RTT WebRTC: ${streamTelemetry.rttMs}ms"
                             } else {
                                 "RTT WebRTC: --"
                             }
                         }
-                        isSmartBypassEngine -> {
-                            if (currentPingMs > 0) {
-                                if (isEn) "Last session ping: ${currentPingMs}ms" else "Ping lần chơi gần nhất: ${currentPingMs}ms"
-                            } else {
-                                if (isEn) "Last session ping: No data" else "Ping lần chơi gần nhất: Chưa có dữ liệu"
-                            }
-                        }
-                        isTestingAll -> if (isEn) "Testing ping to proxy..." else "Đang đo ping tới proxy..."
-                        currentPingMs > 0 -> if (isEn) {
-                            "Ping to proxy (affects login/launch): ${currentPingMs}ms"
+                        hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
+                            "Server ping: ${currentPingMs}ms"
                         } else {
-                            "Ping tới proxy (ảnh hưởng đăng nhập/khởi động): ${currentPingMs}ms"
+                            "Ping máy chủ: ${currentPingMs}ms"
                         }
-                        hasTriedCurrentPing -> if (isEn) {
-                            "Ping to proxy (affects login/launch): Unreachable"
+                        isTestingAll -> if (isEn) "Testing server ping..." else "Đang đo ping máy chủ..."
+                        hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
+                            "Server ping: Unreachable"
                         } else {
-                            "Ping tới proxy (ảnh hưởng đăng nhập/khởi động): Không đo được"
+                            "Ping máy chủ: Không đo được"
+                        }
+                        isSmartBypassEngine && currentPingMs > 0 -> if (isEn) {
+                            "Last session ping: ${currentPingMs}ms"
+                        } else {
+                            "Ping lần chơi gần nhất: ${currentPingMs}ms"
                         }
                         else -> if (isEn) {
-                            "Ping to proxy (affects login/launch): Not tested"
+                            "Server ping: Not tested"
                         } else {
-                            "Ping tới proxy (ảnh hưởng đăng nhập/khởi động): Chưa đo"
+                            "Ping máy chủ: Chưa đo"
                         }
                     }
 
@@ -800,9 +796,10 @@ fun ServersScreen(
 
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
-            val isGameActiveNow = networkStatus.isLowLatencyStreamActive
+            val isGameActiveOnThisServer = networkStatus.isLowLatencyStreamActive &&
+                vpnState.activeStreamServerId == server.id
             val hasTriedPing = serverPings.containsKey(server.id)
-            val ping = if (isGameActiveNow && isSelected) {
+            val ping = if (isGameActiveOnThisServer) {
                 if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
             } else {
                 VpnManager.getEffectiveServerPing(
@@ -822,7 +819,7 @@ fun ServersScreen(
                 pingMs = ping,
                 hasTriedPing = hasTriedPing,
                 isSmartBypass = isSmartBypassEngine,
-                isGameActiveNow = isGameActiveNow && isSelected,
+                isGameActiveNow = isGameActiveOnThisServer,
                 isTestingPings = isTestingAll,
                 unlockStatus = unlockStatus,
                 isEn = isEn,
@@ -1081,24 +1078,24 @@ private fun ServerCard(
                             text = when {
                                 pingMs > 0 -> "${animatedPingMs}ms"
                                 isGameActiveNow -> "--"
-                                isSmartBypass -> if (isEn) "No data" else "Chưa có dữ liệu"
                                 isTestingPings -> "..."
                                 hasTriedPing -> if (isEn) "Unreachable" else "Không đo được"
+                                isSmartBypass -> if (isEn) "No data" else "Chưa có dữ liệu"
                                 else -> "--"
                             },
-                            color = if (pingMs > 0) pingColor else if (!isSmartBypass && isTestingPings) DirectCyan else pingColor,
+                            color = if (pingMs > 0) pingColor else if (isTestingPings) DirectCyan else pingColor,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = if (isSmartBypass && pingMs <= 0) 10.sp else 12.sp
+                            fontSize = if (pingMs <= 0 && (hasTriedPing || isSmartBypass)) 10.sp else 12.sp
                         )
                     }
 
                     val metricLabelText = when {
                         isGameActiveNow -> "RTT WebRTC"
-                        isSmartBypass -> if (isEn) "Last session ping" else "Ping lần chơi gần nhất"
-                        pingMs > 0 -> if (isEn) "Ping to proxy (login/launch)" else "Ping tới proxy (đăng nhập/khởi động)"
-                        isTestingPings -> if (isEn) "Testing proxy... • :${server.port}" else "Đang đo proxy... • :${server.port}"
+                        hasTriedPing && pingMs > 0 -> if (isEn) "Server ping • :${server.port}" else "Ping máy chủ • :${server.port}"
+                        isTestingPings -> if (isEn) "Testing ping... • :${server.port}" else "Đang đo ping... • :${server.port}"
                         hasTriedPing -> if (isEn) "Unreachable • :${server.port}" else "Không đo được • :${server.port}"
+                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session ping" else "Ping lần chơi gần nhất"
                         else -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
                     }
 

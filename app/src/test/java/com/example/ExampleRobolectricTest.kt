@@ -233,5 +233,66 @@ class ExampleRobolectricTest {
         assertEquals(servers[1].id, measuredSorted[1].id)
         assertEquals(servers[0].id, measuredSorted[2].id)
     }
+
+    @Test
+    fun `verify nearest regional probe selection for HCMC Hanoi and neighboring countries`() {
+        val hcmGeo = com.example.vpn.GeoIpResult(
+            ip = "113.161.72.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Ho Chi Minh City",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 10.8231,
+            longitude = 106.6297
+        )
+        val hcmProbes = com.example.vpn.RegionalProbeTester.selectOrderedProbes(hcmGeo)
+        assertEquals("vn_hcm", hcmProbes.first().id)
+
+        val hanoiGeo = com.example.vpn.GeoIpResult(
+            ip = "14.225.204.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Hanoi",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 21.0285,
+            longitude = 105.8542
+        )
+        val hanoiProbes = com.example.vpn.RegionalProbeTester.selectOrderedProbes(hanoiGeo)
+        assertEquals("vn_han", hanoiProbes.first().id)
+
+        // Small country without domestic probe (e.g. Cambodia KH) picks nearest neighbor (Ho Chi Minh City)
+        val khGeo = com.example.vpn.GeoIpResult(
+            ip = "203.189.150.1",
+            countryCode = "KH",
+            countryName = "Cambodia",
+            city = "Phnom Penh",
+            flagEmoji = "🌐",
+            isXboxSupported = false,
+            latitude = 11.5564,
+            longitude = 104.9282
+        )
+        val khProbes = com.example.vpn.RegionalProbeTester.selectOrderedProbes(khGeo)
+        assertEquals("vn_hcm", khProbes.first().id)
+    }
+
+    @Test
+    fun `verify measured server ping takes precedence in SMART_BYPASS and AppLogger records events`() {
+        com.example.data.AppLogger.clear()
+        com.example.data.AppLogger.info("PROBE", "Test probe log entry")
+        assertTrue(com.example.data.AppLogger.logs.value.any { it.message.contains("Test probe log entry") })
+        assertTrue(com.example.data.AppLogger.exportAsText().contains("[PROBE] Test probe log entry"))
+
+        val server = VpnManager.getAllServers().first()
+        val pingMap = mapOf(server.id to 64)
+        val effPing = VpnManager.getEffectiveServerPing(
+            server = server,
+            engine = com.example.vpn.VpnEngine.SMART_BYPASS,
+            pingMap = pingMap,
+            sessions = emptyList()
+        )
+        assertEquals(64, effPing)
+    }
 }
 

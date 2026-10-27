@@ -420,5 +420,6 @@ data class VpnConnectionState(
     val unlockRecords: Map<String, ServerUnlockRecord> = emptyMap(),
     val unlockFailPromptServer: ServerLocation? = null,
     val serverPings: Map<String, Int> = emptyMap(),
-    val isTestingPings: Boolean = false
+    val isTestingPings: Boolean = false,
+    val activeStreamServerId: String? = null
 )

@@ -656,27 +656,20 @@ object VpnManager {
         )
 
         // Khi vùng của người dùng đã được Xbox hỗ trợ (!currentGeo.isFromWebView && isSupported):
-        // mặc định đi mạng trực tiếp (DIRECT_NETWORK), không tự bật VPN.
+        // mặc định đi mạng trực tiếp, không tự bật VPN.
         val isRealSupportedRegion = isSupported && !currentGeo.isFromWebView
         if (isRealSupportedRegion && _state.value.mode != NetworkMode.VPN_JAPAN) {
             clearWebViewProxy()
         }
 
-        val nextMode = if (isRealSupportedRegion && _state.value.mode == NetworkMode.DISCONNECTED) {
-            NetworkMode.DIRECT_NETWORK
-        } else {
-            _state.value.mode
-        }
-
         val nextPhase = when {
             isSupported -> SmartVpnPhase.DIRECT_SUPPORTED_REGION
-            nextMode == NetworkMode.VPN_JAPAN -> SmartVpnPhase.BYPASS_ACTIVE
-            nextMode == NetworkMode.DIRECT_NETWORK -> SmartVpnPhase.DIRECT_GAMING
+            _state.value.mode == NetworkMode.VPN_JAPAN -> SmartVpnPhase.BYPASS_ACTIVE
+            _state.value.mode == NetworkMode.DIRECT_NETWORK -> SmartVpnPhase.DIRECT_GAMING
             else -> SmartVpnPhase.IDLE
         }
 
         _state.value = _state.value.copy(
-            mode = nextMode,
             detectedGeoIp = currentGeo,
             smartDecision = decision,
             smartVpnPhase = nextPhase,

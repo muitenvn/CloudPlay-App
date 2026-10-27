@@ -18,6 +18,22 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class ExampleRobolectricTest {
 
+    @org.junit.Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        VpnManager.updateSmartDecision(
+            com.example.vpn.GeoIpResult(
+                ip = "14.225.204.10",
+                countryCode = "VN",
+                countryName = "Việt Nam",
+                city = "Hanoi",
+                flagEmoji = "🇻🇳",
+                isXboxSupported = false
+            )
+        )
+        VpnManager.disconnect(context)
+    }
+
     @Test
     fun `read string from context`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -185,6 +201,37 @@ class ExampleRobolectricTest {
         org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost("https://fake-microsoft.com"))
         org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost(null))
         org.junit.Assert.assertFalse(com.example.cloudplay.XboxBridge.isTrustedHost(""))
+    }
+
+    @Test
+    fun `verify server sorting orders measured servers before unmeasured without geographic bias`() {
+        val servers = VpnManager.getAllServers().take(3)
+        // Without measured pings, default list order is preserved
+        val unmeasuredSorted = VpnManager.sortServersByUnlockAndPing(
+            servers = servers,
+            pingMap = emptyMap(),
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            sessions = emptyList()
+        )
+        assertEquals(servers.map { it.id }, unmeasuredSorted.map { it.id })
+
+        // With measured pings, server with lower real ping is ranked first
+        val measuredPings = mapOf(
+            servers[0].id to -1,
+            servers[1].id to 120,
+            servers[2].id to 45
+        )
+        val measuredSorted = VpnManager.sortServersByUnlockAndPing(
+            servers = servers,
+            pingMap = measuredPings,
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            sessions = emptyList()
+        )
+        assertEquals(servers[2].id, measuredSorted[0].id)
+        assertEquals(servers[1].id, measuredSorted[1].id)
+        assertEquals(servers[0].id, measuredSorted[2].id)
     }
 }
 

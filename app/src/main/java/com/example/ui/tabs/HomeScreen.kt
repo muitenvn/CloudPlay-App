@@ -576,22 +576,20 @@ private fun QuickNetworkCockpitCard(
     val optimizerStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
     val streamTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
     val recentSessions by SessionHistoryRepository.sessions.collectAsState()
-    val isStreaming = optimizerStatus.isLowLatencyStreamActive
-    val isSmartBypass = vpnState.engine == VpnEngine.SMART_BYPASS
+    val isStreaming = optimizerStatus.isLowLatencyStreamActive &&
+        vpnState.activeStreamServerId == vpnState.currentServer.id &&
+        streamTelemetry.rttMs > 0
+    val lastSessionPing: Int? = com.example.vpn.VpnManager.getLastSessionPingForServer(
+        server = vpnState.currentServer,
+        sessions = recentSessions
+    ).takeIf { it > 0 }
 
-    // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair;
-    // Khi engine là SMART_BYPASS, không hiển thị ping TCP của server.ip mà hiển thị "Ping lần chơi gần nhất" từ SessionHistory;
-    // Với PROXY_TUNNEL giữ ping TCP và ghi nhãn "Ping tới proxy (ảnh hưởng đăng nhập/khởi động)".
-    val directPing: Int? = when {
-        isStreaming -> streamTelemetry.rttMs.takeIf { it > 0 }
-        isSmartBypass -> com.example.vpn.VpnManager.getLastSessionPingForServer(
-            server = vpnState.currentServer,
-            sessions = recentSessions
-        ).takeIf { it > 0 }
-        else -> {
-            val proxyPing = vpnState.serverPings[vpnState.currentServer.id] ?: vpnState.latencyMs ?: -1
-            proxyPing.takeIf { it > 0 }
-        }
+    // Khi đang có stream thực sự trên máy chủ này mới hiển thị RTT WebRTC;
+    // Khi không có stream, chỉ lấy "Ping lần chơi gần nhất" của đúng máy chủ đang chọn từ SessionHistory (hoặc "--").
+    val directPing: Int? = if (isStreaming) {
+        streamTelemetry.rttMs.takeIf { it > 0 }
+    } else {
+        lastSessionPing
     }
     val hasPing = directPing != null && directPing > 0
     val animatedDirectPing by animateXboxIntAsState(
@@ -673,15 +671,15 @@ private fun QuickNetworkCockpitCard(
                     Text(
                         text = when {
                             isStreaming -> if (isEn) "WebRTC RTT • Tap to switch" else "RTT WebRTC • Chạm để đổi"
-                            isSmartBypass -> if (hasPing) {
-                                if (isEn) "Last session ping" else "Ping lần chơi gần nhất"
+                            lastSessionPing != null -> if (isEn) {
+                                "Last session ping: $lastSessionPing ms"
                             } else {
-                                if (isEn) "Last session ping: No data" else "Ping lần chơi gần nhất: Chưa có dữ liệu"
+                                "Ping lần chơi gần nhất: $lastSessionPing ms"
                             }
                             else -> if (isEn) {
-                                "Ping to proxy (affects login/launch)"
+                                "Last session ping: --"
                             } else {
-                                "Ping tới proxy (ảnh hưởng đăng nhập/khởi động)"
+                                "Ping lần chơi gần nhất: --"
                             }
                         },
                         color = TextSecondary,
@@ -726,15 +724,10 @@ private fun QuickNetworkCockpitCard(
                             }
                         }
                         Text(
-                            text = when {
-                                hasPing -> "${animatedDirectPing}ms"
-                                isStreaming -> "--"
-                                isSmartBypass -> if (isEn) "No data" else "Chưa có dữ liệu"
-                                else -> "--"
-                            },
+                            text = if (hasPing) "${animatedDirectPing}ms" else "--",
                             color = signalTint,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = if (!hasPing && isSmartBypass && !isStreaming) 9.sp else 10.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1
                         )

@@ -120,12 +120,13 @@ fun AppLogDialog(
                     )
                     Text(
                         text = if (isEn) {
-                            "${logs.size} events • Probe, Ping, VPN & Stream"
+                            "${logs.size}/${AppLogger.MAX_LOGS} events • ${AppLogger.STORAGE_LOCATION_DESC_EN}"
                         } else {
-                            "${logs.size} bản ghi • Trạm đo, Ping, VPN & Stream"
+                            "${logs.size}/${AppLogger.MAX_LOGS} bản ghi • ${AppLogger.STORAGE_LOCATION_DESC_VI}"
                         },
                         color = TextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 10.sp,
+                        lineHeight = 13.5.sp
                     )
                 }
             }

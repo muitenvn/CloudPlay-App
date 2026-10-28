@@ -149,6 +149,7 @@ class XboxBridge(
             gpuLoadReduction: Boolean = true,
             isCellular: Boolean = false
         ): String {
+            val isEnglishUi = com.example.data.SettingsRepository.config.value.isEnglishUI()
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
                 preserveGameTitles = preserveTitles,
@@ -157,6 +158,7 @@ class XboxBridge(
             )
             return """
                 (function() {
+                    window.__cloudPlayIsEnglishUi = $isEnglishUi;
                     if (window.__cloudPlayInjected) {
                         if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale" });
                         if (window.__setClarityPreset) window.__setClarityPreset($clarityBoost ? "$clarityPreset" : "OFF");
@@ -1124,16 +1126,19 @@ class XboxBridge(
                         if (document.getElementById('__cloudplay_unlock_fail_banner')) return;
                         const bar = document.createElement('div');
                         bar.id = '__cloudplay_unlock_fail_banner';
+                        bar.setAttribute('translate', 'no');
+                        bar.setAttribute('data-cloudplay-ui', '1');
+                        bar.className = 'notranslate';
                         bar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2147483647;background:rgba(12,20,15,0.96);border:1.5px solid #ef4444;border-radius:14px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,0.65);font-family:sans-serif;max-width:92vw;color:#fff;';
-                        const isViUi = !!window.__xcloudTranslateEnabled || (preferredLocale || '').toLowerCase().startsWith('vi');
+                        const isViUi = !window.__cloudPlayIsEnglishUi;
                         const msg = document.createElement('span');
                         msg.style.cssText = 'font-size:12.5px;font-weight:700;line-height:1.35;';
                         msg.textContent = isViUi
-                            ? 'Máy chủ này không mở khóa được, đổi sang máy chủ khác?'
+                            ? 'Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?'
                             : 'This server cannot unlock the region, switch to another server?';
                         const btnOk = document.createElement('button');
                         btnOk.style.cssText = 'background:#107C10;color:#fff;border:1px solid #22c55e;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;';
-                        btnOk.textContent = isViUi ? 'Xác nhận' : 'Switch';
+                        btnOk.textContent = isViUi ? 'Chuyển máy chủ' : 'Switch server';
                         btnOk.onclick = function() {
                             bar.remove();
                             if (window.CloudPlayBridge && window.CloudPlayBridge.confirmSwitchBestServer) {

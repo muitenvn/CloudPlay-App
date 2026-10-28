@@ -18,7 +18,7 @@ enum class QualityTier(val title: String, val badge: String, val resolutionTag: 
     HIGH("1080p • Cao", "✨ 1080p Cao", "1080p"),
     BALANCED("900p • Vừa", "🌿 900p Vừa", "900p"),
     SAVER("720p • Thấp", "❄️ 720p Thấp", "720p"),
-    EMERGENCY("720p • Siêu nhẹ", "🛡️ 720p Nhẹ", "720p")
+    EMERGENCY("720p • Nhẹ", "🛡️ 720p Nhẹ", "720p")
 }
 
 data class BitrateLadderStep(
@@ -90,7 +90,7 @@ object AdaptiveQualityManager {
 
     // Kept for unit test & legacy compatibility
     val WIFI_5GHZ_LADDER = listOf(
-        BitrateLadderStep(QualityTier.SAVER, 5.0, 22, "Tiết Kiệm Dung Lượng (5M)", "Giảm tải GPU tối đa, siêu mát máy"),
+        BitrateLadderStep(QualityTier.SAVER, 5.0, 22, "Tiết Kiệm Dung Lượng (5M)", "Giảm tải GPU, mát máy"),
         BitrateLadderStep(QualityTier.BALANCED, 9.0, 20, "Trung Bình Cân Bằng (9M)", "Mát máy, giữ 60 FPS ổn định"),
         BitrateLadderStep(QualityTier.HIGH, 14.0, 18, "Cao Sắc Nét 1080p (14M)", "Hình ảnh 1080p60 sắc nét, chi tiết cao"),
         BitrateLadderStep(QualityTier.ULTRA, 20.0, 16, "Rất Cao Tối Đa (20M)", "Bung trọn vẹn đồ họa xCloud tối đa")
@@ -103,8 +103,8 @@ object AdaptiveQualityManager {
     )
 
     val LOW_SAVER_LADDER = listOf(
-        BitrateLadderStep(QualityTier.EMERGENCY, 3.5, 24, "Siêu Tiết Kiệm (3.5M)", "Siêu nhẹ cho máy yếu & sóng yếu, giải mã <3ms"),
-        BitrateLadderStep(QualityTier.SAVER, 5.0, 20, "Thấp • Cố Định (5M)", "Tiết kiệm 60% dung lượng, siêu mát máy & đỡ hao pin")
+        BitrateLadderStep(QualityTier.EMERGENCY, 3.5, 24, "Tiết Kiệm Tối Đa (3.5M)", "Nhẹ cho máy yếu & sóng yếu"),
+        BitrateLadderStep(QualityTier.SAVER, 5.0, 20, "Thấp • Cố Định (5M)", "Tiết kiệm 60% dung lượng, mát máy & đỡ hao pin")
     )
 
     val MEDIUM_BALANCED_LADDER = listOf(

@@ -40,7 +40,7 @@ enum class ClarityPreset(
 ) {
     OFF("Tắt", "Hình ảnh nguyên bản không can thiệp", "Off", "Original unmodified video stream"),
     BALANCED("Cân Bằng", "Tăng nét nhẹ + 8% tương phản (Khuyên dùng)", "Balanced", "Gentle sharpening + 8% contrast (Recommended)"),
-    ULTRA_SHARP("Ultra Sharp", "Làm nét cạnh tối đa cho game 3D/FPS", "Ultra Sharp", "Maximum edge clarity for 3D/FPS games"),
+    ULTRA_SHARP("Sắc Nét Cao", "Làm nét cạnh tối đa cho game 3D/FPS", "High Sharpness", "High edge clarity for 3D/FPS games"),
     OLED_PUNCH("OLED Punch", "Màu sắc rực rỡ & độ sâu màu cho màn AMOLED/OLED", "OLED Punch", "Vivid colors & deep contrast for AMOLED/OLED");
 
     fun localizedName(isEn: Boolean): String = if (isEn) displayNameEn else displayName
@@ -71,11 +71,11 @@ enum class StreamGraphicsQuality(
         id = "saver",
         title = "Tiết Kiệm Dung Lượng (Thấp)",
         shortLabel = "Tiết Kiệm (5M)",
-        subtitle = "Tiết kiệm data, siêu mát máy, tốn ít pin",
+        subtitle = "Tiết kiệm data, mát máy, tốn ít pin",
         targetBitrateMbps = 5,
-        deviceLoadLabel = "❄️ Siêu mát máy • Tiết kiệm pin tối đa",
+        deviceLoadLabel = "❄️ Mát máy • Tiết kiệm pin",
         dataSavingNotice = "Tiết kiệm đến 60% dung lượng data di động",
-        description = "Giảm tải tối đa cho GPU và CPU điện thoại, thời gian giải mã cực nhanh dưới 4ms, máy chạy mát rượi và tốn rất ít pin."
+        description = "Giảm tải cho GPU và CPU điện thoại, giảm thời gian giải mã khung hình, máy ít nóng và tiết kiệm pin."
     ),
     MEDIUM(
         id = "medium",
@@ -203,10 +203,10 @@ enum class CellularOptimizationMode(
         bitrateMbps = 20,
         deviceLoadBadge = "🔥 1080p+ Tối Đa",
         description = "Độ nét cao nhất dành cho mạng Wi-Fi 5GHz hoặc 5G tốc độ cao.",
-        titleEn = "1080p+ • Ultra",
-        shortLabelEn = "1080p+ • Ultra (20M)",
+        titleEn = "1080p+ • Very High",
+        shortLabelEn = "1080p+ • Very High (20M)",
         subtitleEn = "Maximum clarity for fast Wi-Fi • 20 Mbps",
-        resolutionBadgeEn = "1080p+ • Ultra",
+        resolutionBadgeEn = "1080p+ • Very High",
         deviceLoadBadgeEn = "🔥 1080p+ Max",
         descriptionEn = "Highest visual clarity for fast 5GHz Wi-Fi or strong 5G.",
         request1080p = true
@@ -232,7 +232,7 @@ enum class CellularOptimizationMode(
         DATA_SAVER_HIGH_SPEED -> if (isEn) "720p • Low" else "720p • Thấp"
         MEDIUM -> if (isEn) "900p • Med" else "900p • Vừa"
         HIGH -> if (isEn) "1080p • High" else "1080p • Cao"
-        MAX_SPEED_UNCAPPED -> if (isEn) "1080p+ • Ultra" else "1080p+ • Rất cao"
+        MAX_SPEED_UNCAPPED -> if (isEn) "1080p+ • Very High" else "1080p+ • Rất cao"
     }
 }
 
@@ -253,22 +253,22 @@ enum class NetworkTuningMode(
     WIFI_SPEED_FIRST(
         id = "wifi_speed",
         title = "Ưu Tiên Độ Trễ Thấp & Mượt 60 FPS",
-        subtitle = "Triệt tiêu trễ đệm khi mạng yếu, giảm tải GPU tức thì",
+        subtitle = "Giảm trễ đệm khi mạng yếu và giảm tải GPU",
         titleEn = "Prioritize Low Latency & Smooth 60 FPS",
-        subtitleEn = "Eliminates buffer bloat on weak links, reduces GPU load"
+        subtitleEn = "Reduces buffer bloat on weak links and lowers GPU load"
     ),
     CELLULAR_DATA_SAVER(
         id = "cell_saver",
         title = "Thấp (Tiết Kiệm Dung Lượng)",
-        subtitle = "Tiết kiệm 60% dung lượng, siêu mát máy & nhẹ GPU",
+        subtitle = "Tiết kiệm 60% dung lượng, mát máy & nhẹ GPU",
         titleEn = "Low (Mobile Data Saver)",
-        subtitleEn = "Saves up to 60% data, ultra-cool & lightweight GPU decode"
+        subtitleEn = "Saves up to 60% data, cool & lightweight GPU decode"
     ),
     CELLULAR_MAX_SPEED(
         id = "cell_max",
         title = "Rất Cao (Đồ Họa Tối Đa)",
         subtitle = "Bung tối đa 20 Mbps cho hình ảnh sắc nét nhất",
-        titleEn = "Ultra (Maximum Graphics)",
+        titleEn = "Very High (Maximum Graphics)",
         subtitleEn = "Unlocks full 20 Mbps for the sharpest visual quality"
     );
 
@@ -381,11 +381,11 @@ enum class StreamRenderScale(
         id = "60",
         scaleFactor = 0.60f,
         targetHeightPx = 540,
-        titleVi = "60% (540p Siêu nhẹ)",
-        titleEn = "60% (540p Ultra Light)",
+        titleVi = "60% (540p Nhẹ)",
+        titleEn = "60% (540p Light)",
         shortVi = "60%",
         shortEn = "60%",
-        descVi = "Dành cho máy yếu, siêu mát",
+        descVi = "Dành cho máy yếu, mát máy",
         descEn = "For low-end devices, runs cool"
     );
 
@@ -485,7 +485,7 @@ enum class ScreenRecordQuality(
         titleEn = "720p • 60 FPS",
         shortVi = "720p • 60 FPS",
         shortEn = "720p • 60 FPS",
-        descVi = "Siêu mượt cho máy khỏe",
+        descVi = "60 FPS cho máy cấu hình khá",
         descEn = "60 FPS for fast devices"
     );
 
@@ -586,7 +586,9 @@ data class AppConfig(
     val autoCheckUpdatesOnLaunch: Boolean = true,
     val backgroundMusicEnabled: Boolean = false, // Mặc định TẮT cho người dùng mới
     val backgroundMusicVolume: Float = 0.08f, // 0.0f .. 1.0f (mặc định 8% cho người dùng mới)
-    val backgroundMusicPlayInGame: Boolean = true // Mặc định BẬT phát nhạc khi đang chơi
+    val backgroundMusicPlayInGame: Boolean = true, // Mặc định BẬT phát nhạc khi đang chơi
+    val enableGlobalpingProbe: Boolean = false, // A4: Mặc định TẮT đo qua trạm Globalping bên thứ ba
+    val hideUnreachableDynamicServers: Boolean = false // A8: Tùy chọn ẩn máy chủ động không đo được
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -752,7 +754,9 @@ object SettingsRepository {
             } else {
                 0.08f
             },
-            backgroundMusicPlayInGame = sp.getBoolean("background_music_play_in_game", true)
+            backgroundMusicPlayInGame = sp.getBoolean("background_music_play_in_game", true),
+            enableGlobalpingProbe = sp.getBoolean("enable_globalping_probe", false),
+            hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -829,6 +833,8 @@ object SettingsRepository {
             }
             putFloat("background_music_volume", c.backgroundMusicVolume.coerceIn(0f, 1f))
             putBoolean("background_music_play_in_game", c.backgroundMusicPlayInGame)
+            putBoolean("enable_globalping_probe", c.enableGlobalpingProbe)
+            putBoolean("hide_unreachable_dynamic_servers", c.hideUnreachableDynamicServers)
             apply()
         }
     }
@@ -1307,6 +1313,16 @@ object SettingsRepository {
 
     fun updateBackgroundMusicPlayInGame(enabled: Boolean) {
         _config.update { it.copy(backgroundMusicPlayInGame = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateEnableGlobalpingProbe(enabled: Boolean) {
+        _config.update { it.copy(enableGlobalpingProbe = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateHideUnreachableDynamicServers(hide: Boolean) {
+        _config.update { it.copy(hideUnreachableDynamicServers = hide) }
         persist(_config.value)
     }
 }

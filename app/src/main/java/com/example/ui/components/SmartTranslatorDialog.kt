@@ -574,7 +574,7 @@ private fun LiveTranslateSection(
                     ) {
                         Text(
                             text = if (translationResult.isFromCache) {
-                                if (isEn) "⚡ Instant Cache (0ms)" else "⚡ Bộ nhớ đệm tức thì (0ms)"
+                                if (isEn) "⚡ Translation Cache" else "⚡ Bộ nhớ đệm từ điển"
                             } else {
                                 if (isEn) "⏱️ Response time: ${translationResult.executionTimeMs}ms" else "⏱️ Thời gian phản hồi: ${translationResult.executionTimeMs}ms"
                             },
@@ -742,9 +742,9 @@ private fun SmartRulesSection(isEn: Boolean) {
                 }
                 Text(
                     text = if (isEn) {
-                        "1. Scans web menus quickly without slowing down your device.\n2. Translates common Xbox interface buttons instantly using a built-in dictionary.\n3. Keeps game titles and controller button names in their original form.\n4. Translates longer descriptions and story summaries into natural Vietnamese.\n5. Saves translated phrases in memory so repeat visits open immediately."
+                        "1. Scans web menus quickly without slowing down your device.\n2. Translates common Xbox interface buttons using a built-in dictionary.\n3. Keeps game titles and controller button names in their original form.\n4. Translates longer descriptions and story summaries into natural Vietnamese.\n5. Saves translated phrases in memory so repeat visits open quickly."
                     } else {
-                        "1. Quét nhanh các mục menu trên trang mà không làm nặng máy.\n2. Dịch tức thì các nút giao diện Xbox quen thuộc bằng từ điển có sẵn.\n3. Giữ nguyên tên riêng của trò chơi và ký hiệu nút tay cầm (A, B, X, Y, LT, RT).\n4. Dịch mượt phần mô tả cốt truyện và thông báo sang tiếng Việt tự nhiên.\n5. Lưu tạm các câu đã dịch để lần mở sau hiển thị ngay lập tức."
+                        "1. Quét nhanh các mục menu trên trang mà không làm nặng máy.\n2. Dịch nhanh các nút giao diện Xbox quen thuộc bằng từ điển có sẵn.\n3. Giữ nguyên tên riêng của trò chơi và ký hiệu nút tay cầm (A, B, X, Y, LT, RT).\n4. Dịch phần mô tả cốt truyện và thông báo sang tiếng Việt tự nhiên.\n5. Lưu tạm các câu đã dịch để lần mở sau hiển thị nhanh hơn."
                     },
                     color = TextSecondary,
                     fontSize = 9.5.sp,

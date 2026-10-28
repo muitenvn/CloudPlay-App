@@ -57,6 +57,7 @@ class StreamController(private val context: Context) {
     private var sessionDecodeSum: Double = 0.0
     private var sessionDecodeCount: Int = 0
     private var sessionMaxFramesDropped: Int = 0
+    private var sessionMaxFramesDecoded: Int = 0
     private var sessionMaxFreezeCount: Int = 0
     private var sessionMaxFreezesDurationSec: Double = 0.0
     private var sessionJitterSum: Long = 0L
@@ -259,6 +260,7 @@ class StreamController(private val context: Context) {
         sessionDecodeSum = 0.0
         sessionDecodeCount = 0
         sessionMaxFramesDropped = 0
+        sessionMaxFramesDecoded = 0
         sessionMaxFreezeCount = 0
         sessionMaxFreezesDurationSec = 0.0
         sessionJitterSum = 0L
@@ -298,6 +300,9 @@ class StreamController(private val context: Context) {
         }
         if (t.framesDropped > sessionMaxFramesDropped) {
             sessionMaxFramesDropped = t.framesDropped
+        }
+        if (t.framesDecoded > sessionMaxFramesDecoded) {
+            sessionMaxFramesDecoded = t.framesDecoded
         }
         if (t.freezeCount > sessionMaxFreezeCount) {
             sessionMaxFreezeCount = t.freezeCount
@@ -392,6 +397,14 @@ class StreamController(private val context: Context) {
             _uiState.value.currentUrl
         )
 
+        val netState = NetworkOptimizer.status.value
+        val resolvedNetworkType = when {
+            netState.isWifi -> "WIFI"
+            netState.isCellular -> "CELLULAR_4G"
+            netState.physicalType == PhysicalNetworkType.ETHERNET -> "ETHERNET"
+            else -> ""
+        }
+
         val record = com.example.data.PlaySessionRecord(
             id = "sess_${startMs}",
             gameTitle = resolvedGameTitle,
@@ -409,7 +422,9 @@ class StreamController(private val context: Context) {
             freezeCount = sessionMaxFreezeCount,
             totalFreezesDuration = sessionMaxFreezesDurationSec,
             jitterMs = avgJitter,
-            jitterBufferDelayMs = avgJbDelay
+            jitterBufferDelayMs = avgJbDelay,
+            networkType = resolvedNetworkType,
+            framesDecoded = sessionMaxFramesDecoded
         )
         com.example.data.SessionHistoryRepository.recordSession(record)
     }
@@ -526,9 +541,9 @@ class StreamController(private val context: Context) {
             autoBypassTriggered = true,
             showBanner = true,
             bannerMessage = if (isEn) {
-                "✅ VPN auto-disconnected! Now streaming over ultra-low latency Direct ISP."
+                "✅ VPN auto-disconnected! Using direct network."
             } else {
-                "✅ Đã TỰ ĐỘNG TẮT VPN khi vào game! Đang dùng mạng trực tiếp mượt nhất."
+                "✅ Đã TỰ ĐỘNG TẮT VPN khi vào game! Đang dùng mạng trực tiếp."
             },
             bannerType = BannerType.SUCCESS
         )

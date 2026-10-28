@@ -1499,13 +1499,37 @@ private fun DenseCoreTelemetrySection(
     onToggleVirtualController: () -> Unit,
     adaptiveBufferMs: Int = 12
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+
     // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair; nếu không có thì hiện "--", không rơi về ping TCP/VPN
     val effectivePing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
-    val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
-        if (effectivePing != null) "Direct • ${effectivePing}ms" else "Direct • --"
-    } else {
-        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms" else "VPN ${vpnState.currentServer.flag} • --"
+    val pingTierLabel = when {
+        effectivePing == null || effectivePing <= 0 -> if (isEn) "Unmeasured" else "Chưa đo"
+        effectivePing < 80 -> if (isEn) "Good" else "Tốt"
+        effectivePing <= 120 -> if (isEn) "Moderate" else "Trung bình"
+        else -> if (isEn) "High" else "Cao"
     }
+    val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
+        if (effectivePing != null) "Direct • ${effectivePing}ms ($pingTierLabel)" else "Direct • -- ($pingTierLabel)"
+    } else {
+        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms ($pingTierLabel)" else "VPN ${vpnState.currentServer.flag} • -- ($pingTierLabel)"
+    }
+
+    val jitterVal = telemetry.jitterMs
+    val jitterTierLabel = when {
+        jitterVal <= 0 && effectivePing == null -> if (isEn) "Unmeasured" else "Chưa đo"
+        jitterVal < 8 -> if (isEn) "Good" else "Tốt"
+        jitterVal <= 20 -> if (isEn) "Moderate" else "Trung bình"
+        else -> if (isEn) "High" else "Cao"
+    }
+    val jitterColor = when {
+        jitterVal <= 0 && effectivePing == null -> TextSecondary
+        jitterVal < 8 -> XboxNeonGreen
+        jitterVal <= 20 -> Color(0xFFFFB300)
+        else -> JapanRed
+    }
+    val jitterDisplayText = "${jitterVal}ms ($jitterTierLabel)"
 
     val fpsValueText = if (telemetry.fps > 0) "${telemetry.fps} FPS" else "-- FPS"
     val bitrateValueText = if (telemetry.bitrateMbps > 0) {
@@ -1519,10 +1543,11 @@ private fun DenseCoreTelemetrySection(
     } else {
         adaptiveBufferMs.coerceIn(8, 45)
     }
+    val bufferLabel = if (isEn) "Data buffer" else "Bộ đệm dữ liệu"
     val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
-        String.format("%.1fms • Bộ đệm %dms", telemetry.decodeTimeMs, liveBufMs)
+        String.format("%.1fms • %s %dms", telemetry.decodeTimeMs, bufferLabel, liveBufMs)
     } else {
-        "-- ms • Bộ đệm ${liveBufMs}ms"
+        "-- ms • $bufferLabel ${liveBufMs}ms"
     }
     // Chuẩn ITU-T G.1072 / 60Hz (16.6ms): < 8ms Xanh, 8-16ms Vàng, > 16ms Đỏ
     val decodeColor = when {
@@ -1530,6 +1555,28 @@ private fun DenseCoreTelemetrySection(
         telemetry.decodeTimeMs < 8.0 -> XboxNeonGreen
         telemetry.decodeTimeMs <= 16.0 -> Color(0xFFFFB300)
         else -> JapanRed
+    }
+
+    val droppedCount = telemetry.framesDropped
+    val freezeCount = telemetry.freezeCount
+    val dropRatioPct = if (telemetry.framesDecoded > 0) {
+        (droppedCount.toDouble() * 100.0) / (telemetry.framesDecoded + droppedCount).toDouble()
+    } else 0.0
+    val dropTierLabel = when {
+        telemetry.framesDecoded <= 0 && droppedCount == 0 -> if (isEn) "Good" else "Tốt"
+        dropRatioPct < 0.5 -> if (isEn) "Good" else "Tốt"
+        dropRatioPct <= 2.0 -> if (isEn) "Moderate" else "Trung bình"
+        else -> if (isEn) "High" else "Cao"
+    }
+    val dropColor = when {
+        dropRatioPct < 0.5 -> XboxNeonGreen
+        dropRatioPct <= 2.0 -> Color(0xFFFFB300)
+        else -> JapanRed
+    }
+    val droppedAndFreezeText = if (isEn) {
+        "$droppedCount ($dropTierLabel) • Temporary freeze: $freezeCount"
+    } else {
+        "$droppedCount ($dropTierLabel) • Đứng hình tạm thời: $freezeCount"
     }
 
     val pingMetricColor = when {
@@ -1544,9 +1591,6 @@ private fun DenseCoreTelemetrySection(
         virtualControllerEnabled -> stringResource(R.string.hud_virtual_gamepad)
         else -> stringResource(R.string.controller_disconnected)
     }
-
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
 
     val batteryStatusText = if (batteryPercent >= 0) {
         val chargeStr = if (isBatteryCharging) {
@@ -1585,35 +1629,35 @@ private fun DenseCoreTelemetrySection(
         }
         isRedState -> when {
             vpnState.mode != NetworkMode.DIRECT_NETWORK && pVal > 120 -> if (isEn) {
-                "High network latency (Ping: ${pVal}ms). Tip: Turn off VPN now to route directly."
+                "High network latency (${pVal}ms). Tip: Turn off VPN now to route directly."
             } else {
-                "Độ trễ mạng tăng cao (Ping: ${pVal}ms). Gợi ý: Tắt VPN ngay sau khi vào game để giảm trễ."
+                "Độ trễ mạng tăng cao (${pVal}ms). Gợi ý: Tắt VPN ngay sau khi vào game để giảm trễ."
             }
             dVal > 16.0 -> if (isEn) {
                 "Slow hardware decode (${String.format("%.1f", dVal)}ms > 16.6ms). Tip: Switch to 720p or cool down device."
             } else {
-                "Giải mã khung hình chậm (${String.format("%.1f", dVal)}ms > 16.6ms). Gợi ý: Chuyển về 720p hoặc để máy hạ nhiệt."
+                "Thời gian giải mã cao (${String.format("%.1f", dVal)}ms > 16.6ms). Gợi ý: Chuyển về 720p hoặc để máy hạ nhiệt."
             }
             jVal > 20 -> if (isEn) {
-                "Unstable network (Jitter: ${jVal}ms). Tip: Move closer to Wi-Fi or stronger 4G area."
+                "High network jitter (${jVal}ms). Tip: Move closer to Wi-Fi or stronger 4G area."
             } else {
-                "Độ biến động mạng cao (Jitter: ${jVal}ms). Gợi ý: Di chuyển tới nơi sóng 4G mạnh hơn hoặc dùng Wi-Fi 5GHz."
+                "Độ biến động mạng cao (${jVal}ms). Gợi ý: Di chuyển tới nơi sóng 4G mạnh hơn hoặc dùng Wi-Fi 5GHz."
             }
             else -> if (isEn) {
-                "High network latency (Ping: ${pVal}ms). Tip: Pause background downloads or check VPN."
+                "High network latency (${pVal}ms). Tip: Pause background downloads or check VPN."
             } else {
-                "Độ trễ mạng tăng cao (Ping: ${pVal}ms). Gợi ý: Kiểm tra xem VPN đã tắt chưa hoặc tạm dừng tải ngầm."
+                "Độ trễ mạng tăng cao (${pVal}ms). Gợi ý: Kiểm tra xem VPN đã tắt chưa hoặc tạm dừng tải ngầm."
             }
         }
         isYellowState -> if (isEn) {
-            "Moderate connection (Ping: ${pVal}ms | Jitter: ${jVal}ms). Tip: Keep Auto quality enabled to limit congestion."
+            "Moderate connection (Network latency: ${pVal}ms | Network jitter: ${jVal}ms). Tip: Keep Auto quality enabled."
         } else {
-            "Đường truyền biến động nhẹ (Ping: ${pVal}ms | Biến động: ${jVal}ms). Gợi ý: Giữ chế độ Tự động để hạn chế nghẽn trạm."
+            "Đường truyền biến động nhẹ (Độ trễ mạng: ${pVal}ms | Độ biến động mạng: ${jVal}ms). Gợi ý: Giữ chế độ Tự động."
         }
         else -> if (isEn) {
-            "Stable stream (Ping: ${pVal}ms | Decode: ${String.format("%.1f", dVal)}ms)."
+            "Stable stream (Network latency: ${pVal}ms | Decode time: ${String.format("%.1f", dVal)}ms)."
         } else {
-            "Ổn định (Độ trễ: ${pVal}ms | Giải mã: ${String.format("%.1f", dVal)}ms)."
+            "Ổn định (Độ trễ mạng: ${pVal}ms | Thời gian giải mã: ${String.format("%.1f", dVal)}ms)."
         }
     }
 
@@ -1640,21 +1684,35 @@ private fun DenseCoreTelemetrySection(
                 onRowClick = onToggleNetwork
             )
 
-            // 2. Dòng FPS & Chất lượng truyền tải
+            // 2. Dòng Độ biến động mạng (C1 & C3)
             DenseMetricRowItem(
-                label = "FPS",
-                value = "$fpsValueText ($bitrateValueText)",
+                label = if (isEn) "Network jitter" else "Độ biến động mạng",
+                value = jitterDisplayText,
+                valueColor = jitterColor
+            )
+
+            // 3. Dòng Chất lượng truyền tải & FPS (C1)
+            DenseMetricRowItem(
+                label = if (isEn) "Stream bitrate" else "Chất lượng truyền tải",
+                value = "$bitrateValueText ($fpsValueText)",
                 valueColor = if (telemetry.fps >= 55) XboxNeonGreen else TextPrimary
             )
 
-            // 3. Dòng Thời gian giải mã & Bộ đệm dữ liệu
+            // 4. Dòng Thời gian giải mã & Bộ đệm dữ liệu (C1)
             DenseMetricRowItem(
                 label = if (isEn) "Decode time" else "Thời gian giải mã",
-                value = if (isEn) decodeTimeText.replace("Bộ đệm", "Buf") else decodeTimeText,
+                value = decodeTimeText,
                 valueColor = decodeColor
             )
 
-            // 4. Dòng Tay cầm (chạm để bật/tắt tay cầm ảo)
+            // 5. Dòng Khung hình bị rớt & Đứng hình tạm thời (C1 & C3)
+            DenseMetricRowItem(
+                label = if (isEn) "Dropped frames" else "Khung hình bị rớt",
+                value = droppedAndFreezeText,
+                valueColor = dropColor
+            )
+
+            // 6. Dòng Tay cầm (chạm để bật/tắt tay cầm ảo)
             DenseMetricRowItem(
                 label = stringResource(R.string.hud_controller),
                 value = controllerStatusText,
@@ -1667,7 +1725,7 @@ private fun DenseCoreTelemetrySection(
                 onRowClick = onToggleVirtualController
             )
 
-            // 5. Dòng % Pin & trạng thái sạc (+ Nhiệt độ máy trên API 29+)
+            // 7. Dòng % Pin & trạng thái sạc (+ Nhiệt độ máy trên API 29+)
             DenseMetricRowItem(
                 label = if (isEn) "Battery" else "Pin & Máy",
                 value = batteryStatusText,
@@ -1675,7 +1733,7 @@ private fun DenseCoreTelemetrySection(
                 badgeText = if (isThermalSupported) "$thermalIcon $thermalLabel" else null
             )
 
-            // 6. Hộp đánh giá tự động theo chuẩn ITU-T G.1072 ([Nguyên nhân] + [Gợi ý])
+            // 8. Hộp đánh giá tự động theo chuẩn ITU-T G.1072 ([Nguyên nhân] + [Gợi ý])
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(6.dp),
@@ -1936,28 +1994,28 @@ private fun DenseQualityModeSection(
                     else -> if (isEn) "2. Local Net: Active" else "2. Mạng cục bộ: Đang hoạt động"
                 }
 
-                // Lớp 3: Tuyến cáp quốc tế Việt Nam -> Nhật Bản
+                // Lớp 3: Tuyến đường quốc tế tới máy chủ luồng
                 val layer3Bad = telemetry.rttMs > 150
                 val layer3Text = when {
                     telemetry.rttMs > 160 && !layer2Bad -> if (isEn) {
-                        "3. Intl Route (JP): Congested (${telemetry.rttMs}ms)${if (isPeakHour) " • Peak hours 20h-23h" else ""}"
+                        "3. Intl Route: Congested (${telemetry.rttMs}ms)${if (isPeakHour) " • Peak hours 20h-23h" else ""}"
                     } else {
-                        "3. Tuyến quốc tế (Nhật): Nghẽn (${telemetry.rttMs}ms)${if (isPeakHour) " • Giờ cao điểm 20h-23h" else ""}"
+                        "3. Tuyến quốc tế: Nghẽn (${telemetry.rttMs}ms)${if (isPeakHour) " • Giờ cao điểm 20h-23h" else ""}"
                     }
                     telemetry.rttMs > 0 -> if (isEn) {
-                        "3. Intl Route (JP): Normal (${telemetry.rttMs}ms)"
+                        "3. Intl Route: Normal (${telemetry.rttMs}ms)"
                     } else {
-                        "3. Tuyến quốc tế (Nhật): Bình thường (${telemetry.rttMs}ms)"
+                        "3. Tuyến quốc tế: Bình thường (${telemetry.rttMs}ms)"
                     }
-                    else -> if (isEn) "3. Intl Route (JP): Measuring STUN RTT..." else "3. Tuyến quốc tế (Nhật): Đang đo STUN RTT..."
+                    else -> if (isEn) "3. Intl Route: Measuring WebRTC RTT..." else "3. Tuyến quốc tế: Đang đo độ trễ WebRTC..."
                 }
 
                 // Lớp 4: Trạng thái giao diện VPN (tun0 / TRANSPORT_VPN)
                 val layer4Bad = isVpnActive
                 val layer4Text = if (layer4Bad) {
-                    if (isEn) "4. VPN: Active (Adds +30~90ms latency — turn off after game loads!)" else "4. VPN: Đang bật (Làm tăng +30~90ms trễ — hãy tắt khi đã vào game!)"
+                    if (isEn) "4. VPN: Active (Adds detour routing latency — turn off after game loads!)" else "4. VPN: Đang bật (Tăng độ trễ đường vòng — hãy tắt khi đã vào game!)"
                 } else {
-                    if (isEn) "4. VPN: Off (Direct low-latency routing)" else "4. VPN: Đã tắt (Truyền trực tiếp không đi vòng)"
+                    if (isEn) "4. VPN: Off (Direct routing)" else "4. VPN: Đã tắt (Truyền trực tiếp không đi vòng)"
                 }
 
                 Surface(

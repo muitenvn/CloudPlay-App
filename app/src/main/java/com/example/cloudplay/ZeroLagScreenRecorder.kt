@@ -174,7 +174,7 @@ object ZeroLagScreenRecorder {
         val toastMsg = if (isEn) {
             "🔴 Recording (${quality.localizedShort(true)} • Low-CPU .MP4)"
         } else {
-            "🔴 Đang quay (${quality.localizedShort(false)} • Siêu nhẹ .MP4)"
+            "🔴 Đang quay (${quality.localizedShort(false)} • Nhẹ .MP4)"
         }
         Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
     }

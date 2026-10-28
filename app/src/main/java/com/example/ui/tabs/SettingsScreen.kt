@@ -492,6 +492,18 @@ fun SettingsScreen(
                             }
                         }
                     }
+
+                    SettingToggleRow(
+                        title = if (isEn) "Estimate Ping via Globalping Probe" else "Ước lượng độ trễ qua trạm Globalping",
+                        subtitle = if (isEn) {
+                            "Sends server IP to third-party Globalping service for reference (free tier: 250 tests/hr, local cap: 200/hr)"
+                        } else {
+                            "Gửi IP máy chủ tới dịch vụ bên thứ ba Globalping để đo tham khảo cho máy chủ đang chọn (miễn phí 250 lượt/giờ, giới hạn app 200 lượt/giờ)"
+                        },
+                        checked = config.enableGlobalpingProbe,
+                        onCheckedChange = { SettingsRepository.updateEnableGlobalpingProbe(it) },
+                        switchTestTag = "settings_switch_globalping_probe"
+                    )
                 }
             }
         }
@@ -965,7 +977,7 @@ fun SettingsScreen(
                         text = if (isEn) {
                             "⚡ Hardware VBR encoding & background load reduction run automatically while recording."
                         } else {
-                            "⚡ Tự động mã hóa phần cứng siêu nhẹ (VBR) & tắt hiệu ứng nền khi đang quay để chống nóng máy."
+                            "⚡ Tự động mã hóa phần cứng nhẹ (VBR) & tắt hiệu ứng nền khi đang quay để chống nóng máy."
                         },
                         color = TextSecondary,
                         fontSize = 10.5.sp

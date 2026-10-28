@@ -157,6 +157,10 @@ object XboxTranslator {
         "Disconnected from server" to "Mất kết nối tới máy chủ",
         "Try again" to "Thử lại",
         "Retry" to "Thử lại",
+        "Switch" to "Chuyển đổi",
+        "Switch server" to "Chuyển máy chủ",
+        "Switch account" to "Chuyển tài khoản",
+        "This server cannot unlock the region, switch to another server?" to "Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?",
         "Feedback" to "Góp ý chất lượng",
         "Give feedback" to "Gửi góp ý",
         "Mute" to "Tắt tiếng",
@@ -509,6 +513,8 @@ object XboxTranslator {
                         while (el && el !== document.body) {
                             if (el.tagName === 'VIDEO' || el.tagName === 'CANVAS') return true;
                             if (el.id === 'stream-video' || el.getAttribute('data-testid') === 'stream-video') return true;
+                            if (el.id === '__cloudplay_unlock_fail_banner' || el.getAttribute('data-cloudplay-ui') === '1') return true;
+                            if (el.getAttribute('translate') === 'no' || (el.classList && el.classList.contains('notranslate'))) return true;
                             if (el.classList && el.classList.contains('game-stream')) return true;
                             el = el.parentElement;
                         }

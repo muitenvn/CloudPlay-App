@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,14 +89,20 @@ import com.example.ui.theme.xboxPressScale
 import com.example.ui.theme.xboxSlideFadeIn
 import com.example.data.SettingsRepository
 import com.example.vpn.DEFAULT_SERVERS
+import com.example.vpn.EndpointPingMeasurement
 import com.example.vpn.LiveProxyFetcher
 import com.example.vpn.PingTester
 import com.example.vpn.RegionUnlockStatus
 import com.example.vpn.ServerLocation
+import com.example.vpn.ServerPingStatus
 import com.example.vpn.VpnManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
+@OptIn(FlowPreview::class)
 @Composable
 fun ServersScreen(
     currentServer: ServerLocation,
@@ -112,6 +120,7 @@ fun ServersScreen(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
     var isFetchingLive by remember { mutableStateOf(false) }
@@ -120,7 +129,6 @@ fun ServersScreen(
     val jpLabel = stringResource(R.string.cat_japan)
     val krLabel = stringResource(R.string.cat_korea)
     val usLabel = stringResource(R.string.cat_usa)
-    val seaLabel = stringResource(R.string.cat_sea)
     val allLabel = stringResource(R.string.filter_all)
 
     val allServers = remember(vpnState.customServers) {
@@ -131,22 +139,30 @@ fun ServersScreen(
     }
 
     val serverPings = vpnState.serverPings
+    val serverMeasurements = vpnState.serverMeasurements
     val isTestingAll = vpnState.isTestingPings
     val recentSessions by com.example.data.SessionHistoryRepository.sessions.collectAsState()
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // Tự động đo ping danh sách máy chủ trong mục Máy chủ khi chưa có dữ liệu đo
+    // A8: Chỉ đo bước 1 + 2 khi chưa có dữ liệu đo trong phiên; chuyển tab không đo lại.
     LaunchedEffect(Unit) {
         if (serverPings.isEmpty() && !isTestingAll) {
-            VpnManager.testAllServers(autoPickBest = false, context = context)
+            VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
     }
 
-    fun testAllServers(autoPickBest: Boolean = false) {
+    // A4: Globalping tắt mặc định; khi bật trong Cài đặt thì hiển thị ước lượng từ trạm gần nhất cho máy chủ đang chọn
+    val activeProbeEstimate = remember(currentServer.id, config.enableGlobalpingProbe, vpnState.selectedServerProbeEstimate) {
+        if (!config.enableGlobalpingProbe) null
+        else vpnState.selectedServerProbeEstimate ?: com.example.vpn.RegionalProbeTester.getCachedEstimateForServer(currentServer)
+    }
+
+    fun testAllServers(autoPickBest: Boolean = false, forceRefresh: Boolean = true) {
         VpnManager.testAllServers(
             autoPickBest = autoPickBest,
             context = context,
+            forceRefresh = forceRefresh,
             onPickedBest = { best, bestPing ->
                 if (bestPing > 0) {
                     onSelectServer(best)
@@ -187,70 +203,114 @@ fun ServersScreen(
                 }
             }
             isFetchingLive = false
-            VpnManager.testAllServers(autoPickBest = false, context = context)
+            VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
     }
 
     val allServersSnapshot = allServers.toList()
-    val filteredServers = remember(selectedCategory, allServersSnapshot, serverPings, vpnState.unlockRecords, vpnState.engine, recentSessions) {
+    val filteredServers = remember(
+        selectedCategory,
+        allServersSnapshot,
+        serverPings,
+        serverMeasurements,
+        vpnState.unlockRecords,
+        vpnState.engine,
+        recentSessions,
+        config.hideUnreachableDynamicServers,
+        currentServer.id
+    ) {
         val rawFiltered = when (selectedCategory) {
             "ALL" -> allServersSnapshot
             "CUSTOM" -> allServersSnapshot.filter { it.isCustom }
             else -> allServersSnapshot.filter { it.countryCode.equals(selectedCategory, ignoreCase = true) }
+        }.filter { srv ->
+            if (!config.hideUnreachableDynamicServers || srv.id == currentServer.id || !srv.id.startsWith("live_")) {
+                true
+            } else {
+                val m = serverMeasurements[srv.id]
+                val p = serverPings[srv.id]
+                m?.status != ServerPingStatus.UNREACHABLE && p != -1
+            }
         }
         VpnManager.sortServersByUnlockAndPing(
             servers = rawFiltered,
             pingMap = serverPings,
             records = vpnState.unlockRecords,
             engine = vpnState.engine,
-            sessions = recentSessions
+            sessions = recentSessions,
+            measurementsMap = serverMeasurements
         )
     }
 
-    // Gợi ý máy chủ nhanh hơn dựa trên số đo thật (thấp hơn >= 30ms); không gợi ý nếu vùng người dùng đã được Xbox hỗ trợ
+    // A8: Đo lười (lazy viewport probing) khi người dùng cuộn danh sách với debounce 250ms
+    LaunchedEffect(listState, filteredServers) {
+        snapshotFlow {
+            val visibleKeys = listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }.toSet()
+            filteredServers.filter { it.id in visibleKeys }
+        }
+            .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
+            .debounce(250L)
+            .collect { visibleServers ->
+                if (visibleServers.isNotEmpty() && !vpnState.isTestingPings) {
+                    VpnManager.probeVisibleServersLazily(visibleServers)
+                }
+            }
+    }
+
+    // Gợi ý máy chủ nhanh hơn:
+    // - Chỉ hiện sau khi đợt đo ping kết thúc (!isTestingAll) để tránh nhấp nháy.
+    // - Cả máy chủ đang chọn và máy chủ gợi ý đều phải có ping thật đo được trên cổng chính (MEASURED_PRIMARY) và chênh >= 30ms.
+    // - Không coi máy chủ chỉ phản hồi cổng phụ (:443/:80) là ứng viên gợi ý thay thế cổng chính.
     val fasterServerSuggestion: Pair<ServerLocation, Int>? = remember(
         currentServer,
         allServersSnapshot,
         serverPings,
+        serverMeasurements,
         vpnState.unlockRecords,
-        vpnState.engine,
-        recentSessions,
+        isTestingAll,
         userNeedsVpn
     ) {
-        if (!userNeedsVpn) {
+        if (!userNeedsVpn || isTestingAll) {
             null
         } else {
-            val currentEffPing = VpnManager.getEffectiveServerPing(
-                server = currentServer,
-                engine = vpnState.engine,
-                pingMap = serverPings,
-                sessions = recentSessions
-            )
-            if (currentEffPing <= 0) {
+            val currentMeasuredPing = serverPings[currentServer.id] ?: -1
+            if (currentMeasuredPing <= 0) {
                 null
             } else {
+                val currentStatus = VpnManager.getServerUnlockStatus(currentServer, vpnState.unlockRecords)
+                val hasAnyUnlockedServer = allServersSnapshot.any {
+                    VpnManager.getServerUnlockStatus(it, vpnState.unlockRecords) == RegionUnlockStatus.UNLOCKED
+                }
+                val allowUntestedFallback = currentStatus != RegionUnlockStatus.UNLOCKED && !hasAnyUnlockedServer
+
                 allServersSnapshot
                     .asSequence()
                     .filter { it.id != currentServer.id }
-                    .filter {
-                        val st = VpnManager.getServerUnlockStatus(it, vpnState.unlockRecords)
-                        st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+                    .filter { candidate ->
+                        val m = serverMeasurements[candidate.id]
+                        m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
                     }
-                    .map { candidate ->
-                        candidate to VpnManager.getEffectiveServerPing(
-                            server = candidate,
-                            engine = vpnState.engine,
-                            pingMap = serverPings,
-                            sessions = recentSessions
-                        )
+                    .filter { candidate ->
+                        val st = VpnManager.getServerUnlockStatus(candidate, vpnState.unlockRecords)
+                        st == RegionUnlockStatus.UNLOCKED || (allowUntestedFallback && st == RegionUnlockStatus.UNTESTED)
                     }
-                    .filter { (_, ping) -> ping > 0 && (currentEffPing - ping) >= 30 }
-                    .minByOrNull { (_, ping) -> ping }
+                    .map { candidate -> candidate to (serverPings[candidate.id] ?: -1) }
+                    .filter { (_, ping) -> ping > 0 && (currentMeasuredPing - ping) >= 30 }
+                    .minWithOrNull(
+                        Comparator { a, b ->
+                            val stA = VpnManager.getServerUnlockStatus(a.first, vpnState.unlockRecords)
+                            val stB = VpnManager.getServerUnlockStatus(b.first, vpnState.unlockRecords)
+                            val rankA = if (stA == RegionUnlockStatus.UNLOCKED) 0 else 1
+                            val rankB = if (stB == RegionUnlockStatus.UNLOCKED) 0 else 1
+                            if (rankA != rankB) rankA.compareTo(rankB) else a.second.compareTo(b.second)
+                        }
+                    )
             }
         }
     }
 
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
@@ -259,6 +319,12 @@ fun ServersScreen(
     ) {
         if (fasterServerSuggestion != null) {
             val (fasterServer, fasterPing) = fasterServerSuggestion
+            val fasterUnlockStatus = VpnManager.getServerUnlockStatus(fasterServer, vpnState.unlockRecords)
+            val untestedNote = if (fasterUnlockStatus == RegionUnlockStatus.UNTESTED) {
+                if (isEn) " • Untested unlock" else " • Chưa thử mở khóa"
+            } else {
+                ""
+            }
             item(key = "faster_server_suggestion_banner") {
                 Surface(
                     modifier = Modifier
@@ -277,9 +343,9 @@ fun ServersScreen(
                     ) {
                         Text(
                             text = if (isEn) {
-                                "Faster server: ${fasterServer.flag} ${fasterServer.name} ($fasterPing ms)"
+                                "Faster server: ${fasterServer.flag} ${fasterServer.name} ($fasterPing ms$untestedNote)"
                             } else {
-                                "Máy chủ nhanh hơn: ${fasterServer.flag} ${fasterServer.name} ($fasterPing ms)"
+                                "Máy chủ nhanh hơn: ${fasterServer.flag} ${fasterServer.name} ($fasterPing ms$untestedNote)"
                             },
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
@@ -334,7 +400,7 @@ fun ServersScreen(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
-                                text = if (isEn) "This server cannot unlock the region, switch to another server?" else "Máy chủ này không mở khóa được, đổi sang máy chủ khác?",
+                                text = if (isEn) "This server cannot unlock the region, switch to another server?" else "Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?",
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 12.sp,
@@ -365,7 +431,7 @@ fun ServersScreen(
                                     .testTag("confirm_switch_best_server_button")
                             ) {
                                 Text(
-                                    text = if (isEn) "Confirm" else "Xác nhận",
+                                    text = if (isEn) "Switch server" else "Chuyển máy chủ",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold
@@ -486,6 +552,7 @@ fun ServersScreen(
                     // Compact Selected Server & Unlock Telemetry Strip
                     val isGameActiveOnSelected = networkStatus.isLowLatencyStreamActive &&
                         vpnState.activeStreamServerId == currentServer.id
+                    val currentMeasurement = serverMeasurements[currentServer.id]
                     val hasTriedCurrentPing = serverPings.containsKey(currentServer.id)
                     val currentPingMs = if (isGameActiveOnSelected) {
                         if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
@@ -518,26 +585,30 @@ fun ServersScreen(
                                 "RTT WebRTC: --"
                             }
                         }
-                        hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
-                            "Server ping: ${currentPingMs}ms"
-                        } else {
-                            "Ping máy chủ: ${currentPingMs}ms"
+                        currentMeasurement != null && currentMeasurement.status != ServerPingStatus.UNTESTED -> {
+                            val prefix = if (isEn) "Network latency: " else "Độ trễ mạng: "
+                            prefix + currentMeasurement.formatDisplayBadge(isEn)
                         }
-                        isTestingAll -> if (isEn) "Testing server ping..." else "Đang đo ping máy chủ..."
-                        hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
-                            "Server ping: Unreachable"
+                        hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
+                            "Network latency: ${currentPingMs}ms (:${currentServer.port})"
                         } else {
-                            "Ping máy chủ: Không đo được"
+                            "Độ trễ mạng: ${currentPingMs}ms (:${currentServer.port})"
+                        }
+                        isTestingAll -> if (isEn) "Testing network latency..." else "Đang đo độ trễ mạng..."
+                        hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
+                            "Network latency: Unreachable"
+                        } else {
+                            "Độ trễ mạng: Không đo được"
                         }
                         isSmartBypassEngine && currentPingMs > 0 -> if (isEn) {
-                            "Last session ping: ${currentPingMs}ms"
+                            "Last session latency: ${currentPingMs}ms"
                         } else {
-                            "Ping lần chơi gần nhất: ${currentPingMs}ms"
+                            "Độ trễ phiên gần nhất: ${currentPingMs}ms"
                         }
                         else -> if (isEn) {
-                            "Server ping: Not tested"
+                            "Network latency: Not tested"
                         } else {
-                            "Ping máy chủ: Chưa đo"
+                            "Độ trễ mạng: Chưa đo"
                         }
                     }
 
@@ -592,11 +663,30 @@ fun ServersScreen(
                                     )
                                     Text(
                                         text = currentPingText,
-                                        color = if (currentPingMs in 1..99) XboxNeonGreen else DirectCyan,
+                                        color = if (currentMeasurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY) {
+                                            WarningAmber
+                                        } else if (currentPingMs in 1..99) {
+                                            XboxNeonGreen
+                                        } else {
+                                            DirectCyan
+                                        },
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        maxLines = 1
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (config.enableGlobalpingProbe && activeProbeEstimate != null) {
+                                    Text(
+                                        text = activeProbeEstimate.formatLabel(isEn),
+                                        color = WarningAmber,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag("globalping_estimate_label")
                                     )
                                 }
                             }
@@ -608,7 +698,7 @@ fun ServersScreen(
                                 modifier = Modifier
                                     .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable(enabled = !isTestingAll) { testAllServers(autoPickBest = true) }
+                                    .clickable(enabled = !isTestingAll) { testAllServers(autoPickBest = true, forceRefresh = true) }
                                     .testTag("auto_pick_best_server_button")
                             ) {
                                 Row(
@@ -641,12 +731,13 @@ fun ServersScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Button(
-                            onClick = { testAllServers(autoPickBest = false) },
+                            onClick = { testAllServers(autoPickBest = false, forceRefresh = true) },
                             enabled = !isTestingAll,
                             modifier = Modifier
                                 .weight(1f)
                                 .defaultMinSize(minHeight = 42.dp)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
+                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
+                                .testTag("ping_test_all_button"),
                             contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                             shape = RoundedCornerShape(11.dp)
@@ -737,7 +828,7 @@ fun ServersScreen(
         }
 
         item {
-            // Region Selector Pills
+            // Region Selector Pills + Optional Hide Unreachable Dynamic Proxies Chip
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -779,25 +870,57 @@ fun ServersScreen(
                         )
                     }
                 }
+
+                if (allServersSnapshot.any { it.id.startsWith("live_") }) {
+                    item(key = "toggle_hide_dead_live_proxies") {
+                        val hideActive = config.hideUnreachableDynamicServers
+                        Surface(
+                            modifier = Modifier
+                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable {
+                                    SettingsRepository.updateHideUnreachableDynamicServers(!hideActive)
+                                }
+                                .testTag("toggle_hide_dead_live_proxies_chip"),
+                            color = if (hideActive) DirectCyan.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.88f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (hideActive) DirectCyan else XboxCardBorder
+                            ),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) {
+                                    if (hideActive) "Hiding dead dynamic" else "Hide dead dynamic"
+                                } else {
+                                    if (hideActive) "Đang ẩn proxy chết" else "Ẩn proxy động chết"
+                                },
+                                color = if (hideActive) DirectCyan else TextSecondary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        // Servers list
+        // Servers list: Huy hiệu "★ ĐỀ XUẤT" chỉ dành riêng cho máy chủ đã mở khóa thành công (UNLOCKED) và có ping thật trên cổng chính (MEASURED_PRIMARY)
         val recommendedServerId = filteredServers.firstOrNull { server ->
-            val p = VpnManager.getEffectiveServerPing(
-                server = server,
-                engine = vpnState.engine,
-                pingMap = serverPings,
-                sessions = recentSessions
-            )
+            val measuredPing = serverPings[server.id] ?: -1
+            val m = serverMeasurements[server.id]
+            val isPrimaryOk = m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
             val st = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
-            p > 0 && st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+            measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED
         }?.id
 
         items(filteredServers, key = { it.id }) { server ->
             val isSelected = server.id == currentServer.id
             val isGameActiveOnThisServer = networkStatus.isLowLatencyStreamActive &&
                 vpnState.activeStreamServerId == server.id
+            val measurement = serverMeasurements[server.id]
             val hasTriedPing = serverPings.containsKey(server.id)
             val ping = if (isGameActiveOnThisServer) {
                 if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
@@ -817,6 +940,7 @@ fun ServersScreen(
                 isSelected = isSelected,
                 isRecommended = isRecommended,
                 pingMs = ping,
+                measurement = measurement,
                 hasTriedPing = hasTriedPing,
                 isSmartBypass = isSmartBypassEngine,
                 isGameActiveNow = isGameActiveOnThisServer,
@@ -856,6 +980,7 @@ private fun ServerCard(
     isSelected: Boolean,
     isRecommended: Boolean = false,
     pingMs: Int,
+    measurement: EndpointPingMeasurement? = null,
     hasTriedPing: Boolean = false,
     isSmartBypass: Boolean = false,
     isGameActiveNow: Boolean = false,
@@ -875,11 +1000,14 @@ private fun ServerCard(
         motionEnabled = motionEnabled,
         label = "server_ping_${server.id}"
     )
+    val isFallbackPortOnly = measurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY
+    val isServerCurrentlyTesting = measurement?.status == ServerPingStatus.TESTING
+    val isUnstablePing = measurement?.isUnstable == true || pingMs >= 1000
     val targetPingColor = when {
         pingMs <= 0 -> Color.Gray
-        pingMs < 60 -> DirectCyan
-        pingMs < 100 -> XboxNeonGreen
-        pingMs < 160 -> WarningAmber
+        isFallbackPortOnly || isUnstablePing -> WarningAmber
+        pingMs <= 80 -> XboxNeonGreen
+        pingMs <= 120 -> WarningAmber
         else -> JapanRed
     }
     val pingColor by animateColorAsState(
@@ -895,17 +1023,18 @@ private fun ServerCard(
 
     val activeBars = when {
         pingMs <= 0 -> 0
-        pingMs < 65 -> 4
-        pingMs < 120 -> 3
-        pingMs < 200 -> 2
+        isFallbackPortOnly -> 2
+        pingMs <= 65 -> 4
+        pingMs <= 120 -> 3
+        pingMs <= 200 -> 2
         else -> 1
     }
 
-    // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử" (xám), "Sai vùng" (vàng)
+    // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử mở khóa" (xám), "Sai vùng" (vàng)
     val unlockLabel = when (unlockStatus) {
         RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
         RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
-        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested" else "Chưa thử"
+        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested unlock" else "Chưa thử mở khóa"
         RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
     }
     val unlockBadgeColor = when (unlockStatus) {
@@ -1074,28 +1203,45 @@ private fun ServerCard(
                             }
                         }
 
+                        val mainPingValueText = when {
+                            isGameActiveNow && pingMs > 0 -> "${animatedPingMs}ms"
+                            isGameActiveNow -> "--"
+                            isServerCurrentlyTesting -> "..."
+                            isFallbackPortOnly && pingMs > 0 -> "${animatedPingMs}ms (:${measurement?.measuredPort ?: 443})"
+                            pingMs > 0 && isUnstablePing -> if (isEn) "${animatedPingMs}ms • Unstable" else "${animatedPingMs}ms • Mạng chập chờn"
+                            pingMs > 0 -> "${animatedPingMs}ms"
+                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
+                            else -> if (isEn) "Not tested" else "Chưa đo"
+                        }
+
                         Text(
-                            text = when {
-                                pingMs > 0 -> "${animatedPingMs}ms"
-                                isGameActiveNow -> "--"
-                                isTestingPings -> "..."
-                                hasTriedPing -> if (isEn) "Unreachable" else "Không đo được"
-                                isSmartBypass -> if (isEn) "No data" else "Chưa có dữ liệu"
-                                else -> "--"
-                            },
-                            color = if (pingMs > 0) pingColor else if (isTestingPings) DirectCyan else pingColor,
+                            text = mainPingValueText,
+                            color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else pingColor,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = if (pingMs <= 0 && (hasTriedPing || isSmartBypass)) 10.sp else 12.sp
+                            fontSize = if (pingMs <= 0 || isFallbackPortOnly || isUnstablePing) 10.sp else 12.sp
                         )
                     }
 
                     val metricLabelText = when {
                         isGameActiveNow -> "RTT WebRTC"
-                        hasTriedPing && pingMs > 0 -> if (isEn) "Server ping • :${server.port}" else "Ping máy chủ • :${server.port}"
-                        isTestingPings -> if (isEn) "Testing ping... • :${server.port}" else "Đang đo ping... • :${server.port}"
-                        hasTriedPing -> if (isEn) "Unreachable • :${server.port}" else "Không đo được • :${server.port}"
-                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session ping" else "Ping lần chơi gần nhất"
+                        isServerCurrentlyTesting -> if (isEn) "Testing... • :${server.port}" else "Đang đo... • :${server.port}"
+                        isFallbackPortOnly -> {
+                            val fbPort = measurement?.measuredPort ?: 443
+                            if (isEn) "Fallback :$fbPort • :${server.port} closed" else "Cổng phụ :$fbPort • Cổng :${server.port} đóng"
+                        }
+                        measurement?.status == ServerPingStatus.MEASURED_PRIMARY && pingMs > 0 -> {
+                            val qualityTag = when {
+                                isUnstablePing -> if (isEn) "Unstable" else "Mạng chập chờn"
+                                pingMs <= 80 -> if (isEn) "Good" else "Tốt"
+                                pingMs <= 120 -> if (isEn) "Fair" else "Trung bình"
+                                else -> if (isEn) "High" else "Cao"
+                            }
+                            if (isEn) "Latency ($qualityTag) • :${measurement.measuredPort}" else "Độ trễ mạng ($qualityTag) • :${measurement.measuredPort}"
+                        }
+                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency • :${server.port}" else "Độ trễ mạng • :${server.port}"
+                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable • :${server.port}" else "Không đo được • :${server.port}"
+                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session latency" else "Độ trễ phiên gần nhất"
                         else -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
                     }
 
@@ -1112,7 +1258,7 @@ private fun ServerCard(
                             )
                             Text(
                                 text = metricLabelText,
-                                color = XboxNeonGreen,
+                                color = if (isFallbackPortOnly) WarningAmber else XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -1121,7 +1267,7 @@ private fun ServerCard(
                     } else {
                         Text(
                             text = metricLabelText,
-                            color = TextSecondary,
+                            color = if (isFallbackPortOnly) WarningAmber else TextSecondary,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 9.5.sp
                         )

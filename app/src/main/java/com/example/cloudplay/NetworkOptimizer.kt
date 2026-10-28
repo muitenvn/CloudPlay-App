@@ -24,7 +24,7 @@ import org.json.JSONObject
 import kotlin.math.roundToLong
 
 enum class PhysicalNetworkType(val label: String, val icon: String) {
-    WIFI_6GHZ("Wifi 6GHz (Siêu tốc Wi-Fi 6E/7)", "🛜"),
+    WIFI_6GHZ("Wifi 6GHz (Wi-Fi 6E/7)", "🛜"),
     WIFI_5GHZ("Wifi 5GHz (Tốc độ cao)", "🛜"),
     WIFI_2_4GHZ("Wifi 2.4GHz (Chống nhiễu)", "🛜"),
     WIFI_STANDARD("Wifi (Chuẩn)", "🛜"),
@@ -60,6 +60,7 @@ data class StreamTelemetry(
     val jitterMs: Int = 0,
     val packetsLostPercent: Double = 0.0,
     val framesDropped: Int = 0,
+    val framesDecoded: Int = 0,
     val freezeCount: Int = 0,
     val totalFreezesDurationSec: Double = 0.0,
     val jitterBufferDelayMs: Double = 0.0,
@@ -441,6 +442,7 @@ object NetworkOptimizer {
             val jitter = json.optInt("jitterMs", 0)
             val loss = json.optDouble("packetsLostPercent", 0.0)
             val framesDropped = json.optInt("framesDropped", 0)
+            val framesDecoded = json.optInt("framesDecoded", 0)
             val freezeCount = json.optInt("freezeCount", 0)
             val totalFreezesDurationSec = json.optDouble("totalFreezesDurationSec", 0.0)
             val jitterBufferDelayMs = json.optDouble("jitterBufferDelayMs", 0.0)
@@ -475,6 +477,7 @@ object NetworkOptimizer {
                 jitterMs = jitter,
                 packetsLostPercent = loss,
                 framesDropped = framesDropped,
+                framesDecoded = framesDecoded,
                 freezeCount = freezeCount,
                 totalFreezesDurationSec = totalFreezesDurationSec,
                 jitterBufferDelayMs = jitterBufferDelayMs,

@@ -296,56 +296,370 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify two stage nearest xbox country selection and physical ping calibration`() {
-        val vnGeo = com.example.vpn.GeoIpResult(
-            ip = "113.161.72.10",
-            countryCode = "VN",
-            countryName = "Việt Nam",
-            city = "Ho Chi Minh City",
-            flagEmoji = "🇻🇳",
-            isXboxSupported = false,
-            latitude = 10.8231,
-            longitude = 106.6297
-        )
-        VpnManager.updateSmartDecision(vnGeo)
+    fun `test 1 A1 no physical distance ping calibration and real measured rtt preserved`() {
+        val methodsInPingTester = com.example.vpn.PingTester::class.java.declaredMethods.map { it.name }
+        val methodsInProbeTester = com.example.vpn.RegionalProbeTester::class.java.declaredMethods.map { it.name }
+        org.junit.Assert.assertFalse(methodsInPingTester.any { it.contains("calibrateMeasured") || it.contains("computeMinimumPhysicalRtt") })
+        org.junit.Assert.assertFalse(methodsInProbeTester.any { it.contains("calibrateMeasured") || it.contains("computeMinimumPhysicalRtt") })
+    }
 
+    @Test
+    fun `test 2 A2 summarizeRawSamples computes median min max without subtracting 960`() {
+        val methodsInPingTester = com.example.vpn.PingTester::class.java.declaredMethods.map { it.name }
+        org.junit.Assert.assertFalse(methodsInPingTester.any { it.contains("normalizeKernelSynRetransmit") })
+
+        // Samples [45, 52, 980]: median must be 52, min=45, max=980
+        val summary = com.example.vpn.PingTester.summarizeRawSamples(listOf(45, 980, 52))
+        assertNotNull(summary)
+        val (medianRtt, minRtt, maxRtt) = summary!!
+        assertEquals(52, medianRtt)
+        assertEquals(45, minRtt)
+        assertEquals(980, maxRtt)
+        assertTrue((maxRtt - minRtt) >= 80)
+
+        // Samples >= 1000ms must NOT be reduced by 960 or modulo 960
+        val highSummary = com.example.vpn.PingTester.summarizeRawSamples(listOf(1020, 1080))
+        assertNotNull(highSummary)
+        assertTrue("RTT >= 1000ms must remain >= 1000ms", highSummary!!.first >= 1000)
+    }
+
+    @Test
+    fun `test 3 A3 fallback port measurement separates MEASURED_PRIMARY and MEASURED_FALLBACK_ONLY`() {
+        val primaryMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 58,
+            minRttMs = 55,
+            maxRttMs = 61,
+            configuredPort = 1194,
+            measuredPort = 1194,
+            resolvedIp = "219.100.37.10",
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+        assertTrue(primaryMeasurement.isPrimaryPortAlive)
+        org.junit.Assert.assertFalse(primaryMeasurement.isFallbackPortOnly)
+        assertEquals("58ms (:1194)", primaryMeasurement.formatDisplayBadge(isEn = false))
+
+        val fallbackMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 63,
+            minRttMs = 61,
+            maxRttMs = 65,
+            configuredPort = 1194,
+            measuredPort = 443,
+            resolvedIp = "219.100.37.10",
+            measurementType = com.example.vpn.PingMeasurementType.TCP_FALLBACK_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_FALLBACK_ONLY,
+            isUnstable = false
+        )
+        org.junit.Assert.assertFalse(fallbackMeasurement.isPrimaryPortAlive)
+        assertTrue(fallbackMeasurement.isFallbackPortOnly)
+        assertTrue(fallbackMeasurement.formatDisplayBadge(isEn = false).contains(":443"))
+        assertTrue(fallbackMeasurement.formatDisplayBadge(isEn = false).contains("Cổng :1194 đóng"))
+    }
+
+    @Test
+    fun `test 4 A4 Globalping default off null coordinates when no GeoIP and 200 per hour quota`() {
+        val defaultConfig = com.example.data.AppConfig()
+        org.junit.Assert.assertFalse("Globalping must be OFF by default", defaultConfig.enableGlobalpingProbe)
+
+        // Missing GeoIP must return null coordinates (never default to VN)
+        val emptyGeo = com.example.vpn.GeoIpResult(ip = "", countryCode = "", countryName = "", city = "", flagEmoji = "", isXboxSupported = false)
+        org.junit.Assert.assertNull(com.example.vpn.RegionalProbeTester.resolveUserCoordinatesOrNull(emptyGeo))
+        assertTrue(com.example.vpn.RegionalProbeTester.selectOrderedProbes(emptyGeo).isEmpty())
+
+        // Quota enforcement: 200 per hour
+        com.example.vpn.RegionalProbeTester.resetQuotaForTest()
+        var acquiredCount = 0
+        for (i in 1..205) {
+            if (com.example.vpn.RegionalProbeTester.tryAcquireHourlyQuota(nowMs = 1_000_000L + i)) {
+                acquiredCount++
+            }
+        }
+        assertEquals(com.example.vpn.RegionalProbeTester.LOCAL_DEVICE_HOURLY_CAP, acquiredCount)
+
+        // Estimate label clearly states station and excludes phone-to-station leg
+        val estimate = com.example.vpn.GlobalpingProbeEstimate(
+            rttMs = 68,
+            probeId = "vn_han",
+            probeCity = "Hà Nội",
+            probeDisplayName = "Hà Nội (VN)",
+            timestampMs = 1000L
+        )
+        assertTrue(estimate.formatLabel(isEn = false).contains("Ước lượng từ trạm Hà Nội (không gồm đoạn từ điện thoại tới trạm): 68 ms"))
+    }
+
+    @Test
+    fun `test 5 A5 server sorting prioritizes real ping over geography and MEASURED_PRIMARY before MEASURED_FALLBACK_ONLY`() {
+        val emptyGeo = com.example.vpn.GeoIpResult(ip = "", countryCode = "", countryName = "", city = "", flagEmoji = "", isXboxSupported = false)
         val allServers = VpnManager.getAllServers()
-        val jpServer = allServers.first { it.countryCode == "JP" }
-        val krServer = allServers.first { it.countryCode == "KR" }
-        val usServer = allServers.first { it.countryCode == "US" }
+        // Without GeoIP, getNearestSupportedCountryTier must return 0 for all countries
+        assertEquals(0, com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("JP", allServers, emptyGeo))
+        assertEquals(0, com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("US", allServers, emptyGeo))
 
-        // Stage 1: For Vietnam user, JP and KR are Tier 0 (nearest Xbox-supported countries), while US is Tier 2 (trans-oceanic)
-        val jpTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("JP", allServers, vnGeo)
-        val krTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("KR", allServers, vnGeo)
-        val usTier = com.example.vpn.RegionalProbeTester.getNearestSupportedCountryTier("US", allServers, vnGeo)
-        assertEquals(0, jpTier)
-        assertEquals(0, krTier)
-        assertTrue("US must be in a distant tier from Vietnam", usTier > 0)
-
-        // Physical distance calibration prevents fake 47ms Anycast ping on US server from Vietnam
-        val calibratedUsPing = com.example.vpn.RegionalProbeTester.calibrateMeasuredRttWithPhysicalDistance(
-            rawRttMs = 47,
-            server = usServer,
-            geo = vnGeo
-        )
-        assertTrue("Calibrated US ping from Vietnam must be >= 140ms (got $calibratedUsPing)", calibratedUsPing >= 140)
-
-        // Stage 2: Sorting prioritizes nearest Xbox-supported country and lowest ping within that region
-        val pingMap = mapOf(
-            usServer.id to calibratedUsPing,
-            jpServer.id to 88,
-            krServer.id to 72
+        val s1 = allServers[0]
+        val s2 = allServers[1]
+        val pingMap = mapOf(s1.id to -1, s2.id to 75)
+        val detailsMap = mapOf(
+            s1.id to com.example.vpn.EndpointPingMeasurement(
+                rttMs = 50,
+                minRttMs = 50,
+                maxRttMs = 50,
+                configuredPort = s1.port,
+                measuredPort = 443,
+                resolvedIp = s1.ip,
+                measurementType = com.example.vpn.PingMeasurementType.TCP_FALLBACK_PORT,
+                status = com.example.vpn.ServerPingStatus.MEASURED_FALLBACK_ONLY
+            ),
+            s2.id to com.example.vpn.EndpointPingMeasurement(
+                rttMs = 75,
+                minRttMs = 75,
+                maxRttMs = 75,
+                configuredPort = s2.port,
+                measuredPort = s2.port,
+                resolvedIp = s2.ip,
+                measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+                status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY
+            )
         )
         val sorted = VpnManager.sortServersByUnlockAndPing(
-            servers = listOf(usServer, jpServer, krServer),
+            servers = listOf(s1, s2),
             pingMap = pingMap,
             records = emptyMap(),
             engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            sessions = emptyList(),
+            measurementsMap = detailsMap
+        )
+        // s2 (MEASURED_PRIMARY 75ms) must come before s1 (MEASURED_FALLBACK_ONLY 50ms)
+        assertEquals(s2.id, sorted[0].id)
+        assertEquals(s1.id, sorted[1].id)
+    }
+
+    @Test
+    fun `test 6 A6 AppLogger redacts sensitive tokens before storing and enforces 300 lines and 64KB cap`() {
+        com.example.data.AppLogger.clear()
+        val rawSecretLog = """GET https://user:myPass123@xbox.com/play?access_token=abc987xyz Authorization: Bearer eyJhbGciOiJIUzI1NiJ9 Cookie: MSCC=secret_cookie; RPSAuth=tok123 {"token":"jsonSecret999","email":"gamer@example.com"}"""
+        com.example.data.AppLogger.info("AUTH", rawSecretLog)
+
+        val storedEntry = com.example.data.AppLogger.logs.value.last()
+        org.junit.Assert.assertFalse(storedEntry.message.contains("myPass123"))
+        org.junit.Assert.assertFalse(storedEntry.message.contains("abc987xyz"))
+        org.junit.Assert.assertFalse(storedEntry.message.contains("eyJhbGciOiJIUzI1NiJ9"))
+        org.junit.Assert.assertFalse(storedEntry.message.contains("secret_cookie"))
+        org.junit.Assert.assertFalse(storedEntry.message.contains("jsonSecret999"))
+        org.junit.Assert.assertFalse(storedEntry.message.contains("gamer@example.com"))
+        assertTrue(storedEntry.message.contains("[REDACTED]"))
+
+        // Enforce 300 entries and 64KB limit
+        for (i in 1..350) {
+            com.example.data.AppLogger.info("TEST", "Log line $i with padding " + "X".repeat(220))
+        }
+        assertTrue(com.example.data.AppLogger.logs.value.size <= com.example.data.AppLogger.MAX_LOGS)
+        val totalBytes = com.example.data.AppLogger.logs.value.sumOf { (it.timestamp.length + it.tag.length + it.message.length + 16) * 2 }
+        assertTrue(totalBytes <= com.example.data.AppLogger.MAX_TOTAL_BYTES)
+
+        com.example.data.AppLogger.clear()
+        assertTrue(com.example.data.AppLogger.logs.value.isEmpty())
+    }
+
+    @Test
+    fun `test 7 A7 verify public directory does not exist in workspace`() {
+        val publicDir = java.io.File("public")
+        org.junit.Assert.assertFalse("public/ directory must not exist", publicDir.exists())
+    }
+
+    @Test
+    fun `test 8 A8 scalable 2-step representative selection socket cap cache and generation guard`() {
+        assertTrue(com.example.vpn.PingTester.MAX_CONCURRENT_SOCKETS in 4..6)
+
+        val allServers = VpnManager.getAllServers()
+        val reps = VpnManager.selectStep1RepresentativeServers(allServers)
+        // At most 3 representatives per country
+        val byCountry = reps.groupBy { it.countryCode }
+        assertTrue(byCountry.values.all { it.size <= 3 })
+
+        // Verify generation guard ignores stale measurement writes
+        val currentGen = VpnManager.getCurrentMeasurementGeneration()
+        val staleGen = currentGen - 1L
+        val targetServer = allServers.first()
+        val staleMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 99,
+            minRttMs = 99,
+            maxRttMs = 99,
+            configuredPort = targetServer.port,
+            measuredPort = targetServer.port,
+            resolvedIp = targetServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY
+        )
+        org.junit.Assert.assertFalse(
+            VpnManager.recordMeasurementIfCurrentGeneration(staleGen, targetServer.id, staleMeasurement)
+        )
+    }
+
+    @Test
+    fun `test 9 B1 SessionHistoryRepository backward compatibility with legacy JSON`() {
+        val legacyJson = """
+            [
+              {
+                "id": "legacy_1",
+                "gameTitle": "Halo Infinite",
+                "startTimeMillis": 1700000000000,
+                "durationSeconds": 180,
+                "serverName": "Japan Tokyo #1",
+                "isDirectNetwork": true,
+                "avgFps": 60,
+                "avgPingMs": 55,
+                "framesDropped": 4,
+                "avgDecodeMs": 6.2,
+                "jitterMs": 5,
+                "freezeCount": 0
+              }
+            ]
+        """.trimIndent()
+        val parsed = com.example.data.SessionHistoryRepository.deserializeSessionsJson(legacyJson)
+        assertEquals(1, parsed.size)
+        assertEquals("Halo Infinite", parsed[0].gameTitle)
+        assertEquals("", parsed[0].networkType)
+        assertEquals(0, parsed[0].framesDecoded)
+    }
+
+    @Test
+    fun `test 10 B2 diagnoseSessionLag handles insufficient data freeze without network blame and decode overload`() {
+        // 1. Short session (< 30s) -> isInsufficientData = true
+        val shortSession = com.example.data.PlaySessionRecord(
+            id = "s_short",
+            gameTitle = "Fortnite",
+            startTimeMillis = 1700000000000L,
+            durationSeconds = 15L,
+            serverName = "Japan #1",
+            isDirectNetwork = true,
+            avgPingMs = 50,
+            avgFps = 60,
+            avgDecodeMs = 6.0,
+            isSlowDecode = false,
+            isThermalHot = false,
+            pingSamples = listOf(50)
+        )
+        val shortDiag = com.example.ui.tabs.diagnoseSessionLag(shortSession, isEn = false)
+        assertTrue(shortDiag.isInsufficientData)
+        assertTrue(shortDiag.evidenceSentence.contains("Chưa đủ dữ liệu"))
+
+        // 2. Freeze > 0 while ping (45ms) and jitter (5ms) are normal -> must NOT blame network
+        val freezeNormalNetSession = com.example.data.PlaySessionRecord(
+            id = "s_freeze",
+            gameTitle = "Fortnite",
+            startTimeMillis = 1700000000000L,
+            durationSeconds = 120L,
+            serverName = "Japan #1",
+            isDirectNetwork = true,
+            avgPingMs = 45,
+            avgFps = 58,
+            avgDecodeMs = 6.5,
+            isSlowDecode = false,
+            isThermalHot = false,
+            pingSamples = listOf(44, 46),
+            framesDecoded = 7000,
+            framesDropped = 10,
+            jitterMs = 5,
+            freezeCount = 2
+        )
+        val freezeDiag = com.example.ui.tabs.diagnoseSessionLag(freezeNormalNetSession, isEn = false)
+        org.junit.Assert.assertFalse(freezeDiag.isInsufficientData)
+        assertTrue(freezeDiag.evidenceSentence.contains("đều bình thường"))
+        assertTrue(freezeDiag.suggestionSentence.contains("không phải do độ trễ mạng"))
+
+        // 3. Decode overload only when avgDecodeMs > 12.0 AND dropRatioPct > 2.0%
+        val decodeOverloadSession = freezeNormalNetSession.copy(
+            id = "s_decode",
+            framesDecoded = 4000,
+            framesDropped = 200, // ~4.76% > 2.0%
+            avgDecodeMs = 14.5,
+            isSlowDecode = true
+        )
+        val decodeDiag = com.example.ui.tabs.diagnoseSessionLag(decodeOverloadSession, isEn = false)
+        assertTrue(decodeDiag.evidenceSentence.contains("Thời gian giải mã trung bình"))
+    }
+
+    @Test
+    fun `test 11 B3 diagnoseSessionLag performs zero network operations`() {
+        com.example.vpn.PingTester.resetSocketCountersForTest()
+        val session = com.example.data.PlaySessionRecord(
+            id = "s_offline",
+            gameTitle = "Forza",
+            startTimeMillis = 1700000000000L,
+            durationSeconds = 90L,
+            serverName = "Korea #1",
+            isDirectNetwork = true,
+            avgPingMs = 60,
+            avgFps = 60,
+            avgDecodeMs = 5.5,
+            isSlowDecode = false,
+            isThermalHot = false,
+            pingSamples = listOf(58, 62),
+            framesDecoded = 5400,
+            framesDropped = 5,
+            jitterMs = 4
+        )
+        val diag = com.example.ui.tabs.diagnoseSessionLag(session, isEn = false)
+        org.junit.Assert.assertFalse(diag.isInsufficientData)
+        assertEquals(0, com.example.vpn.PingTester.getPeakOpenSocketsCount())
+    }
+
+    @Test
+    fun `test 12 C1 C2 C3 standardized metric explanations and 3-state accessible text labels`() {
+        val keys = listOf("ping", "jitter", "decode", "buffer", "dropped", "freeze")
+        for (key in keys) {
+            val expVi = com.example.ui.tabs.getMetricOneSentenceExplanation(key, isEn = false)
+            assertNotNull("Explanation for $key must not be null", expVi)
+            assertTrue("Explanation for $key must not be blank", expVi!!.isNotBlank())
+        }
+        assertEquals("Tốt", com.example.ui.tabs.pingStatusLabel(55, isEn = false))
+        assertEquals("Trung bình", com.example.ui.tabs.pingStatusLabel(95, isEn = false))
+        assertEquals("Cao", com.example.ui.tabs.pingStatusLabel(145, isEn = false))
+
+        assertEquals("Tốt", com.example.ui.tabs.jitterStatusLabel(5, isEn = false))
+        assertEquals("Trung bình", com.example.ui.tabs.jitterStatusLabel(15, isEn = false))
+        assertEquals("Cao", com.example.ui.tabs.jitterStatusLabel(28, isEn = false))
+
+        assertEquals("Tốt", com.example.ui.tabs.dropRatioStatusLabel(0.2, isEn = false))
+        assertEquals("Trung bình", com.example.ui.tabs.dropRatioStatusLabel(1.2, isEn = false))
+        assertEquals("Cao", com.example.ui.tabs.dropRatioStatusLabel(3.5, isEn = false))
+    }
+
+    @Test
+    fun `test 13 C4 verify over-promising strings removed and UNLOCKED prioritized before UNTESTED`() {
+        // Verify CellularOptimizationMode display names no longer contain "Ultra"
+        val modes = com.example.data.CellularOptimizationMode.values()
+        for (mode in modes) {
+            org.junit.Assert.assertFalse(mode.title.contains("Ultra", ignoreCase = true))
+            org.junit.Assert.assertFalse(mode.titleEn.contains("Ultra", ignoreCase = true))
+        }
+
+        // Verify UNLOCKED server is prioritized before UNTESTED
+        val allServers = VpnManager.getAllServers()
+        val krIncheon = allServers.first { it.name.contains("Incheon", ignoreCase = true) }
+        val jpTsukuba = allServers.first { it.name.contains("Tsukuba #7", ignoreCase = true) }
+
+        val krKey = "${krIncheon.ip.trim().lowercase()}:${krIncheon.port}"
+        val records = mapOf(
+            krKey to com.example.vpn.ServerUnlockRecord(
+                serverKey = krKey,
+                status = com.example.vpn.RegionUnlockStatus.UNLOCKED
+            )
+        )
+        val pingMap = mapOf(
+            krIncheon.id to 120,
+            jpTsukuba.id to 63
+        )
+        val sorted = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(jpTsukuba, krIncheon),
+            pingMap = pingMap,
+            records = records,
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
             sessions = emptyList()
         )
-        assertEquals("Best server in nearest supported region (KR 72ms) must be first", krServer.id, sorted[0].id)
-        assertEquals("Second server in nearest supported region (JP 88ms) must be second", jpServer.id, sorted[1].id)
-        assertEquals("Distant US server must be ranked last", usServer.id, sorted[2].id)
+        assertEquals(krIncheon.id, sorted[0].id)
+        assertEquals(jpTsukuba.id, sorted[1].id)
     }
 }
 

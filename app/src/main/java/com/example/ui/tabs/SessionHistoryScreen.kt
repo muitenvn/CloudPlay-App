@@ -100,6 +100,180 @@ private enum class HistoryFilterMode {
 }
 
 /**
+ * Cấu hình ngưỡng chẩn đoán nguyên nhân giật/trễ (Nhóm B2 & C3).
+ */
+object LagDiagnosticConfig {
+    const val MIN_DURATION_SECONDS = 30L
+
+    // Độ trễ mạng (ms)
+    const val GOOD_PING_MAX_MS = 80
+    const val FAIR_PING_MAX_MS = 120
+
+    // Độ biến động mạng - Jitter (ms)
+    const val GOOD_JITTER_MAX_MS = 12
+    const val FAIR_JITTER_MAX_MS = 20
+
+    // Tỉ lệ khung hình bị rớt (%)
+    const val GOOD_DROP_MAX_PCT = 0.5
+    const val FAIR_DROP_MAX_PCT = 2.0
+
+    // Thời gian giải mã mỗi khung hình (ms)
+    const val GOOD_DECODE_MAX_MS = 10.0
+    const val SLOW_DECODE_MIN_MS = 12.0
+}
+
+data class SessionLagDiagnosis(
+    val isInsufficientData: Boolean,
+    val evidenceSentence: String,
+    val suggestionSentence: String,
+    val dropRatioPct: Double,
+    val usedEstimatedDenominator: Boolean
+)
+
+fun computeSessionDropRatio(session: PlaySessionRecord): Pair<Double, Boolean> {
+    val dropped = session.framesDropped.coerceAtLeast(0)
+    return if (session.framesDecoded > 0) {
+        val total = (session.framesDecoded + dropped).coerceAtLeast(1)
+        val pct = (dropped.toDouble() * 100.0) / total.toDouble()
+        pct to false
+    } else {
+        val estimatedRendered = (session.durationSeconds.coerceAtLeast(1L) * session.avgFps.coerceAtLeast(30)).coerceAtLeast(1L)
+        val total = (estimatedRendered + dropped).coerceAtLeast(1L)
+        val pct = (dropped.toDouble() * 100.0) / total.toDouble()
+        pct to true
+    }
+}
+
+/**
+ * B2 & B3: Phân tích "Vì sao có lag?" chỉ dựa trên số liệu thật đã lưu trong PlaySessionRecord.
+ * Không phát sinh bất kỳ truy vấn mạng mới nào; không đổ lỗi cho mạng chỉ vì freezeCount > 0 khi ping và jitter bình thường;
+ * chỉ kết luận giải mã chậm khi avgDecodeMs > 12.0ms kèm tỉ lệ khung hình bị rớt > 2.0%.
+ */
+fun diagnoseSessionLag(session: PlaySessionRecord, isEn: Boolean): SessionLagDiagnosis {
+    val (dropRatioPct, usedEstimate) = computeSessionDropRatio(session)
+    val dropStr = String.format(Locale.US, "%.1f", dropRatioPct)
+    val estSuffix = if (usedEstimate) {
+        if (isEn) " (estimated from avg FPS)" else " (ước tính từ FPS trung bình)"
+    } else {
+        ""
+    }
+
+    if (session.durationSeconds < LagDiagnosticConfig.MIN_DURATION_SECONDS ||
+        (session.avgPingMs <= 0 && session.avgFps <= 0 && session.avgDecodeMs <= 0.0)
+    ) {
+        return SessionLagDiagnosis(
+            isInsufficientData = true,
+            evidenceSentence = if (isEn) {
+                "Insufficient data to analyze this session."
+            } else {
+                "Chưa đủ dữ liệu để phân tích phiên chơi này."
+            },
+            suggestionSentence = "",
+            dropRatioPct = dropRatioPct,
+            usedEstimatedDenominator = usedEstimate
+        )
+    }
+
+    val isSlowDecodeWithDrops =
+        (session.avgDecodeMs > LagDiagnosticConfig.SLOW_DECODE_MIN_MS || session.isSlowDecode) &&
+            dropRatioPct > LagDiagnosticConfig.FAIR_DROP_MAX_PCT
+
+    if (isSlowDecodeWithDrops) {
+        val evidence = if (isEn) {
+            "Decode time averaged ${session.avgDecodeMs}ms with $dropStr% dropped frames$estSuffix."
+        } else {
+            "Thời gian giải mã trung bình ${session.avgDecodeMs}ms kèm tỉ lệ khung hình bị rớt $dropStr%$estSuffix."
+        }
+        val suggestion = if (isEn) {
+            "Suggestion: Consider lowering stream bitrate to 720p or enabling Low-End Device Mode to reduce hardware decode load."
+        } else {
+            "Gợi ý: Có thể thử giảm chất lượng truyền tải xuống 720p hoặc bật Chế độ máy yếu để giảm tải giải mã."
+        }
+        return SessionLagDiagnosis(
+            isInsufficientData = false,
+            evidenceSentence = evidence,
+            suggestionSentence = suggestion,
+            dropRatioPct = dropRatioPct,
+            usedEstimatedDenominator = usedEstimate
+        )
+    }
+
+    val isHighPing = session.avgPingMs > LagDiagnosticConfig.FAIR_PING_MAX_MS
+    val isHighJitter = session.jitterMs > LagDiagnosticConfig.FAIR_JITTER_MAX_MS
+
+    if (isHighPing || isHighJitter) {
+        val evidence = if (isEn) {
+            "Network latency averaged ${session.avgPingMs}ms with ${session.jitterMs}ms network jitter during this session."
+        } else {
+            "Độ trễ mạng trung bình ${session.avgPingMs}ms và độ biến động mạng ${session.jitterMs}ms vượt ngưỡng ổn định trong phiên."
+        }
+        val suggestion = when {
+            !session.isDirectNetwork -> if (isEn) {
+                "Suggestion: Try enabling auto VPN disconnect after game launch or selecting a lower-latency server."
+            } else {
+                "Gợi ý: Có thể thử bật Tự tắt VPN sau khi vào game hoặc chọn máy chủ có độ trễ mạng thấp hơn."
+            }
+            session.networkType.contains("CELLULAR", ignoreCase = true) ||
+                session.networkType.contains("4G", ignoreCase = true) -> if (isEn) {
+                "Suggestion: Mobile network jitter was elevated; switching to a stable Wi-Fi connection may help if available."
+            } else {
+                "Gợi ý: Mạng di động có độ biến động cao, có thể thử chuyển sang kết nối Wi-Fi ổn định nếu sẵn có."
+            }
+            else -> if (isEn) {
+                "Suggestion: Check your current network signal or test server latency before launching the next session."
+            } else {
+                "Gợi ý: Có thể kiểm tra lại tín hiệu mạng hiện tại hoặc đo độ trễ máy chủ trước khi vào phiên tiếp theo."
+            }
+        }
+        return SessionLagDiagnosis(
+            isInsufficientData = false,
+            evidenceSentence = evidence,
+            suggestionSentence = suggestion,
+            dropRatioPct = dropRatioPct,
+            usedEstimatedDenominator = usedEstimate
+        )
+    }
+
+    if (session.freezeCount > 0 || dropRatioPct > LagDiagnosticConfig.FAIR_DROP_MAX_PCT) {
+        val evidence = if (isEn) {
+            "Network latency (${session.avgPingMs}ms), network jitter (${session.jitterMs}ms), and decode time (${session.avgDecodeMs}ms) were normal, but ${session.freezeCount} temporary freezes ($dropStr% dropped frames$estSuffix) occurred."
+        } else {
+            "Độ trễ mạng (${session.avgPingMs}ms), độ biến động mạng (${session.jitterMs}ms) và thời gian giải mã (${session.avgDecodeMs}ms) đều bình thường, nhưng có ${session.freezeCount} lần đứng hình tạm thời (rớt $dropStr%$estSuffix)."
+        }
+        val suggestion = if (isEn) {
+            "Suggestion: This pattern may come from remote cloud encoder spikes or background tasks on the device rather than network latency."
+        } else {
+            "Gợi ý: Hiện tượng này có thể đến từ phía luồng máy chủ đám mây hoặc tác vụ chạy nền trên thiết bị, không phải do độ trễ mạng."
+        }
+        return SessionLagDiagnosis(
+            isInsufficientData = false,
+            evidenceSentence = evidence,
+            suggestionSentence = suggestion,
+            dropRatioPct = dropRatioPct,
+            usedEstimatedDenominator = usedEstimate
+        )
+    }
+
+    val evidence = if (isEn) {
+        "Network latency (${session.avgPingMs}ms), network jitter (${session.jitterMs}ms), and decode time (${session.avgDecodeMs}ms) remained within good thresholds."
+    } else {
+        "Độ trễ mạng (${session.avgPingMs}ms), độ biến động mạng (${session.jitterMs}ms) và thời gian giải mã (${session.avgDecodeMs}ms) đều nằm trong ngưỡng ổn định."
+    }
+    val suggestion = if (isEn) {
+        "Suggestion: Your current network and stream bitrate settings are working well."
+    } else {
+        "Gợi ý: Có thể giữ nguyên cấu hình mạng và mức chất lượng truyền tải hiện tại."
+    }
+    return SessionLagDiagnosis(
+        isInsufficientData = false,
+        evidenceSentence = evidence,
+        suggestionSentence = suggestion,
+        dropRatioPct = dropRatioPct,
+        usedEstimatedDenominator = usedEstimate
+    )
+}
+
+/**
  * Ngưỡng đánh giá chất lượng phiên chơi theo tỉ lệ thời gian (tập trung tại một nơi để dễ tinh chỉnh).
  */
 object SessionVerdictThresholds {
@@ -132,9 +306,7 @@ private data class SessionVerdictEvaluation(
 )
 
 private fun evaluateSessionVerdict(session: PlaySessionRecord): SessionVerdictEvaluation {
-    val estimatedRenderedFrames = (session.durationSeconds.coerceAtLeast(1L) * session.avgFps.coerceAtLeast(30)).coerceAtLeast(1L)
-    val totalFrames = (estimatedRenderedFrames + session.framesDropped.coerceAtLeast(0)).coerceAtLeast(1L)
-    val dropRatioPct = (session.framesDropped.coerceAtLeast(0).toDouble() * 100.0) / totalFrames.toDouble()
+    val (dropRatioPct, _) = computeSessionDropRatio(session)
     val durationMinutes = (session.durationSeconds.coerceAtLeast(1L).toDouble() / 60.0).coerceAtLeast(0.1)
     val freezesPerMinute = session.freezeCount.coerceAtLeast(0).toDouble() / durationMinutes
 
@@ -563,9 +735,10 @@ private fun WeeklySummaryCard(
                     modifier = Modifier.weight(1f)
                 )
                 SummaryStatTile(
-                    label = if (isEn) "Avg Ping" else "Ping TB",
+                    label = if (isEn) "Network latency" else "Độ trễ mạng",
                     value = if (avgPingMs > 0) "${animatedAvgPing}ms" else "--",
                     valueColor = if (avgPingMs > 0) pingMetricColor(avgPingMs) else TextSecondary,
+                    statusBadgeText = if (avgPingMs > 0) pingStatusLabel(avgPingMs, isEn) else null,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -578,10 +751,25 @@ private fun SummaryStatTile(
     label: String,
     value: String,
     valueColor: Color,
+    statusBadgeText: String? = null,
+    onClick: (() -> Unit)? = null,
+    testTagName: String? = null,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick() }
+                } else {
+                    Modifier
+                }
+            )
+            .then(
+                if (testTagName != null) Modifier.testTag(testTagName) else Modifier
+            ),
         shape = RoundedCornerShape(12.dp),
         color = XboxSurfaceVariant.copy(alpha = 0.85f),
         border = BorderStroke(0.8.dp, XboxCardBorder)
@@ -590,20 +778,38 @@ private fun SummaryStatTile(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text(
-                text = label,
-                color = TextSecondary,
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    color = TextSecondary,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (!statusBadgeText.isNullOrBlank()) {
+                    Text(
+                        text = statusBadgeText,
+                        color = valueColor,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
             Text(
                 text = value,
                 color = valueColor,
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 14.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.ExtraBold,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -795,22 +1001,24 @@ private fun SessionHistoryItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // 3 chip số liệu (Ping / FPS / Giải mã) xếp gọn trên 1 hàng, không tràn ngang
+                // 3 chip số liệu (Độ trễ mạng / FPS / Thời gian giải mã) kèm nhãn chữ 3 mức (Tốt / Trung bình / Cao)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val pingTag = pingStatusLabel(session.avgPingMs, isEn)
                     MetricChip(
-                        text = "Ping ${session.avgPingMs}ms",
+                        text = if (isEn) "Latency ${session.avgPingMs}ms ($pingTag)" else "Độ trễ ${session.avgPingMs}ms ($pingTag)",
                         color = pingMetricColor(session.avgPingMs)
                     )
                     MetricChip(
                         text = "${session.avgFps} FPS",
                         color = fpsMetricColor(session.avgFps)
                     )
+                    val decTag = decodeStatusLabel(session.avgDecodeMs, isEn)
                     MetricChip(
-                        text = if (isEn) "Dec ${session.avgDecodeMs}ms" else "Giải mã ${session.avgDecodeMs}ms",
+                        text = if (isEn) "Decode ${session.avgDecodeMs}ms ($decTag)" else "Giải mã ${session.avgDecodeMs}ms ($decTag)",
                         color = decodeMetricColor(session.avgDecodeMs)
                     )
                 }
@@ -853,9 +1061,9 @@ private fun MetricChip(
             text = text,
             color = color,
             fontFamily = JetBrainsMonoFontFamily,
-            fontSize = 9.5.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp)
+            modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 2.5.dp)
         )
     }
 }
@@ -910,6 +1118,8 @@ private fun SessionDetailDialog(
     }
     val minPing = remember(chartSamples) { chartSamples.minOrNull() ?: session.avgPingMs }
     val maxPing = remember(chartSamples) { chartSamples.maxOrNull() ?: session.avgPingMs }
+    val lagDiagnosis = remember(session, isEn) { diagnoseSessionLag(session, isEn) }
+    var selectedMetricKey by remember { mutableStateOf<String?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -939,7 +1149,7 @@ private fun SessionDetailDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header
                 Row(
@@ -1003,7 +1213,7 @@ private fun SessionDetailDialog(
                     else -> if (isEn) {
                         String.format(
                             Locale.US,
-                            "Drop %.1f%% • Freezes %.1f/min • Ping %dms • Jitter %dms",
+                            "Dropped %.1f%% • Freezes %.1f/min • Latency %dms • Jitter %dms",
                             verdict.dropRatioPct,
                             verdict.freezesPerMinute,
                             session.avgPingMs,
@@ -1012,7 +1222,7 @@ private fun SessionDetailDialog(
                     } else {
                         String.format(
                             Locale.US,
-                            "Rớt %.1f%% • Đứng %.1f lần/phút • Ping %dms • Jitter %dms",
+                            "Khung hình bị rớt %.1f%% • Đứng hình tạm thời %.1f lần/phút • Độ trễ mạng %dms • Độ biến động mạng %dms",
                             verdict.dropRatioPct,
                             verdict.freezesPerMinute,
                             session.avgPingMs,
@@ -1038,7 +1248,7 @@ private fun SessionDetailDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1060,8 +1270,8 @@ private fun SessionDetailDialog(
                                         color = verdictColor,
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontWeight = FontWeight.Black,
-                                        fontSize = 13.5.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
                                 Text(
@@ -1076,14 +1286,53 @@ private fun SessionDetailDialog(
                                 text = verdictSummary,
                                 color = TextSecondary,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 9.5.sp,
                                 maxLines = 2
                             )
                         }
                     }
                 }
 
-                // Biểu đồ đường ping theo thời gian
+                // B2: Thẻ "Vì sao có lag?" chỉ sử dụng dữ liệu đã lưu trong PlaySessionRecord
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("why_lag_diagnostic_card"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = XboxSurface.copy(alpha = 0.94f),
+                    border = BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) "WHY WAS THERE LAG?" else "VÌ SAO CÓ LAG?",
+                            color = DirectCyan,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.6.sp
+                        )
+                        Text(
+                            text = lagDiagnosis.evidenceSentence,
+                            color = TextPrimary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (lagDiagnosis.suggestionSentence.isNotBlank()) {
+                            Text(
+                                text = lagDiagnosis.suggestionSentence,
+                                color = TextSecondary,
+                                fontSize = 10.5.sp
+                            )
+                        }
+                    }
+                }
+
+                // Biểu đồ đường độ trễ mạng theo thời gian
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -1091,8 +1340,8 @@ private fun SessionDetailDialog(
                     border = BorderStroke(1.dp, XboxCardBorder)
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1111,9 +1360,9 @@ private fun SessionDetailDialog(
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Text(
-                                    text = if (isEn) "PING CHART" else "BIỂU ĐỒ PING",
+                                    text = if (isEn) "NETWORK LATENCY CHART" else "BIỂU ĐỒ ĐỘ TRỄ MẠNG",
                                     color = TextSecondary,
-                                    fontSize = 10.5.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -1136,26 +1385,33 @@ private fun SessionDetailDialog(
                             strokeColor = pingMetricColor(session.avgPingMs),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(64.dp)
+                                .height(54.dp)
                         )
                     }
                 }
 
-                // Số liệu đầy đủ
+                // C1, C2, C3: Các ô chỉ số chuẩn hóa thuật ngữ, có nhãn chữ 3 mức (Tốt / Trung bình / Cao) và chạm để xem giải thích <= 1 câu
+                val dropPctFormatted = String.format(Locale.US, "%.1f%%", lagDiagnosis.dropRatioPct)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SummaryStatTile(
-                        label = if (isEn) "Duration" else "Thời lượng",
-                        value = formatDurationCompact(session.durationSeconds, isEn),
-                        valueColor = TextPrimary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    SummaryStatTile(
-                        label = if (isEn) "Avg Ping" else "Ping TB",
+                        label = if (isEn) "Network latency" else "Độ trễ mạng",
                         value = "${session.avgPingMs}ms",
                         valueColor = pingMetricColor(session.avgPingMs),
+                        statusBadgeText = pingStatusLabel(session.avgPingMs, isEn),
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "ping") null else "ping" },
+                        testTagName = "metric_tile_ping",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatTile(
+                        label = if (isEn) "Network jitter" else "Độ biến động mạng",
+                        value = "${session.jitterMs}ms",
+                        valueColor = jitterMetricColor(session.jitterMs),
+                        statusBadgeText = jitterStatusLabel(session.jitterMs, isEn),
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "jitter") null else "jitter" },
+                        testTagName = "metric_tile_jitter",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -1165,29 +1421,70 @@ private fun SessionDetailDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SummaryStatTile(
-                        label = if (isEn) "Avg FPS" else "FPS TB",
-                        value = "${session.avgFps} FPS",
-                        valueColor = fpsMetricColor(session.avgFps),
+                        label = if (isEn) "Decode time" else "Thời gian giải mã",
+                        value = "${session.avgDecodeMs}ms",
+                        valueColor = decodeMetricColor(session.avgDecodeMs),
+                        statusBadgeText = decodeStatusLabel(session.avgDecodeMs, isEn),
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "decode") null else "decode" },
+                        testTagName = "metric_tile_decode",
                         modifier = Modifier.weight(1f)
                     )
                     SummaryStatTile(
-                        label = if (isEn) "Decode Time" else "Giải mã TB",
-                        value = "${session.avgDecodeMs}ms",
-                        valueColor = decodeMetricColor(session.avgDecodeMs),
+                        label = if (isEn) "Data buffer" else "Bộ đệm dữ liệu",
+                        value = "${session.jitterBufferDelayMs}ms",
+                        valueColor = DirectCyan,
+                        statusBadgeText = "${session.avgFps} FPS",
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "buffer") null else "buffer" },
+                        testTagName = "metric_tile_buffer",
                         modifier = Modifier.weight(1f)
                     )
                 }
 
-                Text(
-                    text = if (isEn) {
-                        "Dropped frames: ${session.framesDropped} • Freezes: ${session.freezeCount} times • Jitter: ${session.jitterMs} ms"
-                    } else {
-                        "Khung hình rớt: ${session.framesDropped} • Đứng hình: ${session.freezeCount} lần • Jitter: ${session.jitterMs} ms"
-                    },
-                    color = TextSecondary,
-                    fontSize = 11.sp,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SummaryStatTile(
+                        label = if (isEn) "Dropped frames" else "Khung hình bị rớt",
+                        value = "${session.framesDropped} ($dropPctFormatted)",
+                        valueColor = dropRatioMetricColor(lagDiagnosis.dropRatioPct),
+                        statusBadgeText = dropRatioStatusLabel(lagDiagnosis.dropRatioPct, isEn),
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "dropped") null else "dropped" },
+                        testTagName = "metric_tile_dropped",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatTile(
+                        label = if (isEn) "Temporary freeze" else "Đứng hình tạm thời",
+                        value = if (isEn) "${session.freezeCount} times" else "${session.freezeCount} lần",
+                        valueColor = if (session.freezeCount == 0) XboxNeonGreen else if (session.freezeCount <= 2) WarningAmber else JapanRed,
+                        statusBadgeText = formatDurationCompact(session.durationSeconds, isEn),
+                        onClick = { selectedMetricKey = if (selectedMetricKey == "freeze") null else "freeze" },
+                        testTagName = "metric_tile_freeze",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // C2: Hiển thị giải thích <= 1 câu khi người dùng chạm vào một chỉ số
+                val metricExplanationText = remember(selectedMetricKey, isEn) {
+                    getMetricOneSentenceExplanation(selectedMetricKey, isEn)
+                }
+                if (metricExplanationText != null) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("metric_explanation_banner"),
+                        shape = RoundedCornerShape(10.dp),
+                        color = XboxSurfaceVariant.copy(alpha = 0.92f),
+                        border = BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            text = metricExplanationText,
+                            color = TextPrimary,
+                            fontSize = 10.5.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        )
+                    }
+                }
 
                 // Trạng thái thiết bị
                 Surface(
@@ -1199,7 +1496,7 @@ private fun SessionDetailDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1214,7 +1511,7 @@ private fun SessionDetailDialog(
                             session.isThermalHot ->
                                 if (isEn) "Device Hot" else "Máy nóng"
                             session.isSlowDecode ->
-                                if (isEn) "Slow Decode (>16ms)" else "Giải mã chậm (>16ms)"
+                                if (isEn) "Slow Decode (>12ms)" else "Giải mã chậm (>12ms)"
                             else ->
                                 if (isEn) "Cool & Smooth" else "Mát & Ổn định"
                         }
@@ -1246,7 +1543,7 @@ private fun SessionDetailDialog(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(42.dp)
+                            .height(40.dp)
                             .testTag("detail_play_again_button")
                     ) {
                         Icon(
@@ -1279,7 +1576,7 @@ private fun SessionDetailDialog(
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp)
+                            .height(40.dp)
                             .testTag("delete_session_button")
                     ) {
                         Icon(
@@ -1307,7 +1604,7 @@ private fun SessionDetailDialog(
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(42.dp)
+                            .height(40.dp)
                     ) {
                         Text(
                             text = if (isEn) "Close" else "Đóng",
@@ -1324,11 +1621,82 @@ private fun SessionDetailDialog(
     }
 }
 
-private fun pingMetricColor(pingMs: Int): Color = when {
+/**
+ * C2: Giải thích <= 1 câu ngắn gọn khi chạm vào từng ô chỉ số.
+ */
+fun getMetricOneSentenceExplanation(metricKey: String?, isEn: Boolean): String? = when (metricKey) {
+    "ping" -> if (isEn) {
+        "Network latency is the round-trip time for a packet between your device and the cloud server."
+    } else {
+        "Độ trễ mạng là thời gian gói dữ liệu đi từ thiết bị tới máy chủ đám mây và quay về."
+    }
+    "jitter" -> if (isEn) {
+        "Network jitter measures how much latency fluctuates between consecutive packets."
+    } else {
+        "Độ biến động mạng thể hiện mức chênh lệch thời gian đến giữa các gói dữ liệu liên tiếp."
+    }
+    "decode" -> if (isEn) {
+        "Decode time is the time taken by your phone's hardware decoder to process one video frame."
+    } else {
+        "Thời gian giải mã là thời gian chip đồ họa của điện thoại xử lý xong một khung hình video."
+    }
+    "buffer" -> if (isEn) {
+        "Data buffer holds incoming frames briefly to smooth out network jitter before display."
+    } else {
+        "Bộ đệm dữ liệu giữ tạm các khung hình nhận về để bù đắp biến động mạng trước khi hiển thị."
+    }
+    "dropped" -> if (isEn) {
+        "Dropped frames are video frames skipped because they arrived or decoded too late."
+    } else {
+        "Khung hình bị rớt là số khung hình bị bỏ qua do đến trễ hoặc giải mã không kịp."
+    }
+    "freeze" -> if (isEn) {
+        "Temporary freeze counts how many times the video stream paused noticeably during play."
+    } else {
+        "Đứng hình tạm thời là số lần hình ảnh luồng phát bị khựng lại rõ rệt trong phiên chơi."
+    }
+    else -> null
+}
+
+/**
+ * C3: Thang 3 mức màu + chữ đi kèm để người mù màu vẫn phân biệt được.
+ */
+fun pingMetricColor(pingMs: Int): Color = when {
     pingMs <= 0 -> TextSecondary
-    pingMs <= 60 -> XboxNeonGreen
-    pingMs <= 110 -> WarningAmber
+    pingMs <= LagDiagnosticConfig.GOOD_PING_MAX_MS -> XboxNeonGreen
+    pingMs <= LagDiagnosticConfig.FAIR_PING_MAX_MS -> WarningAmber
     else -> JapanRed
+}
+
+fun pingStatusLabel(pingMs: Int, isEn: Boolean): String = when {
+    pingMs <= 0 -> "--"
+    pingMs <= LagDiagnosticConfig.GOOD_PING_MAX_MS -> if (isEn) "Good" else "Tốt"
+    pingMs <= LagDiagnosticConfig.FAIR_PING_MAX_MS -> if (isEn) "Fair" else "Trung bình"
+    else -> if (isEn) "High" else "Cao"
+}
+
+fun jitterMetricColor(jitterMs: Int): Color = when {
+    jitterMs <= LagDiagnosticConfig.GOOD_JITTER_MAX_MS -> XboxNeonGreen
+    jitterMs <= LagDiagnosticConfig.FAIR_JITTER_MAX_MS -> WarningAmber
+    else -> JapanRed
+}
+
+fun jitterStatusLabel(jitterMs: Int, isEn: Boolean): String = when {
+    jitterMs <= LagDiagnosticConfig.GOOD_JITTER_MAX_MS -> if (isEn) "Good" else "Tốt"
+    jitterMs <= LagDiagnosticConfig.FAIR_JITTER_MAX_MS -> if (isEn) "Fair" else "Trung bình"
+    else -> if (isEn) "High" else "Cao"
+}
+
+fun dropRatioMetricColor(dropPct: Double): Color = when {
+    dropPct <= LagDiagnosticConfig.GOOD_DROP_MAX_PCT -> XboxNeonGreen
+    dropPct <= LagDiagnosticConfig.FAIR_DROP_MAX_PCT -> WarningAmber
+    else -> JapanRed
+}
+
+fun dropRatioStatusLabel(dropPct: Double, isEn: Boolean): String = when {
+    dropPct <= LagDiagnosticConfig.GOOD_DROP_MAX_PCT -> if (isEn) "Good" else "Tốt"
+    dropPct <= LagDiagnosticConfig.FAIR_DROP_MAX_PCT -> if (isEn) "Fair" else "Trung bình"
+    else -> if (isEn) "High" else "Cao"
 }
 
 private fun fpsMetricColor(fps: Int): Color = when {
@@ -1337,10 +1705,16 @@ private fun fpsMetricColor(fps: Int): Color = when {
     else -> JapanRed
 }
 
-private fun decodeMetricColor(decodeMs: Double): Color = when {
-    decodeMs <= 10.0 -> XboxNeonGreen
-    decodeMs <= 16.0 -> WarningAmber
+fun decodeMetricColor(decodeMs: Double): Color = when {
+    decodeMs <= LagDiagnosticConfig.GOOD_DECODE_MAX_MS -> XboxNeonGreen
+    decodeMs <= LagDiagnosticConfig.SLOW_DECODE_MIN_MS -> WarningAmber
     else -> JapanRed
+}
+
+fun decodeStatusLabel(decodeMs: Double, isEn: Boolean): String = when {
+    decodeMs <= LagDiagnosticConfig.GOOD_DECODE_MAX_MS -> if (isEn) "Good" else "Tốt"
+    decodeMs <= LagDiagnosticConfig.SLOW_DECODE_MIN_MS -> if (isEn) "Fair" else "Trung bình"
+    else -> if (isEn) "High" else "Cao"
 }
 
 private fun formatDurationCompact(durationSec: Long, isEn: Boolean): String {
@@ -1370,9 +1744,9 @@ private fun buildGlobalSmartTip(sessions: List<PlaySessionRecord>, isEn: Boolean
     val slowOrHotCount = recent.count { it.isSlowDecode || it.isThermalHot }
     if (slowOrHotCount >= 2 || (recent.size == 1 && slowOrHotCount == 1)) {
         return if (isEn) {
-            "Tip: Keep Auto (720p ⇄ 1080p) quality mode enabled to prevent frame delay when Wi-Fi or 4G fluctuates."
+            "Tip: Keep Auto (720p ⇄ 1080p) quality mode enabled to help prevent frame drops when Wi-Fi or mobile signal fluctuates."
         } else {
-            "Gợi ý: Giữ chế độ Tự động (720p ⇄ 1080p) để tự điều chỉnh bitrate êm ái khi sóng Wi-Fi hoặc 4G dao động."
+            "Gợi ý: Giữ chế độ Tự động (720p ⇄ 1080p) để tự điều chỉnh chất lượng truyền tải khi sóng Wi-Fi hoặc di động dao động."
         }
     }
     return null
@@ -1383,21 +1757,6 @@ private fun buildSessionSmartTip(
     @Suppress("UNUSED_PARAMETER") allSessions: List<PlaySessionRecord>,
     isEn: Boolean
 ): String? {
-    val isUsServer = session.serverName.contains("United States", ignoreCase = true) ||
-        session.serverName.contains("Silicon Valley", ignoreCase = true) ||
-        session.serverName.contains("Oregon", ignoreCase = true) ||
-        session.serverName.contains("Virginia", ignoreCase = true) ||
-        session.serverName.contains("Iowa", ignoreCase = true) ||
-        session.serverName.contains("Nevada", ignoreCase = true)
-
-    if (isUsServer && session.avgPingMs >= 140) {
-        return if (isEn) {
-            "Why Ping was ${session.avgPingMs}ms: You launched on a US server (~12,500 km across the Pacific). Switch to a 🇯🇵 Japan (Tokyo) server BEFORE starting the game to lower physical Ping to ~60–90ms!"
-        } else {
-            "Vì sao Ping ${session.avgPingMs}ms: Phiên này mở bằng máy chủ Mỹ (~12.500 km xuyên Thái Bình Dương). Hãy đổi sang máy chủ 🇯🇵 Nhật Bản (Tokyo) TRƯỚC khi vào game để giảm Ping vật lý xuống ~60–90ms!"
-        }
-    }
-
     val samples = session.pingSamples
     val pingSwing = if (samples.size >= 2) {
         (samples.maxOrNull() ?: session.avgPingMs) - (samples.minOrNull() ?: session.avgPingMs)
@@ -1407,23 +1766,23 @@ private fun buildSessionSmartTip(
 
     if (session.isSlowDecode || session.isThermalHot) {
         return if (isEn) {
-            "Tip: 60Hz VSync lock & Auto (720p ⇄ 1080p) bitrate control help keep MediaCodec decode time under 16.6ms."
+            "Tip: 60Hz VSync lock & Auto (720p ⇄ 1080p) bitrate control help keep hardware decode time under 12ms."
         } else {
-            "Gợi ý: Khóa màn hình 60Hz và chế độ Tự động (720p ⇄ 1080p) giúp giữ thời gian giải mã dưới ngưỡng 16.6ms."
+            "Gợi ý: Khóa màn hình 60Hz và chế độ Tự động (720p ⇄ 1080p) giúp giữ thời gian giải mã ổn định."
         }
     }
 
-    if (pingSwing >= 35 || session.avgPingMs > 95) {
+    if (pingSwing >= 35 || session.avgPingMs > LagDiagnosticConfig.FAIR_PING_MAX_MS) {
         return if (isEn) {
-            "Tip: Ping fluctuated by ${pingSwing}ms. Moving closer to your Wi-Fi router or choosing a Japan (Tokyo) server keeps controls responsive."
+            "Tip: Network latency fluctuated by ${pingSwing}ms. Selecting a lower-latency server in the Servers tab may improve stability."
         } else {
-            "Gợi ý: Ping dao động ${pingSwing}ms trong phiên này. Chọn máy chủ Nhật Bản (Tokyo) hoặc ngồi gần Wi-Fi hơn sẽ giúp điều khiển nhạy hơn."
+            "Gợi ý: Độ trễ mạng dao động ${pingSwing}ms trong phiên này. Bạn có thể đo và chọn máy chủ có độ trễ thấp hơn ở mục Máy chủ."
         }
     }
 
     return if (isEn) {
-        "Stream & controls stayed stable throughout this session (~${session.avgPingMs}ms)."
+        "Network latency and stream decoding remained stable throughout this session (${session.avgPingMs}ms)."
     } else {
-        "Đường truyền và độ nhạy điều khiển duy trì ổn định trong suốt phiên chơi (~${session.avgPingMs}ms)."
+        "Độ trễ mạng và giải mã hình ảnh duy trì ổn định trong suốt phiên chơi (${session.avgPingMs}ms)."
     }
 }

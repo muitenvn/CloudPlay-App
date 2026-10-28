@@ -148,7 +148,7 @@ fun InGameLoadingOverlay(
         }
         val pingRating = when {
             !hasValidPing -> if (isEn) "Measuring" else "Đang đo"
-            realLatencyMs < 50 -> if (isEn) "Ultra Smooth" else "Cực mượt"
+            realLatencyMs < 50 -> if (isEn) "Very Good" else "Rất ổn định"
             realLatencyMs < 90 -> if (isEn) "Great" else "Rất tốt"
             realLatencyMs < 130 -> if (isEn) "Stable" else "Ổn định"
             else -> if (isEn) "High Ping" else "Ping cao"
@@ -767,7 +767,7 @@ private fun SystemTelemetryCard(
             GameOptimizationRow(
                 icon = Icons.Default.Bolt,
                 title = if (isEn) "Route Optimization" else "Tối ưu đường truyền",
-                status = if (isEn) "Auto zero-lag switch in-game" else "Tự động xả trễ khi vào game",
+                status = if (isEn) "Auto switch to direct network in-game" else "Tự động chuyển mạng trực tiếp khi vào game",
                 accentColor = XboxNeonGreen
             )
         }

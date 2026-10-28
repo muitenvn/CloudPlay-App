@@ -28,9 +28,52 @@ object VpnManager {
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var pingJob: Job? = null
     private var batchPingJob: Job? = null
+    private var lazyPingJob: Job? = null
     private var ipCheckJob: Job? = null
     private val proxyExecutor = Executors.newSingleThreadExecutor()
     private var appContext: Context? = null
+
+    /** Bộ đếm đợt đo (Generation ID) ngăn đợt đo cũ ghi đè kết quả của đợt đo mới */
+    private val measurementGeneration = java.util.concurrent.atomic.AtomicLong(1L)
+
+    fun getCurrentMeasurementGeneration(): Long = measurementGeneration.get()
+
+    fun incrementMeasurementGeneration(): Long = measurementGeneration.incrementAndGet()
+
+    fun isDynamicLiveProxy(server: ServerLocation): Boolean {
+        return server.id.startsWith("live_", ignoreCase = true)
+    }
+
+    /**
+     * Chỉ ghi nhận kết quả đo nếu `generationId` khớp với đợt đo hiện hành (chống race condition từ tác vụ cũ).
+     */
+    @Synchronized
+    fun recordMeasurementIfCurrentGeneration(
+        generationId: Long,
+        serverId: String,
+        measurement: EndpointPingMeasurement
+    ): Boolean {
+        if (generationId != measurementGeneration.get()) {
+            return false
+        }
+        val nextMeas = _state.value.serverMeasurements.toMutableMap()
+        nextMeas[serverId] = measurement
+
+        val nextPings = _state.value.serverPings.toMutableMap()
+        // Chỉ ghi vào serverPings khi cổng chính phản hồi (MEASURED_PRIMARY) hoặc đánh dấu -1 khi thất bại;
+        // tuyệt đối không lấy kết quả cổng phụ (:443/:80) giả làm ping cổng chính.
+        when (measurement.status) {
+            ServerPingStatus.MEASURED_PRIMARY -> nextPings[serverId] = measurement.rttMs
+            ServerPingStatus.MEASURED_FALLBACK_ONLY, ServerPingStatus.UNREACHABLE -> nextPings[serverId] = -1
+            ServerPingStatus.UNTESTED, ServerPingStatus.TESTING, ServerPingStatus.EXPIRED -> nextPings.remove(serverId)
+        }
+
+        _state.value = _state.value.copy(
+            serverMeasurements = nextMeas,
+            serverPings = nextPings
+        )
+        return true
+    }
 
     init {
         // Initial location check at launch
@@ -41,8 +84,8 @@ object VpnManager {
         appContext = context.applicationContext
         loadPersistedServers(context.applicationContext)
         loadPersistedUnlockRecords(context.applicationContext)
-        if (_state.value.serverPings.isEmpty()) {
-            testAllServers(autoPickBest = false, context = context.applicationContext)
+        if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
+            testAllServers(autoPickBest = false, context = context.applicationContext, forceRefresh = false)
         }
     }
 
@@ -269,14 +312,9 @@ object VpnManager {
         server: ServerLocation,
         sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
     ): Int {
-        val sameRegionNames = getAllServers()
-            .filter { it.countryCode.equals(server.countryCode, ignoreCase = true) }
-            .map { it.name }
-            .toSet()
         return com.example.data.SessionHistoryRepository.getAverageRttForServerOrRegion(
             serverName = server.name,
             countryCode = server.countryCode,
-            sameRegionServerNames = sameRegionNames,
             sessionsList = sessions
         )
     }
@@ -299,19 +337,26 @@ object VpnManager {
     }
 
     /**
-     * 4. SẮP XẾP 2 TẦNG (Quốc gia hỗ trợ Xbox gần người dùng nhất -> Server ngon nhất):
-     * - Bước 1: Ưu tiên trạng thái mở khóa vùng hợp lệ (UNLOCKED / UNTESTED xếp trước FAILED / WRONG_REGION).
-     * - Bước 2: Máy chủ đo được ping thật (> 0) luôn xếp trước máy chủ không đo được.
-     * - Bước 3: Giữa các máy chủ đo được ping thật, ưu tiên nhóm Quốc gia được hỗ trợ Xbox gần vị trí người dùng nhất
-     *   (VD: ở Việt Nam ưu tiên cụm Đông Á JP/KR ở Tầng 0, xếp trên cụm xuyên đại dương US ở Tầng 2).
-     * - Bước 4: Trong cùng khu vực gần nhất, xếp máy chủ có ping thực tế thấp nhất lên đầu ("Server ngon nhất").
+     * 4. SẮP XẾP ĐA TẦNG MINH BẠCH (A3, A5, A8):
+     * - Tách riêng trạng thái hợp lệ (UNLOCKED / UNTESTED) trước trạng thái lỗi mở khóa (FAILED / WRONG_REGION).
+     * - Phân tầng trạng thái đo kết nối (pingReachabilityTier):
+     *   + Tầng 0: Cổng chính phản hồi (`MEASURED_PRIMARY` hoặc `ping > 0`).
+     *   + Tầng 1: Chỉ cổng phụ `:443` / `:80` phản hồi (`MEASURED_FALLBACK_ONLY`) — không bao giờ xếp trên cổng chính sống.
+     *   + Tầng 2: Chưa đo (`UNTESTED` / `TESTING` / `EXPIRED`).
+     *   + Tầng 3: Không đo được (`UNREACHABLE`) — máy chủ tĩnh/tự thêm.
+     *   + Tầng 4: Không đo được (`UNREACHABLE`) — máy chủ động từ `LiveProxyFetcher` (`live_*`) xếp xuống cuối cùng.
+     * - Trong cùng tầng kết nối:
+     *   + Ưu tiên `UNLOCKED` trước `UNTESTED`.
+     *   + Khi đã có số đo thực tế (Tầng 0 hoặc Tầng 1): ưu tiên đường truyền ổn định (`!isUnstable`) rồi xếp trực tiếp theo **số ping đo thật từ thấp đến cao**. Khoảng cách địa lý KHÔNG được ghi đè số đo thật.
+     *   + Khi chưa có số đo (Tầng 2): mới dùng khoảng cách địa lý sơ bộ (`getNearestSupportedCountryTier` — trả về 0 nếu thiếu GeoIP).
      */
     fun sortServersByUnlockAndPing(
         servers: List<ServerLocation>,
         pingMap: Map<String, Int> = _state.value.serverPings,
         records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords,
         engine: VpnEngine = _state.value.engine,
-        sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value
+        sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value,
+        measurementsMap: Map<String, EndpointPingMeasurement> = _state.value.serverMeasurements
     ): List<ServerLocation> {
         val currentGeo = _state.value.detectedGeoIp
         return servers.sortedWith(
@@ -324,7 +369,7 @@ object VpnManager {
                     return@Comparator tierA.compareTo(tierB)
                 }
 
-                if (engine == VpnEngine.SMART_BYPASS && pingMap.isEmpty()) {
+                if (engine == VpnEngine.SMART_BYPASS && pingMap.isEmpty() && measurementsMap.isEmpty()) {
                     val rankA = unlockSortRank(statusA)
                     val rankB = unlockSortRank(statusB)
                     if (rankA != rankB) {
@@ -340,43 +385,97 @@ object VpnManager {
                     if (hasPlayA && hasPlayB && lastPlayA != lastPlayB) {
                         return@Comparator lastPlayA.compareTo(lastPlayB)
                     }
-                    return@Comparator 0
-                }
-
-                val pingA = pingMap[a.id] ?: -1
-                val pingB = pingMap[b.id] ?: -1
-                val hasPingA = pingA > 0
-                val hasPingB = pingB > 0
-
-                // Máy chủ đo được ping thật luôn xếp trước máy chủ không đo được
-                if (hasPingA != hasPingB) {
-                    return@Comparator if (hasPingA) -1 else 1
-                }
-
-                // Nếu cả hai đều đo được ping thật:
-                // 1) Ưu tiên Quốc gia hỗ trợ Xbox gần vị trí người dùng nhất (tránh chọn nhầm US khi đang ở VN)
-                // 2) Trong nhóm quốc gia gần nhất, chọn Server có ping thấp nhất
-                if (hasPingA && hasPingB) {
                     val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
                     val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
                     if (countryTierA != countryTierB) {
                         return@Comparator countryTierA.compareTo(countryTierB)
                     }
-                    if (pingA != pingB) {
-                        return@Comparator pingA.compareTo(pingB)
-                    }
+                    return@Comparator 0
                 }
 
+                val measA = measurementsMap[a.id]
+                val measB = measurementsMap[b.id]
+                val pingA = if (measA?.isPrimaryPortAlive == true) measA.rttMs else (pingMap[a.id] ?: 0)
+                val pingB = if (measB?.isPrimaryPortAlive == true) measB.rttMs else (pingMap[b.id] ?: 0)
+
+                val reachTierA = computePingReachabilityTier(a, measA, pingMap)
+                val reachTierB = computePingReachabilityTier(b, measB, pingMap)
+                if (reachTierA != reachTierB) {
+                    return@Comparator reachTierA.compareTo(reachTierB)
+                }
+
+                // Ưu tiên UNLOCKED trước UNTESTED trong cùng tầng kết nối
                 val rankA = unlockSortRank(statusA)
                 val rankB = unlockSortRank(statusB)
                 if (rankA != rankB) {
                     return@Comparator rankA.compareTo(rankB)
                 }
 
-                // Giữ thứ tự mặc định trong danh sách khi chưa có số đo
+                // Tầng 0 (Cổng chính sống): xếp trực tiếp theo độ ổn định và số ping đo thật (KHÔNG để địa lý ghi đè ping thật)
+                if (reachTierA == 0) {
+                    val unstableA = measA?.isUnstable == true
+                    val unstableB = measB?.isUnstable == true
+                    if (unstableA != unstableB) {
+                        return@Comparator if (!unstableA) -1 else 1
+                    }
+                    if (pingA != pingB) {
+                        return@Comparator pingA.compareTo(pingB)
+                    }
+                    val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
+                    val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
+                    if (countryTierA != countryTierB) {
+                        return@Comparator countryTierA.compareTo(countryTierB)
+                    }
+                    return@Comparator 0
+                }
+
+                // Tầng 1 (Chỉ cổng phụ :443/:80 sống): xếp theo RTT cổng phụ
+                if (reachTierA == 1) {
+                    val fbPingA = measA?.rttMs ?: Int.MAX_VALUE
+                    val fbPingB = measB?.rttMs ?: Int.MAX_VALUE
+                    if (fbPingA != fbPingB) {
+                        return@Comparator fbPingA.compareTo(fbPingB)
+                    }
+                }
+
+                // Tầng 2 (Chưa đo): dùng khoảng cách địa lý sơ bộ nếu có GeoIP hợp lệ, ưu tiên máy chủ tĩnh trước máy chủ động
+                if (reachTierA == 2) {
+                    val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
+                    val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
+                    if (countryTierA != countryTierB) {
+                        return@Comparator countryTierA.compareTo(countryTierB)
+                    }
+                    val dynA = isDynamicLiveProxy(a)
+                    val dynB = isDynamicLiveProxy(b)
+                    if (dynA != dynB) {
+                        return@Comparator if (!dynA) -1 else 1
+                    }
+                }
+
                 0
             }
         )
+    }
+
+    private fun computePingReachabilityTier(
+        server: ServerLocation,
+        measurement: EndpointPingMeasurement?,
+        pingMap: Map<String, Int>
+    ): Int {
+        if (measurement != null) {
+            return when (measurement.status) {
+                ServerPingStatus.MEASURED_PRIMARY -> if (measurement.rttMs > 0) 0 else 3
+                ServerPingStatus.MEASURED_FALLBACK_ONLY -> if (measurement.rttMs > 0) 1 else 3
+                ServerPingStatus.UNTESTED, ServerPingStatus.TESTING, ServerPingStatus.EXPIRED -> 2
+                ServerPingStatus.UNREACHABLE -> if (isDynamicLiveProxy(server)) 4 else 3
+            }
+        }
+        val rawPing = pingMap[server.id] ?: return 2 // Chưa có trong pingMap -> Chưa đo (Tầng 2)
+        return if (rawPing > 0) {
+            0
+        } else {
+            if (isDynamicLiveProxy(server)) 4 else 3
+        }
     }
 
     private fun unlockEligibilityTier(status: RegionUnlockStatus): Int {
@@ -397,77 +496,291 @@ object VpnManager {
     }
 
     /**
-     * Đo ping thực tế toàn bộ danh sách máy chủ (qua Trạm Test gần nhất -> Trạm lân cận -> Đo trực tiếp từ máy)
-     * và tự động ưu tiên Quốc gia hỗ trợ Xbox gần người dùng nhất + Server có ping ngon nhất.
+     * Chọn tập máy chủ cho Bước 1 (2–3 đại diện mỗi quốc gia/vùng) để thăm dò sơ bộ.
+     */
+    fun selectStep1RepresentativeServers(
+        allServers: List<ServerLocation>,
+        records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords
+    ): List<ServerLocation> {
+        val valid = allServers.filter {
+            val st = getServerUnlockStatus(it, records)
+            st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+        }
+        return valid
+            .groupBy { it.countryCode.trim().uppercase() }
+            .flatMap { (_, listInCountry) ->
+                listInCountry
+                    .sortedWith(
+                        compareBy<ServerLocation> { unlockSortRank(getServerUnlockStatus(it, records)) }
+                            .thenBy { isDynamicLiveProxy(it) }
+                    )
+                    .take(3)
+            }
+    }
+
+    /**
+     * Đo lười (Lazy Viewport Probing — A8):
+     * Chỉ đo các máy chủ đang hiển thị trên màn hình (hoặc được truyền vào) mà chưa có kết quả hợp lệ trong cache 5 phút.
+     * Các máy chủ ngoài danh sách hiển thị giữ nguyên trạng thái "Chưa đo" (UNTESTED).
+     */
+    fun probeVisibleServersLazily(
+        visibleServers: List<ServerLocation>,
+        customProbeExecutor: (suspend (String, Int, Int) -> Pair<Int, String>)? = null
+    ) {
+        if (visibleServers.isEmpty()) return
+        val currentGen = measurementGeneration.get()
+        val now = System.currentTimeMillis()
+        val currentMeas = _state.value.serverMeasurements.toMutableMap()
+        val currentPings = _state.value.serverPings.toMutableMap()
+        val needNetworkProbe = mutableListOf<ServerLocation>()
+
+        for (srv in visibleServers) {
+            val existing = currentMeas[srv.id]
+            if (existing != null && !existing.isExpired(now) &&
+                existing.status != ServerPingStatus.UNTESTED &&
+                existing.status != ServerPingStatus.EXPIRED
+            ) {
+                continue
+            }
+            val cached = PingTester.getCachedMeasurement(srv, now)
+            if (cached != null && cached.status != ServerPingStatus.EXPIRED) {
+                currentMeas[srv.id] = cached
+                if (cached.isPrimaryPortAlive) {
+                    currentPings[srv.id] = cached.rttMs
+                } else if (cached.status == ServerPingStatus.UNREACHABLE || cached.isFallbackPortOnly) {
+                    currentPings[srv.id] = -1
+                }
+            } else {
+                needNetworkProbe.add(srv)
+            }
+        }
+
+        _state.value = _state.value.copy(
+            serverMeasurements = currentMeas,
+            serverPings = currentPings
+        )
+
+        if (needNetworkProbe.isEmpty() || _state.value.isTestingPings) return
+
+        lazyPingJob?.cancel()
+        lazyPingJob = scope.launch(Dispatchers.IO) {
+            val batch = needNetworkProbe.take(8)
+            // Đánh dấu trạng thái TESTING cho các mục đang hiển thị sắp đo
+            synchronized(this@VpnManager) {
+                if (currentGen == measurementGeneration.get()) {
+                    val markTesting = _state.value.serverMeasurements.toMutableMap()
+                    for (srv in batch) {
+                        if (markTesting[srv.id] == null || markTesting[srv.id]?.status == ServerPingStatus.UNTESTED) {
+                            markTesting[srv.id] = EndpointPingMeasurement(
+                                rttMs = -1,
+                                configuredPort = srv.port,
+                                measuredPort = srv.port,
+                                resolvedIp = srv.ip,
+                                measurementType = PingMeasurementType.NONE,
+                                status = ServerPingStatus.TESTING
+                            )
+                        }
+                    }
+                    _state.value = _state.value.copy(serverMeasurements = markTesting)
+                }
+            }
+
+            // Thời hạn cho một bước đo lười <= 5 giây
+            kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                val jobs = batch.map { server ->
+                    async {
+                        val meas = kotlinx.coroutines.withTimeoutOrNull(1300L) {
+                            PingTester.measureServerEndpoint(
+                                server = server,
+                                timeoutMs = 900,
+                                useCache = true,
+                                customProbeExecutor = customProbeExecutor
+                            )
+                        } ?: EndpointPingMeasurement(
+                            rttMs = -1,
+                            configuredPort = server.port,
+                            measuredPort = server.port,
+                            resolvedIp = server.ip,
+                            measurementType = PingMeasurementType.NONE,
+                            status = ServerPingStatus.UNREACHABLE
+                        )
+                        recordMeasurementIfCurrentGeneration(currentGen, server.id, meas)
+                    }
+                }
+                jobs.awaitAll()
+            }
+
+            // Bất kỳ mục nào trong batch hết hạn 5s mà vẫn đang TESTING -> chuyển sang UNREACHABLE
+            synchronized(this@VpnManager) {
+                if (currentGen == measurementGeneration.get()) {
+                    val cleanup = _state.value.serverMeasurements.toMutableMap()
+                    val cleanupPings = _state.value.serverPings.toMutableMap()
+                    for (srv in batch) {
+                        if (cleanup[srv.id]?.status == ServerPingStatus.TESTING) {
+                            cleanup[srv.id] = EndpointPingMeasurement(
+                                rttMs = -1,
+                                configuredPort = srv.port,
+                                measuredPort = srv.port,
+                                resolvedIp = srv.ip,
+                                measurementType = PingMeasurementType.NONE,
+                                status = ServerPingStatus.UNREACHABLE
+                            )
+                            cleanupPings[srv.id] = -1
+                        }
+                    }
+                    _state.value = _state.value.copy(
+                        serverMeasurements = cleanup,
+                        serverPings = cleanupPings
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Đo ping theo 2 bước chịu tải danh sách lớn (A8):
+     * - Bước 1 (thời hạn <= 5 giây): Đo 2–3 máy chủ đại diện mỗi vùng/quốc gia để tạo thứ tự ưu tiên sơ bộ.
+     * - Bước 2 (thời hạn <= 5 giây): Đo các ứng viên tốt từ các vùng phản hồi + máy chủ đang chọn + đầu bảng.
+     * - Các máy chủ còn lại trong danh sách lớn giữ nguyên trạng thái "Chưa đo" (UNTESTED) và được đo lười khi người dùng cuộn tới.
+     * - Khi bấm "Đo ping" (`forceRefresh = true`), tăng `measurementGeneration`, xóa cache cần làm mới và chặn tác vụ cũ ghi đè.
      */
     fun testAllServers(
         autoPickBest: Boolean = false,
         context: Context? = null,
+        forceRefresh: Boolean = true,
+        visibleServerIds: Set<String> = emptySet(),
         onPickedBest: ((ServerLocation, Int) -> Unit)? = null
     ) {
-        if (_state.value.isTestingPings && !autoPickBest) return
         batchPingJob?.cancel()
-        _state.value = _state.value.copy(isTestingPings = true)
+        lazyPingJob?.cancel()
+
+        val myGeneration = if (forceRefresh) {
+            PingTester.clearCache()
+            incrementMeasurementGeneration()
+        } else {
+            measurementGeneration.get()
+        }
+
+        _state.value = _state.value.copy(
+            isTestingPings = true,
+            serverPings = if (forceRefresh) emptyMap() else _state.value.serverPings,
+            serverMeasurements = if (forceRefresh) emptyMap() else _state.value.serverMeasurements
+        )
+
         batchPingJob = scope.launch(Dispatchers.IO) {
             try {
-                val serversToTest = getAllServers()
+                val allServers = getAllServers()
                 val currentEngine = _state.value.engine
-                val updatedMap = _state.value.serverPings.toMutableMap()
-                val nearestProbe = RegionalProbeTester.selectOrderedProbes().firstOrNull()
-                val nearestCountries = RegionalProbeTester.getNearestSupportedCountriesForUser(serversToTest)
+                val records = _state.value.unlockRecords
+                val currentSrv = _state.value.currentServer
+
+                // BƯỚC 1 (Thời hạn <= 5 giây): Đo 2–3 đại diện mỗi vùng/quốc gia
+                val step1Targets = (selectStep1RepresentativeServers(allServers, records) + currentSrv)
+                    .distinctBy { it.id }
+
                 com.example.data.AppLogger.info(
                     "PING",
-                    "Bắt đầu đo ${serversToTest.size} máy chủ • Trạm đo: ${nearestProbe?.displayName ?: "Mặc định"} • Vùng Xbox gần nhất: ${nearestCountries.take(2).joinToString("/")}"
+                    "Đợt đo #$myGeneration • Bước 1: Thăm dò ${step1Targets.size}/${allServers.size} đại diện vùng (thời hạn ≤5s, tối đa ${PingTester.MAX_CONCURRENT_SOCKETS} socket mở đồng thời)"
                 )
 
-                val deferreds = serversToTest.map { server ->
-                    async {
-                        val measured = PingTester.measureServerLatency(server, 2400)
-                        val realPing = if (measured > 0) measured else -1
-                        synchronized(updatedMap) {
-                            updatedMap[server.id] = realPing
-                            _state.value = _state.value.copy(serverPings = updatedMap.toMap())
-                        }
-                        server.id to realPing
-                    }
-                }
-                deferreds.awaitAll()
+                runMeasurementStepWithDeadline(
+                    generationId = myGeneration,
+                    targets = step1Targets,
+                    stepDeadlineMs = 5000L,
+                    useCache = !forceRefresh
+                )
 
-                val finalPings = updatedMap.toMap()
-                val reachableCount = finalPings.count { it.value > 0 }
+                if (myGeneration != measurementGeneration.get()) return@launch
+
+                // Đánh giá sơ bộ các vùng có phản hồi từ Bước 1 (giữ lại ứng viên từ nhiều vùng, không loại bỏ cứng vùng khác)
+                val step1Meas = _state.value.serverMeasurements
+                val countryBestRtt = allServers
+                    .map { it.countryCode.trim().uppercase() }
+                    .distinct()
+                    .associateWith { code ->
+                        step1Targets
+                            .filter { it.countryCode.equals(code, ignoreCase = true) }
+                            .mapNotNull { srv -> step1Meas[srv.id]?.takeIf { it.isReachableAnyPort }?.rttMs }
+                            .minOrNull() ?: Int.MAX_VALUE
+                    }
+
+                val orderedCountries = countryBestRtt.entries
+                    .sortedBy { it.value }
+                    .map { it.key }
+
+                // BƯỚC 2 (Thời hạn <= 5 giây): Đo các ứng viên tốt từ các vùng + các mục đang hiển thị trên màn hình
+                val testedIds = step1Targets.map { it.id }.toSet()
+                val visibleTargets = allServers.filter { it.id in visibleServerIds && it.id !in testedIds }
+                val regionalCandidates = orderedCountries.flatMap { code ->
+                    allServers
+                        .filter {
+                            it.countryCode.equals(code, ignoreCase = true) &&
+                                it.id !in testedIds &&
+                                !isDynamicLiveProxy(it)
+                        }
+                        .take(5)
+                }
+                val step2Targets = (visibleTargets + regionalCandidates)
+                    .distinctBy { it.id }
+                    .take(14)
+
+                if (step2Targets.isNotEmpty() && myGeneration == measurementGeneration.get()) {
+                    com.example.data.AppLogger.info(
+                        "PING",
+                        "Đợt đo #$myGeneration • Bước 2: Đo kỹ ${step2Targets.size} máy chủ ứng viên & mục đang hiển thị (thời hạn ≤5s)"
+                    )
+                    runMeasurementStepWithDeadline(
+                        generationId = myGeneration,
+                        targets = step2Targets,
+                        stepDeadlineMs = 5000L,
+                        useCache = !forceRefresh
+                    )
+                }
+
+                if (myGeneration != measurementGeneration.get()) return@launch
+
+                // Nếu công tắc Globalping được bật và có GeoIP thật, đo tham khảo đơn lẻ cho máy chủ đang chọn
+                val probeEst = if (com.example.data.SettingsRepository.config.value.enableGlobalpingProbe) {
+                    RegionalProbeTester.measureSelectedServerEstimateViaProbe(_state.value.currentServer)
+                } else {
+                    null
+                }
+
+                val finalPings = _state.value.serverPings
+                val finalMeas = _state.value.serverMeasurements
+                val primaryAliveCount = finalMeas.values.count { it.isPrimaryPortAlive }
+                val fallbackOnlyCount = finalMeas.values.count { it.isFallbackPortOnly }
+                val untestedCount = (allServers.size - finalMeas.size).coerceAtLeast(0)
+
                 com.example.data.AppLogger.success(
                     "PING",
-                    "Hoàn tất đo danh sách máy chủ: $reachableCount/${serversToTest.size} máy chủ phản hồi"
+                    "Hoàn tất đợt đo #$myGeneration: $primaryAliveCount cổng chính mở, $fallbackOnlyCount chỉ mở cổng phụ (:443/:80), $untestedCount chưa đo (đo lười khi cuộn)"
                 )
+
                 _state.value = _state.value.copy(
-                    serverPings = finalPings,
+                    selectedServerProbeEstimate = probeEst,
                     isTestingPings = false
                 )
 
-                val records = _state.value.unlockRecords
-                val currentSrv = _state.value.currentServer
+                val currentSrvStatus = getServerUnlockStatus(currentSrv, records)
+                val currentSrvPing = finalPings[currentSrv.id] ?: -1
                 val currentSrvCountryTier = RegionalProbeTester.getNearestSupportedCountryTier(
                     currentSrv.countryCode,
-                    serversToTest,
+                    allServers,
                     _state.value.detectedGeoIp
                 )
-                val currentSrvPing = finalPings[currentSrv.id] ?: -1
-                val currentSrvStatus = getServerUnlockStatus(currentSrv, records)
 
-                // Tự động chuyển sang Quốc gia hỗ trợ Xbox gần nhất & Server ngon nhất nếu:
-                // 1) Người dùng bấm "Chọn tối ưu" (autoPickBest == true), HOẶC
-                // 2) Máy chủ đang chọn nằm ở quốc gia quá xa (VD: đang chọn Mỹ US khi ở Việt Nam, currentSrvCountryTier > 0), HOẶC
-                // 3) Máy chủ đang chọn không phản hồi (ping <= 0) hoặc bị đánh dấu lỗi vùng.
+                // Chỉ tự động đổi máy chủ khi người dùng bấm "Chọn tối ưu" hoặc máy chủ hiện tại bị lỗi/chưa mở khóa và chết cổng chính.
+                // Không bao giờ thay máy chủ UNLOCKED đang chạy bằng máy chủ UNTESTED hoặc bằng máy chủ chỉ mở cổng phụ (:443/:80).
                 val shouldAutoSwitchToOptimal = autoPickBest ||
                     (!currentSrv.isCustom && (
-                        currentSrvCountryTier > 0 ||
-                            currentSrvPing <= 0 ||
-                            currentSrvStatus == RegionUnlockStatus.FAILED ||
-                            currentSrvStatus == RegionUnlockStatus.WRONG_REGION
+                        currentSrvStatus == RegionUnlockStatus.FAILED ||
+                            currentSrvStatus == RegionUnlockStatus.WRONG_REGION ||
+                            (currentSrvStatus != RegionUnlockStatus.UNLOCKED && (currentSrvCountryTier > 0 || currentSrvPing <= 0))
                         ))
 
                 if (shouldAutoSwitchToOptimal) {
-                    val validPool = serversToTest.filter {
+                    val validPool = allServers.filter {
                         val st = getServerUnlockStatus(it, records)
                         st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
                     }
@@ -475,15 +788,30 @@ object VpnManager {
                         servers = validPool,
                         pingMap = finalPings,
                         records = records,
-                        engine = currentEngine
+                        engine = currentEngine,
+                        measurementsMap = finalMeas
                     )
-                    val best = candidates.firstOrNull { (finalPings[it.id] ?: -1) > 0 }
-                        ?: if (currentEngine == VpnEngine.SMART_BYPASS) {
-                            candidates.firstOrNull { getLastSessionPingForServer(it) > 0 }
-                                ?: candidates.firstOrNull()
+                    val best = candidates.firstOrNull { cand ->
+                        val candMeas = finalMeas[cand.id]
+                        val candPrimaryPing = if (candMeas != null) {
+                            if (candMeas.isPrimaryPortAlive) candMeas.rttMs else -1
                         } else {
-                            null
+                            finalPings[cand.id] ?: -1
                         }
+                        val candStatus = getServerUnlockStatus(cand, records)
+                        val allowedByUnlockRule = if (currentSrvStatus == RegionUnlockStatus.UNLOCKED && currentSrvPing > 0) {
+                            candStatus == RegionUnlockStatus.UNLOCKED
+                        } else {
+                            true
+                        }
+                        candPrimaryPing > 0 && allowedByUnlockRule
+                    } ?: if (currentEngine == VpnEngine.SMART_BYPASS && currentSrvStatus != RegionUnlockStatus.UNLOCKED) {
+                        candidates.firstOrNull { getLastSessionPingForServer(it) > 0 }
+                            ?: candidates.firstOrNull()
+                    } else {
+                        null
+                    }
+
                     if (best != null) {
                         val measuredBest = finalPings[best.id] ?: -1
                         val bestPing = if (measuredBest > 0) {
@@ -496,7 +824,7 @@ object VpnManager {
                         if (best.id != currentSrv.id || autoPickBest) {
                             com.example.data.AppLogger.success(
                                 "VPN",
-                                "Thuật toán chọn vùng Xbox gần nhất (${best.countryCode}) & server ngon nhất: ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Sẵn sàng"})"
+                                "Chọn tối ưu (${best.countryCode} • ${getServerUnlockStatus(best, records)}): ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Sẵn sàng"})"
                             )
                             withContext(Dispatchers.Main) {
                                 selectServer(best, context ?: appContext)
@@ -507,13 +835,92 @@ object VpnManager {
                         }
                     } else if (autoPickBest) {
                         withContext(Dispatchers.Main) {
-                            onPickedBest?.invoke(_state.value.currentServer, -1)
+                            onPickedBest?.invoke(_state.value.currentServer, currentSrvPing)
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "testAllServers interrupted", e)
-                _state.value = _state.value.copy(isTestingPings = false)
+                if (myGeneration == measurementGeneration.get()) {
+                    _state.value = _state.value.copy(isTestingPings = false)
+                }
+            }
+        }
+    }
+
+    private suspend fun runMeasurementStepWithDeadline(
+        generationId: Long,
+        targets: List<ServerLocation>,
+        stepDeadlineMs: Long,
+        useCache: Boolean
+    ) {
+        if (targets.isEmpty() || generationId != measurementGeneration.get()) return
+
+        // Đánh dấu TESTING cho các máy chủ trong bước này
+        synchronized(this) {
+            if (generationId == measurementGeneration.get()) {
+                val markTesting = _state.value.serverMeasurements.toMutableMap()
+                for (srv in targets) {
+                    markTesting[srv.id] = EndpointPingMeasurement(
+                        rttMs = -1,
+                        configuredPort = srv.port,
+                        measuredPort = srv.port,
+                        resolvedIp = srv.ip,
+                        measurementType = PingMeasurementType.NONE,
+                        status = ServerPingStatus.TESTING
+                    )
+                }
+                _state.value = _state.value.copy(serverMeasurements = markTesting)
+            }
+        }
+
+        kotlinx.coroutines.withTimeoutOrNull(stepDeadlineMs) {
+            val deferreds = targets.map { server ->
+                scope.async(Dispatchers.IO) {
+                    if (generationId != measurementGeneration.get()) return@async
+                    val meas = kotlinx.coroutines.withTimeoutOrNull(1350L) {
+                        PingTester.measureServerEndpoint(
+                            server = server,
+                            timeoutMs = 900,
+                            useCache = useCache
+                        )
+                    } ?: EndpointPingMeasurement(
+                        rttMs = -1,
+                        configuredPort = server.port,
+                        measuredPort = server.port,
+                        resolvedIp = server.ip,
+                        measurementType = PingMeasurementType.NONE,
+                        status = ServerPingStatus.UNREACHABLE
+                    )
+                    recordMeasurementIfCurrentGeneration(generationId, server.id, meas)
+                }
+            }
+            deferreds.awaitAll()
+        }
+
+        // Bất kỳ mục nào trong bước này chưa xong khi hết hạn stepDeadlineMs -> chuyển sang UNREACHABLE
+        synchronized(this) {
+            if (generationId == measurementGeneration.get()) {
+                val nextMeas = _state.value.serverMeasurements.toMutableMap()
+                val nextPings = _state.value.serverPings.toMutableMap()
+                for (srv in targets) {
+                    val cur = nextMeas[srv.id]
+                    if (cur == null || cur.status == ServerPingStatus.TESTING) {
+                        nextMeas[srv.id] = EndpointPingMeasurement(
+                            rttMs = -1,
+                            configuredPort = srv.port,
+                            measuredPort = srv.port,
+                            resolvedIp = srv.ip,
+                            measurementType = PingMeasurementType.NONE,
+                            status = ServerPingStatus.UNREACHABLE
+                        )
+                        nextPings[srv.id] = -1
+                    }
+                }
+                _state.value = _state.value.copy(
+                    serverMeasurements = nextMeas,
+                    serverPings = nextPings
+                )
             }
         }
     }
@@ -712,7 +1119,7 @@ object VpnManager {
             actionSummary = if (needsVpn) {
                 if (isEn) "Auto: ON at launch ➔ OFF in-game" else "Tự động: BẬT lúc mở game ➔ TẮT khi vào trận"
             } else {
-                if (isEn) "Auto: Keep Direct ISP (0ms VPN lag)" else "Tự động: Giữ Direct ISP (0ms lag VPN)"
+                if (isEn) "Auto: Keep direct network" else "Tự động: Giữ mạng trực tiếp"
             }
         )
 
@@ -724,11 +1131,12 @@ object VpnManager {
         }
 
         // Giai đoạn 1: Tự động chuyển sang quốc gia hỗ trợ Xbox gần người dùng nhất nếu server hiện tại
-        // đang nằm ở quốc gia xa (ví dụ người dùng ở VN nhưng server cũ đang lưu là US).
+        // chưa xác nhận mở khóa (UNTESTED / FAILED) và đang nằm ở quốc gia xa (ví dụ người dùng ở VN nhưng server cũ là US).
         var updatedCurrentServer = _state.value.currentServer
-        if (!currentGeo.isFromWebView && !updatedCurrentServer.isCustom) {
+        val records = _state.value.unlockRecords
+        val currentServerStatus = getServerUnlockStatus(updatedCurrentServer, records)
+        if (!currentGeo.isFromWebView && !updatedCurrentServer.isCustom && currentServerStatus != RegionUnlockStatus.UNLOCKED) {
             val allServers = getAllServers()
-            val records = _state.value.unlockRecords
             val currentCountryTier = RegionalProbeTester.getNearestSupportedCountryTier(
                 serverCountryCode = updatedCurrentServer.countryCode,
                 servers = allServers,
@@ -1156,18 +1564,25 @@ object VpnManager {
 
     fun selectServer(server: ServerLocation, context: Context? = null) {
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
-        _state.value = _state.value.copy(currentServer = server, unlockFailPromptServer = null)
+        val cachedProbe = RegionalProbeTester.getCachedEstimateForServer(server)
+        _state.value = _state.value.copy(
+            currentServer = server,
+            unlockFailPromptServer = null,
+            selectedServerProbeEstimate = cachedProbe
+        )
         com.example.data.AppLogger.info("VPN", "Chọn máy chủ: ${server.name} (${server.ip}:${server.port})")
         persistCustomServers(context, _state.value.customServers, server)
         preCheckProxyRegion(server)
+        val gen = measurementGeneration.get()
         scope.launch(Dispatchers.IO) {
-            val measured = PingTester.measureServerLatency(server, 2200)
-            val updatedMap = _state.value.serverPings.toMutableMap()
-            updatedMap[server.id] = if (measured > 0) measured else -1
-            // Chỉ cập nhật serverPings, KHÔNG ghi số đo thử vào latencyMs và pingHistory của phiên
-            _state.value = _state.value.copy(
-                serverPings = updatedMap
-            )
+            val meas = PingTester.measureServerEndpoint(server, timeoutMs = 950, useCache = true)
+            recordMeasurementIfCurrentGeneration(gen, server.id, meas)
+            if (com.example.data.SettingsRepository.config.value.enableGlobalpingProbe) {
+                val est = RegionalProbeTester.measureSelectedServerEstimateViaProbe(server)
+                if (est != null && _state.value.currentServer.id == server.id) {
+                    _state.value = _state.value.copy(selectedServerProbeEstimate = est)
+                }
+            }
         }
         if (wasConnected && context != null) {
             connect(context, server)

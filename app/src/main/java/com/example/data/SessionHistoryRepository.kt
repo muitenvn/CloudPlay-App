@@ -27,7 +27,9 @@ data class PlaySessionRecord(
     val freezeCount: Int = 0,
     val totalFreezesDuration: Double = 0.0,
     val jitterMs: Int = 0,
-    val jitterBufferDelayMs: Double = 0.0
+    val jitterBufferDelayMs: Double = 0.0,
+    val networkType: String = "",
+    val framesDecoded: Int = 0
 ) {
     fun formattedNetworkLabel(isEn: Boolean): String {
         val modeLabel = if (isDirectNetwork) {
@@ -35,7 +37,14 @@ data class PlaySessionRecord(
         } else {
             "VPN"
         }
-        return if (serverName.isNotBlank()) "$serverName • $modeLabel" else modeLabel
+        val netSuffix = when (networkType.uppercase()) {
+            "WIFI" -> " • Wi-Fi"
+            "CELLULAR_5G", "5G" -> " • 5G"
+            "CELLULAR_4G", "4G", "LTE" -> " • 4G"
+            "ETHERNET" -> " • LAN"
+            else -> ""
+        }
+        return if (serverName.isNotBlank()) "$serverName • $modeLabel$netSuffix" else "$modeLabel$netSuffix"
     }
 }
 
@@ -57,11 +66,10 @@ object SessionHistoryRepository {
         loadFromPrefs(sharedPrefs)
     }
 
-    private fun loadFromPrefs(sharedPrefs: SharedPreferences) {
+    fun deserializeSessionsJson(raw: String): List<PlaySessionRecord> {
+        val loaded = mutableListOf<PlaySessionRecord>()
         try {
-            val raw = sharedPrefs.getString(KEY_SESSIONS_JSON, null) ?: return
             val arr = JSONArray(raw)
-            val loaded = mutableListOf<PlaySessionRecord>()
             for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
                 val id = obj.optString("id", "").trim()
@@ -99,11 +107,53 @@ object SessionHistoryRepository {
                         freezeCount = obj.optInt("freezeCount", 0),
                         totalFreezesDuration = totalFreezesDur,
                         jitterMs = obj.optInt("jitterMs", 0),
-                        jitterBufferDelayMs = jbDelay
+                        jitterBufferDelayMs = jbDelay,
+                        networkType = obj.optString("networkType", "").trim(),
+                        framesDecoded = obj.optInt("framesDecoded", 0).coerceAtLeast(0)
                     )
                 )
             }
-            _sessions.value = loaded
+        } catch (_: Exception) {
+        }
+        return loaded
+    }
+
+    fun serializeSessionsJson(list: List<PlaySessionRecord>): String {
+        val trimmed = list.sortedByDescending { it.startTimeMillis }.take(MAX_SESSIONS)
+        val arr = JSONArray()
+        for (item in trimmed) {
+            val samplesJson = JSONArray()
+            item.pingSamples.takeLast(MAX_PING_SAMPLES).forEach { samplesJson.put(it) }
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("gameTitle", item.gameTitle)
+                put("startTimeMillis", item.startTimeMillis)
+                put("durationSeconds", item.durationSeconds)
+                put("serverName", item.serverName)
+                put("isDirectNetwork", item.isDirectNetwork)
+                put("avgPingMs", item.avgPingMs)
+                put("avgFps", item.avgFps)
+                put("avgDecodeMs", ((item.avgDecodeMs * 10.0).roundToInt()) / 10.0)
+                put("isSlowDecode", item.isSlowDecode)
+                put("isThermalHot", item.isThermalHot)
+                put("pingSamples", samplesJson)
+                put("framesDropped", item.framesDropped)
+                put("freezeCount", item.freezeCount)
+                put("totalFreezesDuration", ((item.totalFreezesDuration * 100.0).roundToInt()) / 100.0)
+                put("jitterMs", item.jitterMs)
+                put("jitterBufferDelayMs", ((item.jitterBufferDelayMs * 10.0).roundToInt()) / 100.0 * 10.0)
+                put("networkType", item.networkType)
+                put("framesDecoded", item.framesDecoded)
+            }
+            arr.put(obj)
+        }
+        return arr.toString()
+    }
+
+    private fun loadFromPrefs(sharedPrefs: SharedPreferences) {
+        try {
+            val raw = sharedPrefs.getString(KEY_SESSIONS_JSON, null) ?: return
+            _sessions.value = deserializeSessionsJson(raw)
                 .sortedByDescending { it.startTimeMillis }
                 .take(MAX_SESSIONS)
         } catch (_: Exception) {
@@ -113,33 +163,7 @@ object SessionHistoryRepository {
     private fun saveToPrefs(list: List<PlaySessionRecord>) {
         val sharedPrefs = prefs ?: return
         try {
-            val trimmed = list.sortedByDescending { it.startTimeMillis }.take(MAX_SESSIONS)
-            val arr = JSONArray()
-            for (item in trimmed) {
-                val samplesJson = JSONArray()
-                item.pingSamples.takeLast(MAX_PING_SAMPLES).forEach { samplesJson.put(it) }
-                val obj = JSONObject().apply {
-                    put("id", item.id)
-                    put("gameTitle", item.gameTitle)
-                    put("startTimeMillis", item.startTimeMillis)
-                    put("durationSeconds", item.durationSeconds)
-                    put("serverName", item.serverName)
-                    put("isDirectNetwork", item.isDirectNetwork)
-                    put("avgPingMs", item.avgPingMs)
-                    put("avgFps", item.avgFps)
-                    put("avgDecodeMs", ((item.avgDecodeMs * 10.0).roundToInt()) / 10.0)
-                    put("isSlowDecode", item.isSlowDecode)
-                    put("isThermalHot", item.isThermalHot)
-                    put("pingSamples", samplesJson)
-                    put("framesDropped", item.framesDropped)
-                    put("freezeCount", item.freezeCount)
-                    put("totalFreezesDuration", ((item.totalFreezesDuration * 100.0).roundToInt()) / 100.0)
-                    put("jitterMs", item.jitterMs)
-                    put("jitterBufferDelayMs", ((item.jitterBufferDelayMs * 10.0).roundToInt()) / 10.0)
-                }
-                arr.put(obj)
-            }
-            sharedPrefs.edit().putString(KEY_SESSIONS_JSON, arr.toString()).apply()
+            sharedPrefs.edit().putString(KEY_SESSIONS_JSON, serializeSessionsJson(list)).apply()
         } catch (_: Exception) {
         }
     }
@@ -165,49 +189,25 @@ object SessionHistoryRepository {
     }
 
     /**
-     * Returns the average WebRTC RTT (ms) of saved sessions for a given server or its region/country.
-     * Used in SMART_BYPASS mode to display "Ping lần chơi gần nhất" instead of TCP ping to server.ip.
-     * Returns -1 if no valid session RTT exists yet ("Chưa có dữ liệu").
+     * Returns the average WebRTC RTT (ms) of saved sessions for a specific server.
+     * Only matches sessions played on that exact server so different servers never share the same number.
+     * Returns -1 if no valid session RTT exists for this server yet.
      */
     fun getAverageRttForServerOrRegion(
         serverName: String,
-        countryCode: String,
+        countryCode: String = "",
         sameRegionServerNames: Set<String> = emptySet(),
         sessionsList: List<PlaySessionRecord> = _sessions.value
     ): Int {
-        val validSessions = sessionsList.filter { it.avgPingMs > 0 }
-        if (validSessions.isEmpty()) return -1
-
-        val exactServerMatches = validSessions.filter {
-            it.serverName.equals(serverName.trim(), ignoreCase = true)
+        val cleanTarget = serverName.trim()
+        if (cleanTarget.isBlank()) return -1
+        val exactServerMatches = sessionsList.filter {
+            it.avgPingMs > 0 && it.serverName.trim().equals(cleanTarget, ignoreCase = true)
         }
         if (exactServerMatches.isNotEmpty()) {
             return exactServerMatches.map { it.avgPingMs }.average().roundToInt()
         }
-
-        val regionMatches = validSessions.filter { rec ->
-            val recName = rec.serverName.trim()
-            sameRegionServerNames.any { it.equals(recName, ignoreCase = true) } ||
-                matchesCountryKeyword(recName, countryCode)
-        }
-        if (regionMatches.isNotEmpty()) {
-            return regionMatches.map { it.avgPingMs }.average().roundToInt()
-        }
-
         return -1
-    }
-
-    private fun matchesCountryKeyword(serverName: String, countryCode: String): Boolean {
-        val lower = serverName.lowercase()
-        return when (countryCode.trim().uppercase()) {
-            "JP" -> lower.contains("japan") || lower.contains("tokyo") || lower.contains("osaka") || lower.contains("tsukuba") || lower.contains("chiba")
-            "KR" -> lower.contains("korea") || lower.contains("seoul") || lower.contains("incheon") || lower.contains("busan")
-            "US" -> lower.contains("united states") || lower.contains("silicon") || lower.contains("oregon") || lower.contains("iowa") || lower.contains("virginia") || lower.contains("nevada")
-            "SG" -> lower.contains("singapore")
-            "TW" -> lower.contains("taiwan") || lower.contains("taipei")
-            "HK" -> lower.contains("hong kong")
-            else -> false
-        }
     }
 
     /**

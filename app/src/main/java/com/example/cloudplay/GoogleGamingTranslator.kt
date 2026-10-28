@@ -230,9 +230,11 @@ object GoogleGamingTranslator {
             return@withContext if (bilingual && cached != trimmed) "$cached ($trimmed)" else cached
         }
 
-        // Fast-path: Check local dictionary
+        // Fast-path: Check local dictionary (case-insensitive)
         val dictMatch = XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed]
-            ?: XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed.lowercase()]
+            ?: XboxTranslator.XBOX_UI_DICTIONARY_EN.entries.firstOrNull {
+                it.key.equals(trimmed, ignoreCase = true)
+            }?.value
         if (dictMatch != null) {
             putCachedTranslation(cacheKey, dictMatch)
             return@withContext if (bilingual) "$dictMatch ($trimmed)" else dictMatch
@@ -272,8 +274,12 @@ object GoogleGamingTranslator {
             val rawTranslated = translatedBuilder.toString()
             if (rawTranslated.isBlank()) return@withContext rawText
 
-            // Restore protected gaming terms
-            val finalizedText = restoreProtectedContent(rawTranslated, placeholderMap).trim()
+            // Restore protected gaming terms and guard against "Switch" -> "Công tắc" mistranslation
+            var finalizedText = restoreProtectedContent(rawTranslated, placeholderMap).trim()
+            if (trimmed.contains("switch", ignoreCase = true) && finalizedText.contains("công tắc", ignoreCase = true)) {
+                finalizedText = finalizedText
+                    .replace(Regex("công tắc", RegexOption.IGNORE_CASE), "Chuyển đổi")
+            }
 
             // Save to bounded LRU cache
             putCachedTranslation(cacheKey, finalizedText)
@@ -312,7 +318,7 @@ object GoogleGamingTranslator {
                 originalText = rawText,
                 translatedText = finalized,
                 protectedTerms = protectedList,
-                translatedTerms = listOf("Đã tải tức thì từ bộ nhớ đệm LRU (0ms)"),
+                translatedTerms = listOf("Đã tải từ bộ nhớ đệm LRU"),
                 executionTimeMs = System.currentTimeMillis() - startTime,
                 isFromCache = true
             )

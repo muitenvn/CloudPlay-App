@@ -115,7 +115,9 @@ object VpnManager {
                     timestampMs = ts,
                     detectedCountryCode = country
                 )
-                if (record.isExpired(now)) {
+                if (record.isExpired(now) ||
+                    (status == RegionUnlockStatus.WRONG_REGION && (country == null || country.equals("ALL", ignoreCase = true) || country.equals("CUSTOM", ignoreCase = true)))
+                ) {
                     hadExpired = true
                 } else {
                     map[key] = record
@@ -585,24 +587,15 @@ object VpnManager {
                 }
             }
 
-            // Thời hạn cho một bước đo lười <= 5 giây
+            // Thời hạn cho một bước đo lười <= 5 giây (giới hạn timeout socket được quản lý bên trong Semaphore của PingTester)
             kotlinx.coroutines.withTimeoutOrNull(5000L) {
                 val jobs = batch.map { server ->
                     async {
-                        val meas = kotlinx.coroutines.withTimeoutOrNull(1300L) {
-                            PingTester.measureServerEndpoint(
-                                server = server,
-                                timeoutMs = 900,
-                                useCache = true,
-                                customProbeExecutor = customProbeExecutor
-                            )
-                        } ?: EndpointPingMeasurement(
-                            rttMs = -1,
-                            configuredPort = server.port,
-                            measuredPort = server.port,
-                            resolvedIp = server.ip,
-                            measurementType = PingMeasurementType.NONE,
-                            status = ServerPingStatus.UNREACHABLE
+                        val meas = PingTester.measureServerEndpoint(
+                            server = server,
+                            timeoutMs = 850,
+                            useCache = true,
+                            customProbeExecutor = customProbeExecutor
                         )
                         recordMeasurementIfCurrentGeneration(currentGen, server.id, meas)
                     }
@@ -610,28 +603,16 @@ object VpnManager {
                 jobs.awaitAll()
             }
 
-            // Bất kỳ mục nào trong batch hết hạn 5s mà vẫn đang TESTING -> chuyển sang UNREACHABLE
+            // Bất kỳ mục nào trong batch hết hạn 5s mà chưa tới lượt lấy giấy phép Semaphore (vẫn TESTING) -> trả về trạng thái Chưa đo (UNTESTED) để đo lại khi cuộn
             synchronized(this@VpnManager) {
                 if (currentGen == measurementGeneration.get()) {
                     val cleanup = _state.value.serverMeasurements.toMutableMap()
-                    val cleanupPings = _state.value.serverPings.toMutableMap()
                     for (srv in batch) {
                         if (cleanup[srv.id]?.status == ServerPingStatus.TESTING) {
-                            cleanup[srv.id] = EndpointPingMeasurement(
-                                rttMs = -1,
-                                configuredPort = srv.port,
-                                measuredPort = srv.port,
-                                resolvedIp = srv.ip,
-                                measurementType = PingMeasurementType.NONE,
-                                status = ServerPingStatus.UNREACHABLE
-                            )
-                            cleanupPings[srv.id] = -1
+                            cleanup.remove(srv.id)
                         }
                     }
-                    _state.value = _state.value.copy(
-                        serverMeasurements = cleanup,
-                        serverPings = cleanupPings
-                    )
+                    _state.value = _state.value.copy(serverMeasurements = cleanup)
                 }
             }
         }
@@ -718,11 +699,11 @@ object VpnManager {
                                 it.id !in testedIds &&
                                 !isDynamicLiveProxy(it)
                         }
-                        .take(5)
+                        .take(10)
                 }
                 val step2Targets = (visibleTargets + regionalCandidates)
                     .distinctBy { it.id }
-                    .take(14)
+                    .take(24)
 
                 if (step2Targets.isNotEmpty() && myGeneration == measurementGeneration.get()) {
                     com.example.data.AppLogger.info(
@@ -878,19 +859,10 @@ object VpnManager {
             val deferreds = targets.map { server ->
                 scope.async(Dispatchers.IO) {
                     if (generationId != measurementGeneration.get()) return@async
-                    val meas = kotlinx.coroutines.withTimeoutOrNull(1350L) {
-                        PingTester.measureServerEndpoint(
-                            server = server,
-                            timeoutMs = 900,
-                            useCache = useCache
-                        )
-                    } ?: EndpointPingMeasurement(
-                        rttMs = -1,
-                        configuredPort = server.port,
-                        measuredPort = server.port,
-                        resolvedIp = server.ip,
-                        measurementType = PingMeasurementType.NONE,
-                        status = ServerPingStatus.UNREACHABLE
+                    val meas = PingTester.measureServerEndpoint(
+                        server = server,
+                        timeoutMs = 850,
+                        useCache = useCache
                     )
                     recordMeasurementIfCurrentGeneration(generationId, server.id, meas)
                 }
@@ -898,28 +870,18 @@ object VpnManager {
             deferreds.awaitAll()
         }
 
-        // Bất kỳ mục nào trong bước này chưa xong khi hết hạn stepDeadlineMs -> chuyển sang UNREACHABLE
+        // Bất kỳ mục nào trong bước này chưa tới lượt chạy xong khi hết hạn stepDeadlineMs -> trả về UNTESTED để đo lười khi cuộn
         synchronized(this) {
             if (generationId == measurementGeneration.get()) {
                 val nextMeas = _state.value.serverMeasurements.toMutableMap()
-                val nextPings = _state.value.serverPings.toMutableMap()
                 for (srv in targets) {
                     val cur = nextMeas[srv.id]
-                    if (cur == null || cur.status == ServerPingStatus.TESTING) {
-                        nextMeas[srv.id] = EndpointPingMeasurement(
-                            rttMs = -1,
-                            configuredPort = srv.port,
-                            measuredPort = srv.port,
-                            resolvedIp = srv.ip,
-                            measurementType = PingMeasurementType.NONE,
-                            status = ServerPingStatus.UNREACHABLE
-                        )
-                        nextPings[srv.id] = -1
+                    if (cur != null && cur.status == ServerPingStatus.TESTING) {
+                        nextMeas.remove(srv.id)
                     }
                 }
                 _state.value = _state.value.copy(
-                    serverMeasurements = nextMeas,
-                    serverPings = nextPings
+                    serverMeasurements = nextMeas
                 )
             }
         }
@@ -968,17 +930,31 @@ object VpnManager {
             val jsonStr = sp.getString("custom_servers_json", null) ?: return
             val array = org.json.JSONArray(jsonStr)
             val list = mutableListOf<ServerLocation>()
+            val defaultKeys = DEFAULT_SERVERS.map { "${it.ip.trim().lowercase()}:${it.port}" }.toSet()
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
+                val id = obj.getString("id")
+                val cc = obj.optString("countryCode", "JP")
+                val ip = obj.getString("ip")
+                val port = obj.getInt("port")
+                val key = "${ip.trim().lowercase()}:$port"
+                // Bỏ qua các bản ghi lỗi cũ có countryCode = "ALL" hoặc trùng với DEFAULT_SERVERS
+                if (id.startsWith("live_all_", ignoreCase = true) ||
+                    cc.equals("ALL", ignoreCase = true) ||
+                    cc.equals("CUSTOM", ignoreCase = true) ||
+                    key in defaultKeys
+                ) {
+                    continue
+                }
                 list.add(
                     ServerLocation(
-                        id = obj.getString("id"),
+                        id = id,
                         name = obj.getString("name"),
                         flag = obj.optString("flag", "🌐"),
-                        ip = obj.getString("ip"),
-                        port = obj.getInt("port"),
+                        ip = ip,
+                        port = port,
                         protocol = obj.optString("protocol", "http"),
-                        countryCode = obj.optString("countryCode", "JP"),
+                        countryCode = cc,
                         azureEndpoint = obj.optString("azureEndpoint", "japaneast.cloudapp.azure.com"),
                         description = obj.optString("description", "Proxy cá nhân"),
                         speedMbps = obj.optInt("speedMbps", 200),
@@ -987,9 +963,7 @@ object VpnManager {
                     )
                 )
             }
-            if (list.isNotEmpty()) {
-                _state.value = _state.value.copy(customServers = list)
-            }
+            _state.value = _state.value.copy(customServers = list)
             val lastServerId = sp.getString("selected_server_id", null)
             if (lastServerId != null) {
                 val all = list + DEFAULT_SERVERS

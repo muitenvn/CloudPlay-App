@@ -230,34 +230,22 @@ object PingTester {
             customProbeExecutor ?: { h, p, t -> measureSingleTcpRttWithPermit(h, p, t) }
 
         val measurement = coroutineScope {
-            // Chạy song song cổng chính và các cổng dự phòng (:443, :80) trên cùng IP
-            val primaryDeferred = async {
-                val (firstRtt, resolvedIp) = probeFn(host, configuredPort, primaryTimeout)
-                if (firstRtt <= 0) {
-                    Pair(emptyList<Int>(), resolvedIp)
-                } else {
-                    val list = mutableListOf(firstRtt)
-                    if (firstRtt < 350) {
-                        val (secondRtt, _) = probeFn(host, configuredPort, primaryTimeout.coerceAtMost(650))
-                        if (secondRtt > 0) list.add(secondRtt)
-                    }
-                    Pair(list, resolvedIp)
+            // Ưu tiên đo cổng cấu hình chính trước để không chiếm giữ giấy phép Semaphore cho cổng phụ (:80/:443) khi cổng chính đang sống
+            val (firstRtt, primaryResolvedIp) = probeFn(host, configuredPort, primaryTimeout)
+            val primarySamples = if (firstRtt <= 0) {
+                emptyList()
+            } else {
+                val list = mutableListOf(firstRtt)
+                if (firstRtt < 280) {
+                    val (secondRtt, _) = probeFn(host, configuredPort, primaryTimeout.coerceAtMost(500))
+                    if (secondRtt > 0) list.add(secondRtt)
                 }
+                list
             }
 
-            val fallbackPorts = listOf(443, 80).filter { it != configuredPort }
-            val fallbackDeferreds = fallbackPorts.map { fbPort ->
-                fbPort to async {
-                    probeFn(host, fbPort, fallbackTimeout)
-                }
-            }
-
-            val (primarySamples, primaryResolvedIp) = primaryDeferred.await()
             val primarySummary = summarizeRawSamples(primarySamples)
 
             if (primarySummary != null) {
-                // Cổng chính phản hồi -> hủy ngay các nhánh cổng phụ còn đang chạy
-                fallbackDeferreds.forEach { (_, job) -> job.cancel() }
                 val (medianRtt, minRtt, maxRtt) = primarySummary
                 val unstable = (maxRtt - minRtt >= 80) || (medianRtt >= 1000)
                 EndpointPingMeasurement(
@@ -273,7 +261,14 @@ object PingTester {
                     timestampMs = System.currentTimeMillis()
                 )
             } else {
-                // Cổng chính không phản hồi -> kiểm tra kết quả từ cổng phụ :443 / :80
+                // Cổng chính không phản hồi -> thử song song cổng phụ :443 và :80 trên cùng IP (timeout <= 700ms)
+                val fallbackPorts = listOf(443, 80).filter { it != configuredPort }
+                val fallbackDeferreds = fallbackPorts.map { fbPort ->
+                    fbPort to async {
+                        probeFn(host, fbPort, fallbackTimeout)
+                    }
+                }
+
                 var bestFallbackPort = -1
                 var bestFallbackRtt = Int.MAX_VALUE
                 var bestResolvedIp = primaryResolvedIp

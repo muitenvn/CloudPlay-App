@@ -21,15 +21,17 @@ data class XboxLanguage(
 val POPULAR_XBOX_LANGUAGES = listOf(
     XboxLanguage("en-US", "Tiếng Anh (Mỹ)", "English (United States)", "🇺🇸", "English (United States)"),
     XboxLanguage("en-GB", "Tiếng Anh (Anh)", "English (United Kingdom)", "🇬🇧", "English (United Kingdom)"),
-    XboxLanguage("ja-JP", "Tiếng Nhật", "日本語", "🇯🇵", "Japanese (日本語)"),
-    XboxLanguage("ko-KR", "Tiếng Hàn", "한국어", "🇰🇷", "Korean (한국어)"),
-    XboxLanguage("zh-TW", "Tiếng Trung (Phồn thể)", "繁體中文", "🇹🇼", "Traditional Chinese (繁體中文)"),
+    XboxLanguage("es-ES", "Tiếng Tây Ban Nha", "Español (España)", "🇪🇸", "Spanish (Español)"),
+    XboxLanguage("es-MX", "Tiếng Tây Ban Nha (Mỹ Latin)", "Español (México)", "🇲🇽", "Spanish (Latinoamérica)"),
+    XboxLanguage("pt-BR", "Tiếng Bồ Đào Nha (Brazil)", "Português (Brasil)", "🇧🇷", "Portuguese (Português)"),
     XboxLanguage("fr-FR", "Tiếng Pháp", "Français", "🇫🇷", "French (Français)"),
     XboxLanguage("de-DE", "Tiếng Đức", "Deutsch", "🇩🇪", "German (Deutsch)"),
-    XboxLanguage("es-ES", "Tiếng Tây Ban Nha", "Español", "🇪🇸", "Spanish (Español)"),
-    XboxLanguage("pt-BR", "Tiếng Bồ Đào Nha", "Português (Brasil)", "🇧🇷", "Portuguese (Português)"),
+    XboxLanguage("ja-JP", "Tiếng Nhật", "日本語", "🇯🇵", "Japanese (日本語)"),
+    XboxLanguage("ko-KR", "Tiếng Hàn", "한국어", "🇰🇷", "Korean (한국어)"),
+    XboxLanguage("zh-TW", "Tiếng Trung (Phồn thể)", "繁體中文", "🇹🇼", "Chinese (繁體中文)"),
     XboxLanguage("it-IT", "Tiếng Ý", "Italiano", "🇮🇹", "Italian (Italiano)"),
-    XboxLanguage("pl-PL", "Tiếng Ba Lan", "Polski", "🇵🇱", "Polish (Polski)")
+    XboxLanguage("pl-PL", "Tiếng Ba Lan", "Polski", "🇵🇱", "Polish (Polski)"),
+    XboxLanguage("tr-TR", "Tiếng Thổ Nhĩ Kỳ", "Türkçe", "🇹🇷", "Turkish (Türkçe)")
 )
 
 enum class ClarityPreset(
@@ -276,12 +278,53 @@ enum class NetworkTuningMode(
     fun localizedSubtitle(isEn: Boolean): String = if (isEn) subtitleEn else subtitle
 }
 
-enum class AppLanguage(val code: String, val title: String, val titleEn: String) {
-    SYSTEM("system", "Theo hệ thống (Tự động)", "System Default (Auto)"),
-    VIETNAMESE("vi", "Tiếng Việt", "Tiếng Việt (Vietnamese)"),
-    ENGLISH("en", "English", "English");
+enum class AppLanguage(
+    val code: String,
+    val title: String,
+    val titleEn: String,
+    val flag: String,
+    val shortBadge: String,
+    val translateTargetCode: String
+) {
+    SYSTEM("system", "Theo hệ thống (Tự động)", "System Default (Auto)", "🌐", "AUTO", ""),
+    ENGLISH("en", "English", "English", "🇺🇸", "EN", "en"),
+    VIETNAMESE("vi", "Tiếng Việt", "Tiếng Việt (Vietnamese)", "🇻🇳", "VI", "vi"),
+    SPANISH("es", "Español", "Español (Spanish)", "🇪🇸", "ES", "es"),
+    PORTUGUESE("pt", "Português", "Português (Portuguese)", "🇧🇷", "PT", "pt"),
+    FRENCH("fr", "Français", "Français (French)", "🇫🇷", "FR", "fr"),
+    GERMAN("de", "Deutsch", "Deutsch (German)", "🇩🇪", "DE", "de"),
+    JAPANESE("ja", "日本語", "日本語 (Japanese)", "🇯🇵", "JA", "ja"),
+    KOREAN("ko", "한국어", "한국어 (Korean)", "🇰🇷", "KO", "ko"),
+    CHINESE("zh", "中文", "中文 (Chinese)", "🇨🇳", "ZH", "zh-CN"),
+    INDONESIAN("id", "Bahasa Indonesia", "Bahasa Indonesia", "🇮🇩", "ID", "id"),
+    THAI("th", "ไทย", "ไทย (Thai)", "🇹🇭", "TH", "th"),
+    RUSSIAN("ru", "Русский", "Русский (Russian)", "🇷🇺", "RU", "ru");
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
+
+    fun effectiveLanguageCode(): String {
+        if (this != SYSTEM) return code
+        val rawSys = Locale.getDefault().language.lowercase(Locale.ROOT)
+        val normalized = if (rawSys == "in") "id" else rawSys
+        return entries.firstOrNull { it != SYSTEM && normalized.startsWith(it.code) }?.code ?: "en"
+    }
+
+    fun effectiveShortBadge(): String {
+        if (this != SYSTEM) return shortBadge
+        val code = effectiveLanguageCode()
+        return entries.firstOrNull { it.code == code }?.shortBadge ?: "EN"
+    }
+
+    fun effectiveFlag(): String {
+        if (this != SYSTEM) return flag
+        val code = effectiveLanguageCode()
+        return entries.firstOrNull { it.code == code }?.flag ?: "🌐"
+    }
+
+    fun resolveTranslateTargetCode(): String {
+        val eff = effectiveLanguageCode()
+        return entries.firstOrNull { it.code == eff }?.translateTargetCode?.ifBlank { "en" } ?: "en"
+    }
 }
 
 enum class GamepadLayoutPreset(
@@ -602,15 +645,19 @@ data class AppConfig(
     }
 
     fun isEnglishUI(): Boolean {
-        return when (appLanguage) {
-            AppLanguage.ENGLISH -> true
-            AppLanguage.VIETNAMESE -> false
-            AppLanguage.SYSTEM -> !Locale.getDefault().language.lowercase().startsWith("vi")
-        }
+        return appLanguage.effectiveLanguageCode() != "vi"
+    }
+
+    fun isVietnameseUI(): Boolean {
+        return appLanguage.effectiveLanguageCode() == "vi"
+    }
+
+    fun getTargetTranslateLanguageCode(): String {
+        return appLanguage.resolveTranslateTargetCode()
     }
 
     fun isEffectiveTranslateEnabled(): Boolean {
-        return xcloudTranslateEnabled && !isEnglishUI()
+        return xcloudTranslateEnabled && appLanguage.effectiveLanguageCode() != "en"
     }
 }
 
@@ -844,12 +891,17 @@ object SettingsRepository {
      * If the system language is unsupported (e.g. Vietnamese 'vi'), automatically falls back to 'en-US'.
      */
     fun resolveSystemXboxLocale(): String {
+        val appLang = _config.value.appLanguage
         val sysLocale = Locale.getDefault()
-        val lang = sysLocale.language.lowercase()
-        val country = sysLocale.country.uppercase()
+        val lang = if (appLang != AppLanguage.SYSTEM) {
+            appLang.code.lowercase(Locale.ROOT)
+        } else {
+            sysLocale.language.lowercase(Locale.ROOT)
+        }
+        val country = sysLocale.country.uppercase(Locale.ROOT)
 
         return when (lang) {
-            "vi" -> "en-US" // Tiếng Việt chưa hỗ trợ xCloud -> Fallback tiếng Anh (en-US)
+            "vi", "id", "in", "th" -> "en-US"
             "en" -> when (country) {
                 "GB" -> "en-GB"
                 "CA" -> "en-CA"
@@ -874,7 +926,8 @@ object SettingsRepository {
             "cs" -> "cs-CZ"
             "hu" -> "hu-HU"
             "tr" -> "tr-TR"
-            else -> "en-US" // Ngôn ngữ khác -> Fallback sang tiếng Anh (en-US)
+            "ru" -> "ru-RU"
+            else -> "en-US"
         }
     }
 
@@ -944,11 +997,7 @@ object SettingsRepository {
     }
 
     fun updateAppLanguage(language: AppLanguage) {
-        val autoTranslate = when (language) {
-            AppLanguage.ENGLISH -> false
-            AppLanguage.VIETNAMESE -> true
-            AppLanguage.SYSTEM -> Locale.getDefault().language.lowercase().startsWith("vi")
-        }
+        val autoTranslate = language.effectiveLanguageCode() != "en"
         _config.update {
             it.copy(
                 appLanguage = language,

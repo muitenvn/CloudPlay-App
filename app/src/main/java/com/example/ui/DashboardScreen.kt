@@ -133,6 +133,7 @@ fun DashboardScreen(
     var showTranslatorDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
+    var showLanguageMenu by remember { mutableStateOf(false) }
 
     val motionEnabled = rememberXboxMotionEnabled(
         lowEndDeviceMode = config.lowEndDeviceMode,
@@ -325,56 +326,78 @@ fun DashboardScreen(
                                     }
                                 }
 
-                                // 2. Language Button (48dp touch target)
-                                val currentLangLabel = when (config.appLanguage) {
-                                    com.example.data.AppLanguage.SYSTEM -> {
-                                        val sys = java.util.Locale.getDefault()
-                                        if (sys.language.lowercase().startsWith("vi")) "VI" else "EN"
-                                    }
-                                    com.example.data.AppLanguage.VIETNAMESE -> "VI"
-                                    com.example.data.AppLanguage.ENGLISH -> "EN"
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                        .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            val nextLang = when (config.appLanguage) {
-                                                com.example.data.AppLanguage.SYSTEM -> com.example.data.AppLanguage.VIETNAMESE
-                                                com.example.data.AppLanguage.VIETNAMESE -> com.example.data.AppLanguage.ENGLISH
-                                                com.example.data.AppLanguage.ENGLISH -> com.example.data.AppLanguage.SYSTEM
-                                            }
-                                            SettingsRepository.updateAppLanguage(nextLang)
-                                        }
-                                        .testTag("topbar_language_button"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Surface(
+                                // 2. Global Language Button (48dp touch target + dropdown for 12 languages)
+                                val currentLangLabel = config.appLanguage.effectiveShortBadge()
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
                                         modifier = Modifier
-                                            .height(34.dp)
-                                            .clip(RoundedCornerShape(9.dp))
-                                            .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp)),
-                                        color = XboxSurfaceVariant.copy(alpha = 0.9f)
+                                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable { showLanguageMenu = true }
+                                            .testTag("topbar_language_button"),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        Surface(
+                                            modifier = Modifier
+                                                .height(34.dp)
+                                                .clip(RoundedCornerShape(9.dp))
+                                                .border(1.dp, XboxCardBorder, RoundedCornerShape(9.dp)),
+                                            color = XboxSurfaceVariant.copy(alpha = 0.9f)
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Language,
-                                                contentDescription = stringResource(R.string.current_language),
-                                                tint = XboxNeonGreen,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = currentLangLabel,
-                                                color = TextPrimary,
-                                                fontFamily = SpaceGroteskFontFamily,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Language,
+                                                    contentDescription = stringResource(R.string.current_language),
+                                                    tint = XboxNeonGreen,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Text(
+                                                    text = currentLangLabel,
+                                                    color = TextPrimary,
+                                                    fontFamily = SpaceGroteskFontFamily,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showLanguageMenu,
+                                        onDismissRequest = { showLanguageMenu = false },
+                                        modifier = Modifier
+                                            .background(XboxSurface)
+                                            .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp))
+                                    ) {
+                                        com.example.data.AppLanguage.entries.forEach { langOption ->
+                                            val isSelected = config.appLanguage == langOption
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Text(text = langOption.flag, fontSize = 15.sp)
+                                                        Text(
+                                                            text = langOption.localizedTitle(isEnUi),
+                                                            color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                                            fontFamily = SpaceGroteskFontFamily,
+                                                            fontSize = 12.5.sp,
+                                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    showLanguageMenu = false
+                                                    SettingsRepository.updateAppLanguage(langOption)
+                                                },
+                                                modifier = Modifier.testTag("topbar_lang_item_${langOption.code}")
                                             )
                                         }
                                     }
@@ -851,16 +874,23 @@ private fun ConsoleFloatingNavigationDock(
                                 .background(accentColor)
                         )
 
-                        Box(contentAlignment = Alignment.TopEnd) {
+                        Box(
+                            modifier = Modifier
+                                .width(56.dp)
+                                .height(22.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
                                 tint = iconTint,
-                                modifier = Modifier.size(21.dp)
+                                modifier = Modifier
+                                    .size(21.dp)
+                                    .align(Alignment.Center)
                             )
                             if (tab == DashboardTab.LIBRARY && gamesCount > 0) {
                                 Surface(
-                                    modifier = Modifier.padding(start = 16.dp),
+                                    modifier = Modifier.align(Alignment.TopEnd),
                                     shape = RoundedCornerShape(6.dp),
                                     color = DirectCyan.copy(alpha = 0.22f),
                                     border = androidx.compose.foundation.BorderStroke(
@@ -872,15 +902,16 @@ private fun ConsoleFloatingNavigationDock(
                                         text = if (gamesCount > 99) "99+" else "$gamesCount",
                                         color = DirectCyan,
                                         fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 7.5.sp,
+                                        fontSize = 7.sp,
                                         fontWeight = FontWeight.Black,
-                                        modifier = Modifier.padding(horizontal = 3.5.dp, vertical = 0.5.dp)
+                                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                                     )
                                 }
                             } else if (tab == DashboardTab.SERVERS && isVpnActive) {
                                 Box(
                                     modifier = Modifier
-                                        .padding(start = 14.dp)
+                                        .align(Alignment.TopEnd)
+                                        .padding(end = 10.dp)
                                         .size(6.dp)
                                         .clip(CircleShape)
                                         .background(XboxNeonGreen)

@@ -77,11 +77,12 @@ data class ServerLocation(
             .replace("Đại học Tsukuba Academic", "Tsukuba Academic Node")
             .replace("Trục cáp quang", "Fiber Backbone")
             .replace("Cụm máy chủ", "Server Cluster")
-            .replace("Độ trễ thấp cho VN", "Low Latency for SEA/VN")
-            .replace("Kết nối khu vực Đông Nam Á", "Southeast Asia Regional Hub")
+            .replace("Độ trễ thấp cho VN", "Low Latency Regional Route")
+            .replace("Kết nối khu vực Đông Nam Á", "Asia-Pacific Regional Hub")
             .replace("Đầu mối quốc tế tốc độ cao", "High-Speed International Node")
             .replace("Mạng lưới toàn cầu", "Global Edge Network")
             .replace("Cổng kết nối ổn định", "Stable Gateway")
+            .replace("Cổng :", "Port :")
             .replace("Máy chủ SOCKS5 do người dùng tự thêm", "User-added custom SOCKS5 proxy")
             .replace("Máy chủ HTTP do người dùng tự thêm", "User-added custom HTTP proxy")
             .replace("do người dùng tự thêm", "User-added custom proxy")
@@ -449,11 +450,11 @@ enum class SmartVpnPhase {
 data class SmartVpnDecision(
     val checked: Boolean = false,
     val needsVpn: Boolean = true,
-    val userCountryCode: String = "VN",
-    val userCountryName: String = "Việt Nam",
+    val userCountryCode: String = "--",
+    val userCountryName: String = "Global",
     val isSupportedRegion: Boolean = false,
-    val message: String = "Đang kiểm tra IP người chơi...",
-    val actionSummary: String = "BẬT lúc mở game ➔ TẮT khi vào trận"
+    val message: String = "Checking network region...",
+    val actionSummary: String = "Auto: ON at launch ➔ OFF in-game"
 )
 
 @Immutable

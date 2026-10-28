@@ -217,7 +217,7 @@ object GoogleGamingTranslator {
      */
     suspend fun translate(
         rawText: String,
-        targetLang: String = "vi",
+        targetLang: String = com.example.data.SettingsRepository.config.value.getTargetTranslateLanguageCode(),
         bilingual: Boolean = false
     ): String = withContext(Dispatchers.IO) {
         val trimmed = rawText.trim()
@@ -230,14 +230,16 @@ object GoogleGamingTranslator {
             return@withContext if (bilingual && cached != trimmed) "$cached ($trimmed)" else cached
         }
 
-        // Fast-path: Check local dictionary (case-insensitive)
-        val dictMatch = XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed]
-            ?: XboxTranslator.XBOX_UI_DICTIONARY_EN.entries.firstOrNull {
-                it.key.equals(trimmed, ignoreCase = true)
-            }?.value
-        if (dictMatch != null) {
-            putCachedTranslation(cacheKey, dictMatch)
-            return@withContext if (bilingual) "$dictMatch ($trimmed)" else dictMatch
+        // Fast-path: Check local Vietnamese dictionary only when target language is Vietnamese
+        if (targetLang.startsWith("vi", ignoreCase = true)) {
+            val dictMatch = XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed]
+                ?: XboxTranslator.XBOX_UI_DICTIONARY_EN.entries.firstOrNull {
+                    it.key.equals(trimmed, ignoreCase = true)
+                }?.value
+            if (dictMatch != null) {
+                putCachedTranslation(cacheKey, dictMatch)
+                return@withContext if (bilingual) "$dictMatch ($trimmed)" else dictMatch
+            }
         }
 
         // Tokenize gaming terms to protect them
@@ -301,7 +303,7 @@ object GoogleGamingTranslator {
      */
     suspend fun translateWithAnalysis(
         rawText: String,
-        targetLang: String = "vi",
+        targetLang: String = com.example.data.SettingsRepository.config.value.getTargetTranslateLanguageCode(),
         bilingual: Boolean = false
     ): SmartTranslationResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
@@ -318,7 +320,7 @@ object GoogleGamingTranslator {
                 originalText = rawText,
                 translatedText = finalized,
                 protectedTerms = protectedList,
-                translatedTerms = listOf("Đã tải từ bộ nhớ đệm LRU"),
+                translatedTerms = listOf("Loaded from LRU cache"),
                 executionTimeMs = System.currentTimeMillis() - startTime,
                 isFromCache = true
             )
@@ -331,7 +333,7 @@ object GoogleGamingTranslator {
             originalText = rawText,
             translatedText = translated,
             protectedTerms = protectedList,
-            translatedTerms = listOf("Mô tả game / Cốt truyện / Menu điều hướng"),
+            translatedTerms = listOf("Game description / Story / Navigation Menu"),
             executionTimeMs = timeSpent,
             isFromCache = false
         )
@@ -342,7 +344,7 @@ object GoogleGamingTranslator {
      */
     suspend fun translateBatch(
         texts: List<String>,
-        targetLang: String = "vi",
+        targetLang: String = com.example.data.SettingsRepository.config.value.getTargetTranslateLanguageCode(),
         bilingual: Boolean = false
     ): Map<String, String> = withContext(Dispatchers.IO) {
         val distinctTexts = texts.map { it.trim() }.filter { it.isNotEmpty() }.distinct()

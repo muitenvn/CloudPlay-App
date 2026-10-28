@@ -709,80 +709,150 @@ fun SettingsScreen(
         }
 
         // =========================================================================
-        // NHÓM 4: DỊCH TIẾNG VIỆT & HỆ THỐNG (Mặc định gập)
+        // NHÓM 4: NGÔN NGỮ, DỊCH TỰ ĐỘNG & HỆ THỐNG (Mặc định gập)
         // =========================================================================
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Translation, Language & System" else "Dịch Tiếng Việt & Hệ thống",
-                subtitle = if (isEn) "Translator, App Language, Account" else "Bộ dịch, Ngôn ngữ & Tài khoản",
+                title = if (isEn) "Language, Auto-Translate & System" else "Ngôn ngữ, Dịch tự động & Hệ thống",
+                subtitle = if (isEn) "12 World Languages, Translator, Account" else "12 ngôn ngữ quốc tế, Bộ dịch & Tài khoản",
                 icon = Icons.Default.Tune,
                 expanded = expandAdvanced,
                 onToggle = { expandAdvanced = !expandAdvanced },
                 testTag = "settings_group_advanced"
             ) {
-                // 4.1 Bộ dịch & hiển thị
-                SettingsCard(title = if (isEn) "Vietnamese Translator" else "Bộ dịch Tiếng Việt") {
+                // 4.1 Bộ dịch đa ngôn ngữ & hiển thị
+                SettingsCard(title = if (isEn) "Smart Cloud Translator" else "Bộ dịch đa ngôn ngữ") {
                     SettingToggleRow(
-                        title = if (isEn) "Auto-translate to Vietnamese" else "Tự động dịch Tiếng Việt",
-                        subtitle = if (isEn) "Translates Xbox menus and notifications" else "Dịch giao diện và thông báo trên trang Xbox",
+                        title = if (isEn) "Auto-translate Xbox interface" else "Tự động dịch giao diện Xbox",
+                        subtitle = if (isEn) {
+                            "Translates Xbox Cloud menus into your selected language (${config.appLanguage.localizedTitle(true)})"
+                        } else {
+                            "Dịch giao diện và thông báo Xbox sang ngôn ngữ bạn chọn (${config.appLanguage.localizedTitle(false)})"
+                        },
                         checked = config.xcloudTranslateEnabled,
                         onCheckedChange = { SettingsRepository.updateXcloudTranslate(it) },
                         switchTestTag = "settings_switch_xcloud_translate"
                     )
 
                     SettingToggleRow(
-                        title = if (isEn) "Bilingual mode (VI - EN)" else "Chế độ song ngữ (Việt - Anh)",
-                        subtitle = if (isEn) "Shows original English in parentheses" else "Hiện kèm tiếng Anh gốc trong ngoặc",
+                        title = if (isEn) "Bilingual mode (Translated + Original)" else "Chế độ song ngữ (Bản dịch + Gốc)",
+                        subtitle = if (isEn) "Shows original text in parentheses" else "Hiện kèm ngôn ngữ gốc trong ngoặc",
                         checked = config.bilingualMode,
                         onCheckedChange = { SettingsRepository.updateBilingualMode(it) }
                     )
                 }
 
-                // 4.2 Ngôn ngữ ứng dụng (Gộp 1 hàng 3 nút gọn gàng)
-                SettingsCard(title = if (isEn) "App Language" else "Ngôn ngữ ứng dụng") {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(
-                            Triple(AppLanguage.SYSTEM, if (isEn) "🌐 System" else "🌐 Hệ thống", "app_lang_system_button"),
-                            Triple(AppLanguage.VIETNAMESE, "🇻🇳 Tiếng Việt", "app_lang_vi_button"),
-                            Triple(AppLanguage.ENGLISH, "🇺🇸 English", "app_lang_en_button")
-                        ).forEach { (lang, label, tag) ->
-                            val isSelected = config.appLanguage == lang
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) XboxNeonGreen else XboxCardBorder,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateAppLanguage(lang) }
-                                    .testTag(tag),
-                                color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.55f)
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
-                                    contentAlignment = Alignment.Center
+                // 4.2 Ngôn ngữ ứng dụng (Hàng đầu: Hệ thống / Tiếng Việt / English + Lưới ngôn ngữ quốc tế phổ biến)
+                SettingsCard(title = if (isEn) "App Language (Global)" else "Ngôn ngữ ứng dụng (Quốc tế)") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                Triple(AppLanguage.SYSTEM, if (isEn) "🌐 System" else "🌐 Hệ thống", "app_lang_system_button"),
+                                Triple(AppLanguage.VIETNAMESE, "🇻🇳 Tiếng Việt", "app_lang_vi_button"),
+                                Triple(AppLanguage.ENGLISH, "🇺🇸 English", "app_lang_en_button")
+                            ).forEach { (lang, label, tag) ->
+                                val isSelected = config.appLanguage == lang
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { SettingsRepository.updateAppLanguage(lang) }
+                                        .testTag(tag),
+                                    color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.55f)
                                 ) {
-                                    Text(
-                                        text = label,
-                                        color = if (isSelected) XboxNeonGreen else TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        val worldLanguages = listOf(
+                            AppLanguage.SPANISH,
+                            AppLanguage.PORTUGUESE,
+                            AppLanguage.FRENCH,
+                            AppLanguage.GERMAN,
+                            AppLanguage.JAPANESE,
+                            AppLanguage.KOREAN,
+                            AppLanguage.CHINESE,
+                            AppLanguage.INDONESIAN,
+                            AppLanguage.THAI,
+                            AppLanguage.RUSSIAN
+                        )
+                        worldLanguages.chunked(2).forEach { rowLangs ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                rowLangs.forEach { lang ->
+                                    val isSelected = config.appLanguage == lang
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(
+                                                1.dp,
+                                                if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.7f),
+                                                RoundedCornerShape(10.dp)
+                                            )
+                                            .clickable { SettingsRepository.updateAppLanguage(lang) }
+                                            .testTag("app_lang_${lang.shortBadge.lowercase()}_button"),
+                                        color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.4f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text(text = lang.flag, fontSize = 13.sp)
+                                                Text(
+                                                    text = lang.title,
+                                                    color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Text(
+                                                text = lang.shortBadge,
+                                                color = if (isSelected) XboxNeonGreen else TextSecondary,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // 4.3 Ngôn ngữ trang Xbox (chỉ giữ danh sách chọn nhanh 1 chạm, ẩn ô gõ URL thủ công)
-                SettingsCard(title = if (isEn) "Xbox Page Language" else "Ngôn ngữ trang Xbox") {
+                // 4.3 Ngôn ngữ trang Xbox (chọn nhanh 1 chạm cho mọi khu vực quốc tế)
+                SettingsCard(title = if (isEn) "Xbox Cloud Storefront Locale" else "Ngôn ngữ trang Xbox Cloud") {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -802,13 +872,13 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isEn) "Auto Default (English - US)" else "Mặc định (Tiếng Anh - Mỹ)",
+                                    text = if (isEn) "Auto Match App / System Locale" else "Tự động theo ngôn ngữ máy / ứng dụng",
                                     color = TextPrimary,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp
                                 )
                                 Text(
-                                    text = if (isEn) "Keeps Xbox menus in English instead of Japanese" else "Giữ trang Xbox hiển thị tiếng Anh dễ đọc",
+                                    text = if (isEn) "Prevents Xbox pages from defaulting to server region language" else "Giữ trang Xbox hiển thị ngôn ngữ quen thuộc thay vì tiếng của máy chủ VPN",
                                     color = TextSecondary,
                                     fontSize = 10.sp
                                 )
@@ -820,7 +890,7 @@ fun SettingsScreen(
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        POPULAR_XBOX_LANGUAGES.take(5).forEach { lang ->
+                        POPULAR_XBOX_LANGUAGES.forEach { lang ->
                             val isSelected = !config.useSystemLanguage && config.customLocale.equals(lang.code, ignoreCase = true)
                             Surface(
                                 modifier = Modifier

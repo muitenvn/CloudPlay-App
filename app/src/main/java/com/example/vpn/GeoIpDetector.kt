@@ -37,7 +37,10 @@ object GeoIpDetector {
         .build()
 
     // Xbox Cloud officially supported countries (Singapore 'SG' is NOT supported by Xbox Cloud Gaming)
-    val SUPPORTED_COUNTRIES = setOf("JP", "US", "KR", "DE", "GB", "FR", "NL", "AU", "CA", "SE", "NO", "DK", "FI", "PL", "BR", "MX")
+    val SUPPORTED_COUNTRIES = setOf(
+        "JP", "US", "KR", "DE", "GB", "FR", "ES", "IT", "PT", "NL", "BE", "AT", "CH", "IE",
+        "AU", "NZ", "CA", "SE", "NO", "DK", "FI", "PL", "CZ", "HU", "SK", "BR", "MX", "AR", "CL", "CO"
+    )
 
     fun getFlagEmoji(countryCode: String): String {
         return when (countryCode.uppercase()) {
@@ -46,14 +49,38 @@ object GeoIpDetector {
             "US" -> "🇺🇸"
             "SG" -> "🇸🇬"
             "VN" -> "🇻🇳"
-            "GB" -> "🇬🇧"
+            "GB", "UK" -> "🇬🇧"
             "DE" -> "🇩🇪"
             "FR" -> "🇫🇷"
+            "ES" -> "🇪🇸"
+            "IT" -> "🇮🇹"
+            "PT" -> "🇵🇹"
+            "NL" -> "🇳🇱"
             "AU" -> "🇦🇺"
+            "NZ" -> "🇳🇿"
             "CA" -> "🇨🇦"
             "BR" -> "🇧🇷"
             "MX" -> "🇲🇽"
+            "AR" -> "🇦🇷"
+            "CL" -> "🇨🇱"
+            "CO" -> "🇨🇴"
             "PL" -> "🇵🇱"
+            "SE" -> "🇸🇪"
+            "NO" -> "🇳🇴"
+            "DK" -> "🇩🇰"
+            "FI" -> "🇫🇮"
+            "TR" -> "🇹🇷"
+            "RU" -> "🇷🇺"
+            "IN" -> "🇮🇳"
+            "ID" -> "🇮🇩"
+            "TH" -> "🇹🇭"
+            "MY" -> "🇲🇾"
+            "PH" -> "🇵🇭"
+            "TW" -> "🇹🇼"
+            "HK" -> "🇭🇰"
+            "CN" -> "🇨🇳"
+            "AE" -> "🇦🇪"
+            "SA" -> "🇸🇦"
             else -> "🌐"
         }
     }
@@ -62,7 +89,7 @@ object GeoIpDetector {
         val isEn = try {
             com.example.data.SettingsRepository.config.value.isEnglishUI()
         } catch (_: Exception) {
-            false
+            true
         }
         return when (countryCode.uppercase()) {
             "JP" -> if (isEn) "Japan" else "Nhật Bản (Japan)"
@@ -70,15 +97,33 @@ object GeoIpDetector {
             "US" -> if (isEn) "United States" else "Hoa Kỳ (United States)"
             "SG" -> "Singapore"
             "VN" -> if (isEn) "Vietnam" else "Việt Nam (Vietnam)"
-            "GB" -> if (isEn) "United Kingdom" else "Vương Quốc Anh (United Kingdom)"
+            "GB", "UK" -> if (isEn) "United Kingdom" else "Vương Quốc Anh (UK)"
             "DE" -> if (isEn) "Germany" else "Đức (Germany)"
             "FR" -> if (isEn) "France" else "Pháp (France)"
+            "ES" -> if (isEn) "Spain" else "Tây Ban Nha (Spain)"
+            "IT" -> if (isEn) "Italy" else "Ý (Italy)"
+            "PT" -> if (isEn) "Portugal" else "Bồ Đào Nha (Portugal)"
+            "NL" -> if (isEn) "Netherlands" else "Hà Lan (Netherlands)"
             "AU" -> if (isEn) "Australia" else "Úc (Australia)"
+            "NZ" -> "New Zealand"
             "CA" -> "Canada"
             "BR" -> "Brazil"
             "MX" -> "Mexico"
+            "AR" -> "Argentina"
+            "CL" -> "Chile"
+            "CO" -> "Colombia"
             "PL" -> if (isEn) "Poland" else "Ba Lan (Poland)"
-            else -> countryCode
+            "TR" -> if (isEn) "Turkey" else "Thổ Nhĩ Kỳ (Turkey)"
+            "RU" -> if (isEn) "Russia" else "Nga (Russia)"
+            "IN" -> if (isEn) "India" else "Ấn Độ (India)"
+            "ID" -> "Indonesia"
+            "TH" -> if (isEn) "Thailand" else "Thái Lan (Thailand)"
+            "MY" -> "Malaysia"
+            "PH" -> "Philippines"
+            "TW" -> if (isEn) "Taiwan" else "Đài Loan (Taiwan)"
+            "HK" -> "Hong Kong"
+            "CN" -> if (isEn) "China" else "Trung Quốc (China)"
+            else -> countryCode.ifBlank { "Global" }
         }
     }
 
@@ -107,7 +152,7 @@ object GeoIpDetector {
         _isChecking.value = true
         var result: GeoIpResult? = null
 
-        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates (e.g. Ho Chi Minh City vs Hanoi)
+        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates globally
         try {
             val req = Request.Builder()
                 .url("https://ipwho.is/")
@@ -119,23 +164,25 @@ object GeoIpDetector {
                 val json = JSONObject(bodyStr)
                 if (json.optBoolean("success", true)) {
                     val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country_code", "VN").uppercase()
-                    val countryName = json.optString("country", getCountryDisplayName(countryCode))
-                    val city = json.optString("city", "")
-                    val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                    val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                    val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                    val countryCode = json.optString("country_code", "").trim().uppercase()
+                    if (countryCode.length == 2) {
+                        val countryName = json.optString("country", getCountryDisplayName(countryCode))
+                        val city = json.optString("city", "")
+                        val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                        val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                    result = GeoIpResult(
-                        ip = ip,
-                        countryCode = countryCode,
-                        countryName = countryName,
-                        city = city,
-                        flagEmoji = getFlagEmoji(countryCode),
-                        isXboxSupported = isSupported,
-                        latitude = lat,
-                        longitude = lon
-                    )
+                        result = GeoIpResult(
+                            ip = ip,
+                            countryCode = countryCode,
+                            countryName = countryName,
+                            city = city,
+                            flagEmoji = getFlagEmoji(countryCode),
+                            isXboxSupported = isSupported,
+                            latitude = lat,
+                            longitude = lon
+                        )
+                    }
                 }
             }
             resp.close()
@@ -154,17 +201,19 @@ object GeoIpDetector {
                     val bodyStr = resp.body?.string() ?: ""
                     val json = JSONObject(bodyStr)
                     val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country", "VN").uppercase()
-                    val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                    val countryCode = json.optString("country", "").trim().uppercase()
+                    if (countryCode.length == 2) {
+                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                    result = GeoIpResult(
-                        ip = ip,
-                        countryCode = countryCode,
-                        countryName = getCountryDisplayName(countryCode),
-                        city = "",
-                        flagEmoji = getFlagEmoji(countryCode),
-                        isXboxSupported = isSupported
-                    )
+                        result = GeoIpResult(
+                            ip = ip,
+                            countryCode = countryCode,
+                            countryName = getCountryDisplayName(countryCode),
+                            city = "",
+                            flagEmoji = getFlagEmoji(countryCode),
+                            isXboxSupported = isSupported
+                        )
+                    }
                 }
                 resp.close()
             } catch (_: Exception) {
@@ -183,23 +232,25 @@ object GeoIpDetector {
                     val bodyStr = resp.body?.string() ?: ""
                     val json = JSONObject(bodyStr)
                     val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country_code", "VN").uppercase()
-                    val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
-                    val city = json.optString("city", "")
-                    val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                    val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                    val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                    val countryCode = json.optString("country_code", "").trim().uppercase()
+                    if (countryCode.length == 2) {
+                        val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
+                        val city = json.optString("city", "")
+                        val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                        val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                    result = GeoIpResult(
-                        ip = ip,
-                        countryCode = countryCode,
-                        countryName = countryName,
-                        city = city,
-                        flagEmoji = getFlagEmoji(countryCode),
-                        isXboxSupported = isSupported,
-                        latitude = lat,
-                        longitude = lon
-                    )
+                        result = GeoIpResult(
+                            ip = ip,
+                            countryCode = countryCode,
+                            countryName = countryName,
+                            city = city,
+                            flagEmoji = getFlagEmoji(countryCode),
+                            isXboxSupported = isSupported,
+                            latitude = lat,
+                            longitude = lon
+                        )
+                    }
                 }
                 resp.close()
             } catch (_: Exception) {

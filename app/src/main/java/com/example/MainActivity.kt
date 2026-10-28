@@ -87,14 +87,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val config by SettingsRepository.config.collectAsState()
             val targetLocale: java.util.Locale = remember(config.appLanguage) {
-                when (config.appLanguage) {
-                    com.example.data.AppLanguage.SYSTEM -> {
-                        val sys = java.util.Locale.getDefault()
-                        if (sys.language.lowercase().startsWith("vi")) java.util.Locale.forLanguageTag("vi") else java.util.Locale.ENGLISH
-                    }
-                    com.example.data.AppLanguage.VIETNAMESE -> java.util.Locale.forLanguageTag("vi")
-                    com.example.data.AppLanguage.ENGLISH -> java.util.Locale.ENGLISH
-                }
+                val langCode = config.appLanguage.effectiveLanguageCode()
+                java.util.Locale.forLanguageTag(langCode)
             }
 
             val baseContext = androidx.compose.ui.platform.LocalContext.current

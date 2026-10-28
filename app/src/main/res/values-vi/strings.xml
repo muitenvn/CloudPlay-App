@@ -7,7 +7,7 @@
 
     <!-- Navigation Tabs -->
     <string name="tab_home">Trang chủ</string>
-    <string name="tab_library">Game</string>
+    <string name="tab_library">Thư viện</string>
     <string name="tab_servers">Máy chủ</string>
     <string name="tab_settings">Cài đặt</string>
 
@@ -15,7 +15,7 @@
     <string name="section_app_language">NGÔN NGỮ ỨNG DỤNG</string>
     <string name="app_language_desc">Tự động chọn ngôn ngữ theo hệ điều hành hoặc thiết lập thủ công.</string>
     <string name="lang_system_default">Theo hệ thống (Tự động)</string>
-    <string name="lang_vietnamese">Tiếng Việt (Mặc định VN)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Vietnamese)</string>
     <string name="lang_english">English (Tiếng Anh)</string>
     <string name="current_language">Ngôn ngữ</string>
 

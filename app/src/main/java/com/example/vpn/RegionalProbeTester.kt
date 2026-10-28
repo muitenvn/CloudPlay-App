@@ -114,17 +114,26 @@ object RegionalProbeTester {
         ProbeStation("in_bom", "Mumbai (IN)", "IN", "Mumbai", 19.0760, 72.8777),
         ProbeStation("au_syd", "Sydney (AU)", "AU", "Sydney", -33.8688, 151.2093),
 
-        // Châu Âu
+        // Châu Âu & Trung Đông
         ProbeStation("de_fra", "Frankfurt (DE)", "DE", "Frankfurt", 50.1109, 8.6821),
         ProbeStation("gb_lon", "London (GB)", "GB", "London", 51.5074, -0.1278),
         ProbeStation("fr_par", "Paris (FR)", "FR", "Paris", 48.8566, 2.3522),
         ProbeStation("nl_ams", "Amsterdam (NL)", "NL", "Amsterdam", 52.3676, 4.9041),
+        ProbeStation("es_mad", "Madrid (ES)", "ES", "Madrid", 40.4168, -3.7038),
+        ProbeStation("it_mil", "Milan (IT)", "IT", "Milan", 45.4642, 9.1900),
+        ProbeStation("pl_waw", "Warsaw (PL)", "PL", "Warsaw", 52.2297, 21.0122),
+        ProbeStation("tr_ist", "Istanbul (TR)", "TR", "Istanbul", 41.0082, 28.9784),
+        ProbeStation("ae_dxb", "Dubai (AE)", "AE", "Dubai", 25.2048, 55.2708),
 
         // Châu Mỹ
         ProbeStation("us_sjc", "Silicon Valley (US)", "US", "San Jose", 37.3382, -121.8863),
         ProbeStation("us_sea", "Seattle (US)", "US", "Seattle", 47.6062, -122.3321),
         ProbeStation("us_iad", "Virginia (US)", "US", "Ashburn", 39.0438, -77.4874),
-        ProbeStation("br_gru", "São Paulo (BR)", "BR", "Sao Paulo", -23.5505, -46.6333)
+        ProbeStation("ca_tor", "Toronto (CA)", "CA", "Toronto", 43.6532, -79.3832),
+        ProbeStation("mx_mex", "Mexico City (MX)", "MX", "Mexico City", 19.4326, -99.1332),
+        ProbeStation("br_gru", "São Paulo (BR)", "BR", "Sao Paulo", -23.5505, -46.6333),
+        ProbeStation("ar_bue", "Buenos Aires (AR)", "AR", "Buenos Aires", -34.6037, -58.3816),
+        ProbeStation("cl_scl", "Santiago (CL)", "CL", "Santiago", -33.4489, -70.6693)
     )
 
     private val COUNTRY_REFERENCE_COORDS = mapOf(
@@ -145,14 +154,32 @@ object RegionalProbeTester {
         "JP" to Pair(35.6762, 139.6503),
         "KR" to Pair(37.5665, 126.9780),
         "IN" to Pair(19.0760, 72.8777),
+        "PK" to Pair(24.8607, 67.0011),
+        "BD" to Pair(23.8103, 90.4125),
         "AU" to Pair(-33.8688, 151.2093),
         "NZ" to Pair(-36.8485, 174.7633),
         "DE" to Pair(50.1109, 8.6821),
         "GB" to Pair(51.5074, -0.1278),
         "UK" to Pair(51.5074, -0.1278),
         "FR" to Pair(48.8566, 2.3522),
+        "ES" to Pair(40.4168, -3.7038),
+        "IT" to Pair(45.4642, 9.1900),
+        "PT" to Pair(38.7223, -9.1393),
         "NL" to Pair(52.3676, 4.9041),
+        "BE" to Pair(50.8503, 4.3517),
+        "CH" to Pair(47.3769, 8.5417),
+        "AT" to Pair(48.2082, 16.3738),
         "PL" to Pair(52.2297, 21.0122),
+        "CZ" to Pair(50.0755, 14.4378),
+        "HU" to Pair(47.4979, 19.0402),
+        "RO" to Pair(44.4268, 26.1025),
+        "UA" to Pair(50.4501, 30.5234),
+        "RU" to Pair(55.7558, 37.6173),
+        "TR" to Pair(41.0082, 28.9784),
+        "AE" to Pair(25.2048, 55.2708),
+        "SA" to Pair(24.7136, 46.6753),
+        "EG" to Pair(30.0444, 31.2357),
+        "ZA" to Pair(-26.2041, 28.0473),
         "SE" to Pair(59.3293, 18.0686),
         "NO" to Pair(59.9139, 10.7522),
         "DK" to Pair(55.6761, 12.5683),
@@ -160,7 +187,11 @@ object RegionalProbeTester {
         "US" to Pair(37.3382, -121.8863),
         "CA" to Pair(49.2827, -123.1207),
         "MX" to Pair(19.4326, -99.1332),
-        "BR" to Pair(-23.5505, -46.6333)
+        "BR" to Pair(-23.5505, -46.6333),
+        "AR" to Pair(-34.6037, -58.3816),
+        "CL" to Pair(-33.4489, -70.6693),
+        "CO" to Pair(4.7110, -74.0721),
+        "PE" to Pair(-12.0464, -77.0428)
     )
 
     fun haversineDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {

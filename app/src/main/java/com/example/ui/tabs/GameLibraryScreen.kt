@@ -187,59 +187,107 @@ fun GameLibraryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Segmented switch: "Thư viện" | "Lịch sử"
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("game_tab_segmented_bar"),
-                shape = RoundedCornerShape(14.dp),
-                color = XboxSurfaceVariant.copy(alpha = 0.9f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                Surface(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        .weight(1f)
+                        .testTag("game_tab_segmented_bar"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = XboxSurfaceVariant.copy(alpha = 0.9f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
                 ) {
-                    val sections = listOf(
-                        GameTabSection.LIBRARY to (if (isEn) "Library" else "Thư viện"),
-                        GameTabSection.HISTORY to (if (isEn) "History" else "Lịch sử")
-                    )
-                    sections.forEach { (section, label) ->
-                        val isSelected = activeSection == section
-                        val segmentBg by animateColorAsState(
-                            targetValue = if (isSelected) XboxGreen else Color.Transparent,
-                            animationSpec = tween(durationMillis = if (motionEnabled) 160 else 0),
-                            label = "library_segment_bg"
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val sections = listOf(
+                            GameTabSection.LIBRARY to "${stringResource(R.string.tab_library)} (${games.size})",
+                            GameTabSection.HISTORY to (if (isEn) "History" else "Lịch sử")
                         )
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { activeSection = section }
-                                .testTag(
-                                    if (section == GameTabSection.LIBRARY) "segment_library_button"
-                                    else "segment_history_button"
-                                ),
-                            shape = RoundedCornerShape(10.dp),
-                            color = segmentBg,
-                            border = if (isSelected) {
-                                androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f))
-                            } else null
-                        ) {
-                            Box(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                        sections.forEach { (section, label) ->
+                            val isSelected = activeSection == section
+                            val segmentBg by animateColorAsState(
+                                targetValue = if (isSelected) XboxGreen else Color.Transparent,
+                                animationSpec = tween(durationMillis = if (motionEnabled) 160 else 0),
+                                label = "library_segment_bg"
+                            )
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { activeSection = section }
+                                    .testTag(
+                                        if (section == GameTabSection.LIBRARY) "segment_library_button"
+                                        else "segment_history_button"
+                                    ),
+                                shape = RoundedCornerShape(10.dp),
+                                color = segmentBg,
+                                border = if (isSelected) {
+                                    androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f))
+                                } else null
                             ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) Color.White else TextSecondary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
-                                )
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = if (isSelected) Color.White else TextSecondary,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
+                        }
+                    }
+                }
+
+                if (activeSection == GameTabSection.LIBRARY) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = DirectCyan.copy(alpha = 0.14f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f)),
+                        modifier = Modifier
+                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(enabled = !isSyncingCatalog) {
+                                GameLibraryRepository.syncLiveXboxCatalog(force = true)
+                            }
+                            .testTag("sync_xbox_catalog_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = if (isEn) "Refresh Catalog" else "Làm mới danh sách",
+                                tint = DirectCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = if (isSyncingCatalog) {
+                                    "..."
+                                } else {
+                                    if (isEn) "Refresh" else "Làm mới"
+                                },
+                                color = DirectCyan,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
@@ -271,143 +319,28 @@ fun GameLibraryScreen(
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                // 1. Vault Telemetry Header Strip
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = XboxSurface.copy(alpha = 0.95f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Brush.horizontalGradient(
-                            listOf(XboxNeonGreen.copy(alpha = 0.45f), XboxCardBorder, DirectCyan.copy(alpha = 0.45f))
-                        )
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "XBOX CLOUD GAMES" else "KHO GAME XBOX CLOUD",
-                                color = XboxNeonGreen,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.8.sp
-                            )
-                            Text(
-                                text = if (isSyncingCatalog) {
-                                    if (isEn) "Updating game list (${games.size} games)..."
-                                    else "Đang tải danh sách (${games.size} game)..."
-                                } else {
-                                    if (isEn) "${games.size} Games • $freeCount Free • $touchCount Touch"
-                                    else "${games.size} game • $freeCount Miễn phí • $touchCount Cảm ứng"
-                                },
-                                color = if (isSyncingCatalog) DirectCyan else TextSecondary,
-                                fontSize = 10.5.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = DirectCyan.copy(alpha = 0.14f),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.55f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable(enabled = !isSyncingCatalog) {
-                                        GameLibraryRepository.syncLiveXboxCatalog(force = true)
-                                    }
-                                    .testTag("sync_xbox_catalog_button")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Sync,
-                                        contentDescription = null,
-                                        tint = DirectCyan,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = if (isSyncingCatalog) {
-                                            "..."
-                                        } else {
-                                            if (isEn) "Refresh" else "Làm mới"
-                                        },
-                                        color = DirectCyan,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = XboxNeonGreen.copy(alpha = 0.16f),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { showAddDialog = true }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = null,
-                                        tint = XboxNeonGreen,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = if (isEn) "Add" else "Thêm",
-                                        color = XboxNeonGreen,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2. High-Tech Console Search Bar
+                // 1. High-Tech Console Search Bar (no fixed 52.dp clipping)
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
                         .testTag("library_search_input"),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        color = TextPrimary,
+                        fontSize = 13.5.sp,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.Medium
+                    ),
                     placeholder = {
                         Text(
                             stringResource(R.string.search_games_placeholder),
                             fontSize = 13.sp,
-                            color = TextSecondary
+                            color = TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     leadingIcon = {
@@ -440,7 +373,7 @@ fun GameLibraryScreen(
                     singleLine = true
                 )
 
-                // 3. Category Tabs Carousel
+                // 2. Category Tabs Carousel
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
                     GameFilterTab.FAVORITES to (if (isEn) "❤️ Favorites ($favCount)" else "❤️ Yêu thích ($favCount)"),
@@ -451,7 +384,8 @@ fun GameLibraryScreen(
                     GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
                 )
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     items(filterOptions) { (tab, label) ->
                         val isSelected = selectedTab == tab
@@ -472,19 +406,24 @@ fun GameLibraryScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .clickable { selectedTab = tab }
                         ) {
-                            Text(
-                                text = label,
-                                color = if (isSelected) Color.White else TextSecondary,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                            Box(
+                                contentAlignment = Alignment.Center,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                            )
+                            ) {
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) Color.White else TextSecondary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
 
-                // 3b. Quick Genre Chips + Live Result Counter
+                // 3. Quick Genre Chips + Live Result Counter
                 val genreOptions = listOf(
                     "ALL" to (if (isEn) "All Genres" else "Mọi thể loại"),
                     "SHOOTER" to (if (isEn) "Shooter / FPS" else "Bắn súng"),
@@ -500,7 +439,8 @@ fun GameLibraryScreen(
                 ) {
                     LazyRow(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         items(genreOptions) { (genreCode, genreLabel) ->
                             val isGenreSelected = selectedGenre == genreCode
@@ -522,21 +462,30 @@ fun GameLibraryScreen(
                                     .clickable { selectedGenre = genreCode }
                                     .testTag("genre_chip_${genreCode.lowercase()}")
                             ) {
-                                Text(
-                                    text = genreLabel,
-                                    color = if (isGenreSelected) DirectCyan else TextSecondary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (isGenreSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
+                                ) {
+                                    Text(
+                                        text = genreLabel,
+                                        color = if (isGenreSelected) DirectCyan else TextSecondary,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isGenreSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
 
                     Text(
-                        text = if (isEn) "${filteredGames.size} games" else "${filteredGames.size} game",
-                        color = XboxNeonGreen,
+                        text = if (isSyncingCatalog) {
+                            if (isEn) "Syncing..." else "Đang tải..."
+                        } else {
+                            if (isEn) "${filteredGames.size} games" else "${filteredGames.size} game"
+                        },
+                        color = if (isSyncingCatalog) DirectCyan else XboxNeonGreen,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -884,53 +833,61 @@ private fun LibraryGameCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(7.dp),
-                    color = Color(0xCC060B08),
-                    border = androidx.compose.foundation.BorderStroke(0.6.dp, GoldStar.copy(alpha = 0.45f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.5.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    Surface(
+                        shape = RoundedCornerShape(7.dp),
+                        color = Color(0xCC060B08),
+                        border = androidx.compose.foundation.BorderStroke(0.6.dp, GoldStar.copy(alpha = 0.45f))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = GoldStar,
-                            modifier = Modifier.size(11.dp)
-                        )
-                        Text(
-                            text = game.rating,
-                            color = Color.White,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 9.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = GoldStar,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = game.rating,
+                                color = Color.White,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (game.supportsTouch) {
+                        Surface(
+                            shape = RoundedCornerShape(7.dp),
+                            color = Color(0xCC060B08),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, DirectCyan.copy(alpha = 0.55f))
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TouchApp,
+                                    contentDescription = "Touch",
+                                    tint = DirectCyan,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    if (game.supportsTouch) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xCC060B08),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, DirectCyan.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TouchApp,
-                                contentDescription = "Touch",
-                                tint = DirectCyan,
-                                modifier = Modifier
-                                    .padding(5.dp)
-                                    .size(13.dp)
-                            )
-                        }
-                    }
-
                     Surface(
                         shape = CircleShape,
                         color = Color(0xCC060B08),
@@ -994,7 +951,7 @@ private fun LibraryGameCard(
                 }
             }
 
-            // Bottom Info & Play Trigger
+            // Bottom Info & Play Trigger (Uniform height across all 2-column cards)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1002,17 +959,20 @@ private fun LibraryGameCard(
                     .align(Alignment.BottomStart),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (localizedBadge != null) {
-                    Text(
-                        text = localizedBadge,
-                        color = XboxNeonGreen,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                val badgeText = localizedBadge ?: if (game.freeToPlay) {
+                    stringResource(R.string.badge_free)
+                } else {
+                    "XBOX CLOUD"
                 }
+                Text(
+                    text = badgeText,
+                    color = if (localizedBadge != null || game.freeToPlay) XboxNeonGreen else DirectCyan.copy(alpha = 0.9f),
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
                 Text(
                     text = game.title,
@@ -1035,7 +995,9 @@ private fun LibraryGameCard(
                         fontSize = 10.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 6.dp)
                     )
 
                     Surface(

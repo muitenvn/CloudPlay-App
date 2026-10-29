@@ -790,7 +790,7 @@ fun CloudBrowserScreen(
         // Mục 7e: Khi người dùng đã tự đổi thị trường Xbox khác en-US và vào game thất bại (unlock fail),
         // hiện gợi ý "Quay về en-US" để người dùng bấm (không tự ý đổi ngầm).
         AnimatedVisibility(
-            visible = vpnState.showUnlockFailPrompt && !effectiveLocale.equals("en-US", ignoreCase = true),
+            visible = vpnState.unlockFailPromptServer != null && !effectiveLocale.equals("en-US", ignoreCase = true),
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             modifier = Modifier

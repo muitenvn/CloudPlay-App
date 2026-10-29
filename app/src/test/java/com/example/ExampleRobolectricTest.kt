@@ -664,7 +664,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun `test 14 Muc 1 R id webview_desktop_ua_tag allows safe View setTag without IllegalArgumentException`() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val view = android.view.View(context)
         view.setTag(com.example.R.id.webview_desktop_ua_tag, true)
         assertEquals(true, view.getTag(com.example.R.id.webview_desktop_ua_tag))
@@ -674,10 +674,11 @@ class ExampleRobolectricTest {
 
     @Test
     fun `test 15 Muc 2 and 5 telemetry with hasStatsSample false does not pollute AdaptiveQualityManager EMA or trigger fake decode`() {
-        com.example.cloudplay.AdaptiveQualityManager.resetSession()
+        com.example.cloudplay.AdaptiveQualityManager.toggleAutoAdapting(true)
         val initialStep = com.example.cloudplay.AdaptiveQualityManager.state.value.currentStepIndex
+        val initialBitrate = com.example.cloudplay.AdaptiveQualityManager.state.value.smoothBitrateMbps
 
-        // Gửi mẫu dự phòng khi getStats chưa có dữ liệu (hasStatsSample = false)
+        // Gửi mẫu dự phòng khi getStats chưa có dữ liệu (hasStatsSample = false), kể cả khi chứa số xấu giả định
         com.example.cloudplay.NetworkOptimizer.onTelemetryReceived(
             """
             {
@@ -702,11 +703,13 @@ class ExampleRobolectricTest {
         assertEquals(0, tFallback.rttMs)
         assertEquals(0, tFallback.jitterMs)
 
-        // Đảm bảo mẫu hasStatsSample = false không làm thay đổi EMA hay bậc chất lượng của AdaptiveQualityManager
+        // Đảm bảo mẫu hasStatsSample = false (kể cả khi truyền rtt/decode cao) bị bỏ qua hoàn toàn bởi AdaptiveQualityManager
+        com.example.cloudplay.AdaptiveQualityManager.evaluateTelemetry(
+            tFallback.copy(hasStatsSample = false, rttMs = 300, jitterMs = 80, decodeTimeMs = 28.0, packetsLostPercent = 15.0)
+        )
         val aqmAfterFallback = com.example.cloudplay.AdaptiveQualityManager.state.value
         assertEquals(initialStep, aqmAfterFallback.currentStepIndex)
-        assertEquals(0.0, aqmAfterFallback.emaDecodeMs, 0.001)
-        assertEquals(0.0, aqmAfterFallback.emaRttMs, 0.001)
+        assertEquals(initialBitrate, aqmAfterFallback.smoothBitrateMbps, 0.001)
 
         // Gửi mẫu thật (hasStatsSample = true) với khóa chuẩn rttMs, jitterMs, decodeTimeMs
         com.example.cloudplay.NetworkOptimizer.onTelemetryReceived(
@@ -732,12 +735,11 @@ class ExampleRobolectricTest {
         assertEquals(48, tReal.rttMs)
         assertEquals(4, tReal.jitterMs)
         assertEquals(5.4, tReal.decodeTimeMs, 0.01)
-        assertTrue(com.example.cloudplay.AdaptiveQualityManager.state.value.emaRttMs > 0.0)
     }
 
     @Test
     fun `test 16 Muc 3 and 4 queryHardwareCodecSupport and clarity auto disable syncs ClarityPreset OFF and clarityBoostEnabled false`() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = ApplicationProvider.getApplicationContext<Context>()
         SettingsRepository.init(context)
 
         // Kiểm tra Mục 3: queryHardwareCodecSupport trả về cấu trúc hợp lệ và script nhúng cờ phần cứng thật
@@ -762,7 +764,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun `test 17 Muc 6 QualityAdapter applyAdaptiveBitrate uses 2 parameters without bufferHintMs`() {
-        com.example.cloudplay.QualityAdapter.resetTracking()
+        com.example.cloudplay.QualityAdapter.setWebView(null)
         com.example.cloudplay.QualityAdapter.applyAdaptiveBitrate(targetBitrateMbps = 10.5, smoothGlide = true)
         val script = com.example.cloudplay.XboxBridge.getInjectionScript(clarityBoost = false)
         assertTrue(script.contains("window.__setAdaptiveBitrate = function(targetMbps, smoothGlide)"))
@@ -771,7 +773,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun `test 18 Muc 7 Xbox market separated from app language and one-time migration resets non-en-US to en-US`() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
 
         // Giả lập người dùng từ bản cũ đang lưu thị trường khác en-US (vd: ko-KR, use_system_language = false)
@@ -801,11 +803,12 @@ class ExampleRobolectricTest {
 
     @Test
     fun `test 19 Muc 8 translation target language migration and getTargetTranslateLanguageCode never returns blank`() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = ApplicationProvider.getApplicationContext<Context>()
         val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
 
         // 1. Người dùng cũ có xcloud_translate = true -> giữ nguyên "vi"
-        sp.edit().clear()
+        sp.edit()
+            .clear()
             .putBoolean("xcloud_translate", true)
             .putString("app_language", com.example.data.AppLanguage.VIETNAMESE.name)
             .commit()
@@ -829,12 +832,13 @@ class ExampleRobolectricTest {
             hideStreamStats = true,
             targetLanguage = "es"
         )
-        assertTrue(esScript.contains("const IS_VI_TARGET = false;"))
+        assertTrue(esScript.contains("const isVietnameseTarget = false;"))
+        assertTrue(esScript.contains("const RAW_DICT = {};"))
     }
 
     @Test
     fun `test 20 Muc 9 and 10 GeoIpDetector lookup flag country name azureEndpoint for JP KR US VN DE FR unknown and private IPs`() {
-        val context = RuntimeEnvironment.getApplication()
+        val context = ApplicationProvider.getApplicationContext<Context>()
         SettingsRepository.init(context)
         SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
 

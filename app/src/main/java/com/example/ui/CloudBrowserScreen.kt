@@ -303,6 +303,7 @@ fun CloudBrowserScreen(
         vpnState.currentServer,
         effectiveLocale,
         effectiveTranslate,
+        config.translateLanguage,
         config.preserveGameTitles,
         config.bilingualMode,
         config.hideStreamStatsOverlay,
@@ -487,8 +488,7 @@ fun CloudBrowserScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
 
-                    // Giữ LAYER_TYPE_NONE trên cửa sổ đã bật Hardware Acceleration để Chromium kích hoạt
-                    // lớp phủ phần cứng zero-copy SurfaceControl trực tiếp cho <video> thay vì ép vẽ qua bộ đệm FBO trung gian.
+                    // Giữ LAYER_TYPE_NONE để tránh ép WebView vẽ qua bộ đệm phần mềm/lớp trung gian phụ.
                     setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                     keepScreenOn = true
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -514,7 +514,7 @@ fun CloudBrowserScreen(
                         }
                         userAgentString = initialUa
                     }
-                    setTag(android.R.id.summary, config.forceDesktopUserAgent)
+                    setTag(com.example.R.id.webview_desktop_ua_tag, config.forceDesktopUserAgent)
 
                     CookieManager.getInstance().let { cookieManager ->
                         cookieManager.setAcceptCookie(true)
@@ -656,9 +656,9 @@ fun CloudBrowserScreen(
                 // Tránh gọi IPC sang luồng Chromium (WebSettings.getDefaultUserAgent / view.settings.userAgentString)
                 // mỗi khi Compose vẽ lại theo nhịp telemetry trong trận.
                 val wantDesktopUa = config.forceDesktopUserAgent
-                val lastDesktopFlag = view.getTag(android.R.id.summary) as? Boolean
+                val lastDesktopFlag = view.getTag(com.example.R.id.webview_desktop_ua_tag) as? Boolean
                 if (lastDesktopFlag != wantDesktopUa) {
-                    view.setTag(android.R.id.summary, wantDesktopUa)
+                    view.setTag(com.example.R.id.webview_desktop_ua_tag, wantDesktopUa)
                     val desiredUa = if (wantDesktopUa) EDGE_DESKTOP_UA else WebSettings.getDefaultUserAgent(context)
                     if (view.settings.userAgentString != desiredUa) {
                         view.settings.userAgentString = desiredUa
@@ -782,6 +782,61 @@ fun CloudBrowserScreen(
                                 color = Color.White
                             )
                         }
+                    }
+                }
+            }
+        }
+
+        // Mục 7e: Khi người dùng đã tự đổi thị trường Xbox khác en-US và vào game thất bại (unlock fail),
+        // hiện gợi ý "Quay về en-US" để người dùng bấm (không tự ý đổi ngầm).
+        AnimatedVisibility(
+            visible = vpnState.showUnlockFailPrompt && !effectiveLocale.equals("en-US", ignoreCase = true),
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 72.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(14.dp))
+                    .testTag("market_fallback_en_us_banner"),
+                color = XboxSurface.copy(alpha = 0.96f),
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (config.isEnglishUI()) {
+                            "Market $effectiveLocale failed to launch. Return to verified en-US market?"
+                        } else {
+                            "Thị trường $effectiveLocale không vào được game. Bạn có muốn quay về en-US?"
+                        },
+                        color = TextPrimary,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = {
+                            SettingsRepository.resetXboxMarketToDefault()
+                            VpnManager.dismissUnlockFailPrompt()
+                            val enUsUrl = SettingsRepository.formatXboxUrlWithLocale(currentMainFrameUrl.ifBlank { initialUrl }, "en-US")
+                            webViewInstance?.loadUrl(enUsUrl)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
+                        modifier = Modifier.testTag("reset_market_to_en_us_banner_btn")
+                    ) {
+                        Text(
+                            text = if (config.isEnglishUI()) "Return to en-US" else "Quay về en-US",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
                     }
                 }
             }

@@ -362,7 +362,7 @@ object XboxTranslator {
     suspend fun syncDictionaryFromGithub(rawUrl: String = "https://raw.githubusercontent.com/redphx/better-xcloud/main/src/locales/vi-VN.json"): Boolean {
         return withContext(Dispatchers.IO) {
             val config = com.example.data.SettingsRepository.config.value
-            if (!config.isEffectiveTranslateEnabled() || dynamicGithubDictionary.isNotEmpty()) {
+            if (!config.isEffectiveTranslateEnabled() || !config.getTargetTranslateLanguageCode().equals("vi", ignoreCase = true) || dynamicGithubDictionary.isNotEmpty()) {
                 return@withContext dynamicGithubDictionary.isNotEmpty()
             }
             try {
@@ -451,20 +451,24 @@ object XboxTranslator {
         enabled: Boolean,
         preserveGameTitles: Boolean = true,
         bilingualMode: Boolean = false,
-        hideStreamStats: Boolean = true
+        hideStreamStats: Boolean = true,
+        targetLanguage: String = "vi"
     ): String {
+        val isVietnameseTarget = targetLanguage.trim().equals("vi", ignoreCase = true)
         val mergedDict = HashMap<String, String>()
-        XBOX_UI_DICTIONARY_EN.forEach { (k, v) -> mergedDict[k] = v }
-        XBOX_UI_DICTIONARY_JP.forEach { (k, v) -> mergedDict[k] = v }
-        XBOX_UI_DICTIONARY_KR.forEach { (k, v) -> mergedDict[k] = v }
-        dynamicGithubDictionary.forEach { (k, v) -> mergedDict[k] = v }
+        if (isVietnameseTarget) {
+            XBOX_UI_DICTIONARY_EN.forEach { (k, v) -> mergedDict[k] = v }
+            XBOX_UI_DICTIONARY_JP.forEach { (k, v) -> mergedDict[k] = v }
+            XBOX_UI_DICTIONARY_KR.forEach { (k, v) -> mergedDict[k] = v }
+            dynamicGithubDictionary.forEach { (k, v) -> mergedDict[k] = v }
+        }
 
         val dictJson = mapToJsonString(mergedDict)
         val protectedTitlesJson = listToJsonString(PROTECTED_GAME_TITLES)
 
         return """
             (function() {
-                if (window.__xcloudTranslatorInstalled) {
+                if (window.__xcloudTranslatorInstalled && window.__xcloudTargetLang === '${escapeJson(targetLanguage)}') {
                     if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($enabled);
                     if (window.__setXCloudTranslationConfig) {
                         window.__setXCloudTranslationConfig({
@@ -476,11 +480,13 @@ object XboxTranslator {
                     return;
                 }
                 window.__xcloudTranslatorInstalled = true;
+                window.__xcloudTargetLang = '${escapeJson(targetLanguage)}';
 
                 let isTranslationEnabled = $enabled;
                 let preserveTitles = $preserveGameTitles;
                 let isBilingual = $bilingualMode;
                 let hideStreamStats = $hideStreamStats;
+                const isVietnameseTarget = $isVietnameseTarget;
                 let translatedCount = 0;
 
                 const RAW_DICT = $dictJson;
@@ -533,9 +539,9 @@ object XboxTranslator {
                     return false;
                 }
 
-                // High-speed O(1) text translation
+                // High-speed O(1) text translation (Static dictionary & regexes only when targetLanguage == 'vi')
                 function translateString(text) {
-                    if (!text || text.length < 2) return null;
+                    if (!isVietnameseTarget || !text || text.length < 2) return null;
                     const trimmed = text.trim();
 
                     // O(1) Exact Match

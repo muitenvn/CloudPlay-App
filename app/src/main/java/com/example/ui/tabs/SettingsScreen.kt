@@ -722,17 +722,81 @@ fun SettingsScreen(
             ) {
                 // 4.1 Bộ dịch đa ngôn ngữ & hiển thị
                 SettingsCard(title = if (isEn) "Smart Cloud Translator" else "Bộ dịch đa ngôn ngữ") {
+                    val activeTargetLangCode = if (config.isEffectiveTranslateEnabled()) config.getTargetTranslateLanguageCode() else SettingsRepository.TRANSLATE_LANG_OFF
                     SettingToggleRow(
                         title = if (isEn) "Auto-translate Xbox interface" else "Tự động dịch giao diện Xbox",
                         subtitle = if (isEn) {
-                            "Translates Xbox Cloud menus into your selected language (${config.appLanguage.localizedTitle(true)})"
+                            "Translates Xbox Cloud menus into your selected target language ($activeTargetLangCode)"
                         } else {
-                            "Dịch giao diện và thông báo Xbox sang ngôn ngữ bạn chọn (${config.appLanguage.localizedTitle(false)})"
+                            "Dịch giao diện và thông báo Xbox sang ngôn ngữ đích đã chọn ($activeTargetLangCode)"
                         },
-                        checked = config.xcloudTranslateEnabled,
+                        checked = config.isEffectiveTranslateEnabled(),
                         onCheckedChange = { SettingsRepository.updateXcloudTranslate(it) },
                         switchTestTag = "settings_switch_xcloud_translate"
                     )
+
+                    Text(
+                        text = if (isEn) "Translation Target Language:" else "Ngôn ngữ dịch giao diện Xbox:",
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    val translateOptions = listOf(
+                        Triple(SettingsRepository.TRANSLATE_LANG_OFF, if (isEn) "🚫 Off" else "🚫 Tắt", "translate_lang_off_btn"),
+                        Triple("vi", "🇻🇳 Tiếng Việt", "translate_lang_vi_btn"),
+                        Triple("es", "🇪🇸 Español", "translate_lang_es_btn"),
+                        Triple("pt", "🇧🇷 Português", "translate_lang_pt_btn"),
+                        Triple("fr", "🇫🇷 Français", "translate_lang_fr_btn"),
+                        Triple("de", "🇩🇪 Deutsch", "translate_lang_de_btn"),
+                        Triple("ja", "🇯🇵 日本語", "translate_lang_ja_btn"),
+                        Triple("ko", "🇰🇷 한국어", "translate_lang_ko_btn"),
+                        Triple("zh-CN", "🇨🇳 中文", "translate_lang_zh_btn"),
+                        Triple("id", "🇮🇩 Indonesia", "translate_lang_id_btn"),
+                        Triple("th", "🇹🇭 ไทย", "translate_lang_th_btn"),
+                        Triple("ru", "🇷🇺 Русский", "translate_lang_ru_btn")
+                    )
+                    translateOptions.chunked(3).forEach { rowOpts ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            rowOpts.forEach { (code, label, tag) ->
+                                val isSelected = if (code == SettingsRepository.TRANSLATE_LANG_OFF) {
+                                    !config.isEffectiveTranslateEnabled()
+                                } else {
+                                    config.isEffectiveTranslateEnabled() && config.getTargetTranslateLanguageCode().equals(code, ignoreCase = true)
+                                }
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) DirectCyan else XboxCardBorder.copy(alpha = 0.6f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { SettingsRepository.updateTranslateLanguage(code) }
+                                        .testTag(tag),
+                                    color = if (isSelected) DirectCyan.copy(alpha = 0.16f) else XboxSurfaceVariant.copy(alpha = 0.4f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 7.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) DirectCyan else TextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 10.5.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     SettingToggleRow(
                         title = if (isEn) "Bilingual mode (Translated + Original)" else "Chế độ song ngữ (Bản dịch + Gốc)",
@@ -851,19 +915,24 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4.3 Ngôn ngữ trang Xbox (chọn nhanh 1 chạm cho mọi khu vực quốc tế)
-                SettingsCard(title = if (isEn) "Xbox Cloud Storefront Locale" else "Ngôn ngữ trang Xbox Cloud") {
+                // 4.3 Thị trường trang Xbox Cloud (Mục 7: mặc định en-US đã xác minh; mục Nâng cao ẩn cho chọn thủ công kèm cảnh báo & nút Quay về en-US)
+                SettingsCard(title = if (isEn) "Xbox Cloud Storefront Market" else "Thị trường trang Xbox Cloud") {
+                    var expandManualXboxMarket by rememberSaveable { mutableStateOf(false) }
+                    val effectiveMarket = config.getEffectiveLocale()
+                    val isDefaultEnUs = effectiveMarket.equals("en-US", ignoreCase = true)
+
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .border(
                                 1.dp,
-                                if (config.useSystemLanguage) XboxNeonGreen else XboxCardBorder,
+                                if (isDefaultEnUs) XboxNeonGreen else XboxCardBorder,
                                 RoundedCornerShape(10.dp)
                             )
-                            .clickable { SettingsRepository.updateUseSystemLanguage(true) },
-                        color = if (config.useSystemLanguage) XboxSurfaceVariant else Color.Transparent
+                            .clickable { SettingsRepository.resetXboxMarketToDefault() }
+                            .testTag("xbox_market_default_en_us_card"),
+                        color = if (isDefaultEnUs) XboxSurfaceVariant else Color.Transparent
                     ) {
                         Row(
                             modifier = Modifier.padding(10.dp),
@@ -872,57 +941,143 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isEn) "Auto Match App / System Locale" else "Tự động theo ngôn ngữ máy / ứng dụng",
+                                    text = if (isEn) "🇺🇸 Verified Default Market (en-US • Recommended)" else "🇺🇸 Thị trường chuẩn đã xác minh (en-US • Khuyên dùng)",
                                     color = TextPrimary,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp
                                 )
                                 Text(
-                                    text = if (isEn) "Prevents Xbox pages from defaulting to server region language" else "Giữ trang Xbox hiển thị ngôn ngữ quen thuộc thay vì tiếng của máy chủ VPN",
+                                    text = if (isEn) {
+                                        "Separated from app UI language to prevent unsupported region redirects"
+                                    } else {
+                                        "Tách biệt với ngôn ngữ ứng dụng để tránh bị chuyển hướng sang vùng không hỗ trợ xCloud"
+                                    },
                                     color = TextSecondary,
                                     fontSize = 10.sp
                                 )
                             }
-                            if (config.useSystemLanguage) {
+                            if (isDefaultEnUs) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        POPULAR_XBOX_LANGUAGES.forEach { lang ->
-                            val isSelected = !config.useSystemLanguage && config.customLocale.equals(lang.code, ignoreCase = true)
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.5f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateCustomLocale(lang.code) },
-                                color = if (isSelected) XboxSurfaceVariant else Color.Black.copy(alpha = 0.2f)
+                    if (!isDefaultEnUs) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(10.dp)),
+                            color = Color(0x26F59E0B)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Text(
+                                    text = if (isEn) {
+                                        "⚠️ Custom market active ($effectiveMarket). Non-en-US markets may cause region errors or fail to launch games."
+                                    } else {
+                                        "⚠️ Đang chọn thị trường thủ công ($effectiveMarket). Thị trường khác en-US có thể báo lỗi vùng hoặc không vào được game."
+                                    },
+                                    color = TextPrimary,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Button(
+                                    onClick = { SettingsRepository.resetXboxMarketToDefault() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("settings_reset_xbox_market_en_us_btn"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = if (isEn) "Return to en-US" else "Quay về en-US",
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.5.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, XboxCardBorder.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .clickable { expandManualXboxMarket = !expandManualXboxMarket }
+                            .testTag("toggle_advanced_manual_xbox_market_btn"),
+                        color = Color.Black.copy(alpha = 0.25f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = if (isEn) "⚙️ Advanced: Manual Xbox Market Override" else "⚙️ Nâng cao: Tự chọn thị trường Xbox thủ công",
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (expandManualXboxMarket) "▲" else "▼",
+                                color = DirectCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (expandManualXboxMarket) {
+                        Text(
+                            text = if (isEn) {
+                                "Warning: Only en-US is in the initial verified market whitelist. If a game fails to launch after switching, use 'Return to en-US'."
+                            } else {
+                                "Lưu ý: Danh sách trắng ban đầu chỉ gồm en-US. Nếu đổi thị trường làm không vào được game, hãy bấm 'Quay về en-US'."
+                            },
+                            color = Color(0xFFFBBF24),
+                            fontSize = 10.5.sp
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            POPULAR_XBOX_LANGUAGES.forEach { lang ->
+                                val isSelected = !config.useSystemLanguage && config.customLocale.equals(lang.code, ignoreCase = true)
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.5f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { SettingsRepository.updateCustomLocale(lang.code) },
+                                    color = if (isSelected) XboxSurfaceVariant else Color.Black.copy(alpha = 0.2f)
                                 ) {
                                     Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(text = lang.flag, fontSize = 15.sp)
-                                        Text(
-                                            text = lang.localizedName(isEn),
-                                            color = TextPrimary,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                    if (isSelected) {
-                                        Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(text = lang.flag, fontSize = 15.sp)
+                                            Text(
+                                                text = lang.localizedName(isEn),
+                                                color = TextPrimary,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }
@@ -930,8 +1085,39 @@ fun SettingsScreen(
                     }
                 }
 
-                // 4.4 Tài khoản & Bản quyền
-                SettingsCard(title = if (isEn) "Account & Terms" else "Tài khoản & Điều khoản") {
+                // 4.4 Tài khoản, Định vị IP (DB-IP) & Điều khoản
+                SettingsCard(title = if (isEn) "Account, IP Geolocation & Terms" else "Tài khoản, Tra cứu IP & Điều khoản") {
+                    SettingToggleRow(
+                        title = if (isEn) "Fallback HTTPS IP lookup (api.country.is)" else "Dịch vụ tra IP dự phòng qua HTTPS",
+                        subtitle = if (isEn) {
+                            "Used only when an IP is not yet in the local DB-IP Lite database"
+                        } else {
+                            "Chỉ gọi khi IP chưa có trong cơ sở dữ liệu DB-IP Lite trên máy"
+                        },
+                        checked = config.enableGeoIpHttpsFallback,
+                        onCheckedChange = { SettingsRepository.updateEnableGeoIpHttpsFallback(it) },
+                        switchTestTag = "settings_switch_geoip_https_fallback"
+                    )
+
+                    SettingToggleRow(
+                        title = if (isEn) "Allow DB-IP database update on mobile data" else "Cho phép tải dữ liệu DB-IP qua mạng di động",
+                        subtitle = if (isEn) {
+                            "Default OFF (updates automatically on Wi-Fi; asks permission on 4G/5G)"
+                        } else {
+                            "Mặc định TẮT (tự tải trên Wi-Fi; dùng mạng di động phải được bạn cho phép)"
+                        },
+                        checked = config.allowDbIpCellularDownload,
+                        onCheckedChange = { SettingsRepository.updateAllowDbIpCellularDownload(it) },
+                        switchTestTag = "settings_switch_dbip_cellular"
+                    )
+
+                    Text(
+                        text = "IP geolocation by DB-IP.com (CC-BY 4.0 • https://db-ip.com)",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        modifier = Modifier.testTag("dbip_attribution_text")
+                    )
+
                     Button(
                         onClick = onClearCookies,
                         modifier = Modifier.fillMaxWidth(),

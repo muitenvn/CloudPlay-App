@@ -66,7 +66,8 @@ data class StreamTelemetry(
     val jitterBufferDelayMs: Double = 0.0,
     val speedPriorityActive: Boolean = true,
     val appliedProfile: String = "Tự Động",
-    val estimatedDataSavedMb: Double = 0.0
+    val estimatedDataSavedMb: Double = 0.0,
+    val hasStatsSample: Boolean = true
 )
 
 object NetworkOptimizer {
@@ -435,17 +436,18 @@ object NetworkOptimizer {
         if (telemetryJson.isNullOrBlank()) return
         try {
             val json = JSONObject(telemetryJson)
-            val fps = json.optInt("fps", 0)
-            val bitrate = json.optDouble("bitrateMbps", 0.0)
-            val decodeTime = json.optDouble("decodeTimeMs", 0.0)
+            val hasStatsSample = json.optBoolean("hasStatsSample", true)
+            val fps = json.optInt("fps", 0).coerceAtLeast(0)
+            val bitrate = json.optDouble("bitrateMbps", 0.0).coerceAtLeast(0.0)
+            val decodeTime = json.optDouble("decodeTimeMs", 0.0).coerceAtLeast(0.0)
             val rtt = json.optInt("rttMs", 0).coerceAtLeast(0)
-            val jitter = json.optInt("jitterMs", 0)
-            val loss = json.optDouble("packetsLostPercent", 0.0)
-            val framesDropped = json.optInt("framesDropped", 0)
-            val framesDecoded = json.optInt("framesDecoded", 0)
-            val freezeCount = json.optInt("freezeCount", 0)
-            val totalFreezesDurationSec = json.optDouble("totalFreezesDurationSec", 0.0)
-            val jitterBufferDelayMs = json.optDouble("jitterBufferDelayMs", 0.0)
+            val jitter = json.optInt("jitterMs", 0).coerceAtLeast(0)
+            val loss = json.optDouble("packetsLostPercent", 0.0).coerceAtLeast(0.0)
+            val framesDropped = json.optInt("framesDropped", 0).coerceAtLeast(0)
+            val framesDecoded = json.optInt("framesDecoded", 0).coerceAtLeast(0)
+            val freezeCount = json.optInt("freezeCount", 0).coerceAtLeast(0)
+            val totalFreezesDurationSec = json.optDouble("totalFreezesDurationSec", 0.0).coerceAtLeast(0.0)
+            val jitterBufferDelayMs = json.optDouble("jitterBufferDelayMs", 0.0).coerceAtLeast(0.0)
 
             val nowMs = try {
                 val rt = SystemClock.elapsedRealtime()
@@ -463,10 +465,12 @@ object NetworkOptimizer {
             val currentStatus = _status.value
             val isSavingData = currentStatus.effectiveBitrateMbps <= 10
 
-            // Calculate estimated saved MB using actual elapsedSeconds compared to uncapped 15Mbps stream
-            streamSecondsTracked += elapsedSeconds
-            if (isSavingData && bitrate in 0.1..14.0) {
-                totalDataSavedMegabytes += (15.0 - bitrate).coerceAtLeast(0.0) * (elapsedSeconds / 8.0)
+            // Calculate estimated saved MB using actual elapsedSeconds only when real WebRTC stats are present
+            if (hasStatsSample) {
+                streamSecondsTracked += elapsedSeconds
+                if (isSavingData && bitrate in 0.1..14.0) {
+                    totalDataSavedMegabytes += (15.0 - bitrate).coerceAtLeast(0.0) * (elapsedSeconds / 8.0)
+                }
             }
 
             val newTelemetry = StreamTelemetry(
@@ -483,10 +487,13 @@ object NetworkOptimizer {
                 jitterBufferDelayMs = jitterBufferDelayMs,
                 speedPriorityActive = currentStatus.speedFirstPriority,
                 appliedProfile = currentStatus.activeProfileName,
-                estimatedDataSavedMb = totalDataSavedMegabytes
+                estimatedDataSavedMb = totalDataSavedMegabytes,
+                hasStatsSample = hasStatsSample
             )
             _telemetry.value = newTelemetry
-            AdaptiveQualityManager.evaluateTelemetry(newTelemetry)
+            if (hasStatsSample) {
+                AdaptiveQualityManager.evaluateTelemetry(newTelemetry)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing telemetry: $telemetryJson", e)
         }

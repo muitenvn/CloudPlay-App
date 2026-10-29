@@ -14,30 +14,20 @@ object QualityAdapter {
     private const val TAG = "QualityAdapter"
     private var webViewRef: WeakReference<WebView>? = null
     private var lastAppliedBitrateMbps: Double = -1.0
-    private var lastAppliedBufferMs: Double = -1.0
 
     fun setWebView(webView: WebView?) {
         webViewRef = if (webView != null) WeakReference(webView) else null
         if (webView == null) {
             lastAppliedBitrateMbps = -1.0
-            lastAppliedBufferMs = -1.0
         }
     }
 
     /**
-     * Compatibility overload accepting integer bufferHintMs.
-     */
-    fun applyAdaptiveBitrate(targetBitrateMbps: Double, bufferHintMs: Int) {
-        applyAdaptiveBitrate(targetBitrateMbps, bufferHintMs.toDouble(), smoothGlide = true)
-    }
-
-    /**
-     * Applies continuous target bitrate and float buffer tuning hint into the active WebRTC stream
+     * Applies continuous target bitrate into the active WebRTC stream
      * using zero-hitch micro-interpolation in JavaScript.
      */
     fun applyAdaptiveBitrate(
         targetBitrateMbps: Double,
-        bufferHintMs: Double,
         smoothGlide: Boolean = true
     ) {
         val webView = webViewRef?.get() ?: return
@@ -49,9 +39,8 @@ object QualityAdapter {
             return
         }
         lastAppliedBitrateMbps = targetBitrateMbps
-        lastAppliedBufferMs = bufferHintMs
 
-        val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $bufferHintMs, $smoothGlide);"
+        val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $smoothGlide);"
         webView.post {
             try {
                 webView.evaluateJavascript(js, null)

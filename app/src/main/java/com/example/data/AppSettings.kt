@@ -34,6 +34,36 @@ val POPULAR_XBOX_LANGUAGES = listOf(
     XboxLanguage("tr-TR", "Tiếng Thổ Nhĩ Kỳ", "Türkçe", "🇹🇷", "Turkish (Türkçe)")
 )
 
+/**
+ * Danh sách trắng thị trường Xbox đã xác nhận chơi được ban đầu: chỉ giữ en-US.
+ */
+val INITIAL_VERIFIED_XBOX_MARKETS: Set<String> = setOf("en-US")
+
+data class TranslateLanguageOption(
+    val code: String,
+    val titleVi: String,
+    val titleEn: String,
+    val flag: String
+) {
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+}
+
+val TRANSLATE_LANGUAGE_OPTIONS = listOf(
+    TranslateLanguageOption("OFF", "Tắt dịch giao diện Xbox", "Off (Disable Xbox UI translation)", "🚫"),
+    TranslateLanguageOption("vi", "Tiếng Việt", "Vietnamese (Tiếng Việt)", "🇻🇳"),
+    TranslateLanguageOption("en", "English", "English", "🇺🇸"),
+    TranslateLanguageOption("es", "Español", "Spanish (Español)", "🇪🇸"),
+    TranslateLanguageOption("pt", "Português", "Portuguese (Português)", "🇧🇷"),
+    TranslateLanguageOption("fr", "Français", "French (Français)", "🇫🇷"),
+    TranslateLanguageOption("de", "Deutsch", "German (Deutsch)", "🇩🇪"),
+    TranslateLanguageOption("ja", "日本語", "Japanese (日本語)", "🇯🇵"),
+    TranslateLanguageOption("ko", "한국어", "Korean (한국어)", "🇰🇷"),
+    TranslateLanguageOption("zh-CN", "中文", "Chinese (中文)", "🇨🇳"),
+    TranslateLanguageOption("id", "Bahasa Indonesia", "Indonesian (Bahasa Indonesia)", "🇮🇩"),
+    TranslateLanguageOption("th", "ไทย", "Thai (ไทย)", "🇹🇭"),
+    TranslateLanguageOption("ru", "Русский", "Russian (Русский)", "🇷🇺")
+)
+
 enum class ClarityPreset(
     val displayName: String,
     val description: String,
@@ -605,6 +635,7 @@ data class AppConfig(
     val zeroDelayDirectHandshake: Boolean = true,
     val antiJapaneseEnforcer: Boolean = true,
     val xcloudTranslateEnabled: Boolean = true,
+    val translateLanguage: String = "vi",
     val preserveGameTitles: Boolean = true,
     val bilingualMode: Boolean = false,
     val githubDictionaryEnabled: Boolean = true,
@@ -631,7 +662,9 @@ data class AppConfig(
     val backgroundMusicVolume: Float = 0.08f, // 0.0f .. 1.0f (mặc định 8% cho người dùng mới)
     val backgroundMusicPlayInGame: Boolean = true, // Mặc định BẬT phát nhạc khi đang chơi
     val enableGlobalpingProbe: Boolean = false, // A4: Mặc định TẮT đo qua trạm Globalping bên thứ ba
-    val hideUnreachableDynamicServers: Boolean = false // A8: Tùy chọn ẩn máy chủ động không đo được
+    val hideUnreachableDynamicServers: Boolean = false, // A8: Tùy chọn ẩn máy chủ động không đo được
+    val enableGeoIpHttpsFallback: Boolean = true,
+    val allowDbIpCellularDownload: Boolean = false
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -652,16 +685,31 @@ data class AppConfig(
         return appLanguage.effectiveLanguageCode() == "vi"
     }
 
+    /**
+     * Trả về mã ngôn ngữ đích cho bộ dịch giao diện Xbox.
+     * Đảm bảo KHÔNG BAO GIỜ trả về chuỗi rỗng ("") để tránh lỗi API dịch;
+     * nơi gọi phải kiểm tra [isEffectiveTranslateEnabled] trước khi gọi bộ dịch.
+     */
     fun getTargetTranslateLanguageCode(): String {
-        return appLanguage.resolveTranslateTargetCode()
+        val trimmed = translateLanguage.trim()
+        if (trimmed.isNotEmpty() && !trimmed.equals("OFF", ignoreCase = true)) {
+            return trimmed
+        }
+        return appLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
     }
 
     fun isEffectiveTranslateEnabled(): Boolean {
-        return xcloudTranslateEnabled && appLanguage.effectiveLanguageCode() != "en"
+        if (lowEndDeviceMode) return false
+        val trimmed = translateLanguage.trim()
+        if (trimmed.equals("OFF", ignoreCase = true)) return false
+        return xcloudTranslateEnabled && getTargetTranslateLanguageCode().isNotBlank()
     }
 }
 
 object SettingsRepository {
+    const val TRANSLATE_LANG_OFF = "OFF"
+    val INITIAL_VERIFIED_XBOX_MARKETS: Set<String> = setOf("en-US")
+
     private var prefs: SharedPreferences? = null
     private val _config = MutableStateFlow(AppConfig())
     val config: StateFlow<AppConfig> = _config.asStateFlow()
@@ -692,10 +740,61 @@ object SettingsRepository {
                 .apply()
         }
 
+        // Mục 7d: Migration 1 lần đưa thị trường đã lưu khác en-US từ bản cũ về en-US
+        val hasMigratedXboxMarket = sp.getBoolean("migrated_xbox_market_en_us_v1", false)
+        if (!hasMigratedXboxMarket) {
+            val savedLocale = sp.getString("custom_locale", "en-US") ?: "en-US"
+            val savedUseSystem = sp.getBoolean("use_system_language", true)
+            if (!savedUseSystem || !savedLocale.equals("en-US", ignoreCase = true)) {
+                sp.edit()
+                    .putBoolean("use_system_language", true)
+                    .putString("custom_locale", "en-US")
+                    .putBoolean("migrated_xbox_market_en_us_v1", true)
+                    .apply()
+            } else {
+                sp.edit().putBoolean("migrated_xbox_market_en_us_v1", true).apply()
+            }
+        }
+
+        val resolvedAppLanguage = try {
+            AppLanguage.valueOf(sp.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
+        } catch (_: Exception) { AppLanguage.SYSTEM }
+
+        // Mục 8: Migration ngôn ngữ dịch giao diện Xbox:
+        // Người dùng cũ giữ "vi" (nếu xcloudTranslateEnabled đang tắt thì giữ tắt);
+        // Người dùng mới mặc định theo ngôn ngữ app, nếu app tiếng Anh thì tắt.
+        val hasMigratedTranslateLang = sp.getBoolean("migrated_translate_lang_v1", false)
+        if (!hasMigratedTranslateLang) {
+            val isExistingUser = sp.contains("xcloud_translate") || sp.contains("app_language") || sp.contains("smart_vpn_enabled") && hasMigratedUnifiedSwitches
+            if (isExistingUser && (sp.contains("xcloud_translate") || sp.contains("app_language"))) {
+                val oldEnabled = sp.getBoolean("xcloud_translate", true)
+                val targetLang = sp.getString("translate_language", null)?.ifBlank { "vi" } ?: "vi"
+                sp.edit()
+                    .putBoolean("xcloud_translate", oldEnabled)
+                    .putString("translate_language", targetLang)
+                    .putBoolean("migrated_translate_lang_v1", true)
+                    .apply()
+            } else {
+                val effAppCode = resolvedAppLanguage.effectiveLanguageCode()
+                if (effAppCode == "en") {
+                    sp.edit()
+                        .putBoolean("xcloud_translate", false)
+                        .putString("translate_language", "OFF")
+                        .putBoolean("migrated_translate_lang_v1", true)
+                        .apply()
+                } else {
+                    val defaultTarget = resolvedAppLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
+                    sp.edit()
+                        .putBoolean("xcloud_translate", true)
+                        .putString("translate_language", defaultTarget)
+                        .putBoolean("migrated_translate_lang_v1", true)
+                        .apply()
+                }
+            }
+        }
+
         val loaded = AppConfig(
-            appLanguage = try {
-                AppLanguage.valueOf(sp.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
-            } catch (_: Exception) { AppLanguage.SYSTEM },
+            appLanguage = resolvedAppLanguage,
             useSystemLanguage = sp.getBoolean("use_system_language", true),
             customLocale = sp.getString("custom_locale", "en-US") ?: "en-US",
             smartVpnEnabled = effectiveSmartVpn,
@@ -731,6 +830,7 @@ object SettingsRepository {
             zeroDelayDirectHandshake = sp.getBoolean("zero_delay_handshake", true),
             antiJapaneseEnforcer = sp.getBoolean("anti_jp_enforcer", true),
             xcloudTranslateEnabled = sp.getBoolean("xcloud_translate", true),
+            translateLanguage = sp.getString("translate_language", "vi") ?: "vi",
             preserveGameTitles = sp.getBoolean("preserve_titles", true),
             bilingualMode = sp.getBoolean("bilingual_mode", false),
             githubDictionaryEnabled = sp.getBoolean("github_dict", true),
@@ -803,7 +903,9 @@ object SettingsRepository {
             },
             backgroundMusicPlayInGame = sp.getBoolean("background_music_play_in_game", true),
             enableGlobalpingProbe = sp.getBoolean("enable_globalping_probe", false),
-            hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false)
+            hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false),
+            enableGeoIpHttpsFallback = sp.getBoolean("enable_geoip_https_fallback", true),
+            allowDbIpCellularDownload = sp.getBoolean("allow_dbip_cellular_download", false)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -846,6 +948,7 @@ object SettingsRepository {
             putBoolean("zero_delay_handshake", c.zeroDelayDirectHandshake)
             putBoolean("anti_jp_enforcer", c.antiJapaneseEnforcer)
             putBoolean("xcloud_translate", c.xcloudTranslateEnabled)
+            putString("translate_language", c.translateLanguage)
             putBoolean("preserve_titles", c.preserveGameTitles)
             putBoolean("bilingual_mode", c.bilingualMode)
             putBoolean("github_dict", c.githubDictionaryEnabled)
@@ -882,53 +985,19 @@ object SettingsRepository {
             putBoolean("background_music_play_in_game", c.backgroundMusicPlayInGame)
             putBoolean("enable_globalping_probe", c.enableGlobalpingProbe)
             putBoolean("hide_unreachable_dynamic_servers", c.hideUnreachableDynamicServers)
+            putBoolean("enable_geoip_https_fallback", c.enableGeoIpHttpsFallback)
+            putBoolean("allow_dbip_cellular_download", c.allowDbIpCellularDownload)
             apply()
         }
     }
 
     /**
-     * Resolves system language into an officially supported Xbox Cloud Gaming locale.
-     * If the system language is unsupported (e.g. Vietnamese 'vi'), automatically falls back to 'en-US'.
+     * Mục 7a & 7c: Tách ngôn ngữ giao diện app khỏi thị trường Xbox.
+     * Mặc định luôn trả về "en-US" (danh sách trắng ban đầu chỉ gồm en-US) để tránh chuyển hướng
+     * sang thị trường chưa hỗ trợ xCloud hoặc chưa xác minh.
      */
     fun resolveSystemXboxLocale(): String {
-        val appLang = _config.value.appLanguage
-        val sysLocale = Locale.getDefault()
-        val lang = if (appLang != AppLanguage.SYSTEM) {
-            appLang.code.lowercase(Locale.ROOT)
-        } else {
-            sysLocale.language.lowercase(Locale.ROOT)
-        }
-        val country = sysLocale.country.uppercase(Locale.ROOT)
-
-        return when (lang) {
-            "vi", "id", "in", "th" -> "en-US"
-            "en" -> when (country) {
-                "GB" -> "en-GB"
-                "CA" -> "en-CA"
-                "AU" -> "en-AU"
-                "NZ" -> "en-NZ"
-                else -> "en-US"
-            }
-            "ja" -> "ja-JP"
-            "ko" -> "ko-KR"
-            "zh" -> if (country in setOf("CN", "SG")) "zh-CN" else "zh-TW"
-            "fr" -> if (country == "CA") "fr-CA" else "fr-FR"
-            "de" -> "de-DE"
-            "es" -> if (country in setOf("MX", "AR", "CO", "CL")) "es-MX" else "es-ES"
-            "pt" -> if (country == "PT") "pt-PT" else "pt-BR"
-            "it" -> "it-IT"
-            "pl" -> "pl-PL"
-            "nl" -> "nl-NL"
-            "sv" -> "sv-SE"
-            "da" -> "da-DK"
-            "nb", "no" -> "nb-NO"
-            "fi" -> "fi-FI"
-            "cs" -> "cs-CZ"
-            "hu" -> "hu-HU"
-            "tr" -> "tr-TR"
-            "ru" -> "ru-RU"
-            else -> "en-US"
-        }
+        return "en-US"
     }
 
     /**
@@ -997,11 +1066,32 @@ object SettingsRepository {
     }
 
     fun updateAppLanguage(language: AppLanguage) {
-        val autoTranslate = language.effectiveLanguageCode() != "en"
+        // Mục 7a: Không đụng tới thị trường Xbox (customLocale / useSystemLanguage) khi đổi ngôn ngữ giao diện app.
         _config.update {
             it.copy(
-                appLanguage = language,
-                xcloudTranslateEnabled = autoTranslate
+                appLanguage = language
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun updateTranslateLanguage(langCode: String) {
+        val normalized = langCode.trim().ifBlank { "OFF" }
+        val isOff = normalized.equals("OFF", ignoreCase = true)
+        _config.update {
+            it.copy(
+                translateLanguage = if (isOff) "OFF" else normalized,
+                xcloudTranslateEnabled = !isOff
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun resetXboxMarketToDefault() {
+        _config.update {
+            it.copy(
+                customLocale = "en-US",
+                useSystemLanguage = true
             )
         }
         persist(_config.value)
@@ -1049,7 +1139,12 @@ object SettingsRepository {
     }
 
     fun updateClarityPreset(preset: ClarityPreset) {
-        _config.update { it.copy(clarityPreset = preset) }
+        _config.update {
+            it.copy(
+                clarityPreset = preset,
+                clarityBoostEnabled = if (preset == ClarityPreset.OFF) false else it.clarityBoostEnabled
+            )
+        }
         persist(_config.value)
     }
 
@@ -1104,7 +1199,17 @@ object SettingsRepository {
     }
 
     fun updateXcloudTranslate(enabled: Boolean) {
-        _config.update { it.copy(xcloudTranslateEnabled = enabled) }
+        _config.update {
+            val nextLang = if (enabled && it.translateLanguage.equals("OFF", ignoreCase = true)) {
+                it.appLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
+            } else {
+                it.translateLanguage
+            }
+            it.copy(
+                xcloudTranslateEnabled = enabled,
+                translateLanguage = nextLang
+            )
+        }
         persist(_config.value)
     }
 
@@ -1372,6 +1477,16 @@ object SettingsRepository {
 
     fun updateHideUnreachableDynamicServers(hide: Boolean) {
         _config.update { it.copy(hideUnreachableDynamicServers = hide) }
+        persist(_config.value)
+    }
+
+    fun updateEnableGeoIpHttpsFallback(enabled: Boolean) {
+        _config.update { it.copy(enableGeoIpHttpsFallback = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateAllowDbIpCellularDownload(allowed: Boolean) {
+        _config.update { it.copy(allowDbIpCellularDownload = allowed) }
         persist(_config.value)
     }
 }

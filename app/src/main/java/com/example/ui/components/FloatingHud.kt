@@ -563,7 +563,7 @@ fun FloatingHud(
             ) {
                 // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + Controller icon only)
                 if (hudMode == HudMode.MINIMIZED) {
-                    val rawPing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
+                    val rawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
                     val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
                         !hasValidPing -> Color.Gray
@@ -572,7 +572,7 @@ fun FloatingHud(
                         else -> JapanRed
                     }
                     val pingText = if (!hasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--" else "${vpnState.currentServer.flag}--"
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡—" else "${vpnState.currentServer.flag}—"
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
@@ -614,7 +614,7 @@ fun FloatingHud(
                     // ==========================================
                     // COMPACT STATE: ULTRA-SLIM ROW WITH HOME BUTTON (~145dp)
                     // ==========================================
-                    val compactRawPing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
+                    val compactRawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
                     val compactHasValidPing = compactRawPing != null && compactRawPing > 0
                     val pingColor = when {
                         !compactHasValidPing -> Color.Gray
@@ -623,7 +623,7 @@ fun FloatingHud(
                         else -> JapanRed
                     }
                     val compactPingText = if (!compactHasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡--" else "${vpnState.currentServer.flag}--"
+                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡—" else "${vpnState.currentServer.flag}—"
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${compactRawPing}ms" else "${vpnState.currentServer.flag}${compactRawPing}ms"
                     }
@@ -1502,8 +1502,9 @@ private fun DenseCoreTelemetrySection(
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
 
-    // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair; nếu không có thì hiện "--", không rơi về ping TCP/VPN
-    val effectivePing: Int? = if (telemetry.rttMs > 0) telemetry.rttMs else null
+    // Trong khi chơi chỉ hiển thị RTT từ WebRTC candidate-pair; nếu không có thì hiện "—", không rơi về ping TCP/VPN
+    val hasRealSample = telemetry.hasStatsSample
+    val effectivePing: Int? = if (hasRealSample && telemetry.rttMs > 0) telemetry.rttMs else null
     val pingTierLabel = when {
         effectivePing == null || effectivePing <= 0 -> if (isEn) "Unmeasured" else "Chưa đo"
         effectivePing < 80 -> if (isEn) "Good" else "Tốt"
@@ -1511,47 +1512,48 @@ private fun DenseCoreTelemetrySection(
         else -> if (isEn) "High" else "Cao"
     }
     val latencyDisplayText = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) {
-        if (effectivePing != null) "Direct • ${effectivePing}ms ($pingTierLabel)" else "Direct • -- ($pingTierLabel)"
+        if (effectivePing != null) "Direct • ${effectivePing}ms ($pingTierLabel)" else "Direct • — ($pingTierLabel)"
     } else {
-        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms ($pingTierLabel)" else "VPN ${vpnState.currentServer.flag} • -- ($pingTierLabel)"
+        if (effectivePing != null) "VPN ${vpnState.currentServer.flag} • ${effectivePing}ms ($pingTierLabel)" else "VPN ${vpnState.currentServer.flag} • — ($pingTierLabel)"
     }
 
     val jitterVal = telemetry.jitterMs
+    val hasValidJitter = hasRealSample && (jitterVal > 0 || effectivePing != null)
     val jitterTierLabel = when {
-        jitterVal <= 0 && effectivePing == null -> if (isEn) "Unmeasured" else "Chưa đo"
+        !hasValidJitter -> if (isEn) "Unmeasured" else "Chưa đo"
         jitterVal < 8 -> if (isEn) "Good" else "Tốt"
         jitterVal <= 20 -> if (isEn) "Moderate" else "Trung bình"
         else -> if (isEn) "High" else "Cao"
     }
     val jitterColor = when {
-        jitterVal <= 0 && effectivePing == null -> TextSecondary
+        !hasValidJitter -> TextSecondary
         jitterVal < 8 -> XboxNeonGreen
         jitterVal <= 20 -> Color(0xFFFFB300)
         else -> JapanRed
     }
-    val jitterDisplayText = "${jitterVal}ms ($jitterTierLabel)"
+    val jitterDisplayText = if (hasValidJitter) "${jitterVal}ms ($jitterTierLabel)" else "— ($jitterTierLabel)"
 
-    val fpsValueText = if (telemetry.fps > 0) "${telemetry.fps} FPS" else "-- FPS"
-    val bitrateValueText = if (telemetry.bitrateMbps > 0) {
+    val fpsValueText = if (hasRealSample && telemetry.fps > 0) "${telemetry.fps} FPS" else "— FPS"
+    val bitrateValueText = if (hasRealSample && telemetry.bitrateMbps > 0) {
         String.format("%.1f Mbps", telemetry.bitrateMbps)
     } else {
-        "-- Mbps"
+        "— Mbps"
     }
 
-    val liveBufMs = if (telemetry.jitterBufferDelayMs > 1.0) {
+    val liveBufMs = if (hasRealSample && telemetry.jitterBufferDelayMs > 1.0) {
         telemetry.jitterBufferDelayMs.roundToInt().coerceIn(6, 60)
     } else {
         adaptiveBufferMs.coerceIn(8, 45)
     }
     val bufferLabel = if (isEn) "Data buffer" else "Bộ đệm dữ liệu"
-    val decodeTimeText = if (telemetry.decodeTimeMs > 0) {
+    val decodeTimeText = if (hasRealSample && telemetry.decodeTimeMs > 0.0) {
         String.format("%.1fms • %s %dms", telemetry.decodeTimeMs, bufferLabel, liveBufMs)
     } else {
-        "-- ms • $bufferLabel ${liveBufMs}ms"
+        "— • $bufferLabel ${liveBufMs}ms"
     }
     // Chuẩn ITU-T G.1072 / 60Hz (16.6ms): < 8ms Xanh, 8-16ms Vàng, > 16ms Đỏ
     val decodeColor = when {
-        telemetry.decodeTimeMs <= 0.0 -> TextSecondary
+        !hasRealSample || telemetry.decodeTimeMs <= 0.0 -> TextSecondary
         telemetry.decodeTimeMs < 8.0 -> XboxNeonGreen
         telemetry.decodeTimeMs <= 16.0 -> Color(0xFFFFB300)
         else -> JapanRed
@@ -1966,9 +1968,10 @@ private fun DenseQualityModeSection(
                 val isPeakHour = currentHour in 20..23
 
                 // Lớp 1: Môi trường thiết bị (Tiết kiệm pin / Giải mã phần cứng)
-                val layer1Bad = isPowerSave || telemetry.decodeTimeMs > 16.0
+                val layer1Bad = isPowerSave || (telemetry.hasStatsSample && telemetry.decodeTimeMs > 16.0)
                 val layer1Text = when {
                     isPowerSave -> if (isEn) "1. Device: Battery Saver ON (throttles decoder)" else "1. Thiết bị: Đang bật Tiết kiệm pin (bóp xung giải mã)"
+                    !telemetry.hasStatsSample || telemetry.decodeTimeMs <= 0.0 -> if (isEn) "1. Device: 60Hz VSync locked • Decode —" else "1. Thiết bị: Đã khóa 60Hz • Giải mã —"
                     telemetry.decodeTimeMs > 16.0 -> if (isEn) "1. Device: Slow decode (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)" else "1. Thiết bị: Giải mã quá tải (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)"
                     else -> if (isEn) "1. Device: 60Hz VSync locked • Decode OK (${String.format("%.1f", telemetry.decodeTimeMs)}ms)" else "1. Thiết bị: Đã khóa 60Hz • Giải mã tốt (${String.format("%.1f", telemetry.decodeTimeMs)}ms)"
                 }

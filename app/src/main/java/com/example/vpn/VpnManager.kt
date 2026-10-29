@@ -82,6 +82,9 @@ object VpnManager {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        scope.launch(Dispatchers.IO) {
+            GeoIpDetector.downloadDbIpLiteIfPermitted(context.applicationContext, isCellularConfirmedByUser = false)
+        }
         loadPersistedServers(context.applicationContext)
         loadPersistedUnlockRecords(context.applicationContext)
         if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
@@ -1564,10 +1567,19 @@ object VpnManager {
     }
 
     fun addCustomServer(server: ServerLocation) {
-        val updated = _state.value.customServers + server
-        _state.value = _state.value.copy(customServers = updated, currentServer = server, unlockFailPromptServer = null)
-        persistCustomServers(appContext, updated, server)
-        preCheckProxyRegion(server)
+        if (GeoIpDetector.isPrivateOrLoopbackIp(server.ip)) return
+        val resolvedCc = server.countryCode.trim().uppercase().ifBlank {
+            GeoIpDetector.resolveIpCountryCode(server.ip, allowNetworkFallback = false)
+        }
+        val normalizedServer = server.copy(
+            countryCode = resolvedCc,
+            flag = GeoIpDetector.getFlagEmoji(resolvedCc),
+            azureEndpoint = server.azureEndpoint.trim().ifBlank { GeoIpDetector.getAzureEndpointForCountry(resolvedCc) }
+        )
+        val updated = _state.value.customServers + normalizedServer
+        _state.value = _state.value.copy(customServers = updated, currentServer = normalizedServer, unlockFailPromptServer = null)
+        persistCustomServers(appContext, updated, normalizedServer)
+        preCheckProxyRegion(normalizedServer)
     }
 
     fun removeCustomServer(serverId: String) {

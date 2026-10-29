@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch nâng cấp toàn diện CloudPlay Optimizer lên phiên bản Cyber-Console 3.5: tối ưu WebRTC Delta Filter, truyền âm thanh PCM không gây GC pause, tần số quét 120Hz theo công tắc cài đặt, Clarity Boost bảo toàn GPU Overlay, giao diện Cyber-Console 3.5, Dynamic Island HUD tự làm mờ, cảnh báo Wi-Fi 2.4GHz không chặn và lưu bố cục tay cầm riêng cho từng game.",
-  "updatedAt":  "2026-10-28T12:48:25.120676570Z",
+  "summary":  "Cập nhật implementation_plan.md chính xác theo 5 điểm rà soát: (1) giữ nguyên khóa JSON telemetry thật (rttMs, jitterMs, decodeTimeMs, bitrateMbps, framesDropped...) và chỉ thêm hasStatsSample; (2) dán kết quả grep thật và dùng đúng tên hàm/trường thật trong codebase (getInjectionScript, notify('onStreamTelemetry'), QualityAdapter.applyAdaptiveBitrate, ClarityPreset.OFF/BALANCED/ULTRA_SHARP/OLED_PUNCH, CustomProxyDialog, SettingsRepository.init...); (3) sửa truyền cứng 'vi' ở XboxBridge.kt dòng 2313 & 2337, đảm bảo getTargetTranslateLanguageCode() không trả chuỗi rỗng và chỉ dùng từ điển tĩnh tiếng Việt khi ngôn ngữ đích là 'vi'; (4) khôi phục mục 7 (b, d, e) và chuyển việc giả navigator.language/Accept-Language + tự đánh dấu thị trường sang mục Đề xuất thêm; (5) chỉ giữ ánh xạ azureEndpoint có sẵn cho JP và KR, các quốc gia khác để rỗng.",
+  "updatedAt":  "2026-10-29T11:01:56.342432600Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

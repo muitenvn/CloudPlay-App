@@ -176,7 +176,6 @@ object AdaptiveQualityManager {
             )
             QualityAdapter.applyAdaptiveBitrate(
                 targetBitrateMbps = lowEndMbps,
-                bufferHintMs = lowEndBuf,
                 smoothGlide = true
             )
             return
@@ -238,7 +237,6 @@ object AdaptiveQualityManager {
 
             QualityAdapter.applyAdaptiveBitrate(
                 targetBitrateMbps = roundedMbps,
-                bufferHintMs = initialBufMs,
                 smoothGlide = true
             )
         } else {
@@ -275,7 +273,6 @@ object AdaptiveQualityManager {
 
             QualityAdapter.applyAdaptiveBitrate(
                 targetBitrateMbps = fixedMbps,
-                bufferHintMs = fixedBuf,
                 smoothGlide = true
             )
         }
@@ -288,6 +285,7 @@ object AdaptiveQualityManager {
      * - Trên Wi-Fi: cho phép đệm thu 8..42ms và thu hồi sau 6 nhịp (9s) ổn định.
      */
     fun evaluateTelemetry(telemetry: StreamTelemetry) {
+        if (!telemetry.hasStatsSample) return
         val current = _state.value
         val decodeTime = telemetry.decodeTimeMs
         val loss = telemetry.packetsLostPercent
@@ -506,7 +504,6 @@ object AdaptiveQualityManager {
                 if (bufferChanged || bitrateChanged) {
                     QualityAdapter.applyAdaptiveBitrate(
                         targetBitrateMbps = nextBitrateMbps,
-                        bufferHintMs = nextBufMs,
                         smoothGlide = true
                     )
                 }
@@ -544,7 +541,6 @@ object AdaptiveQualityManager {
             )
             QualityAdapter.applyAdaptiveBitrate(
                 targetBitrateMbps = step.targetBitrateMbps,
-                bufferHintMs = step.bufferHintMs.toDouble(),
                 smoothGlide = true
             )
         }

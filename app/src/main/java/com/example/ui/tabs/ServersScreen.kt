@@ -1301,17 +1301,23 @@ private fun CustomProxyDialog(
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    var name by remember { mutableStateOf(if (isEn) "Personal Proxy" else "Proxy Cá Nhân") }
+    var name by remember { mutableStateOf("") }
     var host by remember { mutableStateOf("") }
     var port by remember { mutableStateOf("8080") }
     var protocol by remember { mutableStateOf("http") }
-    var countryCode by remember { mutableStateOf("JP") }
+    var countryCode by remember { mutableStateOf("") }
+    var userEditedCountry by remember { mutableStateOf(false) }
     var description by remember { mutableStateOf(if (isEn) "Custom proxy" else "Proxy cá nhân") }
     var speedMbps by remember { mutableStateOf("250") }
-    var azureEndpoint by remember { mutableStateOf("japaneast.cloudapp.azure.com") }
+    var azureEndpoint by remember { mutableStateOf("") }
     var testResult by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val trimmedHost = host.trim()
+    val isPrivateIp = remember(trimmedHost) {
+        trimmedHost.isNotEmpty() && com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp(trimmedHost)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1331,9 +1337,9 @@ private fun CustomProxyDialog(
             ) {
                 Text(
                     text = if (isEn) {
-                        "Enter your custom server address and port"
+                        "Enter a public proxy server IP address and port"
                     } else {
-                        "Nhập địa chỉ máy chủ và cổng kết nối riêng"
+                        "Nhập địa chỉ IP máy chủ công cộng và cổng kết nối riêng"
                     },
                     color = TextSecondary,
                     fontSize = 12.sp
@@ -1342,7 +1348,7 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(if (isEn) "Display Name" else "Tên gợi nhớ") },
+                    label = { Text(if (isEn) "Display Name (Optional)" else "Tên gợi nhớ (Tùy chọn)") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -1353,9 +1359,17 @@ private fun CustomProxyDialog(
 
                 OutlinedTextField(
                     value = host,
-                    onValueChange = { host = it },
-                    label = { Text(if (isEn) "IP Address or Hostname" else "Địa chỉ IP hoặc Hostname") },
-                    placeholder = { Text(if (isEn) "e.g., 127.0.0.1 or 138.199.21.239" else "vd: 127.0.0.1 hoặc 138.199.21.239") },
+                    onValueChange = { newHost ->
+                        host = newHost
+                        val cleanIp = newHost.trim()
+                        if (!userEditedCountry) {
+                            val detectedCc = com.example.vpn.GeoIpDetector.resolveIpCountryCode(cleanIp, allowNetworkFallback = false)
+                            countryCode = detectedCc
+                            azureEndpoint = com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(detectedCc)
+                        }
+                    },
+                    label = { Text(if (isEn) "Public IPv4 Address" else "Địa chỉ IPv4 công cộng") },
+                    placeholder = { Text(if (isEn) "e.g., 138.199.21.239" else "vd: 138.199.21.239") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -1363,6 +1377,18 @@ private fun CustomProxyDialog(
                         focusedBorderColor = XboxNeonGreen
                     )
                 )
+
+                if (isPrivateIp) {
+                    Text(
+                        text = if (isEn) {
+                            "⚠️ Private or loopback IP (127.0.0.1, 10.x, 192.168.x) cannot unlock Xbox Cloud."
+                        } else {
+                            "⚠️ Địa chỉ IP nội bộ / loopback (127.0.0.1, 10.x, 192.168.x) không hợp lệ."
+                        },
+                        color = JapanRed,
+                        fontSize = 11.sp
+                    )
+                }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -1417,8 +1443,13 @@ private fun CustomProxyDialog(
 
                     OutlinedTextField(
                         value = countryCode,
-                        onValueChange = { countryCode = it.uppercase() },
-                        label = { Text(if (isEn) "Country (JP/KR/US)" else "Quốc gia (JP/KR/US)") },
+                        onValueChange = { newCc ->
+                            userEditedCountry = newCc.isNotBlank()
+                            val cleanCc = newCc.trim().uppercase()
+                            countryCode = cleanCc
+                            azureEndpoint = com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(cleanCc)
+                        },
+                        label = { Text(if (isEn) "Country ISO (Auto/Manual)" else "Mã quốc gia (Tự nhận/Sửa tay)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -1431,7 +1462,7 @@ private fun CustomProxyDialog(
                 OutlinedTextField(
                     value = azureEndpoint,
                     onValueChange = { azureEndpoint = it },
-                    label = { Text(if (isEn) "Azure Endpoint for Ping" else "Azure Endpoint để đo ping") },
+                    label = { Text(if (isEn) "Azure Endpoint (JP/KR only)" else "Azure Endpoint (Chỉ có cho JP/KR)") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
@@ -1447,7 +1478,8 @@ private fun CustomProxyDialog(
                         testResult = null
                         scope.launch(Dispatchers.IO) {
                             val p = port.toIntOrNull() ?: 8080
-                            val ok = PingTester.isHostReachable(host.trim(), p, 1500)
+                            val ok = !com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp(trimmedHost) &&
+                                PingTester.isHostReachable(trimmedHost, p, 1500)
                             testResult = if (ok) {
                                 if (isEn) "✅ Connection successful!" else "✅ Kết nối thành công!"
                             } else {
@@ -1476,27 +1508,22 @@ private fun CustomProxyDialog(
                 onClick = {
                     val p = port.toIntOrNull() ?: 8080
                     val speed = speedMbps.toIntOrNull() ?: 200
-                    val cc = countryCode.trim().uppercase()
-                    val resolvedFlag = when (cc) {
-                        "JP" -> "🇯🇵"
-                        "KR" -> "🇰🇷"
-                        "US" -> "🇺🇸"
-                        "SG" -> "🇸🇬"
-                        "TW" -> "🇹🇼"
-                        "HK" -> "🇭🇰"
-                        "AU" -> "🇦🇺"
-                        "VN" -> "🇻🇳"
-                        "DE", "GB", "UK", "FR", "NL", "EU" -> "🇪🇺"
-                        else -> "🌐"
+                    val cc = countryCode.trim().uppercase().ifBlank {
+                        com.example.vpn.GeoIpDetector.resolveIpCountryCode(trimmedHost, allowNetworkFallback = false)
+                    }
+                    val resolvedFlag = com.example.vpn.GeoIpDetector.getFlagEmoji(cc)
+                    val defaultDisplayName = com.example.vpn.GeoIpDetector.formatServerDisplayName(cc, trimmedHost, isEn)
+                    val resolvedAzure = azureEndpoint.trim().ifBlank {
+                        com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(cc)
                     }
                     val server = ServerLocation(
                         id = "custom_${System.currentTimeMillis()}",
-                        name = name.ifBlank { "Custom Proxy" },
+                        name = name.trim().ifBlank { defaultDisplayName },
                         flag = resolvedFlag,
-                        ip = host.trim(),
+                        ip = trimmedHost,
                         port = p,
-                        protocol = protocol.trim().lowercase(),
-                        azureEndpoint = azureEndpoint.ifBlank { "japaneast.cloudapp.azure.com" },
+                        protocol = protocol.trim().lowercase().let { if (it == "socks5") "socks5" else "http" },
+                        azureEndpoint = resolvedAzure,
                         description = description.ifBlank { if (isEn) "Custom proxy" else "Proxy cá nhân" },
                         speedMbps = speed,
                         countryCode = cc,
@@ -1505,7 +1532,7 @@ private fun CustomProxyDialog(
                     )
                     onAddServer(server)
                 },
-                enabled = host.isNotBlank(),
+                enabled = trimmedHost.isNotBlank() && !isPrivateIp,
                 colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
             ) {
                 Text(if (isEn) "Save & Use" else "Lưu & Sử Dụng")

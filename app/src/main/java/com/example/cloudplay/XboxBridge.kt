@@ -20,6 +20,14 @@ data class TranslationInfo(
     val translatedCount: Int = 0
 )
 
+data class HardwareCodecSupport(
+    val hwH264Baseline: Boolean = true,
+    val hwH264Main: Boolean = true,
+    val hwH264High: Boolean = true,
+    val hwVp9: Boolean = false,
+    val hwAv1: Boolean = false
+)
+
 class XboxBridge(
     private val controller: StreamController,
     private var webViewRef: WeakReference<android.webkit.WebView>? = null
@@ -126,6 +134,92 @@ class XboxBridge(
             return isTrustedDomainHost(host)
         }
 
+        @Volatile
+        private var cachedHardwareCodecSupport: HardwareCodecSupport? = null
+
+        fun queryHardwareCodecSupport(): HardwareCodecSupport {
+            cachedHardwareCodecSupport?.let { return it }
+            var h264Any = false
+            var h264Baseline = false
+            var h264Main = false
+            var h264High = false
+            var vp9 = false
+            var av1 = false
+            try {
+                val codecList = android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+                for (info in codecList.codecInfos) {
+                    if (info.isEncoder) continue
+                    val nameLower = info.name.lowercase()
+                    val isSoftware = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        info.isSoftwareOnly
+                    } else {
+                        nameLower.startsWith("omx.google.") ||
+                            nameLower.startsWith("c2.android.") ||
+                            nameLower.contains(".sw.") ||
+                            nameLower.contains("ffmpeg")
+                    }
+                    if (isSoftware) continue
+
+                    for (type in info.supportedTypes) {
+                        when (type.lowercase()) {
+                            android.media.MediaFormat.MIMETYPE_VIDEO_AVC.lowercase(), "video/avc" -> {
+                                h264Any = true
+                                try {
+                                    val caps = info.getCapabilitiesForType(type)
+                                    val profileLevels = caps?.profileLevels
+                                    if (profileLevels != null && profileLevels.isNotEmpty()) {
+                                        for (pl in profileLevels) {
+                                            when (pl.profile) {
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline,
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedBaseline -> h264Baseline = true
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileMain -> h264Main = true
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedHigh,
+                                                android.media.MediaCodecInfo.CodecProfileLevel.AVCProfileHigh10 -> h264High = true
+                                            }
+                                        }
+                                    } else {
+                                        h264Baseline = true
+                                        h264Main = true
+                                        h264High = true
+                                    }
+                                } catch (_: Exception) {
+                                    h264Baseline = true
+                                    h264Main = true
+                                    h264High = true
+                                }
+                            }
+                            android.media.MediaFormat.MIMETYPE_VIDEO_VP9.lowercase(), "video/x-vnd.on2.vp9" -> {
+                                vp9 = true
+                            }
+                            android.media.MediaFormat.MIMETYPE_VIDEO_AV1.lowercase(), "video/av01" -> {
+                                av1 = true
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                h264Any = true
+                h264Baseline = true
+                h264Main = true
+                h264High = true
+            }
+            if (h264Any && !h264Baseline && !h264Main && !h264High) {
+                h264Baseline = true
+                h264Main = true
+                h264High = true
+            }
+            val result = HardwareCodecSupport(
+                hwH264Baseline = h264Baseline,
+                hwH264Main = h264Main,
+                hwH264High = h264High,
+                hwVp9 = vp9,
+                hwAv1 = av1
+            )
+            cachedHardwareCodecSupport = result
+            return result
+        }
+
         fun getInjectionScript(
             clarityBoost: Boolean,
             clarityPreset: String = "BALANCED",
@@ -149,12 +243,16 @@ class XboxBridge(
             gpuLoadReduction: Boolean = true,
             isCellular: Boolean = false
         ): String {
-            val isEnglishUi = com.example.data.SettingsRepository.config.value.isEnglishUI()
+            val currentConfig = com.example.data.SettingsRepository.config.value
+            val isEnglishUi = currentConfig.isEnglishUI()
+            val targetTranslateLang = currentConfig.getTargetTranslateLanguageCode()
+            val hwCaps = queryHardwareCodecSupport()
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
                 preserveGameTitles = preserveTitles,
                 bilingualMode = bilingualMode,
-                hideStreamStats = hideStreamStats
+                hideStreamStats = hideStreamStats,
+                targetLanguage = targetTranslateLang
             )
             return """
                 (function() {
@@ -229,7 +327,7 @@ class XboxBridge(
                         } catch (e) {}
                     }
 
-                    window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
+                    window.__setAdaptiveBitrate = function(targetMbps, smoothGlide) {
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
@@ -451,20 +549,46 @@ class XboxBridge(
                     // 4. Hook MediaCapabilities & RTCPeerConnection for Hardware Decode Priority, SDP Munging & Telemetry
                     // ==========================================
                     try {
+                        const hwCodecCaps = {
+                            h264Baseline: ${hwCaps.hwH264Baseline},
+                            h264Main: ${hwCaps.hwH264Main},
+                            h264High: ${hwCaps.hwH264High},
+                            vp9: ${hwCaps.hwVp9},
+                            av1: ${hwCaps.hwAv1}
+                        };
+                        window.__hwCodecCaps = hwCodecCaps;
                         if (navigator.mediaCapabilities && typeof navigator.mediaCapabilities.decodingInfo === 'function') {
                             const origDecodingInfo = navigator.mediaCapabilities.decodingInfo.bind(navigator.mediaCapabilities);
                             navigator.mediaCapabilities.decodingInfo = async function(config) {
                                 try {
                                     if (config && config.video && config.video.contentType) {
                                         const ct = config.video.contentType.toLowerCase();
-                                        // Báo cáo mọi cấu hình H.264 (avc1.42, avc1.4d, avc1.64, h264) đều được giải mã phần cứng mượt mà
-                                        // để Android MediaCodec luôn được kích hoạt và không bao giờ bị ép rơi về giải mã phần mềm CPU.
                                         if (ct.indexOf('avc1') !== -1 || ct.indexOf('h264') !== -1) {
-                                            return { supported: true, smooth: true, powerEfficient: true };
+                                            let profileSupported = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main || hwCodecCaps.h264High;
+                                            if (ct.indexOf('avc1.64') !== -1) {
+                                                profileSupported = hwCodecCaps.h264High;
+                                            } else if (ct.indexOf('avc1.4d') !== -1) {
+                                                profileSupported = hwCodecCaps.h264Main || hwCodecCaps.h264High;
+                                            } else if (ct.indexOf('avc1.42') !== -1) {
+                                                profileSupported = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main || hwCodecCaps.h264High;
+                                            }
+                                            if (profileSupported) {
+                                                return { supported: true, smooth: true, powerEfficient: true };
+                                            }
+                                            return origDecodingInfo(config);
                                         }
-                                        // Vô hiệu hóa VP9 và AV1 để tránh việc trình duyệt chọn bộ giải mã phần mềm gây nóng máy và vọt decodeTimeMs
-                                        if (ct.indexOf('vp9') !== -1 || ct.indexOf('av01') !== -1 || ct.indexOf('av1') !== -1) {
-                                            return { supported: false, smooth: false, powerEfficient: false };
+                                        // Chỉ tắt VP9 / AV1 khi thiết bị thực sự không có bộ giải mã phần cứng cho chúng
+                                        if (ct.indexOf('vp9') !== -1) {
+                                            if (!hwCodecCaps.vp9) {
+                                                return { supported: false, smooth: false, powerEfficient: false };
+                                            }
+                                            return origDecodingInfo(config);
+                                        }
+                                        if (ct.indexOf('av01') !== -1 || ct.indexOf('av1') !== -1) {
+                                            if (!hwCodecCaps.av1) {
+                                                return { supported: false, smooth: false, powerEfficient: false };
+                                            }
+                                            return origDecodingInfo(config);
                                         }
                                     }
                                 } catch(mcErr) {}
@@ -797,16 +921,25 @@ class XboxBridge(
                                     window.__lastKnownRttMs = rtt;
                                     window.__lastKnownJitterMs = jitter;
 
-                                    // Tự động tắt bộ lọc CSS trên <video> nếu phần cứng giải mã đang chịu tải cao (> 12ms)
-                                    // để trả <video> về lớp phủ phần cứng SurfaceControl zero-copy ngay lập tức.
-                                    if (decodeTimeMs > 12.0 && window.__clarityBoostActive && window.__setClarityPreset) {
-                                        window.__setClarityPreset('OFF');
+                                    // Mục 4: Tự động tắt bộ lọc làm nét khi decodeTimeMs > 12.0ms cần >= 3 mẫu liên tiếp
+                                    // và thông báo về Kotlin để đồng bộ trạng thái cài đặt & giao diện.
+                                    if (decodeTimeMs > 12.0) {
+                                        window.__highDecodeStreakForClarity = (window.__highDecodeStreakForClarity || 0) + 1;
+                                        if (window.__highDecodeStreakForClarity >= 3 && window.__clarityBoostActive && window.__setClarityPreset) {
+                                            window.__highDecodeStreakForClarity = 0;
+                                            window.__setClarityPreset('OFF');
+                                            notify('onClarityAutoDisabled', String(decodeTimeMs));
+                                        }
+                                    } else {
+                                        window.__highDecodeStreakForClarity = 0;
                                     }
 
                                     const prev = window.__lastSentTelemetrySnapshot;
                                     const elapsedSinceSent = now - (window.__lastTelemetrySentAt || 0);
+                                    const isOverThreshold = (decodeTimeMs > 12.0 || jitter > 15 || (prev && framesDropped > prev.framesDropped) || lostPercent > 2.0);
                                     const hasMeaningfulDelta = !prev ||
                                         elapsedSinceSent >= 4500 ||
+                                        (isOverThreshold && elapsedSinceSent >= 2000) ||
                                         Math.abs(fps - prev.fps) >= 3 ||
                                         Math.abs(rtt - prev.rttMs) >= Math.max(4, Math.round(prev.rttMs * 0.05)) ||
                                         Math.abs(jitter - prev.jitterMs) >= 3 ||
@@ -817,6 +950,7 @@ class XboxBridge(
                                     if (hasMeaningfulDelta) {
                                         window.__lastTelemetrySentAt = now;
                                         const payloadObj = {
+                                            hasStatsSample: true,
                                             fps: fps,
                                             bitrateMbps: bitrateMbps,
                                             decodeTimeMs: decodeTimeMs,
@@ -1237,19 +1371,21 @@ class XboxBridge(
                                         notify('onStreamConnected', 'video_active');
                                     }
                                 }
-                                // Fallback telemetry if WebRTC getStats() hasn't emitted in the last 2.8s
+                                // Fallback telemetry if WebRTC getStats() hasn't emitted in the last 2.8s:
+                                // Mục 2: Không bịa vFps = 60, profMbps hay estDecode = 4.1 / 2.7. Đánh dấu hasStatsSample = false để HUD hiện "—" và không đưa vào EMA/phiên.
                                 const nowMs = Date.now();
                                 if (video.videoWidth > 0 && !video.paused && (nowMs - (window.__lastTelemetrySentAt || 0) > 2800)) {
                                     try {
-                                        let vFps = 60;
+                                        let vFps = 0;
                                         let vDropped = 0;
                                         if (typeof video.getVideoPlaybackQuality === 'function') {
                                             const q = video.getVideoPlaybackQuality();
                                             if (q && q.totalVideoFrames > 0) {
                                                 if (video.__fbLastFrames > 0 && video.__fbLastTs > 0) {
                                                     const dt = (nowMs - video.__fbLastTs) / 1000;
-                                                    if (dt > 0 && q.totalVideoFrames >= video.__fbLastFrames) {
-                                                        vFps = Math.min(120, Math.max(1, Math.round((q.totalVideoFrames - video.__fbLastFrames) / dt)));
+                                                    const deltaFrames = q.totalVideoFrames - video.__fbLastFrames;
+                                                    if (dt > 0 && deltaFrames > 0) {
+                                                        vFps = Math.min(120, Math.round(deltaFrames / dt));
                                                     }
                                                 }
                                                 video.__fbLastFrames = q.totalVideoFrames;
@@ -1257,17 +1393,17 @@ class XboxBridge(
                                                 vDropped = q.droppedVideoFrames || 0;
                                             }
                                         }
-                                        const profMbps = (window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps;
-                                        const estDecode = video.videoHeight >= 1080 ? 4.1 : 2.7;
                                         window.__lastTelemetrySentAt = nowMs;
                                         notify('onStreamTelemetry', JSON.stringify({
+                                            hasStatsSample: false,
                                             fps: vFps,
-                                            bitrateMbps: parseFloat(Number(profMbps).toFixed(1)),
-                                            decodeTimeMs: estDecode,
-                                            rttMs: window.__lastKnownRttMs || 0,
-                                            jitterMs: 0.0,
+                                            bitrateMbps: 0.0,
+                                            decodeTimeMs: 0.0,
+                                            rttMs: 0,
+                                            jitterMs: 0,
                                             packetsLostPercent: 0.0,
                                             framesDropped: vDropped,
+                                            framesDecoded: 0,
                                             freezeCount: 0,
                                             totalFreezesDurationSec: 0.0,
                                             jitterBufferDelayMs: 0.0
@@ -2305,12 +2441,33 @@ class XboxBridge(
     }
 
     @JavascriptInterface
+    fun onClarityAutoDisabled(decodeTimeStr: String?) {
+        if (!isCallerTrusted()) return
+        com.example.data.SettingsRepository.updateClarityPreset(com.example.data.ClarityPreset.OFF)
+        com.example.data.SettingsRepository.updateClarityBoost(false)
+        scope.launch(Dispatchers.Main) {
+            val ctx = webViewRef?.get()?.context
+            if (ctx != null) {
+                val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
+                val msg = if (isEn) {
+                    "Auto-disabled Clarity filter due to high decode load (> 12ms)"
+                } else {
+                    "Đã tự tắt bộ lọc làm nét do tải giải mã cao (> 12ms)"
+                }
+                android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun requestSmartTranslate(rawText: String?, callbackId: String?, isBilingual: Boolean) {
         if (!isCallerTrusted()) return
         if (rawText.isNullOrBlank() || callbackId.isNullOrBlank()) return
-        if (!com.example.data.SettingsRepository.config.value.isEffectiveTranslateEnabled()) return
+        val cfg = com.example.data.SettingsRepository.config.value
+        if (!cfg.isEffectiveTranslateEnabled()) return
+        val targetLang = cfg.getTargetTranslateLanguageCode()
         scope.launch(Dispatchers.IO) {
-            val translated = GoogleGamingTranslator.translate(rawText, "vi", isBilingual)
+            val translated = GoogleGamingTranslator.translate(rawText, targetLang, isBilingual)
             withContext(Dispatchers.Main) {
                 val escapedText = JSONObject.quote(translated)
                 webViewRef?.get()?.evaluateJavascript(
@@ -2325,7 +2482,9 @@ class XboxBridge(
     fun requestBatchTranslate(jsonTexts: String?, batchId: String?, isBilingual: Boolean) {
         if (!isCallerTrusted()) return
         if (jsonTexts.isNullOrBlank() || batchId.isNullOrBlank()) return
-        if (!com.example.data.SettingsRepository.config.value.isEffectiveTranslateEnabled()) return
+        val cfg = com.example.data.SettingsRepository.config.value
+        if (!cfg.isEffectiveTranslateEnabled()) return
+        val targetLang = cfg.getTargetTranslateLanguageCode()
         scope.launch(Dispatchers.IO) {
             try {
                 val array = org.json.JSONArray(jsonTexts)
@@ -2334,7 +2493,7 @@ class XboxBridge(
                     list.add(array.getString(i))
                 }
                 // Use controlled parallel batch translation instead of sequential loop
-                val translatedMap = GoogleGamingTranslator.translateBatch(list, "vi", isBilingual)
+                val translatedMap = GoogleGamingTranslator.translateBatch(list, targetLang, isBilingual)
                 val resultMap = org.json.JSONObject()
                 for ((orig, translated) in translatedMap) {
                     resultMap.put(orig, translated)

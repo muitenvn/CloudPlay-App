@@ -281,6 +281,7 @@ class StreamController(private val context: Context) {
 
     private fun captureTelemetrySample() {
         val t = NetworkOptimizer.telemetry.value
+        if (!t.hasStatsSample) return
         val ping = t.rttMs
         if (ping > 0) {
             sessionPingSum += ping
@@ -364,23 +365,29 @@ class StreamController(private val context: Context) {
         val avgFps = if (sessionFpsCount > 0) {
             (sessionFpsSum / sessionFpsCount).toInt()
         } else {
-            NetworkOptimizer.telemetry.value.fps.let { if (it > 0) it else 60 }
+            NetworkOptimizer.telemetry.value.fps.coerceAtLeast(0)
         }
         val rawAvgDecode = if (sessionDecodeCount > 0) {
             sessionDecodeSum / sessionDecodeCount
-        } else {
+        } else if (NetworkOptimizer.telemetry.value.hasStatsSample) {
             NetworkOptimizer.telemetry.value.decodeTimeMs
+        } else {
+            0.0
         }
         val avgDecode = ((rawAvgDecode * 10.0).toInt()) / 10.0
         val avgJitter = if (sessionJitterCount > 0) {
             (sessionJitterSum / sessionJitterCount).toInt()
-        } else {
+        } else if (NetworkOptimizer.telemetry.value.hasStatsSample) {
             NetworkOptimizer.telemetry.value.jitterMs.coerceAtLeast(0)
+        } else {
+            0
         }
         val rawAvgJbDelay = if (sessionJitterBufferDelayCount > 0) {
             sessionJitterBufferDelaySum / sessionJitterBufferDelayCount
-        } else {
+        } else if (NetworkOptimizer.telemetry.value.hasStatsSample) {
             NetworkOptimizer.telemetry.value.jitterBufferDelayMs
+        } else {
+            0.0
         }
         val avgJbDelay = ((rawAvgJbDelay * 10.0).toInt()) / 10.0
         val samplesSnapshot = if (sessionPingSamples.isNotEmpty()) {

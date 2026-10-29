@@ -661,6 +661,222 @@ class ExampleRobolectricTest {
         assertEquals(krIncheon.id, sorted[0].id)
         assertEquals(jpTsukuba.id, sorted[1].id)
     }
+
+    @Test
+    fun `test 14 Muc 1 R id webview_desktop_ua_tag allows safe View setTag without IllegalArgumentException`() {
+        val context = RuntimeEnvironment.getApplication()
+        val view = android.view.View(context)
+        view.setTag(com.example.R.id.webview_desktop_ua_tag, true)
+        assertEquals(true, view.getTag(com.example.R.id.webview_desktop_ua_tag))
+        view.setTag(com.example.R.id.webview_desktop_ua_tag, false)
+        assertEquals(false, view.getTag(com.example.R.id.webview_desktop_ua_tag))
+    }
+
+    @Test
+    fun `test 15 Muc 2 and 5 telemetry with hasStatsSample false does not pollute AdaptiveQualityManager EMA or trigger fake decode`() {
+        com.example.cloudplay.AdaptiveQualityManager.resetSession()
+        val initialStep = com.example.cloudplay.AdaptiveQualityManager.state.value.currentStepIndex
+
+        // Gửi mẫu dự phòng khi getStats chưa có dữ liệu (hasStatsSample = false)
+        com.example.cloudplay.NetworkOptimizer.onTelemetryReceived(
+            """
+            {
+                "hasStatsSample": false,
+                "fps": 0,
+                "bitrateMbps": 0.0,
+                "decodeTimeMs": 0.0,
+                "rttMs": 0,
+                "jitterMs": 0,
+                "packetsLostPercent": 0.0,
+                "framesDropped": 0,
+                "framesDecoded": 0,
+                "freezeCount": 0,
+                "totalFreezesDurationSec": 0.0,
+                "jitterBufferDelayMs": 0.0
+            }
+            """.trimIndent()
+        )
+        val tFallback = com.example.cloudplay.NetworkOptimizer.telemetry.value
+        org.junit.Assert.assertFalse(tFallback.hasStatsSample)
+        assertEquals(0.0, tFallback.decodeTimeMs, 0.001)
+        assertEquals(0, tFallback.rttMs)
+        assertEquals(0, tFallback.jitterMs)
+
+        // Đảm bảo mẫu hasStatsSample = false không làm thay đổi EMA hay bậc chất lượng của AdaptiveQualityManager
+        val aqmAfterFallback = com.example.cloudplay.AdaptiveQualityManager.state.value
+        assertEquals(initialStep, aqmAfterFallback.currentStepIndex)
+        assertEquals(0.0, aqmAfterFallback.emaDecodeMs, 0.001)
+        assertEquals(0.0, aqmAfterFallback.emaRttMs, 0.001)
+
+        // Gửi mẫu thật (hasStatsSample = true) với khóa chuẩn rttMs, jitterMs, decodeTimeMs
+        com.example.cloudplay.NetworkOptimizer.onTelemetryReceived(
+            """
+            {
+                "hasStatsSample": true,
+                "fps": 60,
+                "bitrateMbps": 12.0,
+                "decodeTimeMs": 5.4,
+                "rttMs": 48,
+                "jitterMs": 4,
+                "packetsLostPercent": 0.0,
+                "framesDropped": 0,
+                "framesDecoded": 180,
+                "freezeCount": 0,
+                "totalFreezesDurationSec": 0.0,
+                "jitterBufferDelayMs": 8.2
+            }
+            """.trimIndent()
+        )
+        val tReal = com.example.cloudplay.NetworkOptimizer.telemetry.value
+        assertTrue(tReal.hasStatsSample)
+        assertEquals(48, tReal.rttMs)
+        assertEquals(4, tReal.jitterMs)
+        assertEquals(5.4, tReal.decodeTimeMs, 0.01)
+        assertTrue(com.example.cloudplay.AdaptiveQualityManager.state.value.emaRttMs > 0.0)
+    }
+
+    @Test
+    fun `test 16 Muc 3 and 4 queryHardwareCodecSupport and clarity auto disable syncs ClarityPreset OFF and clarityBoostEnabled false`() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsRepository.init(context)
+
+        // Kiểm tra Mục 3: queryHardwareCodecSupport trả về cấu trúc hợp lệ và script nhúng cờ phần cứng thật
+        val hwCaps = com.example.cloudplay.XboxBridge.queryHardwareCodecSupport()
+        assertNotNull(hwCaps)
+        val script = com.example.cloudplay.XboxBridge.getInjectionScript(clarityBoost = true, clarityPreset = "BALANCED")
+        assertTrue(script.contains("window.__hwCodecCaps = hwCodecCaps;"))
+        assertTrue(script.contains("window.__highDecodeStreakForClarity >= 3"))
+        org.junit.Assert.assertFalse(script.contains("estDecode = video.videoHeight"))
+
+        // Kiểm tra Mục 4: khi tự tắt làm nét do decode > 12ms, đưa ClarityPreset về OFF và clarityBoostEnabled về false
+        SettingsRepository.updateClarityBoost(true)
+        SettingsRepository.updateClarityPreset(com.example.data.ClarityPreset.ULTRA_SHARP)
+        assertTrue(SettingsRepository.config.value.clarityBoostEnabled)
+        assertEquals(com.example.data.ClarityPreset.ULTRA_SHARP, SettingsRepository.config.value.clarityPreset)
+
+        SettingsRepository.updateClarityPreset(com.example.data.ClarityPreset.OFF)
+        SettingsRepository.updateClarityBoost(false)
+        assertEquals(com.example.data.ClarityPreset.OFF, SettingsRepository.config.value.clarityPreset)
+        org.junit.Assert.assertFalse(SettingsRepository.config.value.clarityBoostEnabled)
+    }
+
+    @Test
+    fun `test 17 Muc 6 QualityAdapter applyAdaptiveBitrate uses 2 parameters without bufferHintMs`() {
+        com.example.cloudplay.QualityAdapter.resetTracking()
+        com.example.cloudplay.QualityAdapter.applyAdaptiveBitrate(targetBitrateMbps = 10.5, smoothGlide = true)
+        val script = com.example.cloudplay.XboxBridge.getInjectionScript(clarityBoost = false)
+        assertTrue(script.contains("window.__setAdaptiveBitrate = function(targetMbps, smoothGlide)"))
+        org.junit.Assert.assertFalse(script.contains("window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs"))
+    }
+
+    @Test
+    fun `test 18 Muc 7 Xbox market separated from app language and one-time migration resets non-en-US to en-US`() {
+        val context = RuntimeEnvironment.getApplication()
+        val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
+
+        // Giả lập người dùng từ bản cũ đang lưu thị trường khác en-US (vd: ko-KR, use_system_language = false)
+        sp.edit()
+            .putString("custom_locale", "ko-KR")
+            .putBoolean("use_system_language", false)
+            .putBoolean("migrated_xbox_market_en_us_v1", false)
+            .commit()
+
+        SettingsRepository.init(context)
+        assertEquals("en-US", SettingsRepository.config.value.getEffectiveLocale())
+        assertTrue(SettingsRepository.INITIAL_VERIFIED_XBOX_MARKETS.contains("en-US"))
+        assertEquals(1, SettingsRepository.INITIAL_VERIFIED_XBOX_MARKETS.size)
+
+        // Đổi ngôn ngữ giao diện app sang Tiếng Việt, Tiếng Nhật, Tiếng Hàn không được làm đổi thị trường Xbox khỏi en-US
+        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
+        assertEquals("en-US", SettingsRepository.config.value.getEffectiveLocale())
+        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.JAPANESE)
+        assertEquals("en-US", SettingsRepository.config.value.getEffectiveLocale())
+
+        // Khi người dùng chủ động chọn thị trường thủ công trong mục Nâng cao rồi bấm "Quay về en-US"
+        SettingsRepository.updateCustomLocale("ja-JP")
+        assertEquals("ja-JP", SettingsRepository.config.value.getEffectiveLocale())
+        SettingsRepository.resetXboxMarketToDefault()
+        assertEquals("en-US", SettingsRepository.config.value.getEffectiveLocale())
+    }
+
+    @Test
+    fun `test 19 Muc 8 translation target language migration and getTargetTranslateLanguageCode never returns blank`() {
+        val context = RuntimeEnvironment.getApplication()
+        val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
+
+        // 1. Người dùng cũ có xcloud_translate = true -> giữ nguyên "vi"
+        sp.edit().clear()
+            .putBoolean("xcloud_translate", true)
+            .putString("app_language", com.example.data.AppLanguage.VIETNAMESE.name)
+            .commit()
+        SettingsRepository.init(context)
+        assertTrue(SettingsRepository.config.value.isEffectiveTranslateEnabled())
+        assertEquals("vi", SettingsRepository.config.value.getTargetTranslateLanguageCode())
+
+        // 2. Chọn "OFF" cho ngôn ngữ dịch -> isEffectiveTranslateEnabled() == false nhưng getTargetTranslateLanguageCode() vẫn trả mã hợp lệ không rỗng
+        SettingsRepository.updateTranslateLanguage("OFF")
+        org.junit.Assert.assertFalse(SettingsRepository.config.value.isEffectiveTranslateEnabled())
+        assertTrue(SettingsRepository.config.value.getTargetTranslateLanguageCode().isNotBlank())
+
+        // 3. Chọn ngôn ngữ đích "es" -> bật dịch sang "es", và từ điển tĩnh tiếng Việt không kích hoạt cho "es"
+        SettingsRepository.updateTranslateLanguage("es")
+        assertTrue(SettingsRepository.config.value.isEffectiveTranslateEnabled())
+        assertEquals("es", SettingsRepository.config.value.getTargetTranslateLanguageCode())
+        val esScript = com.example.cloudplay.XboxTranslator.getTranslatorScript(
+            enabled = true,
+            preserveGameTitles = true,
+            bilingualMode = false,
+            hideStreamStats = true,
+            targetLanguage = "es"
+        )
+        assertTrue(esScript.contains("const IS_VI_TARGET = false;"))
+    }
+
+    @Test
+    fun `test 20 Muc 9 and 10 GeoIpDetector lookup flag country name azureEndpoint for JP KR US VN DE FR unknown and private IPs`() {
+        val context = RuntimeEnvironment.getApplication()
+        SettingsRepository.init(context)
+        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
+
+        // 1. Kiểm tra từ chối IP nội bộ / loopback
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("127.0.0.1"))
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("10.0.0.1"))
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("172.16.5.4"))
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("192.168.1.1"))
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("169.254.1.1"))
+        assertTrue(com.example.vpn.GeoIpDetector.isPrivateOrLoopbackIp("::1"))
+        assertEquals("", com.example.vpn.GeoIpDetector.resolveIpCountryCode("127.0.0.1", allowNetworkFallback = false))
+        assertEquals("", com.example.vpn.GeoIpDetector.resolveIpCountryCode("192.168.1.1", allowNetworkFallback = false))
+
+        // 2. Kiểm tra tra cứu IP -> mã ISO cho JP, KR, US, VN, DE, FR
+        assertEquals("JP", com.example.vpn.GeoIpDetector.resolveIpCountryCode("138.199.21.239", allowNetworkFallback = false))
+        assertEquals("KR", com.example.vpn.GeoIpDetector.resolveIpCountryCode("141.147.150.10", allowNetworkFallback = false))
+        assertEquals("US", com.example.vpn.GeoIpDetector.resolveIpCountryCode("8.8.8.8", allowNetworkFallback = false))
+        assertEquals("VN", com.example.vpn.GeoIpDetector.resolveIpCountryCode("14.160.10.20", allowNetworkFallback = false))
+        assertEquals("DE", com.example.vpn.GeoIpDetector.resolveIpCountryCode("88.198.10.20", allowNetworkFallback = false))
+        assertEquals("FR", com.example.vpn.GeoIpDetector.resolveIpCountryCode("51.15.10.20", allowNetworkFallback = false))
+
+        // 3. Kiểm tra cờ emoji sinh động từ mã ISO và tên hiển thị tiếng Việt
+        assertEquals("🇯🇵", com.example.vpn.GeoIpDetector.getFlagEmoji("JP"))
+        assertEquals("🇰🇷", com.example.vpn.GeoIpDetector.getFlagEmoji("KR"))
+        assertEquals("🇺🇸", com.example.vpn.GeoIpDetector.getFlagEmoji("US"))
+        assertEquals("🇻🇳", com.example.vpn.GeoIpDetector.getFlagEmoji("VN"))
+        assertEquals("🇩🇪", com.example.vpn.GeoIpDetector.getFlagEmoji("DE"))
+        assertEquals("🇫🇷", com.example.vpn.GeoIpDetector.getFlagEmoji("FR"))
+        assertEquals("🌐", com.example.vpn.GeoIpDetector.getFlagEmoji(""))
+
+        assertEquals("🇯🇵 Nhật Bản • 138.199.21.239", com.example.vpn.GeoIpDetector.formatServerDisplayName("JP", "138.199.21.239", isEn = false))
+        assertEquals("🌐 Không rõ quốc gia • 203.0.113.5", com.example.vpn.GeoIpDetector.formatServerDisplayName("", "203.0.113.5", isEn = false))
+
+        // 4. Kiểm tra azureEndpoint: chỉ JP và KR có endpoint thật, các nước khác hoặc không rõ trả về "" (không đoán westus)
+        assertEquals("japaneast.cloudapp.azure.com", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("JP"))
+        assertEquals("koreacentral.cloudapp.azure.com", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("KR"))
+        assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("US"))
+        assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("VN"))
+        assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("DE"))
+        assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("FR"))
+        assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(""))
+    }
 }
 
 

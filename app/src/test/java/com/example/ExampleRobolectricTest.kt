@@ -748,6 +748,7 @@ class ExampleRobolectricTest {
         val script = com.example.cloudplay.XboxBridge.getInjectionScript(clarityBoost = true, clarityPreset = "BALANCED")
         assertTrue(script.contains("window.__hwCodecCaps = hwCodecCaps;"))
         assertTrue(script.contains("window.__highDecodeStreakForClarity >= 3"))
+        assertTrue(script.contains("window.__clarityBoostActive = false;"))
         org.junit.Assert.assertFalse(script.contains("estDecode = video.videoHeight"))
 
         // Kiểm tra Mục 4: khi tự tắt làm nét do decode > 12ms, đưa ClarityPreset về OFF và clarityBoostEnabled về false

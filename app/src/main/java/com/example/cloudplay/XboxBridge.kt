@@ -927,6 +927,7 @@ class XboxBridge(
                                         window.__highDecodeStreakForClarity = (window.__highDecodeStreakForClarity || 0) + 1;
                                         if (window.__highDecodeStreakForClarity >= 3 && window.__clarityBoostActive && window.__setClarityPreset) {
                                             window.__highDecodeStreakForClarity = 0;
+                                            window.__clarityBoostActive = false;
                                             window.__setClarityPreset('OFF');
                                             notify('onClarityAutoDisabled', String(decodeTimeMs));
                                         }
@@ -1638,7 +1639,13 @@ class XboxBridge(
                         }
                     }
 
+                    window.__currentClarityPreset = "$clarityPreset";
                     window.__setClarityPreset = function(preset) {
+                        if (preset && preset !== 'OFF') {
+                            window.__currentClarityPreset = preset;
+                        } else if (preset === 'OFF') {
+                            window.__clarityBoostActive = false;
+                        }
                         if (!clarityStyleEl) {
                             clarityStyleEl = document.createElement('style');
                             clarityStyleEl.id = 'cloudplay-clarity-boost';
@@ -1659,7 +1666,11 @@ class XboxBridge(
                     window.__toggleClarityBoost = function(active) {
                         window.__clarityBoostActive = !!active;
                         if (active) {
-                            window.__setClarityPreset("$clarityPreset");
+                            window.__highDecodeStreakForClarity = 0;
+                            const targetPreset = (window.__currentClarityPreset && window.__currentClarityPreset !== 'OFF')
+                                ? window.__currentClarityPreset
+                                : "$clarityPreset";
+                            window.__setClarityPreset(targetPreset === 'OFF' ? 'BALANCED' : targetPreset);
                         } else {
                             window.__setClarityPreset("OFF");
                         }
@@ -2443,9 +2454,16 @@ class XboxBridge(
     @JavascriptInterface
     fun onClarityAutoDisabled(decodeTimeStr: String?) {
         if (!isCallerTrusted()) return
+        val currentCfg = com.example.data.SettingsRepository.config.value
+        val wasActive = currentCfg.clarityBoostEnabled && currentCfg.clarityPreset != com.example.data.ClarityPreset.OFF
         com.example.data.SettingsRepository.updateClarityPreset(com.example.data.ClarityPreset.OFF)
         com.example.data.SettingsRepository.updateClarityBoost(false)
         scope.launch(Dispatchers.Main) {
+            webViewRef?.get()?.evaluateJavascript(
+                "window.__clarityBoostActive = false; window.__highDecodeStreakForClarity = 0; if (window.__setClarityPreset) window.__setClarityPreset('OFF');",
+                null
+            )
+            if (!wasActive) return@launch
             val ctx = webViewRef?.get()?.context
             if (ctx != null) {
                 val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()

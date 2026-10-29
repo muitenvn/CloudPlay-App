@@ -430,6 +430,19 @@ fun CloudBrowserScreen(
         )
     }
 
+    // Đồng bộ tức thì trạng thái Bộ lọc làm nét (Clarity Boost) với WebView đang chạy
+    LaunchedEffect(config.clarityBoostEnabled, config.clarityPreset, webViewInstance) {
+        val presetName = if (config.clarityBoostEnabled && config.clarityPreset != com.example.data.ClarityPreset.OFF) {
+            config.clarityPreset.name
+        } else {
+            "OFF"
+        }
+        webViewInstance?.evaluateJavascript(
+            "if (window.__setClarityPreset) window.__setClarityPreset('$presetName'); if (window.__toggleClarityBoost) window.__toggleClarityBoost(${config.clarityBoostEnabled});",
+            null
+        )
+    }
+
     BackHandler {
         if (showReturnButton) {
             returnToGame()

@@ -1134,7 +1134,12 @@ object SettingsRepository {
     }
 
     fun updateClarityBoost(enabled: Boolean) {
-        _config.update { it.copy(clarityBoostEnabled = enabled) }
+        _config.update {
+            it.copy(
+                clarityBoostEnabled = enabled,
+                clarityPreset = if (enabled && it.clarityPreset == ClarityPreset.OFF) ClarityPreset.BALANCED else it.clarityPreset
+            )
+        }
         persist(_config.value)
     }
 

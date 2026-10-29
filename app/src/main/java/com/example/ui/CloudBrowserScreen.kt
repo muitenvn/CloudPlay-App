@@ -487,8 +487,9 @@ fun CloudBrowserScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
 
-                    // Hardware Acceleration & High Renderer Priority for Zero-Lag WebRTC Video Decoding
-                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                    // Giữ LAYER_TYPE_NONE trên cửa sổ đã bật Hardware Acceleration để Chromium kích hoạt
+                    // lớp phủ phần cứng zero-copy SurfaceControl trực tiếp cho <video> thay vì ép vẽ qua bộ đệm FBO trung gian.
+                    setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                     keepScreenOn = true
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                         setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
@@ -506,12 +507,14 @@ fun CloudBrowserScreen(
                         allowContentAccess = false
                         setSupportZoom(false)
 
-                        userAgentString = if (config.forceDesktopUserAgent) {
+                        val initialUa = if (config.forceDesktopUserAgent) {
                             EDGE_DESKTOP_UA
                         } else {
                             settings.userAgentString
                         }
+                        userAgentString = initialUa
                     }
+                    setTag(android.R.id.summary, config.forceDesktopUserAgent)
 
                     CookieManager.getInstance().let { cookieManager ->
                         cookieManager.setAcceptCookie(true)
@@ -547,7 +550,7 @@ fun CloudBrowserScreen(
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                             isPageLoading = true
-                            injectedForCurrentPage = false
+                            injectedForCurrentPage = hasDocumentStartScript
                             bridge.updateCurrentUrl(url)
                             url?.let {
                                 streamController.onUrlChanged(it)
@@ -573,8 +576,8 @@ fun CloudBrowserScreen(
                             url?.let {
                                 handleMainFrameNavigation(it)
                             }
-                            if (XboxBridge.isTrustedHost(url)) {
-                                // Ensure hooks are active on finished page
+                            if (!injectedForCurrentPage && XboxBridge.isTrustedHost(url)) {
+                                // Ensure hooks are active on finished page if not already injected at document start
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
@@ -650,9 +653,16 @@ fun CloudBrowserScreen(
                 }
             },
             update = { view ->
-                val desiredUa = if (config.forceDesktopUserAgent) EDGE_DESKTOP_UA else WebSettings.getDefaultUserAgent(context)
-                if (view.settings.userAgentString != desiredUa) {
-                    view.settings.userAgentString = desiredUa
+                // Tránh gọi IPC sang luồng Chromium (WebSettings.getDefaultUserAgent / view.settings.userAgentString)
+                // mỗi khi Compose vẽ lại theo nhịp telemetry trong trận.
+                val wantDesktopUa = config.forceDesktopUserAgent
+                val lastDesktopFlag = view.getTag(android.R.id.summary) as? Boolean
+                if (lastDesktopFlag != wantDesktopUa) {
+                    view.setTag(android.R.id.summary, wantDesktopUa)
+                    val desiredUa = if (wantDesktopUa) EDGE_DESKTOP_UA else WebSettings.getDefaultUserAgent(context)
+                    if (view.settings.userAgentString != desiredUa) {
+                        view.settings.userAgentString = desiredUa
+                    }
                 }
             }
         )
@@ -663,11 +673,11 @@ fun CloudBrowserScreen(
             else com.example.data.GameOptimizationRepository.getProfileForUrl(initialUrl)
         }
 
-        // Kích hoạt chế độ Fortnite Arena (Đệm 8ms + tự động chọn bố cục FPS Pro khi bật tay cầm ảo lần đầu trong Fortnite)
+        // Kích hoạt chế độ Fortnite Arena (tự động chọn bố cục FPS Pro khi bật tay cầm ảo lần đầu trong Fortnite, không ép bộ đệm 8ms gây sụt frame)
         LaunchedEffect(gameProfile.gameId, webViewInstance) {
             val isFn = gameProfile.gameId == "fortnite"
             webViewInstance?.evaluateJavascript(
-                "window.__fortniteArenaMode = $isFn; if ($isFn && window.__setAdaptiveBitrate) window.__setAdaptiveBitrate(${if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps}, 8.0, false);",
+                "window.__fortniteArenaMode = $isFn;",
                 null
             )
             if (isFn && config.gamepadLayoutPreset == com.example.data.GamepadLayoutPreset.STANDARD) {

@@ -41,10 +41,10 @@ object QualityAdapter {
         smoothGlide: Boolean = true
     ) {
         val webView = webViewRef?.get() ?: return
-        // Avoid redundant JS evaluations if change is negligible
+        // Chỉ gửi lệnh cập nhật vào WebView khi mức bitrate mục tiêu thay đổi đáng kể (>= 1.0 Mbps)
+        // để tránh làm phiền luồng chính của Chromium trong lúc đang giải mã khung hình 60FPS.
         if (lastAppliedBitrateMbps > 0 &&
-            abs(targetBitrateMbps - lastAppliedBitrateMbps) < 0.08 &&
-            abs(bufferHintMs - lastAppliedBufferMs) < 0.15
+            abs(targetBitrateMbps - lastAppliedBitrateMbps) < 1.0
         ) {
             return
         }
@@ -54,9 +54,7 @@ object QualityAdapter {
         val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $bufferHintMs, $smoothGlide);"
         webView.post {
             try {
-                webView.evaluateJavascript(js) { res ->
-                    Log.d(TAG, "Glided adaptive bitrate: ${targetBitrateMbps}Mbps, buffer: ${bufferHintMs}ms (smooth=$smoothGlide, res=$res)")
-                }
+                webView.evaluateJavascript(js, null)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to evaluate adaptive bitrate javascript", e)
             }

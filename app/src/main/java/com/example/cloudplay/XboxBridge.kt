@@ -215,36 +215,26 @@ class XboxBridge(
                     function applyReceiverBufferTarget(receiver, kind, videoSec) {
                         if (!receiver) return;
                         try {
-                            const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                            const liveJitterSec = Math.max(0.0, (window.__lastKnownJitterMs || 0) / 1000.0);
-                            const minSafeSec = isCell ? Math.max(0.015, liveJitterSec * 1.5) : Math.max(0.012, liveJitterSec * 1.3);
-                            const maxSafeSec = isCell ? 0.045 : 0.055;
-                            // Theo chuẩn W3C WebRTC & Chromium: Audio (NetEq) và Video (VCM) trong cùng nhóm đồng bộ
-                            // phải dùng chung cùng một mục tiêu jitterBufferTarget để trình duyệt không giữ khung hình đợi âm thanh
-                            const sec = Math.max(minSafeSec, Math.min(maxSafeSec, videoSec));
-                            const ms = Math.round(sec * 1000);
-                            if ('playoutDelayHint' in receiver) {
-                                receiver.playoutDelayHint = sec;
+                            // CRITICAL FIX: Không ép playoutDelayHint hoặc jitterBufferTarget xuống 8ms-18ms (dưới 1 khung hình 16.67ms).
+                            // Việc ép bộ đệm xuống dưới 1 frame làm cạn bộ đệm VCMTiming của Chromium, gây rớt khung hình liên tục,
+                            // kích hoạt bão gói tin RTCP PLI / NACK khiến máy chủ Xbox lầm tưởng là lag mạng (hiện biểu tượng cảnh báo Ping)
+                            // và gửi dồn dập IDR Keyframe khổng lồ làm thời gian giải mã (decodeTimeMs) tăng vọt.
+                            // Đặt về null để bộ ước lượng Jitter tự nhiên của WebRTC (JitterEstimator + NetEq) tự cân bằng mượt mà.
+                            if ('playoutDelayHint' in receiver && receiver.playoutDelayHint !== null) {
+                                receiver.playoutDelayHint = null;
                             }
-                            if ('jitterBufferTarget' in receiver) {
-                                receiver.jitterBufferTarget = ms;
+                            if ('jitterBufferTarget' in receiver && receiver.jitterBufferTarget !== null) {
+                                receiver.jitterBufferTarget = null;
                             }
                         } catch (e) {}
                     }
 
                     window.__setAdaptiveBitrate = function(targetMbps, bufferHintMs, smoothGlide) {
-                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                        const maxAllowedBufMs = isCell ? 40.0 : 50.0;
                         const mbps = Math.max(1.0, Math.min(20.0, parseFloat(targetMbps) || 10.0));
-                        const bufMs = Math.max(12.0, Math.min(maxAllowedBufMs, parseFloat(bufferHintMs) || (isCell ? 18.0 : 16.0)));
-                        const targetSec = parseFloat((bufMs / 1000.0).toFixed(4));
-
                         if (window.__networkProfile) {
                             window.__networkProfile.targetBitrate = mbps;
                         }
-                        window.__targetBufferSec = targetSec;
-                        window.__currentBufferSec = targetSec;
-
+                        // Đảm bảo các receiver đang chạy được giải phóng khỏi mọi giới hạn bộ đệm nhân tạo trước đó
                         try {
                             const pc = window.__activePeerConnection;
                             if (pc && typeof pc.getReceivers === 'function') {
@@ -252,7 +242,7 @@ class XboxBridge(
                                 for (let i = 0; i < receivers.length; i++) {
                                     const r = receivers[i];
                                     if (r && r.track && (r.track.kind === 'video' || r.track.kind === 'audio')) {
-                                        applyReceiverBufferTarget(r, r.track.kind, targetSec);
+                                        applyReceiverBufferTarget(r, r.track.kind, null);
                                     }
                                 }
                             }
@@ -467,17 +457,14 @@ class XboxBridge(
                                 try {
                                     if (config && config.video && config.video.contentType) {
                                         const ct = config.video.contentType.toLowerCase();
-                                        // Prioritize H.264 Baseline/Constrained Baseline (avc1.42) & Main (avc1.4d) for zero-B-frame hardware MediaCodec
-                                        if (ct.indexOf('avc1.42') !== -1 || ct.indexOf('avc1.4d') !== -1 || ct.indexOf('h264') !== -1) {
+                                        // Báo cáo mọi cấu hình H.264 (avc1.42, avc1.4d, avc1.64, h264) đều được giải mã phần cứng mượt mà
+                                        // để Android MediaCodec luôn được kích hoạt và không bao giờ bị ép rơi về giải mã phần mềm CPU.
+                                        if (ct.indexOf('avc1') !== -1 || ct.indexOf('h264') !== -1) {
                                             return { supported: true, smooth: true, powerEfficient: true };
                                         }
-                                        // Deprioritize heavy High Profile CABAC (avc1.64), VP9, and AV1 when Low-End, 4G Cellular, or reduced render scale is active
-                                        const gt = window.__graphicsTuning || {};
-                                        const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
-                                        const isCell = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                                        if ((isLowEnd || isCell || (parseFloat(gt.renderScale) || 1.0) < 0.90) &&
-                                            (ct.indexOf('avc1.64') !== -1 || ct.indexOf('vp9') !== -1 || ct.indexOf('av01') !== -1)) {
-                                            return { supported: true, smooth: false, powerEfficient: false };
+                                        // Vô hiệu hóa VP9 và AV1 để tránh việc trình duyệt chọn bộ giải mã phần mềm gây nóng máy và vọt decodeTimeMs
+                                        if (ct.indexOf('vp9') !== -1 || ct.indexOf('av01') !== -1 || ct.indexOf('av1') !== -1) {
+                                            return { supported: false, smooth: false, powerEfficient: false };
                                         }
                                     }
                                 } catch(mcErr) {}
@@ -492,23 +479,20 @@ class XboxBridge(
                             const caps = RTCRtpReceiver.getCapabilities('video');
                             if (!caps || !Array.isArray(caps.codecs) || caps.codecs.length === 0) return;
 
-                            const sortedCodecs = caps.codecs.slice().sort(function(a, b) {
-                                function scoreCodec(c) {
-                                    const mime = (c.mimeType || '').toLowerCase();
-                                    const fmtp = (c.sdpFmtpLine || '').toLowerCase();
-                                    if (mime === 'video/h264') {
-                                        // Highest priority: Constrained Baseline (42e0 / 4200) -> Zero B-frames, fastest hardware decode
-                                        if (fmtp.indexOf('42e0') !== -1 || fmtp.indexOf('4200') !== -1) return 100;
-                                        // Second priority: Main Profile (4d)
-                                        if (fmtp.indexOf('4d') !== -1) return 85;
-                                        // Other H.264 profiles
-                                        return 70;
-                                    }
-                                    if (mime === 'video/rtx' || mime === 'video/red' || mime === 'video/ulpfec') return 60;
-                                    return 10;
+                            // Giữ nguyên thứ tự profile H.264 gốc của trình duyệt (để ưu tiên đúng MediaCodec phần cứng của thiết bị),
+                            // chỉ đưa nhóm codec H.264 + gói phục hồi lỗi (rtx/red/ulpfec) lên trước VP8/VP9/AV1.
+                            const h264AndFec = [];
+                            const others = [];
+                            for (let i = 0; i < caps.codecs.length; i++) {
+                                const c = caps.codecs[i];
+                                const mime = (c.mimeType || '').toLowerCase();
+                                if (mime === 'video/h264' || mime === 'video/rtx' || mime === 'video/red' || mime === 'video/ulpfec') {
+                                    h264AndFec.push(c);
+                                } else {
+                                    others.push(c);
                                 }
-                                return scoreCodec(b) - scoreCodec(a);
-                            });
+                            }
+                            const sortedCodecs = h264AndFec.concat(others);
 
                             const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
                             for (let i = 0; i < transceivers.length; i++) {
@@ -516,7 +500,7 @@ class XboxBridge(
                                 if (t && typeof t.setCodecPreferences === 'function') {
                                     const receiverKind = t.receiver && t.receiver.track ? t.receiver.track.kind : '';
                                     const senderKind = t.sender && t.sender.track ? t.sender.track.kind : '';
-                                    if (receiverKind === 'video' || senderKind === 'video' || (!receiverKind && !senderKind)) {
+                                    if (receiverKind === 'video' || senderKind === 'video') {
                                         try { t.setCodecPreferences(sortedCodecs); } catch( prefErr ) {}
                                     }
                                 }
@@ -531,30 +515,18 @@ class XboxBridge(
                             const gt = window.__graphicsTuning || {};
                             const isLowEndMode = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
                             const isCellularMode = !!(window.__networkProfile && window.__networkProfile.isCellular);
-                            const scaleFactor = Math.max(0.65, Math.min(1.0, parseFloat(gt.renderScale) || $renderScaleFactor || 1.0));
-                            const fpsTarget = parseInt(gt.fpsCap || $fpsCap || 60, 10) || 60;
-                            const rawMbps = isLowEndMode ? 5 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
-                            const scaleMultiplier = scaleFactor < 0.99 ? Math.max(0.68, scaleFactor * scaleFactor * 1.08) : 1.0;
-                            const maxSafeMbps = isLowEndMode ? 5 : (isCellularMode ? 8 : 16);
-                            const activeMbps = Math.max(4, Math.min(maxSafeMbps, Math.round(rawMbps * scaleMultiplier)));
+                            const rawMbps = isLowEndMode ? 6 : ((window.__networkProfile && window.__networkProfile.targetBitrate) ? window.__networkProfile.targetBitrate : $effectiveBitrateMbps);
+                            const maxSafeMbps = isLowEndMode ? 8 : (isCellularMode ? 10 : 15);
+                            const activeMbps = Math.max(4, Math.min(maxSafeMbps, Math.round(rawMbps)));
                             const targetKbps = activeMbps * 1000;
-                            const startKbps = Math.max(2500, Math.round(targetKbps * 0.70));
 
-                            if (sdp.indexOf('m=video ') !== -1) {
-                                sdp = sdp.replace(/b=AS:\d+\r\n/g, '');
-                                sdp = sdp.replace(/a=framerate:\d+\r\n/g, '');
+                            // Chỉ thêm gợi ý băng thông b=AS vào Local SDP Answer mà KHÔNG sửa đổi profile-level-id hay a=framerate
+                            // nhằm tránh xung đột thông số H.264 khiến phần cứng MediaCodec bị khựng hoặc chuyển sang giải mã CPU.
+                            if (sdp.indexOf('m=video ') !== -1 && sdp.indexOf('b=AS:') === -1) {
                                 sdp = sdp.replace(
                                     /m=video (.*)\r\n/g,
-                                    'm=video $1\r\nb=AS:' + targetKbps + '\r\na=framerate:' + fpsTarget + '\r\n'
+                                    'm=video $1\r\nb=AS:' + targetKbps + '\r\n'
                                 );
-                                // Prefer Constrained Baseline (42e01f, 0 B-frames) on 4G cellular & low-end devices so packet loss never stalls dependent frames
-                                if (isLowEndMode || isCellularMode) {
-                                    sdp = sdp.replace(/profile-level-id=64[0-9a-fA-F]{4}/g, 'profile-level-id=42e01f');
-                                }
-                                sdp = sdp.replace(/(a=fmtp:\d+ [^\r\n]*packetization-mode=1[^\r\n]*)\r\n/g, function(match, p1) {
-                                    if (p1.indexOf('x-google-max-bitrate') !== -1) return match;
-                                    return p1 + ';x-google-max-bitrate=' + targetKbps + ';x-google-start-bitrate=' + startKbps + '\r\n';
-                                });
                             }
 
                             if (isLowEndMode && window.__pauseTranslator) {
@@ -568,6 +540,7 @@ class XboxBridge(
                     }
 
                     window.__lastTelemetrySentAt = 0;
+                    window.__lastSentTelemetrySnapshot = null;
 
                     function attachPeerConnectionHooks(pc) {
                         if (!pc || pc.__cpHooked) return pc;
@@ -588,7 +561,6 @@ class XboxBridge(
 
                         pc.addEventListener('track', function(evt) {
                             try {
-                                const initBufSec = window.__targetBufferSec || 0.014;
                                 if (evt.track) {
                                     window.__activeWebRtcTracks = window.__activeWebRtcTracks || {};
                                     window.__activeWebRtcTracks[evt.track.kind] = evt.track;
@@ -596,7 +568,7 @@ class XboxBridge(
                                         window.__capturedGameAudioTrack = evt.track;
                                     }
                                     if (evt.receiver && (evt.track.kind === 'video' || evt.track.kind === 'audio')) {
-                                        applyReceiverBufferTarget(evt.receiver, evt.track.kind, initBufSec);
+                                        applyReceiverBufferTarget(evt.receiver, evt.track.kind, null);
                                     }
                                 }
                                 if (evt.streams && evt.streams[0]) {
@@ -677,31 +649,36 @@ class XboxBridge(
 
                                 stats.forEach(report => {
                                     if (report.type === 'inbound-rtp' && (report.kind === 'video' || report.mediaType === 'video' || (!report.kind && report.framesDecoded !== undefined))) {
-                                        currentBytes = report.bytesReceived || currentBytes;
-                                        packetsLost = report.packetsLost || packetsLost;
-                                        packetsReceived = report.packetsReceived || packetsReceived;
-                                        if (report.jitter !== undefined) {
-                                            jitter = Math.round(report.jitter * 1000);
-                                        }
-                                        framesDecoded = report.framesDecoded || framesDecoded;
-                                        framesDropped = report.framesDropped || framesDropped;
-                                        if (report.freezeCount !== undefined) {
-                                            freezeCount = report.freezeCount;
-                                        }
-                                        if (report.totalFreezesDuration !== undefined) {
-                                            totalFreezesDurationSec = parseFloat(Number(report.totalFreezesDuration).toFixed(2));
-                                        }
-                                        if (report.jitterBufferDelay !== undefined) {
-                                            rawJitterBufferDelay = report.jitterBufferDelay;
-                                        }
-                                        if (report.jitterBufferEmittedCount !== undefined) {
-                                            rawJitterBufferEmitted = report.jitterBufferEmittedCount;
-                                        }
-                                        if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
-                                            nativeFps = Math.round(report.framesPerSecond);
-                                        }
-                                        if (report.totalDecodeTime !== undefined) {
-                                            currentTotalDecodeTime = report.totalDecodeTime;
+                                        const rptBytes = report.bytesReceived || 0;
+                                        const rptFrames = report.framesDecoded || 0;
+                                        // Chỉ lấy thông số từ luồng video chính đang hoạt động (tránh ghi đè bởi SSRC phụ có 0 frame)
+                                        if (rptFrames >= framesDecoded && rptBytes >= currentBytes) {
+                                            currentBytes = rptBytes;
+                                            packetsLost = report.packetsLost || 0;
+                                            packetsReceived = report.packetsReceived || 0;
+                                            if (report.jitter !== undefined) {
+                                                jitter = Math.round(report.jitter * 1000);
+                                            }
+                                            framesDecoded = rptFrames;
+                                            framesDropped = report.framesDropped || 0;
+                                            if (report.freezeCount !== undefined) {
+                                                freezeCount = report.freezeCount;
+                                            }
+                                            if (report.totalFreezesDuration !== undefined) {
+                                                totalFreezesDurationSec = parseFloat(Number(report.totalFreezesDuration).toFixed(2));
+                                            }
+                                            if (report.jitterBufferDelay !== undefined) {
+                                                rawJitterBufferDelay = report.jitterBufferDelay;
+                                            }
+                                            if (report.jitterBufferEmittedCount !== undefined) {
+                                                rawJitterBufferEmitted = report.jitterBufferEmittedCount;
+                                            }
+                                            if (report.framesPerSecond !== undefined && report.framesPerSecond > 0) {
+                                                nativeFps = Math.round(report.framesPerSecond);
+                                            }
+                                            if (report.totalDecodeTime !== undefined) {
+                                                currentTotalDecodeTime = report.totalDecodeTime;
+                                            }
                                         }
                                     } else if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.nominated || (selectedPairId && report.id === selectedPairId))) {
                                         const isActivePair = (selectedPairId && report.id === selectedPairId) || report.nominated === true;
@@ -817,24 +794,47 @@ class XboxBridge(
                                 }
 
                                 if (fps > 0 || currentBytes > 0 || rtt > 0) {
-                                    window.__lastTelemetrySentAt = now;
                                     window.__lastKnownRttMs = rtt;
                                     window.__lastKnownJitterMs = jitter;
-                                    notify('onStreamTelemetry', JSON.stringify({
-                                        fps: fps,
-                                        bitrateMbps: bitrateMbps,
-                                        decodeTimeMs: decodeTimeMs,
-                                        rttMs: rtt,
-                                        jitterMs: jitter,
-                                        packetsLostPercent: lostPercent,
-                                        framesDropped: framesDropped,
-                                        freezeCount: freezeCount,
-                                        totalFreezesDurationSec: totalFreezesDurationSec,
-                                        jitterBufferDelayMs: jitterBufferDelayMs
-                                    }));
+
+                                    // Tự động tắt bộ lọc CSS trên <video> nếu phần cứng giải mã đang chịu tải cao (> 12ms)
+                                    // để trả <video> về lớp phủ phần cứng SurfaceControl zero-copy ngay lập tức.
+                                    if (decodeTimeMs > 12.0 && window.__clarityBoostActive && window.__setClarityPreset) {
+                                        window.__setClarityPreset('OFF');
+                                    }
+
+                                    const prev = window.__lastSentTelemetrySnapshot;
+                                    const elapsedSinceSent = now - (window.__lastTelemetrySentAt || 0);
+                                    const hasMeaningfulDelta = !prev ||
+                                        elapsedSinceSent >= 4500 ||
+                                        Math.abs(fps - prev.fps) >= 3 ||
+                                        Math.abs(rtt - prev.rttMs) >= Math.max(4, Math.round(prev.rttMs * 0.05)) ||
+                                        Math.abs(jitter - prev.jitterMs) >= 3 ||
+                                        Math.abs(decodeTimeMs - prev.decodeTimeMs) >= 1.0 ||
+                                        framesDropped !== prev.framesDropped ||
+                                        freezeCount !== prev.freezeCount;
+
+                                    if (hasMeaningfulDelta) {
+                                        window.__lastTelemetrySentAt = now;
+                                        const payloadObj = {
+                                            fps: fps,
+                                            bitrateMbps: bitrateMbps,
+                                            decodeTimeMs: decodeTimeMs,
+                                            rttMs: rtt,
+                                            jitterMs: jitter,
+                                            packetsLostPercent: lostPercent,
+                                            framesDropped: framesDropped,
+                                            framesDecoded: framesDecoded,
+                                            freezeCount: freezeCount,
+                                            totalFreezesDurationSec: totalFreezesDurationSec,
+                                            jitterBufferDelayMs: jitterBufferDelayMs
+                                        };
+                                        window.__lastSentTelemetrySnapshot = payloadObj;
+                                        notify('onStreamTelemetry', JSON.stringify(payloadObj));
+                                    }
                                 }
                             } catch(err) {}
-                        }, 1500);
+                        }, 2000);
                         window.__activeStatsIntervalId = statsIntervalId;
                         return pc;
                     }
@@ -850,11 +850,7 @@ class XboxBridge(
                                 proto.setRemoteDescription = function(desc) {
                                     try {
                                         attachPeerConnectionHooks(this);
-                                        prioritizeHardwareH264Codecs(this);
-                                        if (desc && desc.sdp) {
-                                            const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
-                                            desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
-                                        }
+                                        // KHÔNG sửa đổi SDP của máy chủ trong setRemoteDescription để bảo toàn cấu hình H.264 gốc của Xbox
                                     } catch (e) {}
                                     return origProtoSetRemote.call(this, desc);
                                 };
@@ -864,6 +860,7 @@ class XboxBridge(
                                     proto.setLocalDescription = function(desc) {
                                         try {
                                             attachPeerConnectionHooks(this);
+                                            prioritizeHardwareH264Codecs(this);
                                             if (desc && desc.sdp) {
                                                 const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
                                                 desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
@@ -1610,13 +1607,8 @@ class XboxBridge(
                                     }
                                 `;
                             }
-                            if (scale < 0.99) {
-                                cssRules += `
-                                    video#stream-video, video[data-testid="stream-video"], #segmented-video video {
-                                        image-rendering: -webkit-optimize-contrast !important;
-                                    }
-                                `;
-                            }
+                            // Bảo toàn tuyệt đối lớp phủ phần cứng SurfaceControl zero-copy cho <video>:
+                            // Không gắn thuộc tính image-rendering lên thẻ <video> khi giảm renderScale để tránh ép GPU phải vẽ lại qua shader.
                             if (cssRules !== lastAppliedGpuCss) {
                                 gpuLoadStyleEl.textContent = cssRules;
                                 lastAppliedGpuCss = cssRules;

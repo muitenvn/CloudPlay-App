@@ -1,6 +1,6 @@
 {
-  "summary":  "Bản Kế hoạch Thực thi Đã Gia cố (Hardened Implementation Plan A1–D3) kèm Bảng Đối chiếu Khảo sát Repository thực tế (Giai đoạn 1), kiến trúc đo ping thực tế chịu tải lớn (A1–A8), chẩn đoán lag dựa trên dữ liệu thực có kiểm chứng mẫu số (B1–B3), chuẩn hóa giao diện & thang màu 3 mức (C1–C4), báo cáo kiểm toán kỹ thuật độc lập (D1–D3) và 13 bài kiểm thử nghiệm thu bắt buộc.",
-  "updatedAt":  "2026-10-28T07:57:35.267376542Z",
+  "summary":  "Kế hoạch nâng cấp toàn diện CloudPlay Optimizer lên phiên bản Cyber-Console 3.5: tối ưu WebRTC Delta Filter, truyền âm thanh PCM không gây GC pause, tần số quét 120Hz theo công tắc cài đặt, Clarity Boost bảo toàn GPU Overlay, giao diện Cyber-Console 3.5, Dynamic Island HUD tự làm mờ, cảnh báo Wi-Fi 2.4GHz không chặn và lưu bố cục tay cầm riêng cho từng game.",
+  "updatedAt":  "2026-10-28T12:48:25.120676570Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -566,10 +566,10 @@ fun ServersScreen(
                     }
                     val currentUnlockStatus = VpnManager.getServerUnlockStatus(currentServer, vpnState.unlockRecords)
                     val currentUnlockText = when (currentUnlockStatus) {
-                        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
-                        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
-                        RegionUnlockStatus.UNTESTED -> if (isEn) "Ready" else "Sẵn sàng"
-                        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
+                        RegionUnlockStatus.UNLOCKED -> config.tr("Đã mở khóa", "Unlocked")
+                        RegionUnlockStatus.FAILED -> config.tr("Không mở khóa", "Unlock Failed")
+                        RegionUnlockStatus.UNTESTED -> config.tr("Sẵn sàng", "Ready")
+                        RegionUnlockStatus.WRONG_REGION -> config.tr("Sai vùng", "Wrong Region")
                     }
                     val currentUnlockColor = when (currentUnlockStatus) {
                         RegionUnlockStatus.UNLOCKED -> XboxNeonGreen
@@ -632,11 +632,7 @@ fun ServersScreen(
                                 verticalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
                                 Text(
-                                    text = if (isEn) {
-                                        "Selected: ${currentServer.flag} ${currentServer.name}"
-                                    } else {
-                                        "Đang chọn: ${currentServer.flag} ${currentServer.name}"
-                                    },
+                                    text = "${config.tr("Đang chọn", "Selected")}: ${currentServer.flag} ${currentServer.name}",
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 11.5.sp,
@@ -713,7 +709,7 @@ fun ServersScreen(
                                         modifier = Modifier.size(13.dp)
                                     )
                                     Text(
-                                        text = if (isEn) "Auto Best" else "Chọn tối ưu",
+                                        text = config.tr("Chọn tối ưu", "Auto Best"),
                                         color = XboxNeonGreen,
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontSize = 10.5.sp,
@@ -746,7 +742,7 @@ fun ServersScreen(
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isEn) "Pinging..." else "Đang đo ping",
+                                    text = config.tr("Đang đo ping", "Pinging..."),
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -756,7 +752,7 @@ fun ServersScreen(
                                 Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isEn) "Ping Test" else "Đo ping",
+                                    text = config.tr("Đo ping", "Ping Test"),
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -780,7 +776,7 @@ fun ServersScreen(
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), color = DirectCyan, strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isEn) "Updating..." else "Đang tải...",
+                                    text = config.tr("Đang tải...", "Updating..."),
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 11.sp,
@@ -791,7 +787,7 @@ fun ServersScreen(
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isEn) "Update" else "Cập nhật",
+                                    text = config.tr("Cập nhật", "Update"),
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 11.sp,
@@ -814,7 +810,7 @@ fun ServersScreen(
                             Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = if (isEn) "Add" else "Thêm",
+                                text = config.tr("Thêm", "Add"),
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 11.sp,
@@ -837,7 +833,7 @@ fun ServersScreen(
                     "JP" to "🇯🇵 $jpLabel (${allServers.count { it.countryCode == "JP" }})",
                     "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
                     "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
-                    "CUSTOM" to if (isEn) "⚙️ Custom (${allServers.count { it.isCustom }})" else "⚙️ Tùy Chỉnh (${allServers.count { it.isCustom }})",
+                    "CUSTOM" to "⚙️ ${config.tr("Tùy Chỉnh", "Custom")} (${allServers.count { it.isCustom }})",
                     "ALL" to "🌐 $allLabel (${allServers.size})"
                 )
 
@@ -1032,10 +1028,10 @@ private fun ServerCard(
 
     // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử mở khóa" (xám), "Sai vùng" (vàng)
     val unlockLabel = when (unlockStatus) {
-        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
-        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
-        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested unlock" else "Chưa thử mở khóa"
-        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
+        RegionUnlockStatus.UNLOCKED -> config.tr("Đã mở khóa", "Unlocked")
+        RegionUnlockStatus.FAILED -> config.tr("Không mở khóa", "Unlock Failed")
+        RegionUnlockStatus.UNTESTED -> config.tr("Chưa thử mở khóa", "Untested unlock")
+        RegionUnlockStatus.WRONG_REGION -> config.tr("Sai vùng", "Wrong Region")
     }
     val unlockBadgeColor = when (unlockStatus) {
         RegionUnlockStatus.UNLOCKED -> XboxNeonGreen
@@ -1120,7 +1116,7 @@ private fun ServerCard(
                                 border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.65f))
                             ) {
                                 Text(
-                                    text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
+                                    text = config.tr("★ ĐỀ XUẤT", "★ BEST"),
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.sp,
@@ -1208,10 +1204,10 @@ private fun ServerCard(
                             isGameActiveNow -> "--"
                             isServerCurrentlyTesting -> "..."
                             isFallbackPortOnly && pingMs > 0 -> "${animatedPingMs}ms (:${measurement?.measuredPort ?: 443})"
-                            pingMs > 0 && isUnstablePing -> if (isEn) "${animatedPingMs}ms • Unstable" else "${animatedPingMs}ms • Mạng chập chờn"
+                            pingMs > 0 && isUnstablePing -> "${animatedPingMs}ms • ${config.tr("Mạng chập chờn", "Unstable")}"
                             pingMs > 0 -> "${animatedPingMs}ms"
-                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
-                            else -> if (isEn) "Not tested" else "Chưa đo"
+                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> config.tr("Không đo được", "Unreachable")
+                            else -> config.tr("Chưa đo", "Not tested")
                         }
 
                         Text(

@@ -74,6 +74,22 @@ object XboxTranslator {
         "Cloud Gaming" to "Chơi Game Đám Mây",
         "Cloud Gaming (Beta)" to "Chơi Game Đám Mây (Beta)",
         "Xbox Cloud Gaming" to "Xbox Cloud Gaming",
+        "Xbox Cloud Gaming (Beta) on Xbox.com" to "Chơi game trên mây Xbox (Beta) tại Xbox.com",
+        "Xbox Cloud Gaming on Xbox.com" to "Chơi game trên mây Xbox tại Xbox.com",
+        "Play Xbox Cloud Gaming (Beta) on Xbox.com" to "Chơi game trên mây Xbox tại Xbox.com",
+        "Use your Xbox Game Pass Ultimate membership to play 100s of consoles games on PC and supported mobile devices." to "Sử dụng gói thành viên Xbox Game Pass Ultimate của bạn để chơi hàng trăm game console trên PC và các thiết bị di động được hỗ trợ.",
+        "Stream your own game" to "Phát trực tuyến game của riêng bạn",
+        "Stream your own games" to "Phát trực tuyến các game bạn sở hữu",
+        "Buy and stream" to "Mua và phát trực tuyến trên mây",
+        "Included with Game Pass Ultimate" to "Bao gồm trong Game Pass Ultimate",
+        "Optimized for Xbox Series X|S" to "Tối ưu hóa cho Xbox Series X|S",
+        "Vault Edition" to "Phiên bản Vault Edition",
+        "Standard Edition" to "Phiên bản Tiêu chuẩn (Standard Edition)",
+        "Cross-Gen Bundle" to "Gói Liên Thế Hệ (Cross-Gen Bundle)",
+        "Deluxe Edition" to "Phiên bản Cao cấp (Deluxe Edition)",
+        "Ultimate Edition" to "Phiên bản Tối thượng (Ultimate Edition)",
+        "Play Call of Duty: Modern Warfare 4 - Vault Edition" to "Chơi Call of Duty: Modern Warfare 4 - Vault Edition",
+        "Play NBA 2K27 (XBOX Series X|S)" to "Chơi NBA 2K27 (XBOX Series X|S)",
         "Xbox Game Pass" to "Xbox Game Pass",
         "All games" to "Tất cả trò chơi",
         "All Games" to "Tất cả trò chơi",
@@ -83,6 +99,7 @@ object XboxTranslator {
         "Play with touch" to "Chơi bằng cảm ứng",
         "Touch games" to "Game hỗ trợ cảm ứng",
         "Play with Game Pass" to "Chơi cùng Game Pass",
+        "Play with Cloud Gaming" to "Chơi trên đám mây (Cloud Gaming)",
         "Included with Game Pass" to "Bao gồm trong Game Pass",
         "Get Game Pass" to "Đăng ký Game Pass",
         "Join Game Pass" to "Tham gia Game Pass",
@@ -344,9 +361,10 @@ object XboxTranslator {
         "Street Fighter", "Dead Cells", "Hades", "Hollow Knight", "Overcooked",
         "It Takes Two", "ARK", "Rust", "No Man's Sky", "Cities: Skylines",
         "Microsoft Flight Simulator", "Battlefield", "Need for Speed", "FIFA", "EA Sports FC",
-        "NBA 2K", "PUBG", "Apex Legends", "Roblox", "Grand Theft Auto", "GTA",
+        "NBA 2K27 (XBOX Series X|S)", "NBA 2K27", "NBA 2K26", "NBA 2K25", "NBA 2K", "PUBG", "Apex Legends", "Roblox", "Grand Theft Auto", "GTA",
         "Cyberpunk 2077", "Elden Ring", "Hi-Fi RUSH", "Remnant", "Valheim",
-        "Call of Duty", "Modern Warfare", "Warzone", "Black Ops",
+        "Call of Duty: Modern Warfare 4 - Vault Edition", "Call of Duty: Modern Warfare 4", "Modern Warfare 4",
+        "Call of Duty", "Modern Warfare", "Warzone", "Black Ops", "Xbox Series X|S", "XBOX Series X|S",
         "Resident Evil", "Silent Hill", "Deathloop", "Control", "Alan Wake",
         "Dishonored", "Wolfenstein", "Prey", "The Evil Within", "Quake",
         "Senua's Saga: Hellblade", "Hellblade", "Avowed", "Fable", "Outer Worlds",
@@ -355,6 +373,24 @@ object XboxTranslator {
         "Psychonauts", "Ori and the Blind Forest", "Ori and the Will of the Wisps",
         "Slay the Spire", "Dead by Daylight", "Deep Rock Galactic", "Terraria"
     )
+
+    /**
+     * Returns the built-in static dictionary for any of the 12 supported languages
+     * (vi, en, zh, ja, ko, es, pt, fr, de, ru, th, id).
+     */
+    fun getDictionaryForLanguage(targetLanguage: String): Map<String, String> {
+        val norm = targetLanguage.trim().lowercase()
+        return if (norm == "vi" || norm.startsWith("vi-")) {
+            val merged = LinkedHashMap<String, String>(XBOX_UI_DICTIONARY_EN.size + XBOX_UI_DICTIONARY_JP.size + XBOX_UI_DICTIONARY_KR.size)
+            merged.putAll(XBOX_UI_DICTIONARY_EN)
+            merged.putAll(XBOX_UI_DICTIONARY_JP)
+            merged.putAll(XBOX_UI_DICTIONARY_KR)
+            merged.putAll(dynamicGithubDictionary)
+            merged
+        } else {
+            com.example.data.AppUiTranslator.getXboxDictForLanguage(norm)
+        }
+    }
 
     // Dynamic cache for community GitHub updates
     private val dynamicGithubDictionary = mutableMapOf<String, String>()
@@ -462,8 +498,14 @@ object XboxTranslator {
             XBOX_UI_DICTIONARY_KR.forEach { (k, v) -> mergedDict[k] = v }
             dynamicGithubDictionary.forEach { (k, v) -> mergedDict[k] = v }
         }
+        val multiLangDict = if (isVietnameseTarget) {
+            emptyMap()
+        } else {
+            com.example.data.AppUiTranslator.getXboxDictForLanguage(targetLanguage)
+        }
 
         val dictJson = mapToJsonString(mergedDict)
+        val multiLangDictJson = mapToJsonString(multiLangDict)
         val protectedTitlesJson = listToJsonString(PROTECTED_GAME_TITLES)
 
         return """
@@ -490,6 +532,7 @@ object XboxTranslator {
                 let translatedCount = 0;
 
                 const RAW_DICT = $dictJson;
+                const MULTI_LANG_DICT = $multiLangDictJson;
                 const PROTECTED = new Set($protectedTitlesJson);
 
                 // Pre-index O(1) Fast Lookup Maps (Exact & Lowercase)
@@ -497,6 +540,11 @@ object XboxTranslator {
                 const LOWER_MAP = Object.create(null);
                 for (const key in RAW_DICT) {
                     const val = RAW_DICT[key];
+                    EXACT_MAP[key] = val;
+                    LOWER_MAP[key.toLowerCase()] = val;
+                }
+                for (const key in MULTI_LANG_DICT) {
+                    const val = MULTI_LANG_DICT[key];
                     EXACT_MAP[key] = val;
                     LOWER_MAP[key.toLowerCase()] = val;
                 }
@@ -539,18 +587,20 @@ object XboxTranslator {
                     return false;
                 }
 
-                // High-speed O(1) text translation (Static dictionary & regexes only when targetLanguage == 'vi')
+                // High-speed O(1) text translation (Static dictionary for all 12 languages + regexes for 'vi')
                 function translateString(text) {
-                    if (!isVietnameseTarget || !text || text.length < 2) return null;
+                    if (!text || text.length < 2) return null;
                     const trimmed = text.trim();
 
-                    // O(1) Exact Match
+                    // O(1) Exact Match across all supported languages
                     const exact = EXACT_MAP[trimmed];
                     if (exact) return text.replace(trimmed, exact);
 
-                    // O(1) Lowercase Match
+                    // O(1) Lowercase Match across all supported languages
                     const lowerMatch = LOWER_MAP[trimmed.toLowerCase()];
                     if (lowerMatch) return text.replace(trimmed, lowerMatch);
+
+                    if (!isVietnameseTarget) return null;
 
                     // Regex Replacements for dynamic counts/times
                     let s = text;

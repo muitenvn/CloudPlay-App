@@ -882,6 +882,54 @@ class ExampleRobolectricTest {
         assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry("FR"))
         assertEquals("", com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(""))
     }
+
+    @Test
+    fun `test 21 60 verified servers above 250Mbps and 12-language UI and dictionary support with Settings staying Vietnamese`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        SettingsRepository.init(context)
+
+        // 1. Kiểm tra 60 máy chủ VPN đạt chuẩn tốc độ > 250 Mbps, đã xác thực (isVerified = true) và đúng mã vùng GeoIP
+        assertEquals(60, com.example.vpn.DEFAULT_SERVERS.size)
+        com.example.vpn.DEFAULT_SERVERS.forEach { server ->
+            assertTrue("Server ${server.id} speedMbps must be > 250", server.speedMbps > 250)
+            assertTrue("Server ${server.id} must be verified", server.isVerified)
+            assertEquals(
+                "Server ${server.id} GeoIP seed must match countryCode",
+                server.countryCode,
+                com.example.vpn.GeoIpDetector.resolveIpCountryCode(server.ip, allowNetworkFallback = false)
+            )
+        }
+
+        // 2. Khi chọn Tiếng Trung (zh), giao diện app dịch sang Tiếng Trung nhưng mục Cài đặt vẫn giữ Tiếng Việt (isSettingsEnglishUI == false)
+        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.CHINESE)
+        val zhConfig = SettingsRepository.config.value
+        assertEquals("zh", zhConfig.appLanguage.effectiveLanguageCode())
+        org.junit.Assert.assertFalse(zhConfig.isSettingsEnglishUI())
+        assertEquals("直连网络", zhConfig.tr("Mạng trực tiếp", "Direct Net"))
+        assertEquals("快速恢复 (Quick Resume)", zhConfig.tr("CHƠI TIẾP NGAY", "QUICK RESUME"))
+        assertEquals("全部类型", zhConfig.tr("Mọi thể loại", "All Genres"))
+        assertEquals("延迟测速", zhConfig.tr("Đo ping", "Ping Test"))
+
+        // 3. Khi chọn Tiếng Anh (en), mục Cài đặt chuyển sang Tiếng Anh (isSettingsEnglishUI == true)
+        SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.ENGLISH)
+        assertTrue(SettingsRepository.config.value.isSettingsEnglishUI())
+
+        // 4. Kiểm tra từ điển tích hợp cho đủ 12 ngôn ngữ và từ điển Tiếng Việt / Tiếng Anh nâng cấp từ bản HTML
+        val allLangCodes = listOf("vi", "en", "zh", "ja", "ko", "es", "pt", "fr", "de", "ru", "th", "id")
+        allLangCodes.forEach { code ->
+            val dict = com.example.cloudplay.XboxTranslator.getDictionaryForLanguage(code)
+            assertTrue("Dictionary for $code must not be empty", dict.isNotEmpty())
+            assertTrue("Dictionary for $code must contain 'Cloud Gaming'", dict.containsKey("Cloud Gaming"))
+        }
+        assertEquals(
+            "Chơi game trên mây Xbox tại Xbox.com",
+            com.example.cloudplay.XboxTranslator.XBOX_UI_DICTIONARY_EN["Xbox Cloud Gaming on Xbox.com"]
+        )
+        assertTrue(
+            com.example.cloudplay.XboxTranslator.PROTECTED_GAME_TITLES.contains("Call of Duty: Modern Warfare 4 - Vault Edition")
+        )
+        assertTrue(
+            com.example.cloudplay.XboxTranslator.PROTECTED_GAME_TITLES.contains("NBA 2K27 (XBOX Series X|S)")
+        )
+    }
 }
-
-

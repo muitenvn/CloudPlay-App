@@ -230,15 +230,16 @@ object GoogleGamingTranslator {
             return@withContext if (bilingual && cached != trimmed) "$cached ($trimmed)" else cached
         }
 
-        // Fast-path: Check local Vietnamese dictionary only when target language is Vietnamese
-        if (targetLang.startsWith("vi", ignoreCase = true)) {
-            val dictMatch = XboxTranslator.XBOX_UI_DICTIONARY_EN[trimmed]
-                ?: XboxTranslator.XBOX_UI_DICTIONARY_EN.entries.firstOrNull {
+        // Fast-path: Check built-in local dictionary for all 12 supported languages (vi, en, zh, ja, ko, es, pt, fr, de, ru, th, id)
+        val localDict = XboxTranslator.getDictionaryForLanguage(targetLang)
+        if (localDict.isNotEmpty()) {
+            val dictMatch = localDict[trimmed]
+                ?: localDict.entries.firstOrNull {
                     it.key.equals(trimmed, ignoreCase = true)
                 }?.value
             if (dictMatch != null) {
                 putCachedTranslation(cacheKey, dictMatch)
-                return@withContext if (bilingual) "$dictMatch ($trimmed)" else dictMatch
+                return@withContext if (bilingual && dictMatch != trimmed) "$dictMatch ($trimmed)" else dictMatch
             }
         }
 

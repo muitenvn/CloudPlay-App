@@ -428,7 +428,7 @@ fun DashboardScreen(
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Translate,
-                                                contentDescription = if (isEnUi) "Auto Translate" else "Dịch tự động",
+                                                contentDescription = config.tr("Dịch tự động", "Auto Translate"),
                                                 tint = XboxNeonGreen,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -456,7 +456,7 @@ fun DashboardScreen(
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = Icons.Default.MoreVert,
-                                                    contentDescription = if (isEnUi) "More options" else "Thêm tùy chọn",
+                                                    contentDescription = config.tr("Thêm tùy chọn", "More options"),
                                                     tint = TextPrimary,
                                                     modifier = Modifier.size(18.dp)
                                                 )
@@ -474,7 +474,7 @@ fun DashboardScreen(
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    text = if (isEnUi) "Share & QR Code" else "Mã QR & Chia sẻ",
+                                                    text = config.tr("Mã QR & Chia sẻ", "Share & QR Code"),
                                                     color = TextPrimary,
                                                     fontFamily = SpaceGroteskFontFamily,
                                                     fontSize = 13.sp,
@@ -536,6 +536,7 @@ fun DashboardScreen(
                 currentTab = currentTab,
                 gamesCount = allGames.size,
                 isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED,
+                settingsTabLabel = if (config.isSettingsEnglishUI()) "Settings" else "Cài đặt",
                 motionEnabled = motionEnabled,
                 onSelectTab = { currentTab = it }
             )
@@ -604,7 +605,7 @@ fun DashboardScreen(
                             onClearCookies = {
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 android.webkit.WebStorage.getInstance().deleteAllData()
-                                val msg = if (config.isEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
+                                val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
                                 android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                             }
                         )
@@ -759,6 +760,7 @@ private fun ConsoleFloatingNavigationDock(
     currentTab: DashboardTab,
     gamesCount: Int,
     isVpnActive: Boolean,
+    settingsTabLabel: String = "Cài đặt",
     motionEnabled: Boolean = true,
     onSelectTab: (DashboardTab) -> Unit
 ) {
@@ -766,7 +768,7 @@ private fun ConsoleFloatingNavigationDock(
         Triple(DashboardTab.HOME, Icons.Default.Home, stringResource(R.string.tab_home)),
         Triple(DashboardTab.LIBRARY, Icons.Default.SportsEsports, stringResource(R.string.tab_library)),
         Triple(DashboardTab.SERVERS, Icons.Default.Speed, stringResource(R.string.tab_servers)),
-        Triple(DashboardTab.SETTINGS, Icons.Default.Tune, stringResource(R.string.tab_settings))
+        Triple(DashboardTab.SETTINGS, Icons.Default.Tune, settingsTabLabel)
     )
 
     val dockBorderBrush = remember {

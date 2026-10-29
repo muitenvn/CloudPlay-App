@@ -208,7 +208,7 @@ fun GameLibraryScreen(
                     ) {
                         val sections = listOf(
                             GameTabSection.LIBRARY to "${stringResource(R.string.tab_library)} (${games.size})",
-                            GameTabSection.HISTORY to (if (isEn) "History" else "Lịch sử")
+                            GameTabSection.HISTORY to config.tr("Lịch sử", "History")
                         )
                         sections.forEach { (section, label) ->
                             val isSelected = activeSection == section
@@ -272,7 +272,7 @@ fun GameLibraryScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Sync,
-                                contentDescription = if (isEn) "Refresh Catalog" else "Làm mới danh sách",
+                                contentDescription = config.tr("Làm mới", "Refresh"),
                                 tint = DirectCyan,
                                 modifier = Modifier.size(14.dp)
                             )
@@ -280,7 +280,7 @@ fun GameLibraryScreen(
                                 text = if (isSyncingCatalog) {
                                     "..."
                                 } else {
-                                    if (isEn) "Refresh" else "Làm mới"
+                                    config.tr("Làm mới", "Refresh")
                                 },
                                 color = DirectCyan,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -376,9 +376,9 @@ fun GameLibraryScreen(
                 // 2. Category Tabs Carousel
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
-                    GameFilterTab.FAVORITES to (if (isEn) "❤️ Favorites ($favCount)" else "❤️ Yêu thích ($favCount)"),
-                    GameFilterTab.POPULAR to (if (isEn) "🔥 Xbox Popular ($popCount)" else "🔥 Phổ biến Xbox ($popCount)"),
-                    GameFilterTab.RECENTLY_ADDED to (if (isEn) "🆕 New on Cloud ($recentCount)" else "🆕 Mới lên kệ ($recentCount)"),
+                    GameFilterTab.FAVORITES to "❤️ ${config.tr("Yêu thích", "Favorites")} ($favCount)",
+                    GameFilterTab.POPULAR to "🔥 ${config.tr("Phổ biến Xbox", "Xbox Popular")} ($popCount)",
+                    GameFilterTab.RECENTLY_ADDED to "🆕 ${config.tr("Mới lên kệ", "New on Cloud")} ($recentCount)",
                     GameFilterTab.FREE_TO_PLAY to "⚡ ${stringResource(R.string.filter_free)} ($freeCount)",
                     GameFilterTab.TOUCH_FRIENDLY to "👆 ${stringResource(R.string.filter_touch)} ($touchCount)",
                     GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
@@ -425,12 +425,12 @@ fun GameLibraryScreen(
 
                 // 3. Quick Genre Chips + Live Result Counter
                 val genreOptions = listOf(
-                    "ALL" to (if (isEn) "All Genres" else "Mọi thể loại"),
-                    "SHOOTER" to (if (isEn) "Shooter / FPS" else "Bắn súng"),
-                    "ACTION" to (if (isEn) "Action & Adv" else "Hành động"),
-                    "RACING" to (if (isEn) "Racing & Sim" else "Đua xe / Lái"),
-                    "RPG" to (if (isEn) "RPG & Survival" else "Nhập vai / Sinh tồn"),
-                    "SPORTS" to (if (isEn) "Sports & Fight" else "Thể thao / Đối kháng")
+                    "ALL" to config.tr("Mọi thể loại", "All Genres"),
+                    "SHOOTER" to config.tr("Bắn súng", "Shooter / FPS"),
+                    "ACTION" to config.tr("Hành động", "Action & Adv"),
+                    "RACING" to config.tr("Đua xe / Lái", "Racing & Sim"),
+                    "RPG" to config.tr("Nhập vai / Sinh tồn", "RPG & Survival"),
+                    "SPORTS" to config.tr("Thể thao / Đối kháng", "Sports & Fight")
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -481,7 +481,7 @@ fun GameLibraryScreen(
 
                     Text(
                         text = if (isSyncingCatalog) {
-                            if (isEn) "Syncing..." else "Đang tải..."
+                            config.tr("Đang tải...", "Syncing...")
                         } else {
                             if (isEn) "${filteredGames.size} games" else "${filteredGames.size} game"
                         },
@@ -565,14 +565,11 @@ fun GameLibraryScreen(
                             )
                             Text(
                                 text = if (isSyncingCatalog && games.isEmpty()) {
-                                    if (isEn) "Loading games from Xbox Cloud..."
-                                    else "Đang tải danh sách game..."
+                                    config.tr("Đang tải danh sách game...", "Loading games from Xbox Cloud...")
                                 } else if (games.isEmpty()) {
-                                    if (isEn) "No games yet"
-                                    else "Chưa có game"
+                                    config.tr("Chưa có game", "No games yet")
                                 } else {
-                                    if (isEn) "No matching games found"
-                                    else "Chưa có game phù hợp"
+                                    config.tr("Chưa có game phù hợp", "No matching games found")
                                 },
                                 color = if (isSyncingCatalog && games.isEmpty()) DirectCyan else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -1188,7 +1185,7 @@ private fun XboxGameDetailDialog(
                 Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = if (isEn) "Play on Xbox Cloud" else "Chơi trên Xbox Cloud",
+                    text = config.tr("Chơi trên Xbox Cloud", "Play on Xbox Cloud"),
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -1199,15 +1196,15 @@ private fun XboxGameDetailDialog(
                 TextButton(onClick = onToggleFavorite) {
                     Text(
                         text = if (isFavorite) {
-                            if (isEn) "♥ Saved" else "♥ Đã thích"
+                            config.tr("♥ Đã thích", "♥ Saved")
                         } else {
-                            if (isEn) "♡ Favorite" else "♡ Yêu thích"
+                            config.tr("♡ Yêu thích", "♡ Favorite")
                         },
                         color = if (isFavorite) JapanRed else XboxNeonGreen
                     )
                 }
                 TextButton(onClick = onDismiss) {
-                    Text(if (isEn) "Close" else "Đóng", color = TextSecondary)
+                    Text(config.tr("Đóng", "Close"), color = TextSecondary)
                 }
             }
         },

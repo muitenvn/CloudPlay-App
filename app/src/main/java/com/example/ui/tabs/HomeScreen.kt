@@ -393,9 +393,9 @@ private fun HeroConsolePlayDeck(
                                 )
                                 Text(
                                     text = when (vpnState.mode) {
-                                        NetworkMode.DIRECT_NETWORK -> if (isEn) "Direct Net" else "Mạng trực tiếp"
-                                        NetworkMode.VPN_JAPAN -> if (isEn) "Unlocked ${vpnState.currentServer.flag}" else "Mở vùng ${vpnState.currentServer.flag}"
-                                        NetworkMode.DISCONNECTED -> if (isEn) "Auto VPN" else "Tự tắt VPN"
+                                        NetworkMode.DIRECT_NETWORK -> config.tr("Mạng trực tiếp", "Direct Net")
+                                        NetworkMode.VPN_JAPAN -> "${config.tr("Mở vùng", "Unlocked")} ${vpnState.currentServer.flag}"
+                                        NetworkMode.DISCONNECTED -> config.tr("Tự tắt VPN", "Auto VPN")
                                     },
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
@@ -415,11 +415,7 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Text(
-                                text = if (isEn) {
-                                    "⚡ 4G/5G & Wi-Fi Low Lag"
-                                } else {
-                                    "⚡ Giảm trễ 4G/5G & Wi-Fi"
-                                },
+                                text = config.tr("⚡ Giảm trễ 4G/5G & Wi-Fi", "⚡ 4G/5G & Wi-Fi Low Lag"),
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.sp,
@@ -504,7 +500,7 @@ private fun HeroConsolePlayDeck(
                                 maxLines = 1
                             )
                             Text(
-                                text = if (isEn) "Full HD • Smooth 60FPS" else "Full HD • Mượt 60FPS",
+                                text = config.tr("Full HD • Mượt 60FPS", "Full HD • Smooth 60FPS"),
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.5.sp,
@@ -544,7 +540,7 @@ private fun HeroConsolePlayDeck(
                                 maxLines = 1
                             )
                             Text(
-                                text = if (isEn) "Free • Instant Play" else "Miễn phí • Vào ngay",
+                                text = config.tr("Miễn phí • Vào ngay", "Free • Instant Play"),
                                 color = GoldStar.copy(alpha = 0.95f),
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.5.sp,
@@ -670,17 +666,9 @@ private fun QuickNetworkCockpitCard(
                     )
                     Text(
                         text = when {
-                            isStreaming -> if (isEn) "WebRTC RTT • Tap to switch" else "RTT WebRTC • Chạm để đổi"
-                            lastSessionPing != null -> if (isEn) {
-                                "Last session ping: $lastSessionPing ms"
-                            } else {
-                                "Ping lần chơi gần nhất: $lastSessionPing ms"
-                            }
-                            else -> if (isEn) {
-                                "Last session ping: --"
-                            } else {
-                                "Ping lần chơi gần nhất: --"
-                            }
+                            isStreaming -> config.tr("RTT WebRTC • Chạm để đổi", "WebRTC RTT • Tap to switch")
+                            lastSessionPing != null -> "${config.tr("Ping lần chơi gần nhất", "Last session ping")}: $lastSessionPing ms"
+                            else -> "${config.tr("Ping lần chơi gần nhất", "Last session ping")}: --"
                         },
                         color = TextSecondary,
                         fontSize = 9.5.sp,
@@ -905,14 +893,14 @@ private fun FeaturedGamesSection(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = if (isEn) "QUICK RESUME" else "CHƠI TIẾP NGAY",
+                                    text = config.tr("CHƠI TIẾP NGAY", "QUICK RESUME"),
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Text(
-                                    text = if (isEn) "• 60FPS STREAM" else "• STREAM 60FPS",
+                                    text = config.tr("• STREAM 60FPS", "• 60FPS STREAM"),
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.5.sp,
@@ -1022,9 +1010,9 @@ private fun FeaturedGamesSection(
                     )
                     Text(
                         text = if (isSyncing) {
-                            if (isEn) "Loading games..." else "Đang tải game..."
+                            config.tr("Đang tải game...", "Loading games...")
                         } else {
-                            if (isEn) "No games yet" else "Chưa có game"
+                            config.tr("Chưa có game", "No games yet")
                         },
                         color = TextSecondary,
                         fontFamily = SpaceGroteskFontFamily,

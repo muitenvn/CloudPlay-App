@@ -111,7 +111,7 @@ fun SettingsScreen(
 
     val context = LocalContext.current
     val resolvedSystemLocale = remember { SettingsRepository.resolveSystemXboxLocale() }
-    val isEn = config.isEnglishUI()
+    val isEn = config.isSettingsEnglishUI()
 
     LazyColumn(
         modifier = modifier

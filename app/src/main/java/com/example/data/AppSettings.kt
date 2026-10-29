@@ -681,6 +681,27 @@ data class AppConfig(
         return appLanguage.effectiveLanguageCode() != "vi"
     }
 
+    /**
+     * Dùng riêng cho màn hình Cài đặt (`SettingsScreen`):
+     * Khi người dùng chọn Tiếng Trung (`zh`) hoặc các ngôn ngữ quốc tế khác (`ja`, `ko`, `es`, ...),
+     * toàn bộ app chuyển sang ngôn ngữ đó TRỪ phần Cài đặt vẫn giữ Tiếng Việt (chỉ hiện Tiếng Anh khi chọn đúng English),
+     * giúp người dùng luôn đọc và điều chỉnh lại cài đặt dễ dàng.
+     */
+    fun isSettingsEnglishUI(): Boolean {
+        return when (appLanguage) {
+            AppLanguage.ENGLISH -> true
+            AppLanguage.SYSTEM -> !Locale.getDefault().language.lowercase(Locale.ROOT).startsWith("vi")
+            else -> false
+        }
+    }
+
+    /**
+     * Dịch nhanh chuỗi giao diện ứng dụng (ngoài màn hình Cài đặt) sang bất kỳ ngôn ngữ nào trong 12 ngôn ngữ.
+     */
+    fun tr(vi: String, en: String): String {
+        return AppUiTranslator.translateUi(vi = vi, en = en, rawLangCode = appLanguage.effectiveLanguageCode())
+    }
+
     fun isVietnameseUI(): Boolean {
         return appLanguage.effectiveLanguageCode() == "vi"
     }

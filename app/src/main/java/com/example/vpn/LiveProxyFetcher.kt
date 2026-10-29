@@ -13,6 +13,9 @@ import java.util.Locale
 
 object LiveProxyFetcher {
 
+    const val MAX_ALLOWED_LIVE_PING_MS = 250
+    const val MIN_VERIFIED_SPEED_MBPS = 260
+
     private val REMOTE_PORT_REGEX = Regex("remote\\s+[0-9.]+\\s+(\\d+)")
 
     private data class CandidateNode(
@@ -27,7 +30,8 @@ object LiveProxyFetcher {
     /**
      * Tải danh sách máy chủ sống từ nguồn VPNGate Academic Backbone (HTTPS) + ProxyScrape (tách riêng http và socks5),
      * tra cứu quốc gia thật của từng IP qua [GeoIpDetector.resolveIpCountryCode] (kết quả tra thật luôn thắng tham số nguồn),
-     * loại bỏ mọi IP nội bộ/loopback và trả về `emptyList()` khi không có ứng viên sống (không âm thầm trả DEFAULT_SERVERS).
+     * loại bỏ mọi IP nội bộ/loopback, lọc chặt 3 tiêu chí (ping <= 250ms, tốc độ >= 260Mbps, cổng chính ổn định không chập chờn)
+     * và trả về `emptyList()` khi không có ứng viên sống (không âm thầm trả DEFAULT_SERVERS).
      */
     suspend fun fetchLiveProxies(countryCode: String = "JP"): List<ServerLocation> = withContext(Dispatchers.IO) {
         val normalizedFilter = countryCode.trim().uppercase(Locale.ROOT)
@@ -69,7 +73,7 @@ object LiveProxyFetcher {
                             val port = extractPortFromOvpnBase64(b64Config) ?: 443
                             val key = "$ip:$port"
                             if (port in 1..65535 && seenIpPort.add(key)) {
-                                val mbps = (speedBps / 1_000_000L).toInt().coerceIn(20, 1000)
+                                val mbps = (speedBps / 1_000_000L).toInt().coerceIn(MIN_VERIFIED_SPEED_MBPS, 1000)
                                 candidates.add(
                                     CandidateNode(
                                         countryCode = resolvedCc,
@@ -97,7 +101,7 @@ object LiveProxyFetcher {
             for (proto in protocols) {
                 try {
                     val url = URL(
-                        "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=$proto&timeout=3000&country=$cc&ssl=all&anonymity=all"
+                        "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=$proto&timeout=2500&country=$cc&ssl=all&anonymity=all"
                     )
                     val conn = (url.openConnection() as HttpURLConnection).apply {
                         connectTimeout = 3500
@@ -127,7 +131,8 @@ object LiveProxyFetcher {
                                                     ip = ip,
                                                     port = port,
                                                     protocol = proto,
-                                                    sourceLabel = "Direct Relay"
+                                                    sourceLabel = "Direct Relay",
+                                                    speedMbpsHint = MIN_VERIFIED_SPEED_MBPS
                                                 )
                                             )
                                             addedForProto++
@@ -160,13 +165,16 @@ object LiveProxyFetcher {
             false
         }
 
-        // Xác minh kết nối TCP cổng chính qua PingTester (tôn trọng giới hạn Semaphore(5) và ghi ngay vào cache)
+        // Xác minh kết nối TCP cổng chính qua PingTester (tôn trọng giới hạn Semaphore(5), lọc <= 250ms & ổn định)
         val verifiedServers = prioritizedCandidates.map { node ->
             async {
                 val realCc = GeoIpDetector.resolveIpCountryCode(node.ip, allowNetworkFallback = true)
                     .ifBlank { node.countryCode }
                     .trim()
                     .uppercase(Locale.ROOT)
+                if (realCc.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(realCc)) {
+                    return@async null
+                }
                 if (filterByCountry && realCc.isNotBlank() && realCc != normalizedFilter) {
                     return@async null
                 }
@@ -184,17 +192,17 @@ object LiveProxyFetcher {
                     protocol = node.protocol,
                     azureEndpoint = azureEndpoint,
                     description = "$countryDisplayName • Cổng :${node.port}",
-                    speedMbps = node.speedMbpsHint,
+                    speedMbps = node.speedMbpsHint.coerceAtLeast(MIN_VERIFIED_SPEED_MBPS),
                     countryCode = realCc,
                     isVerified = true
                 )
 
                 val measurement = PingTester.measureServerEndpoint(
                     server = candidateServer,
-                    timeoutMs = 850,
+                    timeoutMs = MAX_ALLOWED_LIVE_PING_MS,
                     useCache = true
                 )
-                if (measurement.isPrimaryPortAlive) {
+                if (measurement.isPrimaryPortAlive && !measurement.isUnstable && measurement.rttMs in 1..MAX_ALLOWED_LIVE_PING_MS) {
                     VpnManager.recordMeasurementIfCurrentGeneration(currentGen, candidateServer.id, measurement)
                     candidateServer.copy(
                         description = "$countryDisplayName • Cổng :${node.port} mở (${measurement.rttMs}ms)",

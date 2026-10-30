@@ -141,7 +141,6 @@ fun ServersScreen(
     val serverPings = vpnState.serverPings
     val serverMeasurements = vpnState.serverMeasurements
     val isTestingAll = vpnState.isTestingPings
-    val isAutoSyncingLive = vpnState.isAutoSyncingLiveProxies
     val recentSessions by com.example.data.SessionHistoryRepository.sessions.collectAsState()
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
@@ -708,79 +707,6 @@ fun ServersScreen(
                         }
                     }
 
-                    // Automatic VPN Safety, Error Filter & Reputation Status Banner
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("auto_vpn_sync_status_bar"),
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF0A1611),
-                        border = androidx.compose.foundation.BorderStroke(
-                            0.8.dp,
-                            if (isAutoSyncingLive) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.4f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 11.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (isAutoSyncingLive) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(13.dp),
-                                    color = DirectCyan,
-                                    strokeWidth = 1.8.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = XboxNeonGreen,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-
-                            val autoSyncStatusText = if (isAutoSyncingLive) {
-                                config.tr(
-                                    "Đang tự động cập nhật, phân loại & lọc lỗi VPN an toàn, uy tín...",
-                                    "Auto-updating, classifying & filtering safe, reputable VPNs..."
-                                )
-                            } else {
-                                val liveCount = vpnState.liveVerifiedServers.size
-                                val filteredCount = vpnState.autoFilteredOutErrorCount
-                                val baseText = config.tr(
-                                    "🛡️ Tự động cập nhật & lọc lỗi VPN: ${allServers.size} máy chủ an toàn, uy tín",
-                                    "🛡️ Auto-updated & error-filtered: ${allServers.size} safe, trusted servers"
-                                )
-                                val extraText = when {
-                                    liveCount > 0 && filteredCount > 0 -> config.tr(
-                                        " (+$liveCount mới • Đã loại $filteredCount lỗi)",
-                                        " (+$liveCount new • $filteredCount errors filtered)"
-                                    )
-                                    filteredCount > 0 -> config.tr(
-                                        " (Đã tự loại $filteredCount node lỗi/kém an toàn)",
-                                        " ($filteredCount faulty/unsafe nodes filtered)"
-                                    )
-                                    else -> ""
-                                }
-                                baseText + extraText
-                            }
-
-                            Text(
-                                text = autoSyncStatusText,
-                                color = if (isAutoSyncingLive) DirectCyan else TextPrimary,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
                     // Action buttons row: Đo ping + Thêm (không cần nút Cập nhật thủ công)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1177,23 +1103,6 @@ private fun ServerCard(
                                 maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
                             )
-                        }
-                        if (server.isVerified && unlockStatus != RegionUnlockStatus.FAILED && unlockStatus != RegionUnlockStatus.WRONG_REGION) {
-                            Surface(
-                                shape = RoundedCornerShape(5.dp),
-                                color = Color(0xFF0E2218),
-                                border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.4f))
-                            ) {
-                                Text(
-                                    text = "🛡️ ${server.localizedSafetyBadge(isEn)}",
-                                    color = XboxNeonGreen,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
-                                )
-                            }
                         }
                     }
 

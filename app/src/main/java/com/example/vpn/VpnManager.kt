@@ -30,6 +30,8 @@ object VpnManager {
     private var batchPingJob: Job? = null
     private var lazyPingJob: Job? = null
     private var ipCheckJob: Job? = null
+    private var autoSyncLiveJob: Job? = null
+    private const val AUTO_SYNC_LIVE_INTERVAL_MS = 10L * 60L * 1000L
     private val proxyExecutor = Executors.newSingleThreadExecutor()
     private var appContext: Context? = null
 
@@ -89,6 +91,83 @@ object VpnManager {
         loadPersistedUnlockRecords(context.applicationContext)
         if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
             testAllServers(autoPickBest = false, context = context.applicationContext, forceRefresh = false)
+        }
+        autoSyncTrustedProxiesIfNeeded(context = context.applicationContext, force = false)
+    }
+
+    /**
+     * Tự động cập nhật, lọc lỗi, kiểm tra độ an toàn & phân loại độ uy tín của các máy chủ VPN/Proxy
+     * hoàn toàn tự động trong nền mà không cần người dùng bấm nút Cập nhật thủ công.
+     */
+    fun autoSyncTrustedProxiesIfNeeded(
+        context: Context? = null,
+        countryFilter: String = "ALL",
+        force: Boolean = false
+    ) {
+        val now = System.currentTimeMillis()
+        val currentState = _state.value
+        if (currentState.isAutoSyncingLiveProxies) return
+        if (!force && currentState.lastAutoSyncTimestampMs > 0L &&
+            (now - currentState.lastAutoSyncTimestampMs) < AUTO_SYNC_LIVE_INTERVAL_MS
+        ) {
+            return
+        }
+
+        autoSyncLiveJob?.cancel()
+        _state.value = _state.value.copy(isAutoSyncingLiveProxies = true)
+
+        autoSyncLiveJob = scope.launch(Dispatchers.IO) {
+            try {
+                val syncResult = LiveProxyFetcher.fetchAndClassifyTrustedProxies(countryFilter)
+                val staticAndCustomKeys = (_state.value.customServers + DEFAULT_SERVERS)
+                    .map { it.addressPortKey.lowercase() }
+                    .toSet()
+                val records = _state.value.unlockRecords
+                val measurements = _state.value.serverMeasurements
+
+                // Giữ lại các máy chủ động cũ vẫn đang sống cổng chính & hợp lệ, loại bỏ tự động các máy chủ lỗi/sai vùng/chết cổng
+                val healthyExistingLive = _state.value.liveVerifiedServers.filter { srv ->
+                    val unlockSt = getServerUnlockStatus(srv, records)
+                    val meas = measurements[srv.id]
+                    val isDead = meas?.status == ServerPingStatus.UNREACHABLE || meas?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY
+                    unlockSt != RegionUnlockStatus.FAILED &&
+                        unlockSt != RegionUnlockStatus.WRONG_REGION &&
+                        !isDead
+                }
+
+                val mergedLive = (syncResult.verifiedServers + healthyExistingLive)
+                    .filter { it.addressPortKey.lowercase() !in staticAndCustomKeys }
+                    .distinctBy { it.addressPortKey.lowercase() }
+                    .sortedWith(
+                        compareByDescending<ServerLocation> { it.trustScore }
+                            .thenBy { it.lastPingMs ?: Int.MAX_VALUE }
+                    )
+
+                if (mergedLive.isNotEmpty()) {
+                    preCheckProxiesBatch(mergedLive)
+                }
+
+                val totalFilteredErrors = _state.value.autoFilteredOutErrorCount + syncResult.filteredOutErrorCount
+                _state.value = _state.value.copy(
+                    liveVerifiedServers = mergedLive,
+                    isAutoSyncingLiveProxies = false,
+                    lastAutoSyncTimestampMs = System.currentTimeMillis(),
+                    autoFilteredOutErrorCount = totalFilteredErrors
+                )
+
+                if (syncResult.verifiedServers.isNotEmpty()) {
+                    com.example.data.AppLogger.success(
+                        "VPN_AUTO",
+                        "Tự động thêm ${syncResult.verifiedServers.size} VPN an toàn/uy tín (đã lọc bỏ ${syncResult.filteredOutErrorCount} node lỗi/kém an toàn)"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "autoSyncTrustedProxiesIfNeeded failed", e)
+                _state.value = _state.value.copy(
+                    isAutoSyncingLiveProxies = false,
+                    lastAutoSyncTimestampMs = System.currentTimeMillis()
+                )
+            }
         }
     }
 
@@ -1594,7 +1673,8 @@ object VpnManager {
     }
 
     fun getAllServers(): List<ServerLocation> {
-        return _state.value.customServers + DEFAULT_SERVERS
+        return (_state.value.customServers + DEFAULT_SERVERS + _state.value.liveVerifiedServers)
+            .distinctBy { it.addressPortKey.lowercase() }
     }
 
     private fun ruleFor(server: ServerLocation): String {

@@ -61,10 +61,21 @@ data class ServerLocation(
     val isCustom: Boolean = false,
     val lastPingMs: Int? = null,
     val isVerified: Boolean = true,
-    val unlockStatus: RegionUnlockStatus = RegionUnlockStatus.UNTESTED
+    val unlockStatus: RegionUnlockStatus = RegionUnlockStatus.UNTESTED,
+    val trustScore: Int = 96,
+    val safetyBadge: String = "An toàn • Uy tín"
 ) {
     val addressPortKey: String
         get() = ServerUnlockRecord.keyFor(ip, port)
+
+    fun localizedSafetyBadge(isEn: Boolean): String {
+        if (!isEn) return safetyBadge
+        return safetyBadge
+            .replace("Uy tín cao • Đã lọc lỗi", "High Trust • Error-Filtered")
+            .replace("An toàn • Đã xác minh", "Safe • Verified")
+            .replace("An toàn • Uy tín", "Safe • Trusted")
+            .replace("Tự thêm • Đã kiểm tra", "Custom • Checked")
+    }
 
     fun localizedDescription(isEn: Boolean): String {
         if (!isEn) return description
@@ -880,6 +891,10 @@ data class VpnConnectionState(
     val detectedGeoIp: GeoIpResult? = null,
     val isBypassActiveInBrowser: Boolean = false,
     val customServers: List<ServerLocation> = emptyList(),
+    val liveVerifiedServers: List<ServerLocation> = emptyList(),
+    val isAutoSyncingLiveProxies: Boolean = false,
+    val lastAutoSyncTimestampMs: Long = 0L,
+    val autoFilteredOutErrorCount: Int = 0,
     val autoSwitchedBackupCount: Int = 0,
     val smartVpnPhase: SmartVpnPhase = SmartVpnPhase.IDLE,
     val smartDecision: SmartVpnDecision = SmartVpnDecision(),

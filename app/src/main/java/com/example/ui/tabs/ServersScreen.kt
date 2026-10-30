@@ -123,7 +123,6 @@ fun ServersScreen(
     val listState = rememberLazyListState()
 
     var selectedCategory by remember { mutableStateOf("ALL") }
-    var isFetchingLive by remember { mutableStateOf(false) }
     var showCustomDialog by remember { mutableStateOf(false) }
 
     val jpLabel = stringResource(R.string.cat_japan)
@@ -131,25 +130,28 @@ fun ServersScreen(
     val usLabel = stringResource(R.string.cat_usa)
     val allLabel = stringResource(R.string.filter_all)
 
-    val allServers = remember(vpnState.customServers) {
+    val allServers = remember(vpnState.customServers, vpnState.liveVerifiedServers) {
         mutableStateListOf<ServerLocation>().apply {
-            addAll(vpnState.customServers)
-            addAll(DEFAULT_SERVERS)
+            val combined = (vpnState.customServers + DEFAULT_SERVERS + vpnState.liveVerifiedServers)
+                .distinctBy { it.addressPortKey.lowercase() }
+            addAll(combined)
         }
     }
 
     val serverPings = vpnState.serverPings
     val serverMeasurements = vpnState.serverMeasurements
     val isTestingAll = vpnState.isTestingPings
+    val isAutoSyncingLive = vpnState.isAutoSyncingLiveProxies
     val recentSessions by com.example.data.SessionHistoryRepository.sessions.collectAsState()
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // A8: Chỉ đo bước 1 + 2 khi chưa có dữ liệu đo trong phiên; chuyển tab không đo lại.
+    // Tự động đo ping sơ bộ (bước 1 + 2) và tự động quét, lọc lỗi & phân loại VPN an toàn/uy tín trong nền
     LaunchedEffect(Unit) {
         if (serverPings.isEmpty() && !isTestingAll) {
             VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
+        VpnManager.autoSyncTrustedProxiesIfNeeded(context = context, countryFilter = "ALL", force = false)
     }
 
     // A4: Globalping tắt mặc định; khi bật trong Cài đặt thì hiển thị ước lượng từ trạm gần nhất cho máy chủ đang chọn
@@ -190,21 +192,6 @@ fun ServersScreen(
                 }
             }
         )
-    }
-
-    fun fetchFreshLiveProxies(country: String) {
-        isFetchingLive = true
-        scope.launch {
-            val live = LiveProxyFetcher.fetchLiveProxies(country)
-            VpnManager.preCheckProxiesBatch(live)
-            live.forEach { freshServer ->
-                if (allServers.none { it.id == freshServer.id }) {
-                    allServers.add(0, freshServer)
-                }
-            }
-            isFetchingLive = false
-            VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
-        }
     }
 
     val allServersSnapshot = allServers.toList()
@@ -721,10 +708,83 @@ fun ServersScreen(
                         }
                     }
 
-                    // Action buttons row: Đo ping + Cập nhật + Thêm (full readable labels on 360dp)
+                    // Automatic VPN Safety, Error Filter & Reputation Status Banner
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("auto_vpn_sync_status_bar"),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF0A1611),
+                        border = androidx.compose.foundation.BorderStroke(
+                            0.8.dp,
+                            if (isAutoSyncingLive) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.4f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 11.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isAutoSyncingLive) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(13.dp),
+                                    color = DirectCyan,
+                                    strokeWidth = 1.8.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = XboxNeonGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+
+                            val autoSyncStatusText = if (isAutoSyncingLive) {
+                                config.tr(
+                                    "Đang tự động cập nhật, phân loại & lọc lỗi VPN an toàn, uy tín...",
+                                    "Auto-updating, classifying & filtering safe, reputable VPNs..."
+                                )
+                            } else {
+                                val liveCount = vpnState.liveVerifiedServers.size
+                                val filteredCount = vpnState.autoFilteredOutErrorCount
+                                val baseText = config.tr(
+                                    "🛡️ Tự động cập nhật & lọc lỗi VPN: ${allServers.size} máy chủ an toàn, uy tín",
+                                    "🛡️ Auto-updated & error-filtered: ${allServers.size} safe, trusted servers"
+                                )
+                                val extraText = when {
+                                    liveCount > 0 && filteredCount > 0 -> config.tr(
+                                        " (+$liveCount mới • Đã loại $filteredCount lỗi)",
+                                        " (+$liveCount new • $filteredCount errors filtered)"
+                                    )
+                                    filteredCount > 0 -> config.tr(
+                                        " (Đã tự loại $filteredCount node lỗi/kém an toàn)",
+                                        " ($filteredCount faulty/unsafe nodes filtered)"
+                                    )
+                                    else -> ""
+                                }
+                                baseText + extraText
+                            }
+
+                            Text(
+                                text = autoSyncStatusText,
+                                color = if (isAutoSyncingLive) DirectCyan else TextPrimary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // Action buttons row: Đo ping + Thêm (không cần nút Cập nhật thủ công)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
                             onClick = { testAllServers(autoPickBest = false, forceRefresh = true) },
@@ -734,63 +794,27 @@ fun ServersScreen(
                                 .defaultMinSize(minHeight = 42.dp)
                                 .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                 .testTag("ping_test_all_button"),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                             shape = RoundedCornerShape(11.dp)
                         ) {
                             if (isTestingAll) {
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = config.tr("Đang đo ping", "Pinging..."),
+                                    text = config.tr("Đang đo ping...", "Pinging..."),
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1
                                 )
                             } else {
-                                Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = config.tr("Đo ping", "Ping Test"),
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = { fetchFreshLiveProxies(selectedCategory) },
-                            enabled = !isFetchingLive,
-                            modifier = Modifier
-                                .weight(1f)
-                                .defaultMinSize(minHeight = 42.dp)
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
-                            shape = RoundedCornerShape(11.dp)
-                        ) {
-                            if (isFetchingLive) {
-                                CircularProgressIndicator(modifier = Modifier.size(14.dp), color = DirectCyan, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = config.tr("Đang tải...", "Updating..."),
-                                    color = TextPrimary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1
-                                )
-                            } else {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = config.tr("Cập nhật", "Update"),
-                                    color = TextPrimary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1
                                 )
@@ -800,20 +824,20 @@ fun ServersScreen(
                         Button(
                             onClick = { showCustomDialog = true },
                             modifier = Modifier
-                                .weight(0.85f)
+                                .weight(1f)
                                 .defaultMinSize(minHeight = 42.dp)
                                 .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f),
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
                             shape = RoundedCornerShape(11.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = config.tr("Thêm", "Add"),
+                                text = config.tr("Thêm proxy riêng", "Add Custom"),
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
@@ -1153,6 +1177,23 @@ private fun ServerCard(
                                 maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
                             )
+                        }
+                        if (server.isVerified && unlockStatus != RegionUnlockStatus.FAILED && unlockStatus != RegionUnlockStatus.WRONG_REGION) {
+                            Surface(
+                                shape = RoundedCornerShape(5.dp),
+                                color = Color(0xFF0E2218),
+                                border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "🛡️ ${server.localizedSafetyBadge(isEn)}",
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                )
+                            }
                         }
                     }
 

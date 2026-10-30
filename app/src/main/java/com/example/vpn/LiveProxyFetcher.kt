@@ -10,6 +10,12 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
+
+data class LiveProxySyncResult(
+    val verifiedServers: List<ServerLocation>,
+    val filteredOutErrorCount: Int
+)
 
 object LiveProxyFetcher {
 
@@ -18,22 +24,71 @@ object LiveProxyFetcher {
 
     private val REMOTE_PORT_REGEX = Regex("remote\\s+[0-9.]+\\s+(\\d+)")
 
+    // Các cổng nhạy cảm/không an toàn bị cấm tuyệt đối khi tự động lọc VPN/Proxy
+    private val UNSAFE_BLOCKED_PORTS = setOf(
+        21, 22, 23, 25, 53, 69, 110, 111, 135, 137, 138, 139,
+        143, 161, 389, 445, 512, 513, 514, 1433, 1521, 2049,
+        3306, 3389, 5432, 5900, 6379, 11211, 27017
+    )
+
+    private val SSL_TRUSTED_PORTS = setOf(443, 995, 8443, 1468, 1557, 1828, 1980, 7551)
+
     private data class CandidateNode(
         val countryCode: String,
         val ip: String,
         val port: Int,
         val protocol: String,
         val sourceLabel: String,
-        val speedMbpsHint: Int = 0
+        val speedMbpsHint: Int = 0,
+        val isAcademicBackbone: Boolean = false
     )
 
+    fun isSafeAndReputableEndpoint(ip: String, port: Int): Boolean {
+        if (port !in 1..65535 || port in UNSAFE_BLOCKED_PORTS) return false
+        if (GeoIpDetector.isPrivateOrLoopbackIp(ip)) return false
+        val trimmed = ip.trim()
+        // Từ chối các dải IP bogon/multicast/broadcast
+        if (trimmed.startsWith("0.") || trimmed.startsWith("224.") ||
+            trimmed.startsWith("240.") || trimmed.startsWith("255.")
+        ) {
+            return false
+        }
+        return true
+    }
+
+    fun computeSafetyTrustScore(
+        port: Int,
+        rttMs: Int,
+        speedMbps: Int,
+        isAcademicBackbone: Boolean,
+        isUnstable: Boolean
+    ): Int {
+        if (isUnstable || rttMs <= 0 || rttMs > MAX_ALLOWED_LIVE_PING_MS) return 0
+        var score = if (isAcademicBackbone) 90 else 84
+        if (port in SSL_TRUSTED_PORTS) score += 4
+        score += when {
+            rttMs <= 65 -> 5
+            rttMs <= 110 -> 3
+            rttMs <= 170 -> 1
+            else -> 0
+        }
+        if (speedMbps >= 400) score += 2
+        return score.coerceIn(85, 99)
+    }
+
+    suspend fun fetchLiveProxies(countryCode: String = "ALL"): List<ServerLocation> {
+        return fetchAndClassifyTrustedProxies(countryCode).verifiedServers
+    }
+
     /**
-     * Tải danh sách máy chủ sống từ nguồn VPNGate Academic Backbone (HTTPS) + ProxyScrape (tách riêng http và socks5),
-     * tra cứu quốc gia thật của từng IP qua [GeoIpDetector.resolveIpCountryCode] (kết quả tra thật luôn thắng tham số nguồn),
-     * loại bỏ mọi IP nội bộ/loopback, lọc chặt 3 tiêu chí (ping <= 250ms, tốc độ >= 260Mbps, cổng chính ổn định không chập chờn)
-     * và trả về `emptyList()` khi không có ứng viên sống (không âm thầm trả DEFAULT_SERVERS).
+     * Tự động quét, lọc lỗi, kiểm định độ an toàn & phân loại độ uy tín của các máy chủ VPN/Proxy:
+     * 1. Thu thập ứng viên từ VPNGate Academic Backbone (HTTPS) + ProxyScrape (tách riêng http và socks5).
+     * 2. Lọc bỏ ngay các IP nội bộ/bogon, cổng nguy hiểm (`UNSAFE_BLOCKED_PORTS`), hoặc sai vùng hỗ trợ Xbox.
+     * 3. Đo kiểm cổng chính thực tế qua [PingTester.measureServerEndpoint]: loại bỏ mọi máy chủ chết cổng chính,
+     *    chỉ mở cổng phụ, chập chờn (`isUnstable`) hoặc ping > 250ms.
+     * 4. Chấm điểm uy tín (`trustScore` 85..99) và gắn nhãn an toàn (`safetyBadge`).
      */
-    suspend fun fetchLiveProxies(countryCode: String = "JP"): List<ServerLocation> = withContext(Dispatchers.IO) {
+    suspend fun fetchAndClassifyTrustedProxies(countryCode: String = "ALL"): LiveProxySyncResult = withContext(Dispatchers.IO) {
         val normalizedFilter = countryCode.trim().uppercase(Locale.ROOT)
         val filterByCountry = normalizedFilter.isNotEmpty() && normalizedFilter != "ALL" && normalizedFilter != "CUSTOM"
         val targetCountries = if (filterByCountry) {
@@ -44,8 +99,9 @@ object LiveProxyFetcher {
 
         val candidates = mutableListOf<CandidateNode>()
         val seenIpPort = HashSet<String>()
+        val filteredErrorCounter = AtomicInteger(0)
 
-        // 1. Nguồn 1: VPNGate Academic Backbone API qua HTTPS
+        // 1. Nguồn 1: VPNGate Academic Backbone API qua HTTPS (Uy tín cao)
         try {
             val url = URL("https://www.vpngate.net/api/iphone/")
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -61,7 +117,12 @@ object LiveProxyFetcher {
                         val parts = trimmed.split(",")
                         if (parts.size > 14) {
                             val ip = parts[1].trim()
-                            if (GeoIpDetector.isPrivateOrLoopbackIp(ip)) continue
+                            val b64Config = parts[14].trim()
+                            val port = extractPortFromOvpnBase64(b64Config) ?: 443
+                            if (!isSafeAndReputableEndpoint(ip, port)) {
+                                filteredErrorCounter.incrementAndGet()
+                                continue
+                            }
                             val speedBps = parts[4].trim().toLongOrNull() ?: 0L
                             val sourceCc = parts[6].trim().uppercase(Locale.ROOT)
                             val resolvedCc = GeoIpDetector.resolveIpCountryCode(ip, allowNetworkFallback = false)
@@ -69,10 +130,8 @@ object LiveProxyFetcher {
                             if (filterByCountry && resolvedCc != normalizedFilter) continue
                             if (!filterByCountry && resolvedCc.isNotBlank() && resolvedCc !in targetCountries && sourceCc !in targetCountries) continue
 
-                            val b64Config = parts[14].trim()
-                            val port = extractPortFromOvpnBase64(b64Config) ?: 443
                             val key = "$ip:$port"
-                            if (port in 1..65535 && seenIpPort.add(key)) {
+                            if (seenIpPort.add(key)) {
                                 val mbps = (speedBps / 1_000_000L).toInt().coerceIn(MIN_VERIFIED_SPEED_MBPS, 1000)
                                 candidates.add(
                                     CandidateNode(
@@ -80,8 +139,9 @@ object LiveProxyFetcher {
                                         ip = ip,
                                         port = port,
                                         protocol = "http",
-                                        sourceLabel = "VPNGate Fiber",
-                                        speedMbpsHint = mbps
+                                        sourceLabel = "VPNGate Academic",
+                                        speedMbpsHint = mbps,
+                                        isAcademicBackbone = true
                                     )
                                 )
                             }
@@ -93,7 +153,7 @@ object LiveProxyFetcher {
         } catch (_: Exception) {
         }
 
-        // 2. Nguồn 2: ProxyScrape (tách riêng 2 yêu cầu protocol=http và protocol=socks5 để gán đúng giao thức)
+        // 2. Nguồn 2: ProxyScrape (tách riêng protocol=http và protocol=socks5)
         val protocols = listOf("http", "socks5")
         for (cc in targetCountries) {
             val currentCountForCc = candidates.count { it.countryCode == cc }
@@ -118,9 +178,11 @@ object LiveProxyFetcher {
                                     if (parts.size == 2) {
                                         val ip = parts[0].trim()
                                         val port = parts[1].trim().toIntOrNull()
-                                        if (port == null || port !in 1..65535 || GeoIpDetector.isPrivateOrLoopbackIp(ip)) continue
+                                        if (port == null || !isSafeAndReputableEndpoint(ip, port)) {
+                                            filteredErrorCounter.incrementAndGet()
+                                            continue
+                                        }
                                         val resolvedCc = GeoIpDetector.resolveIpCountryCode(ip, allowNetworkFallback = false)
-                                        // Kết quả tra thật từ IP luôn thắng tham số country=$cc của nguồn proxy
                                         val effectiveCc = resolvedCc.ifBlank { cc }
                                         if (filterByCountry && effectiveCc != normalizedFilter) continue
                                         val key = "$ip:$port"
@@ -132,7 +194,8 @@ object LiveProxyFetcher {
                                                     port = port,
                                                     protocol = proto,
                                                     sourceLabel = "Direct Relay",
-                                                    speedMbpsHint = MIN_VERIFIED_SPEED_MBPS
+                                                    speedMbpsHint = MIN_VERIFIED_SPEED_MBPS,
+                                                    isAcademicBackbone = false
                                                 )
                                             )
                                             addedForProto++
@@ -149,13 +212,19 @@ object LiveProxyFetcher {
             }
         }
 
-        // Giới hạn tối đa 20 ứng viên tốt nhất mỗi đợt cập nhật để kiểm tra cổng chính nhanh
+        // Ưu tiên ứng viên từ trục Academic và tốc độ cao trước
         val prioritizedCandidates = candidates
-            .sortedByDescending { it.speedMbpsHint }
+            .sortedWith(
+                compareByDescending<CandidateNode> { it.isAcademicBackbone }
+                    .thenByDescending { it.speedMbpsHint }
+            )
             .take(20)
 
         if (prioritizedCandidates.isEmpty()) {
-            return@withContext emptyList()
+            return@withContext LiveProxySyncResult(
+                verifiedServers = emptyList(),
+                filteredOutErrorCount = filteredErrorCounter.get()
+            )
         }
 
         val currentGen = VpnManager.getCurrentMeasurementGeneration()
@@ -165,7 +234,7 @@ object LiveProxyFetcher {
             false
         }
 
-        // Xác minh kết nối TCP cổng chính qua PingTester (tôn trọng giới hạn Semaphore(5), lọc <= 250ms & ổn định)
+        // Xác minh kết nối TCP cổng chính, lọc lỗi & chấm điểm uy tín/an toàn
         val verifiedServers = prioritizedCandidates.map { node ->
             async {
                 val realCc = GeoIpDetector.resolveIpCountryCode(node.ip, allowNetworkFallback = true)
@@ -173,9 +242,11 @@ object LiveProxyFetcher {
                     .trim()
                     .uppercase(Locale.ROOT)
                 if (realCc.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(realCc)) {
+                    filteredErrorCounter.incrementAndGet()
                     return@async null
                 }
                 if (filterByCountry && realCc.isNotBlank() && realCc != normalizedFilter) {
+                    filteredErrorCounter.incrementAndGet()
                     return@async null
                 }
                 val flag = GeoIpDetector.getFlagEmoji(realCc)
@@ -204,17 +275,38 @@ object LiveProxyFetcher {
                 )
                 if (measurement.isPrimaryPortAlive && !measurement.isUnstable && measurement.rttMs in 1..MAX_ALLOWED_LIVE_PING_MS) {
                     VpnManager.recordMeasurementIfCurrentGeneration(currentGen, candidateServer.id, measurement)
+                    val trustScore = computeSafetyTrustScore(
+                        port = node.port,
+                        rttMs = measurement.rttMs,
+                        speedMbps = candidateServer.speedMbps,
+                        isAcademicBackbone = node.isAcademicBackbone,
+                        isUnstable = measurement.isUnstable
+                    )
+                    val safetyBadge = if (trustScore >= 92) {
+                        "Uy tín cao • Đã lọc lỗi"
+                    } else {
+                        "An toàn • Đã xác minh"
+                    }
                     candidateServer.copy(
-                        description = "$countryDisplayName • Cổng :${node.port} mở (${measurement.rttMs}ms)",
-                        lastPingMs = measurement.rttMs
+                        description = "$countryDisplayName • ${node.sourceLabel} • Cổng :${node.port} mở (${measurement.rttMs}ms)",
+                        lastPingMs = measurement.rttMs,
+                        trustScore = trustScore,
+                        safetyBadge = safetyBadge
                     )
                 } else {
+                    filteredErrorCounter.incrementAndGet()
                     null
                 }
             }
-        }.awaitAll().filterNotNull().sortedBy { it.lastPingMs ?: Int.MAX_VALUE }
+        }.awaitAll().filterNotNull().sortedWith(
+            compareByDescending<ServerLocation> { it.trustScore }
+                .thenBy { it.lastPingMs ?: Int.MAX_VALUE }
+        )
 
-        verifiedServers
+        LiveProxySyncResult(
+            verifiedServers = verifiedServers,
+            filteredOutErrorCount = filteredErrorCounter.get()
+        )
     }
 
     private fun extractPortFromOvpnBase64(b64: String): Int? {

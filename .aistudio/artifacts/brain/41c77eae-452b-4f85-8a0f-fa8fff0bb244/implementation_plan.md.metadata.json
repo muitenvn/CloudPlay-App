@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật kế hoạch tối ưu giao diện toàn diện bổ sung hệ thống Tay cầm ảo tùy biến từng nút độc lập: kéo thả từng nút, tách rời hoặc gộp chùm A/B/X/Y (và D-Pad), chỉnh kích thước riêng từng nút, xóa nút không dùng và thêm lại nút từ kho nút.",
-  "updatedAt":  "2026-10-30T07:19:13.483005156Z",
+  "summary":  "Cập nhật kế hoạch theo phong cách Gaming Console đơn giản, gọn gàng, thực dụng (nền tối lì, viền mảnh dịu mắt, bỏ các hiệu ứng màu mè/tương lai rườm rà) cho HUD trong game, chỉnh Control và màn hình Loading.",
+  "updatedAt":  "2026-10-30T08:47:14.332106606Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

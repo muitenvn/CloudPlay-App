@@ -547,21 +547,21 @@ fun FloatingHud(
                         }
                     )
                 }
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .border(
-                    if (isNearEdgeForDock) 1.6.dp else 1.dp,
-                    if (isNearEdgeForDock) Color.White else if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan.copy(alpha = 0.55f) else XboxNeonGreen.copy(alpha = 0.55f),
-                    RoundedCornerShape(14.dp)
+                    if (isNearEdgeForDock) 1.5.dp else 1.dp,
+                    if (isNearEdgeForDock) XboxNeonGreen else Color(0xFF24382C),
+                    RoundedCornerShape(12.dp)
                 )
                 .testTag("floating_hud_container"),
-            color = Color(0xF20B130E),
-            shadowElevation = 8.dp
+            color = Color(0xF20D1511),
+            shadowElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
                 horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
-                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + Controller icon only)
+                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + FPS + Controller icon)
                 if (hudMode == HudMode.MINIMIZED) {
                     val rawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
                     val hasValidPing = rawPing != null && rawPing > 0
@@ -576,30 +576,31 @@ fun FloatingHud(
                     } else {
                         if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
                     }
+                    val fpsSuffix = if (telemetry.hasStatsSample && telemetry.fps > 0) " • ${telemetry.fps}fps" else ""
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(9.dp))
                             .clickable {
                                 markUserInteraction()
                                 hudMode = HudMode.COMPACT
                             }
-                            .padding(horizontal = 7.dp, vertical = 4.dp)
+                            .padding(horizontal = 7.dp, vertical = 3.5.dp)
                             .testTag("hud_minimized_pill")
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(6.5.dp)
                                 .clip(CircleShape)
                                 .background(pingColor)
                         )
                         Text(
-                            text = pingText,
+                            text = "$pingText$fpsSuffix",
                             color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             fontSize = 10.5.sp,
                             maxLines = 1
                         )
@@ -607,7 +608,7 @@ fun FloatingHud(
                             imageVector = Icons.Default.Gamepad,
                             contentDescription = null,
                             tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(11.5.dp)
                         )
                     }
                 } else {
@@ -1034,8 +1035,8 @@ fun FloatingHud(
                                         }
                                         .testTag("hud_expanded_video_settings_card"),
                                     shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF0E1D24),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.65f))
+                                    color = Color(0xFF121D17),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF24382C))
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -1048,9 +1049,9 @@ fun FloatingHud(
                                         ) {
                                             Text(
                                                 text = if (isEn) "Colors & Graphics" else "Màu sắc & Đồ họa",
-                                                color = DirectCyan,
+                                                color = TextPrimary,
                                                 fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
+                                                fontWeight = FontWeight.Bold,
                                                 maxLines = 1
                                             )
                                             Text(
@@ -1067,13 +1068,13 @@ fun FloatingHud(
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
-                                            color = DirectCyan.copy(alpha = 0.22f)
+                                            color = Color(0xFF1C2E24)
                                         ) {
                                             Text(
                                                 text = if (isEn) "Open" else "Mở",
-                                                color = Color.White,
+                                                color = XboxNeonGreen,
                                                 fontSize = 11.sp,
-                                                fontWeight = FontWeight.ExtraBold,
+                                                fontWeight = FontWeight.Bold,
                                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                             )
                                         }

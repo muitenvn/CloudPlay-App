@@ -209,6 +209,8 @@ fun VirtualGamepadOverlay(
     var isEditPositionMode by remember { mutableStateOf(false) }
     var selectedButtonId by remember { mutableStateOf<String?>("abxy") }
     var showAddButtonModal by remember { mutableStateOf(false) }
+    var showEditGrid by remember { mutableStateOf(true) }
+    var isToolbarCollapsed by remember { mutableStateOf(false) }
 
     val abxySplitMode = config.gamepadAbxySplitMode
     val dpadSplitMode = config.gamepadDpadSplitMode
@@ -280,6 +282,13 @@ fun VirtualGamepadOverlay(
         updated.remove(nodeId)
         SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated))
         selectedButtonId = nodeId
+    }
+
+    fun resetSingleButton(nodeId: String) {
+        customOffsets.remove(nodeId)
+        customButtonScales.remove(nodeId)
+        saveCustomOffsets()
+        saveButtonScales()
     }
 
     fun resetAllCustomizations() {
@@ -447,6 +456,56 @@ fun VirtualGamepadOverlay(
             .fillMaxSize()
             .testTag("virtual_gamepad_overlay")
     ) {
+        // Simple Alignment Grid & Center Crosshair when editing button positions
+        if (isEditPositionMode && showEditGrid) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("virtual_gamepad_alignment_grid")
+            ) {
+                drawRect(color = Color(0x40060B09))
+                val stepPx = 32.dp.toPx().coerceAtLeast(16f)
+                val gridColor = Color.White.copy(alpha = 0.08f)
+                val centerColor = XboxNeonGreen.copy(alpha = 0.35f)
+
+                var x = stepPx
+                while (x < size.width) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(x, 0f),
+                        end = Offset(x, size.height),
+                        strokeWidth = 1f
+                    )
+                    x += stepPx
+                }
+                var y = stepPx
+                while (y < size.height) {
+                    drawLine(
+                        color = gridColor,
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1f
+                    )
+                    y += stepPx
+                }
+
+                val midX = size.width / 2f
+                val midY = size.height / 2f
+                drawLine(
+                    color = centerColor,
+                    start = Offset(midX, 0f),
+                    end = Offset(midX, size.height),
+                    strokeWidth = 1.5f
+                )
+                drawLine(
+                    color = centerColor,
+                    start = Offset(0f, midY),
+                    end = Offset(size.width, midY),
+                    strokeWidth = 1.5f
+                )
+            }
+        }
+
         // Top Shoulder Triggers & L3/R3 Individual Draggable Buttons
         Row(
             modifier = Modifier
@@ -857,57 +916,87 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Per-Button Edit Mode Inspector Toolbar
+        // Per-Button Edit Mode Inspector Toolbar (Simple Gaming Style + Live X/Y Coordinates)
         if (isEditPositionMode && !showControlTuner) {
             val activeId = selectedButtonId
             val activeInfo = remember(activeId) {
                 ALL_GAMEPAD_NODES.find { it.id == activeId }
             }
             val activeScaleMult = if (activeId != null) (customButtonScales[activeId] ?: 1.0f) else 1.0f
+            val activeOffset = if (activeId != null) (customOffsets[activeId] ?: (0f to 0f)) else (0f to 0f)
+            val coordX = activeOffset.first.roundToInt()
+            val coordY = activeOffset.second.roundToInt()
+            val xSign = if (coordX > 0) "+$coordX" else "$coordX"
+            val ySign = if (coordY > 0) "+$coordY" else "$coordY"
 
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 48.dp, start = 12.dp, end = 12.dp)
-                    .widthIn(max = 520.dp)
+                    .padding(top = 46.dp, start = 12.dp, end = 12.dp)
+                    .widthIn(max = 540.dp)
                     .testTag("virtual_gamepad_edit_toolbar"),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xF208120D),
-                border = androidx.compose.foundation.BorderStroke(1.2.dp, DirectCyan.copy(alpha = 0.85f))
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xF50E1612),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF283D31))
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Row 1: Selected button name + Per-Button Size Controls (- / Slider / +) + Delete Button
+                    // Row 1: Selected button name + Live Coordinates (X, Y) + Size % + Collapse toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (activeInfo != null) {
-                                val title = if (isEn) activeInfo.labelEn else activeInfo.labelVi
-                                "✥ $title (${(activeScaleMult * 100).roundToInt()}%)"
-                            } else {
-                                if (isEn) "✥ Tap any button to resize or delete" else "✥ Chạm vào nút bất kỳ để chỉnh cỡ / xóa"
-                            },
-                            color = XboxNeonGreen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.weight(1f)
-                        )
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (activeInfo != null) {
+                                    val title = if (isEn) activeInfo.labelEn else activeInfo.labelVi
+                                    "✥ $title"
+                                } else {
+                                    if (isEn) "✥ Tap a button to edit" else "✥ Chạm nút bất kỳ để sửa"
+                                },
+                                color = XboxNeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
 
-                        if (activeId != null) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            if (activeId != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(5.dp),
+                                    color = Color(0xFF16241C),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2B4235))
+                                ) {
+                                    Text(
+                                        text = "X:$xSign  Y:$ySign  •  ${(activeScaleMult * 100).roundToInt()}%",
+                                        color = Color.White,
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            .testTag("virtual_gamepad_live_coords")
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (activeId != null && !isToolbarCollapsed) {
                                 // Size -10%
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF16261E),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan),
+                                    color = Color(0xFF17241D),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate()
@@ -917,9 +1006,9 @@ fun VirtualGamepadOverlay(
                                 ) {
                                     Text(
                                         text = "− Cỡ",
-                                        color = DirectCyan,
+                                        color = Color.White,
                                         fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                     )
                                 }
@@ -927,8 +1016,8 @@ fun VirtualGamepadOverlay(
                                 // Size +10%
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF16261E),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen),
+                                    color = Color(0xFF17241D),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.7f)),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate()
@@ -940,16 +1029,37 @@ fun VirtualGamepadOverlay(
                                         text = "+ Cỡ",
                                         color = XboxNeonGreen,
                                         fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                    )
+                                }
+
+                                // Reset only selected button
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF17241D),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                    modifier = Modifier
+                                        .clickable {
+                                            vibrate()
+                                            resetSingleButton(activeId)
+                                        }
+                                        .testTag("virtual_gamepad_reset_single_button")
+                                ) {
+                                    Text(
+                                        text = if (isEn) "↺ Button" else "↺ Nút này",
+                                        color = TextSecondary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                                     )
                                 }
 
                                 // Delete / Hide Selected Button
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = JapanRed.copy(alpha = 0.20f),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed),
+                                    color = JapanRed.copy(alpha = 0.18f),
+                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.75f)),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate(stronger = true)
@@ -962,172 +1072,216 @@ fun VirtualGamepadOverlay(
                                         text = if (isEn) "🗑 Delete" else "🗑 Xóa nút",
                                         color = Color(0xFFFF8A80),
                                         fontSize = 10.sp,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                     )
                                 }
                             }
-                        }
-                    }
 
-                    // Per-button smooth size slider when a button is selected
-                    if (activeId != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = if (isEn) "Size:" else "Cỡ nút:",
-                                color = TextSecondary,
-                                fontSize = 9.5.sp
-                            )
-                            Slider(
-                                value = activeScaleMult,
-                                onValueChange = { setButtonScale(activeId, it) },
-                                valueRange = 0.50f..2.00f,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(20.dp),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = XboxNeonGreen,
-                                    activeTrackColor = XboxNeonGreen
+                            // Collapse / Expand Inspector Toolbar
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                modifier = Modifier.clickable {
+                                    isToolbarCollapsed = !isToolbarCollapsed
+                                }
+                            ) {
+                                Text(
+                                    text = if (isToolbarCollapsed) "▼" else "▲",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                                 )
-                            )
+                            }
                         }
                     }
 
-                    // Row 2: Split/Merge ABXY, Split/Merge D-Pad, + Add Button, Reset, Done
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Toggle Split / Merge ABXY
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = if (abxySplitMode) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF14221B),
-                            border = androidx.compose.foundation.BorderStroke(
-                                0.9.dp,
-                                if (abxySplitMode) XboxNeonGreen else DirectCyan.copy(alpha = 0.7f)
-                            ),
-                            modifier = Modifier
-                                .clickable {
-                                    vibrate()
-                                    val nextSplit = !abxySplitMode
-                                    SettingsRepository.updateGamepadAbxySplitMode(nextSplit)
-                                    selectedButtonId = if (nextSplit) "btn_a" else "abxy"
-                                }
-                                .testTag("virtual_gamepad_split_abxy_toggle")
-                        ) {
-                            Text(
-                                text = if (abxySplitMode) {
-                                    if (isEn) "⇄ Merge ABXY" else "⇄ Gộp chùm ABXY"
-                                } else {
-                                    if (isEn) "⇄ Split A/B/X/Y" else "⇄ Tách rời A/B/X/Y"
-                                },
-                                color = if (abxySplitMode) XboxNeonGreen else DirectCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        // Toggle Split / Merge D-Pad
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = if (dpadSplitMode) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF14221B),
-                            border = androidx.compose.foundation.BorderStroke(
-                                0.9.dp,
-                                if (dpadSplitMode) XboxNeonGreen else XboxCardBorder
-                            ),
-                            modifier = Modifier
-                                .clickable {
-                                    vibrate()
-                                    val nextSplit = !dpadSplitMode
-                                    SettingsRepository.updateGamepadDpadSplitMode(nextSplit)
-                                    selectedButtonId = if (nextSplit) "dpad_up" else "dpad"
-                                }
-                                .testTag("virtual_gamepad_split_dpad_toggle")
-                        ) {
-                            Text(
-                                text = if (dpadSplitMode) {
-                                    if (isEn) "⇄ Merge D-Pad" else "⇄ Gộp D-Pad"
-                                } else {
-                                    if (isEn) "⇄ Split D-Pad" else "⇄ Tách D-Pad"
-                                },
-                                color = if (dpadSplitMode) XboxNeonGreen else TextSecondary,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        // + Add / Restore Buttons
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = DirectCyan.copy(alpha = 0.18f),
-                            border = androidx.compose.foundation.BorderStroke(0.9.dp, DirectCyan),
-                            modifier = Modifier
-                                .clickable {
-                                    vibrate()
-                                    showAddButtonModal = !showAddButtonModal
-                                }
-                                .testTag("virtual_gamepad_add_button")
-                        ) {
-                            val hiddenCount = hiddenButtons.size
-                            Text(
-                                text = if (hiddenCount > 0) {
-                                    if (isEn) "＋ Add Button ($hiddenCount)" else "＋ Thêm nút ($hiddenCount)"
-                                } else {
-                                    if (isEn) "＋ Add / Manage Buttons" else "＋ Thêm / Quản lý nút"
-                                },
-                                color = DirectCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        // Reset All
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = WarningAmber.copy(alpha = 0.16f),
-                            border = androidx.compose.foundation.BorderStroke(0.9.dp, WarningAmber),
-                            modifier = Modifier.clickable {
-                                vibrate()
-                                resetAllCustomizations()
+                    if (!isToolbarCollapsed) {
+                        // Per-button smooth size slider when a button is selected
+                        if (activeId != null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = if (isEn) "Size:" else "Cỡ nút:",
+                                    color = TextSecondary,
+                                    fontSize = 9.5.sp
+                                )
+                                Slider(
+                                    value = activeScaleMult,
+                                    onValueChange = { setButtonScale(activeId, it) },
+                                    valueRange = 0.50f..2.00f,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(20.dp),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = XboxNeonGreen,
+                                        activeTrackColor = XboxNeonGreen
+                                    )
+                                )
                             }
-                        ) {
-                            Text(
-                                text = if (isEn) "↺ Reset" else "↺ Đặt lại",
-                                color = WarningAmber,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
                         }
 
-                        // Done
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = XboxNeonGreen.copy(alpha = 0.25f),
-                            border = androidx.compose.foundation.BorderStroke(0.9.dp, XboxNeonGreen),
-                            modifier = Modifier.clickable {
-                                vibrate()
-                                isEditPositionMode = false
-                                showAddButtonModal = false
-                            }
+                        // Row 2: Grid toggle, Split/Merge ABXY, Split/Merge D-Pad, + Add Button, Reset All, Done
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = if (isEn) "✓ Done" else "✓ Xong",
-                                color = XboxNeonGreen,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                            )
+                            // Grid Toggle
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (showEditGrid) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    0.8.dp,
+                                    if (showEditGrid) XboxNeonGreen else Color(0xFF2E4739)
+                                ),
+                                modifier = Modifier
+                                    .clickable {
+                                        vibrate()
+                                        showEditGrid = !showEditGrid
+                                    }
+                                    .testTag("virtual_gamepad_grid_toggle")
+                            ) {
+                                Text(
+                                    text = if (isEn) "# Grid" else "# Lưới",
+                                    color = if (showEditGrid) XboxNeonGreen else TextSecondary,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Toggle Split / Merge ABXY
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (abxySplitMode) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    0.8.dp,
+                                    if (abxySplitMode) XboxNeonGreen else Color(0xFF2E4739)
+                                ),
+                                modifier = Modifier
+                                    .clickable {
+                                        vibrate()
+                                        val nextSplit = !abxySplitMode
+                                        SettingsRepository.updateGamepadAbxySplitMode(nextSplit)
+                                        selectedButtonId = if (nextSplit) "btn_a" else "abxy"
+                                    }
+                                    .testTag("virtual_gamepad_split_abxy_toggle")
+                            ) {
+                                Text(
+                                    text = if (abxySplitMode) {
+                                        if (isEn) "⇄ Merge ABXY" else "⇄ Gộp chùm ABXY"
+                                    } else {
+                                        if (isEn) "⇄ Split A/B/X/Y" else "⇄ Tách rời A/B/X/Y"
+                                    },
+                                    color = if (abxySplitMode) XboxNeonGreen else Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Toggle Split / Merge D-Pad
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (dpadSplitMode) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    0.8.dp,
+                                    if (dpadSplitMode) XboxNeonGreen else Color(0xFF2E4739)
+                                ),
+                                modifier = Modifier
+                                    .clickable {
+                                        vibrate()
+                                        val nextSplit = !dpadSplitMode
+                                        SettingsRepository.updateGamepadDpadSplitMode(nextSplit)
+                                        selectedButtonId = if (nextSplit) "dpad_up" else "dpad"
+                                    }
+                                    .testTag("virtual_gamepad_split_dpad_toggle")
+                            ) {
+                                Text(
+                                    text = if (dpadSplitMode) {
+                                        if (isEn) "⇄ Merge D-Pad" else "⇄ Gộp D-Pad"
+                                    } else {
+                                        if (isEn) "⇄ Split D-Pad" else "⇄ Tách D-Pad"
+                                    },
+                                    color = if (dpadSplitMode) XboxNeonGreen else Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // + Add / Restore Buttons
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                modifier = Modifier
+                                    .clickable {
+                                        vibrate()
+                                        showAddButtonModal = !showAddButtonModal
+                                    }
+                                    .testTag("virtual_gamepad_add_button")
+                            ) {
+                                val hiddenCount = hiddenButtons.size
+                                Text(
+                                    text = if (hiddenCount > 0) {
+                                        if (isEn) "＋ Add Button ($hiddenCount)" else "＋ Thêm nút ($hiddenCount)"
+                                    } else {
+                                        if (isEn) "＋ Add / Manage Buttons" else "＋ Thêm / Quản lý nút"
+                                    },
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Reset All
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFF17241D),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, WarningAmber.copy(alpha = 0.7f)),
+                                modifier = Modifier.clickable {
+                                    vibrate()
+                                    resetAllCustomizations()
+                                }
+                            ) {
+                                Text(
+                                    text = if (isEn) "↺ Default" else "↺ Mặc định",
+                                    color = WarningAmber,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            // Done
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = XboxNeonGreen.copy(alpha = 0.22f),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen),
+                                modifier = Modifier.clickable {
+                                    vibrate()
+                                    isEditPositionMode = false
+                                    showAddButtonModal = false
+                                }
+                            ) {
+                                Text(
+                                    text = if (isEn) "✓ Done" else "✓ Xong",
+                                    color = XboxNeonGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }

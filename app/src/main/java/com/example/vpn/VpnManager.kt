@@ -104,6 +104,7 @@ object VpnManager {
         countryFilter: String = "ALL",
         force: Boolean = false
     ) {
+        if (isInGameStreamActive) return
         val now = System.currentTimeMillis()
         val currentState = _state.value
         if (currentState.isAutoSyncingLiveProxies) return
@@ -154,11 +155,12 @@ object VpnManager {
                     lastAutoSyncTimestampMs = System.currentTimeMillis(),
                     autoFilteredOutErrorCount = totalFilteredErrors
                 )
+                persistLiveVerifiedServers(context ?: appContext, mergedLive)
 
                 if (syncResult.verifiedServers.isNotEmpty()) {
                     com.example.data.AppLogger.success(
                         "VPN_AUTO",
-                        "Tự động thêm ${syncResult.verifiedServers.size} VPN an toàn/uy tín (đã lọc bỏ ${syncResult.filteredOutErrorCount} node lỗi/kém an toàn)"
+                        "Đã tự động lọc & lưu ${mergedLive.size} VPN uy tín vào dữ liệu ứng dụng (mới: +${syncResult.verifiedServers.size}, loại bỏ lỗi: ${syncResult.filteredOutErrorCount})"
                     )
                 }
             } catch (e: Exception) {
@@ -276,21 +278,36 @@ object VpnManager {
     }
 
     /**
-     * 1. KIỂM TRA TRƯỚC (nhẹ): khi chọn hoặc cập nhật proxy, lấy quốc gia của IP thoát
-     * (dùng GeoIpDetector sẵn có). Nếu quốc gia không thuộc danh sách vùng hỗ trợ thì gắn nhãn "Sai vùng".
+     * 1. KIỂM TRA TRƯỚC (siêu nhanh): khi chọn hoặc cập nhật proxy, kiểm tra ngay tính an toàn của IP
+     * và tra cứu quốc gia qua bộ nhớ đệm / bảng nhị phân DB-IP (< 0.1ms) trước khi dùng truy vấn mạng nhẹ (≤ 1.2s).
      */
     fun preCheckProxyRegion(server: ServerLocation) {
+        if (GeoIpDetector.isPrivateOrLoopbackIp(server.ip)) {
+            saveServerUnlockRecord(server, RegionUnlockStatus.FAILED, server.countryCode)
+            return
+        }
         val declaredCode = server.countryCode.trim().uppercase()
         if (declaredCode.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(declaredCode)) {
             saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, declaredCode)
             return
         }
+        // Kiểm tra tức thì trong bảng nhị phân DB-IP / Seed Table (0ms, không tốn mạng)
+        val fastLocalCode = GeoIpDetector.resolveIpCountryCode(server.ip, allowNetworkFallback = false)
+        if (fastLocalCode.isNotBlank()) {
+            if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(fastLocalCode)) {
+                saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, fastLocalCode)
+            } else if (getServerUnlockStatus(server) == RegionUnlockStatus.WRONG_REGION) {
+                saveServerUnlockRecord(server, RegionUnlockStatus.UNTESTED, fastLocalCode)
+            }
+            return
+        }
+        if (isInGameStreamActive) return
         scope.launch(Dispatchers.IO) {
             try {
-                // Kiểm tra quốc gia của IP máy chủ/proxy kết hợp GeoIpDetector.SUPPORTED_COUNTRIES
                 val detectedCountry = queryIpCountryLight(server.ip)
                 if (!detectedCountry.isNullOrBlank()) {
                     val cleanCode = detectedCountry.trim().uppercase()
+                    GeoIpDetector.cacheResolvedIpCountry(server.ip, cleanCode)
                     if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(cleanCode)) {
                         saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, cleanCode)
                     } else {
@@ -306,43 +323,64 @@ object VpnManager {
     }
 
     fun preCheckProxiesBatch(servers: List<ServerLocation>) {
+        if (isInGameStreamActive || servers.isEmpty()) return
+        val needsRemoteCheck = mutableListOf<ServerLocation>()
         servers.forEach { server ->
+            if (GeoIpDetector.isPrivateOrLoopbackIp(server.ip)) {
+                saveServerUnlockRecord(server, RegionUnlockStatus.FAILED, server.countryCode)
+                return@forEach
+            }
             val declaredCode = server.countryCode.trim().uppercase()
             if (declaredCode.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(declaredCode)) {
                 saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, declaredCode)
+                return@forEach
+            }
+            val localCode = GeoIpDetector.resolveIpCountryCode(server.ip, allowNetworkFallback = false)
+            if (localCode.isNotBlank()) {
+                if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(localCode)) {
+                    saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, localCode)
+                }
+            } else if (getServerUnlockStatus(server) == RegionUnlockStatus.UNTESTED) {
+                needsRemoteCheck.add(server)
             }
         }
+        if (needsRemoteCheck.isEmpty() || isInGameStreamActive) return
         scope.launch(Dispatchers.IO) {
-            servers.take(15).forEach { server ->
-                val currentStatus = getServerUnlockStatus(server)
-                if (currentStatus == RegionUnlockStatus.UNTESTED) {
+            needsRemoteCheck.take(8).map { server ->
+                async {
+                    if (isInGameStreamActive) return@async
                     val detectedCountry = queryIpCountryLight(server.ip)
                     if (!detectedCountry.isNullOrBlank()) {
                         val cleanCode = detectedCountry.trim().uppercase()
+                        GeoIpDetector.cacheResolvedIpCountry(server.ip, cleanCode)
                         if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(cleanCode)) {
                             saveServerUnlockRecord(server, RegionUnlockStatus.WRONG_REGION, cleanCode)
                         }
                     }
                 }
-            }
+            }.awaitAll()
         }
     }
 
     private fun queryIpCountryLight(ip: String): String? {
         val cleanIp = ip.trim()
-        if (cleanIp.isBlank() || cleanIp == "127.0.0.1" || cleanIp == "localhost") return null
+        if (cleanIp.isBlank() || GeoIpDetector.isPrivateOrLoopbackIp(cleanIp)) return null
+        val cachedOrLocal = GeoIpDetector.resolveIpCountryCode(cleanIp, allowNetworkFallback = false)
+        if (cachedOrLocal.isNotBlank()) return cachedOrLocal
         return try {
             val url = java.net.URL("https://api.country.is/$cleanIp")
             val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
-                connectTimeout = 2500
-                readTimeout = 2500
+                connectTimeout = 1200
+                readTimeout = 1200
                 setRequestProperty("User-Agent", "Mozilla/5.0")
             }
             if (conn.responseCode == 200) {
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
                 conn.disconnect()
                 val json = org.json.JSONObject(body)
-                json.optString("country", "").ifBlank { null }
+                json.optString("country", "").ifBlank { null }?.also { cc ->
+                    GeoIpDetector.cacheResolvedIpCountry(cleanIp, cc)
+                }
             } else {
                 conn.disconnect()
                 null
@@ -376,7 +414,14 @@ object VpnManager {
             "UNLOCK_FAIL" -> {
                 com.example.data.AppLogger.warn("UNLOCK", "Máy chủ không mở khóa được vùng: ${currentServer.name} (${currentServer.ip}:${currentServer.port})")
                 saveServerUnlockRecord(currentServer, RegionUnlockStatus.FAILED, currentServer.countryCode)
+                val prunedLive = _state.value.liveVerifiedServers.filterNot {
+                    it.addressPortKey.equals(currentServer.addressPortKey, ignoreCase = true)
+                }
+                if (prunedLive.size != _state.value.liveVerifiedServers.size) {
+                    persistLiveVerifiedServers(appContext, prunedLive)
+                }
                 _state.value = _state.value.copy(
+                    liveVerifiedServers = prunedLive,
                     unlockFailPromptServer = currentServer,
                     statusMessage = if (isEn) {
                         "⚠️ This server cannot unlock the region, switch to another server?"
@@ -611,7 +656,7 @@ object VpnManager {
         visibleServers: List<ServerLocation>,
         customProbeExecutor: (suspend (String, Int, Int) -> Pair<Int, String>)? = null
     ) {
-        if (visibleServers.isEmpty()) return
+        if (visibleServers.isEmpty() || (isInGameStreamActive && customProbeExecutor == null)) return
         val currentGen = measurementGeneration.get()
         val now = System.currentTimeMillis()
         val currentMeas = _state.value.serverMeasurements.toMutableMap()
@@ -714,6 +759,7 @@ object VpnManager {
         visibleServerIds: Set<String> = emptySet(),
         onPickedBest: ((ServerLocation, Int) -> Unit)? = null
     ) {
+        if (isInGameStreamActive && !forceRefresh && !autoPickBest) return
         batchPingJob?.cancel()
         lazyPingJob?.cancel()
 
@@ -1009,46 +1055,97 @@ object VpnManager {
     private fun loadPersistedServers(context: Context) {
         try {
             val sp = context.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
-            val jsonStr = sp.getString("custom_servers_json", null) ?: return
-            val array = org.json.JSONArray(jsonStr)
-            val list = mutableListOf<ServerLocation>()
             val defaultKeys = DEFAULT_SERVERS.map { "${it.ip.trim().lowercase()}:${it.port}" }.toSet()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val id = obj.getString("id")
-                val cc = obj.optString("countryCode", "JP")
-                val ip = obj.getString("ip")
-                val port = obj.getInt("port")
-                val key = "${ip.trim().lowercase()}:$port"
-                // Bỏ qua các bản ghi lỗi cũ có countryCode = "ALL" hoặc trùng với DEFAULT_SERVERS
-                if (id.startsWith("live_all_", ignoreCase = true) ||
-                    cc.equals("ALL", ignoreCase = true) ||
-                    cc.equals("CUSTOM", ignoreCase = true) ||
-                    key in defaultKeys
-                ) {
-                    continue
-                }
-                list.add(
-                    ServerLocation(
-                        id = id,
-                        name = obj.getString("name"),
-                        flag = obj.optString("flag", "🌐"),
-                        ip = ip,
-                        port = port,
-                        protocol = obj.optString("protocol", "http"),
-                        countryCode = cc,
-                        azureEndpoint = obj.optString("azureEndpoint", "japaneast.cloudapp.azure.com"),
-                        description = obj.optString("description", "Proxy cá nhân"),
-                        speedMbps = obj.optInt("speedMbps", 200),
-                        lastPingMs = null,
-                        isCustom = true
+
+            // 1. Khôi phục danh sách máy chủ do người dùng tự thêm (customServers)
+            val customList = mutableListOf<ServerLocation>()
+            val customJsonStr = sp.getString("custom_servers_json", null)
+            if (!customJsonStr.isNullOrBlank()) {
+                val array = org.json.JSONArray(customJsonStr)
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.getString("id")
+                    val cc = obj.optString("countryCode", "JP")
+                    val ip = obj.getString("ip")
+                    val port = obj.getInt("port")
+                    val key = "${ip.trim().lowercase()}:$port"
+                    if (id.startsWith("live_all_", ignoreCase = true) ||
+                        cc.equals("ALL", ignoreCase = true) ||
+                        cc.equals("CUSTOM", ignoreCase = true) ||
+                        key in defaultKeys
+                    ) {
+                        continue
+                    }
+                    customList.add(
+                        ServerLocation(
+                            id = id,
+                            name = obj.getString("name"),
+                            flag = obj.optString("flag", "🌐"),
+                            ip = ip,
+                            port = port,
+                            protocol = obj.optString("protocol", "http"),
+                            countryCode = cc,
+                            azureEndpoint = obj.optString("azureEndpoint", "japaneast.cloudapp.azure.com"),
+                            description = obj.optString("description", "Proxy cá nhân"),
+                            speedMbps = obj.optInt("speedMbps", 200),
+                            lastPingMs = null,
+                            isCustom = true
+                        )
                     )
-                )
+                }
             }
-            _state.value = _state.value.copy(customServers = list)
+
+            // 2. Khôi phục danh sách các máy chủ VPN đã được cập nhật & lọc lỗi tự động (liveVerifiedServers)
+            val customKeys = customList.map { "${it.ip.trim().lowercase()}:${it.port}" }.toSet()
+            val liveList = mutableListOf<ServerLocation>()
+            val liveJsonStr = sp.getString("auto_verified_live_servers_json", null)
+            if (!liveJsonStr.isNullOrBlank()) {
+                val liveArray = org.json.JSONArray(liveJsonStr)
+                for (i in 0 until liveArray.length()) {
+                    val obj = liveArray.getJSONObject(i)
+                    val id = obj.optString("id", "")
+                    val cc = obj.optString("countryCode", "").trim().uppercase()
+                    val ip = obj.optString("ip", "").trim()
+                    val port = obj.optInt("port", 0)
+                    val key = "${ip.lowercase()}:$port"
+                    if (id.isBlank() ||
+                        !LiveProxyFetcher.isSafeAndReputableEndpoint(ip, port) ||
+                        !GeoIpDetector.SUPPORTED_COUNTRIES.contains(cc) ||
+                        key in defaultKeys ||
+                        key in customKeys
+                    ) {
+                        continue
+                    }
+                    liveList.add(
+                        ServerLocation(
+                            id = id,
+                            name = obj.optString("name", "${GeoIpDetector.getFlagEmoji(cc)} $ip"),
+                            flag = obj.optString("flag", GeoIpDetector.getFlagEmoji(cc)),
+                            ip = ip,
+                            port = port,
+                            protocol = obj.optString("protocol", "http"),
+                            countryCode = cc,
+                            azureEndpoint = obj.optString("azureEndpoint", GeoIpDetector.getAzureEndpointForCountry(cc)),
+                            description = obj.optString("description", "Cổng :$port"),
+                            speedMbps = obj.optInt("speedMbps", LiveProxyFetcher.MIN_VERIFIED_SPEED_MBPS),
+                            lastPingMs = obj.optInt("lastPingMs", -1).takeIf { it > 0 },
+                            isCustom = false,
+                            isVerified = true,
+                            trustScore = obj.optInt("trustScore", 92),
+                            safetyBadge = obj.optString("safetyBadge", "An toàn • Đã xác minh")
+                        )
+                    )
+                }
+            }
+
+            _state.value = _state.value.copy(
+                customServers = customList,
+                liveVerifiedServers = liveList
+            )
+
             val lastServerId = sp.getString("selected_server_id", null)
             if (lastServerId != null) {
-                val all = list + DEFAULT_SERVERS
+                val all = customList + DEFAULT_SERVERS + liveList
                 val found = all.find { it.id == lastServerId }
                 if (found != null) {
                     _state.value = _state.value.copy(currentServer = found)
@@ -1056,6 +1153,40 @@ object VpnManager {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not load persisted servers", e)
+        }
+    }
+
+    private fun persistLiveVerifiedServers(context: Context?, liveServers: List<ServerLocation>) {
+        val ctx = context ?: appContext ?: return
+        try {
+            val sp = ctx.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            val array = org.json.JSONArray()
+            // Lưu tối đa 40 máy chủ tự động tốt nhất để bộ nhớ ứng dụng luôn gọn và nhanh
+            for (s in liveServers.take(40)) {
+                val obj = org.json.JSONObject().apply {
+                    put("id", s.id)
+                    put("name", s.name)
+                    put("flag", s.flag)
+                    put("ip", s.ip)
+                    put("port", s.port)
+                    put("protocol", s.protocol)
+                    put("countryCode", s.countryCode)
+                    put("description", s.description)
+                    put("speedMbps", s.speedMbps)
+                    put("azureEndpoint", s.azureEndpoint)
+                    put("trustScore", s.trustScore)
+                    put("safetyBadge", s.safetyBadge)
+                    if (s.lastPingMs != null && s.lastPingMs > 0) {
+                        put("lastPingMs", s.lastPingMs)
+                    }
+                }
+                array.put(obj)
+            }
+            sp.edit()
+                .putString("auto_verified_live_servers_json", array.toString())
+                .apply()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not persist live verified servers", e)
         }
     }
 
@@ -1765,14 +1896,40 @@ object VpnManager {
     @Volatile
     private var isInGameStreamActive: Boolean = false
 
+    fun isStreamActive(): Boolean = isInGameStreamActive
+
+    /**
+     * Khi bước vào game (`active = true`), lập tức hủy mọi tiến trình quét VPN, đo ping hàng loạt,
+     * kiểm tra IP nền và đồng bộ thư viện để nhường 100% CPU + băng thông mạng cho bộ giải mã video phần cứng (Hardware Decoder).
+     */
     fun setInGameStreamActive(active: Boolean) {
         isInGameStreamActive = active
-        _state.value = _state.value.copy(
-            activeStreamServerId = if (active) _state.value.currentServer.id else null
-        )
+        try {
+            com.example.data.GameLibraryRepository.setStreamActive(active)
+        } catch (_: Exception) {
+        }
+        if (active) {
+            autoSyncLiveJob?.cancel()
+            batchPingJob?.cancel()
+            lazyPingJob?.cancel()
+            ipCheckJob?.cancel()
+            _state.value = _state.value.copy(
+                activeStreamServerId = _state.value.currentServer.id,
+                isAutoSyncingLiveProxies = false,
+                isTestingPings = false
+            )
+        } else {
+            _state.value = _state.value.copy(
+                activeStreamServerId = null
+            )
+        }
         com.example.data.AppLogger.info(
             "STREAM",
-            if (active) "Bắt đầu phiên stream trên máy chủ: ${_state.value.currentServer.name}" else "Kết thúc phiên stream"
+            if (active) {
+                "Bắt đầu phiên stream trên máy chủ: ${_state.value.currentServer.name} (Đã tạm dừng cập nhật nền để tối ưu tốc độ giải mã video)"
+            } else {
+                "Kết thúc phiên stream"
+            }
         )
     }
 

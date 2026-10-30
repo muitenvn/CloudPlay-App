@@ -153,17 +153,23 @@ object GeoIpDetector {
         return result
     }
 
+    private val fastHttpClient = OkHttpClient.Builder()
+        .connectTimeout(1200, TimeUnit.MILLISECONDS)
+        .readTimeout(1200, TimeUnit.MILLISECONDS)
+        .build()
+
     fun isPrivateOrLoopbackIp(ip: String): Boolean {
         val trimmed = ip.trim().lowercase(java.util.Locale.ROOT)
         if (trimmed.isEmpty() || trimmed == "localhost") return true
         if (trimmed.contains(':')) {
             if (trimmed == "::1" || trimmed == "::" || trimmed == "0:0:0:0:0:0:0:1") return true
-            if (trimmed.startsWith("fe80:") || trimmed.startsWith("fc") || trimmed.startsWith("fd")) return true
+            if (trimmed.startsWith("fe80:") || trimmed.startsWith("fc") || trimmed.startsWith("fd") || trimmed.startsWith("ff")) return true
             return false
         }
         val ipNum = ipv4ToLong(trimmed) ?: return true
         val b0 = ((ipNum ushr 24) and 0xFF).toInt()
         val b1 = ((ipNum ushr 16) and 0xFF).toInt()
+        val b2 = ((ipNum ushr 8) and 0xFF).toInt()
         // 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8
         if (b0 == 0 || b0 == 10 || b0 == 127) return true
         // 100.64.0.0/10 (CGNAT)
@@ -172,13 +178,38 @@ object GeoIpDetector {
         if (b0 == 169 && b1 == 254) return true
         // 172.16.0.0/12 (Private)
         if (b0 == 172 && (b1 in 16..31)) return true
-        // 192.168.0.0/16 (Private)
-        if (b0 == 192 && b1 == 168) return true
-        // 198.18.0.0/15 (Benchmark)
-        if (b0 == 198 && (b1 == 18 || b1 == 19)) return true
-        // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved)
+        // 192.0.0.0/24 (IETF Protocol) & 192.0.2.0/24 (TEST-NET-1) & 192.168.0.0/16 (Private)
+        if (b0 == 192 && (b1 == 168 || (b1 == 0 && (b2 == 0 || b2 == 2)))) return true
+        // 198.18.0.0/15 (Benchmark) & 198.51.100.0/24 (TEST-NET-2)
+        if (b0 == 198 && (b1 == 18 || b1 == 19 || (b1 == 51 && b2 == 100))) return true
+        // 203.0.113.0/24 (TEST-NET-3)
+        if (b0 == 203 && b1 == 0 && b2 == 113) return true
+        // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved/Broadcast)
         if (b0 >= 224) return true
         return false
+    }
+
+    /**
+     * Kiểm tra nhanh bảo mật IP & vùng quốc gia của máy chủ VPN/Proxy (O(1) bitwise + tra cứu nhị phân trong bộ nhớ < 0.1ms):
+     * - Chặn tức thì IP bogon/private/loopback/CGNAT/TEST-NET/multicast.
+     * - Giải mã mã quốc gia từ bộ nhớ đệm hoặc bảng nhị phân DB-IP / Seed Table mà không cần chờ mạng chậm.
+     */
+    fun fastCheckIpSecurityAndRegion(
+        ip: String,
+        declaredCountryCode: String = "",
+        allowFastNetworkFallback: Boolean = false
+    ): Pair<Boolean, String> {
+        val trimmed = ip.trim()
+        if (isPrivateOrLoopbackIp(trimmed)) return Pair(false, "")
+        val resolved = resolveIpCountryCode(
+            ip = trimmed,
+            allowNetworkFallback = allowFastNetworkFallback,
+            useFastTimeout = true
+        ).ifBlank {
+            declaredCountryCode.trim().uppercase(java.util.Locale.ROOT)
+        }
+        val isSupported = resolved.isEmpty() || SUPPORTED_COUNTRIES.contains(resolved)
+        return Pair(isSupported, resolved)
     }
 
     private data class IpRangeTable(
@@ -193,49 +224,123 @@ object GeoIpDetector {
         val rawRanges = listOf(
             Triple("1.0.16.0", "1.0.31.255", "JP"),
             Triple("1.1.64.0", "1.1.127.255", "JP"),
+            Triple("1.21.0.0", "1.21.255.255", "JP"),
+            Triple("1.33.0.0", "1.33.255.255", "JP"),
             Triple("1.52.0.0", "1.55.255.255", "VN"),
+            Triple("1.66.0.0", "1.79.255.255", "JP"),
+            Triple("1.112.0.0", "1.115.255.255", "JP"),
+            Triple("1.208.0.0", "1.255.255.255", "KR"),
             Triple("8.8.8.0", "8.8.8.255", "US"),
-            Triple("14.10.0.0", "14.10.255.255", "JP"),
+            Triple("14.0.0.0", "14.15.255.255", "JP"),
+            Triple("14.32.0.0", "14.95.255.255", "KR"),
+            Triple("14.128.0.0", "14.139.255.255", "JP"),
             Triple("14.160.0.0", "14.191.255.255", "VN"),
+            Triple("20.18.0.0", "20.31.255.255", "US"),
+            Triple("20.40.0.0", "20.127.255.255", "US"),
+            Triple("20.189.0.0", "20.191.255.255", "JP"),
+            Triple("20.194.0.0", "20.194.255.255", "KR"),
             Triple("27.0.0.0", "27.35.255.255", "KR"),
+            Triple("27.80.0.0", "27.95.255.255", "JP"),
+            Triple("27.112.0.0", "27.127.255.255", "KR"),
             Triple("34.32.0.0", "34.63.255.255", "US"),
+            Triple("34.64.0.0", "34.64.255.255", "KR"),
+            Triple("34.84.0.0", "34.85.255.255", "JP"),
+            Triple("34.146.0.0", "34.146.255.255", "JP"),
+            Triple("35.184.0.0", "35.191.255.255", "US"),
+            Triple("35.200.0.0", "35.200.255.255", "JP"),
             Triple("39.112.0.0", "39.127.255.255", "KR"),
+            Triple("43.200.0.0", "43.203.255.255", "KR"),
+            Triple("43.206.0.0", "43.207.255.255", "JP"),
             Triple("45.32.0.0", "45.32.63.255", "JP"),
+            Triple("45.76.0.0", "45.77.255.255", "JP"),
             Triple("49.160.0.0", "49.175.255.255", "KR"),
+            Triple("49.239.0.0", "49.239.255.255", "JP"),
             Triple("51.15.0.0", "51.15.255.255", "FR"),
             Triple("51.158.0.0", "51.159.255.255", "FR"),
+            Triple("52.68.0.0", "52.69.255.255", "JP"),
+            Triple("52.78.0.0", "52.79.255.255", "KR"),
+            Triple("52.192.0.0", "52.199.255.255", "JP"),
+            Triple("54.64.0.0", "54.65.255.255", "JP"),
+            Triple("54.180.0.0", "54.180.255.255", "KR"),
+            Triple("58.120.0.0", "58.151.255.255", "KR"),
+            Triple("59.0.0.0", "59.31.255.255", "KR"),
+            Triple("60.32.0.0", "60.159.255.255", "JP"),
+            Triple("61.72.0.0", "61.85.255.255", "KR"),
+            Triple("61.112.0.0", "61.127.255.255", "JP"),
             Triple("61.192.0.0", "61.215.255.255", "JP"),
             Triple("67.192.0.0", "69.63.255.255", "US"),
             Triple("88.198.0.0", "88.198.255.255", "DE"),
             Triple("103.1.208.0", "103.1.211.255", "VN"),
             Triple("104.16.0.0", "104.31.255.255", "US"),
             Triple("106.128.0.0", "106.191.255.255", "JP"),
+            Triple("110.0.0.0", "110.15.255.255", "KR"),
+            Triple("112.160.0.0", "112.191.255.255", "KR"),
+            Triple("113.144.0.0", "113.159.255.255", "JP"),
             Triple("113.160.0.0", "113.191.255.255", "VN"),
+            Triple("114.144.0.0", "114.191.255.255", "JP"),
+            Triple("114.199.0.0", "114.207.255.255", "KR"),
+            Triple("115.88.0.0", "115.95.255.255", "KR"),
             Triple("116.120.0.0", "116.127.255.255", "KR"),
+            Triple("118.0.0.0", "118.23.255.255", "JP"),
             Triple("118.32.0.0", "118.47.255.255", "KR"),
+            Triple("118.238.0.0", "118.243.255.255", "JP"),
+            Triple("119.192.0.0", "119.207.255.255", "KR"),
+            Triple("119.240.0.0", "119.245.255.255", "JP"),
             Triple("121.128.0.0", "121.191.255.255", "KR"),
+            Triple("122.16.0.0", "122.31.255.255", "JP"),
             Triple("122.252.0.0", "122.255.255.255", "KR"),
             Triple("123.140.0.0", "123.143.255.255", "KR"),
+            Triple("124.32.0.0", "124.47.255.255", "JP"),
+            Triple("125.128.0.0", "125.143.255.255", "KR"),
+            Triple("125.192.0.0", "125.207.255.255", "JP"),
             Triple("126.0.0.0", "126.255.255.255", "JP"),
             Triple("130.127.0.0", "130.127.255.255", "US"),
+            Triple("130.158.0.0", "130.158.255.255", "JP"),
             Triple("133.0.0.0", "133.255.255.255", "JP"),
             Triple("138.199.21.0", "138.199.21.255", "JP"),
             Triple("139.162.64.0", "139.162.127.255", "JP"),
+            Triple("140.82.0.0", "140.82.63.255", "US"),
             Triple("141.147.128.0", "141.147.191.255", "KR"),
             Triple("141.223.0.0", "141.223.255.255", "KR"),
             Triple("143.244.0.0", "143.247.255.255", "US"),
+            Triple("150.95.0.0", "150.95.255.255", "JP"),
+            Triple("153.120.0.0", "153.255.255.255", "JP"),
+            Triple("157.7.0.0", "157.7.255.255", "JP"),
             Triple("158.247.192.0", "158.247.255.255", "KR"),
             Triple("159.65.0.0", "159.65.255.255", "US"),
+            Triple("159.89.0.0", "159.89.255.255", "US"),
+            Triple("160.16.0.0", "160.16.255.255", "JP"),
+            Triple("163.44.0.0", "163.44.255.255", "JP"),
+            Triple("165.22.0.0", "165.22.255.255", "US"),
             Triple("167.99.0.0", "167.99.255.255", "US"),
             Triple("172.104.64.0", "172.104.127.255", "JP"),
+            Triple("172.105.192.0", "172.105.255.255", "JP"),
             Triple("175.192.0.0", "175.215.255.255", "KR"),
+            Triple("180.0.0.0", "180.63.255.255", "JP"),
+            Triple("180.64.0.0", "180.83.255.255", "KR"),
+            Triple("182.208.0.0", "182.231.255.255", "KR"),
+            Triple("183.76.0.0", "183.79.255.255", "JP"),
             Triple("183.96.0.0", "183.111.255.255", "KR"),
             Triple("185.220.100.0", "185.220.103.255", "DE"),
+            Triple("202.208.0.0", "202.255.255.255", "JP"),
+            Triple("203.224.0.0", "203.255.255.255", "KR"),
+            Triple("210.128.0.0", "210.175.255.255", "JP"),
+            Triple("210.176.0.0", "210.223.255.255", "KR"),
+            Triple("211.0.0.0", "211.19.255.255", "JP"),
+            Triple("211.32.0.0", "211.63.255.255", "KR"),
+            Triple("211.120.0.0", "211.135.255.255", "JP"),
             Triple("211.168.0.0", "211.255.255.255", "KR"),
             Triple("218.144.0.0", "218.159.255.255", "KR"),
-            Triple("219.100.32.0", "219.100.63.255", "JP"),
+            Triple("218.216.0.0", "218.231.255.255", "JP"),
+            Triple("219.96.0.0", "219.127.255.255", "JP"),
+            Triple("219.240.0.0", "219.255.255.255", "KR"),
             Triple("220.64.0.0", "220.127.255.255", "KR"),
-            Triple("222.96.0.0", "222.127.255.255", "KR")
+            Triple("220.144.0.0", "220.159.255.255", "JP"),
+            Triple("220.208.0.0", "220.221.255.255", "JP"),
+            Triple("221.138.0.0", "221.168.255.255", "KR"),
+            Triple("221.240.0.0", "221.255.255.255", "JP"),
+            Triple("222.96.0.0", "222.127.255.255", "KR"),
+            Triple("222.144.0.0", "222.159.255.255", "JP")
         ).mapNotNull { (s, e, cc) ->
             val start = ipv4ToLong(s)
             val end = ipv4ToLong(e)
@@ -253,6 +358,14 @@ object GeoIpDetector {
     private var activeRangeTable: IpRangeTable = defaultSeedTable
 
     private val ipCountryCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    fun cacheResolvedIpCountry(ip: String, countryCode: String) {
+        val cleanIp = ip.trim()
+        val cleanCc = countryCode.trim().uppercase(java.util.Locale.ROOT)
+        if (cleanIp.isNotEmpty() && cleanCc.length == 2 && cleanCc.all { it in 'A'..'Z' } && cleanCc != "XX" && cleanCc != "ZZ") {
+            ipCountryCache[cleanIp] = cleanCc
+        }
+    }
 
     fun loadCsvRangesFromStream(inputStream: java.io.InputStream): Boolean {
         return try {
@@ -326,7 +439,11 @@ object GeoIpDetector {
      * - Nếu không tìm thấy trong bảng hiện tại và [allowNetworkFallback] = true kèm công tắc
      *   `enableGeoIpHttpsFallback` đang bật, mới gọi dịch vụ dự phòng HTTPS `api.country.is`.
      */
-    fun resolveIpCountryCode(ip: String, allowNetworkFallback: Boolean = false): String {
+    fun resolveIpCountryCode(
+        ip: String,
+        allowNetworkFallback: Boolean = false,
+        useFastTimeout: Boolean = true
+    ): String {
         val trimmed = ip.trim()
         if (isPrivateOrLoopbackIp(trimmed)) return ""
         val ipNum = ipv4ToLong(trimmed) ?: return ""
@@ -361,7 +478,8 @@ object GeoIpDetector {
                     .url("https://api.country.is/$trimmed")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-                httpClient.newCall(req).execute().use { resp ->
+                val clientToUse = if (useFastTimeout) fastHttpClient else httpClient
+                clientToUse.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val bodyStr = resp.body?.string() ?: ""
                         val json = JSONObject(bodyStr)
@@ -478,70 +596,72 @@ object GeoIpDetector {
         _isChecking.value = true
         var result: GeoIpResult? = null
 
-        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates globally
+        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates globally (fast 1.2s timeout)
         try {
             val req = Request.Builder()
                 .url("https://ipwho.is/")
                 .header("User-Agent", "Mozilla/5.0")
                 .build()
-            val resp = httpClient.newCall(req).execute()
-            if (resp.isSuccessful) {
-                val bodyStr = resp.body?.string() ?: ""
-                val json = JSONObject(bodyStr)
-                if (json.optBoolean("success", true)) {
-                    val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country_code", "").trim().uppercase()
-                    if (countryCode.length == 2) {
-                        val countryName = json.optString("country", getCountryDisplayName(countryCode))
-                        val city = json.optString("city", "")
-                        val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                        val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+            fastHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val bodyStr = resp.body?.string() ?: ""
+                    val json = JSONObject(bodyStr)
+                    if (json.optBoolean("success", true)) {
+                        val ip = json.optString("ip", "")
+                        val countryCode = json.optString("country_code", "").trim().uppercase()
+                        if (countryCode.length == 2) {
+                            cacheResolvedIpCountry(ip, countryCode)
+                            val countryName = json.optString("country", getCountryDisplayName(countryCode))
+                            val city = json.optString("city", "")
+                            val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                            val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                        result = GeoIpResult(
-                            ip = ip,
-                            countryCode = countryCode,
-                            countryName = countryName,
-                            city = city,
-                            flagEmoji = getFlagEmoji(countryCode),
-                            isXboxSupported = isSupported,
-                            latitude = lat,
-                            longitude = lon
-                        )
+                            result = GeoIpResult(
+                                ip = ip,
+                                countryCode = countryCode,
+                                countryName = countryName,
+                                city = city,
+                                flagEmoji = getFlagEmoji(countryCode),
+                                isXboxSupported = isSupported,
+                                latitude = lat,
+                                longitude = lon
+                            )
+                        }
                     }
                 }
             }
-            resp.close()
         } catch (_: Exception) {
         }
 
-        // 2. Fallback 1: api.country.is (fast, lightweight)
+        // 2. Fallback 1: api.country.is (ultra-fast, lightweight)
         if (result == null) {
             try {
                 val req = Request.Builder()
                     .url("https://api.country.is/")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-                val resp = httpClient.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: ""
-                    val json = JSONObject(bodyStr)
-                    val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country", "").trim().uppercase()
-                    if (countryCode.length == 2) {
-                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                fastHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val bodyStr = resp.body?.string() ?: ""
+                        val json = JSONObject(bodyStr)
+                        val ip = json.optString("ip", "")
+                        val countryCode = json.optString("country", "").trim().uppercase()
+                        if (countryCode.length == 2) {
+                            cacheResolvedIpCountry(ip, countryCode)
+                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                        result = GeoIpResult(
-                            ip = ip,
-                            countryCode = countryCode,
-                            countryName = getCountryDisplayName(countryCode),
-                            city = "",
-                            flagEmoji = getFlagEmoji(countryCode),
-                            isXboxSupported = isSupported
-                        )
+                            result = GeoIpResult(
+                                ip = ip,
+                                countryCode = countryCode,
+                                countryName = getCountryDisplayName(countryCode),
+                                city = "",
+                                flagEmoji = getFlagEmoji(countryCode),
+                                isXboxSupported = isSupported
+                            )
+                        }
                     }
                 }
-                resp.close()
             } catch (_: Exception) {
             }
         }
@@ -553,47 +673,49 @@ object GeoIpDetector {
                     .url("https://ipapi.co/json/")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
-                val resp = httpClient.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: ""
-                    val json = JSONObject(bodyStr)
-                    val ip = json.optString("ip", "")
-                    val countryCode = json.optString("country_code", "").trim().uppercase()
-                    if (countryCode.length == 2) {
-                        val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
-                        val city = json.optString("city", "")
-                        val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                        val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                        val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                fastHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val bodyStr = resp.body?.string() ?: ""
+                        val json = JSONObject(bodyStr)
+                        val ip = json.optString("ip", "")
+                        val countryCode = json.optString("country_code", "").trim().uppercase()
+                        if (countryCode.length == 2) {
+                            cacheResolvedIpCountry(ip, countryCode)
+                            val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
+                            val city = json.optString("city", "")
+                            val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                            val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                        result = GeoIpResult(
-                            ip = ip,
-                            countryCode = countryCode,
-                            countryName = countryName,
-                            city = city,
-                            flagEmoji = getFlagEmoji(countryCode),
-                            isXboxSupported = isSupported,
-                            latitude = lat,
-                            longitude = lon
-                        )
+                            result = GeoIpResult(
+                                ip = ip,
+                                countryCode = countryCode,
+                                countryName = countryName,
+                                city = city,
+                                flagEmoji = getFlagEmoji(countryCode),
+                                isXboxSupported = isSupported,
+                                latitude = lat,
+                                longitude = lon
+                            )
+                        }
                     }
                 }
-                resp.close()
             } catch (_: Exception) {
             }
         }
 
-        if (result != null) {
+        val finalResult = result
+        if (finalResult != null) {
             com.example.data.AppLogger.info(
                 "VPN",
-                "Phát hiện vị trí mạng: ${result.ip} • ${result.countryCode} ${result.city.ifBlank { "(Chưa rõ tỉnh/thành)" }}"
+                "Phát hiện vị trí mạng: ${finalResult.ip} • ${finalResult.countryCode} ${finalResult.city.ifBlank { "(Chưa rõ tỉnh/thành)" }}"
             )
         } else {
             com.example.data.AppLogger.warn("VPN", "Không lấy được thông tin GeoIP từ mạng hiện tại")
         }
 
         _isChecking.value = false
-        _currentGeoIp.value = result
-        result
+        _currentGeoIp.value = finalResult
+        finalResult
     }
 }

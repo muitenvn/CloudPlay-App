@@ -598,7 +598,31 @@ fun GameLibraryScreen(
                         }
                     }
                 } else {
+                    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+                    var visibleLimit by remember(selectedTab, selectedGenre, searchQuery) {
+                        androidx.compose.runtime.mutableIntStateOf(36)
+                    }
+                    val displayedGames = remember(filteredGames, visibleLimit) {
+                        if (filteredGames.size <= visibleLimit) filteredGames else filteredGames.take(visibleLimit)
+                    }
+                    val shouldLoadMore by remember(gridState, displayedGames.size, filteredGames.size) {
+                        androidx.compose.runtime.derivedStateOf {
+                            if (displayedGames.size >= filteredGames.size) {
+                                false
+                            } else {
+                                val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                                lastVisible >= (displayedGames.size - 8).coerceAtLeast(0)
+                            }
+                        }
+                    }
+                    androidx.compose.runtime.LaunchedEffect(shouldLoadMore) {
+                        if (shouldLoadMore && visibleLimit < filteredGames.size) {
+                            visibleLimit = (visibleLimit + 36).coerceAtMost(filteredGames.size)
+                        }
+                    }
+
                     LazyVerticalGrid(
+                        state = gridState,
                         columns = GridCells.Adaptive(minSize = 152.dp),
                         contentPadding = PaddingValues(bottom = 112.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -606,7 +630,7 @@ fun GameLibraryScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         items(
-                            items = filteredGames,
+                            items = displayedGames,
                             key = { it.id },
                             contentType = { "library_game_card" }
                         ) { game ->

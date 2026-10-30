@@ -932,4 +932,36 @@ class ExampleRobolectricTest {
             com.example.cloudplay.XboxTranslator.PROTECTED_GAME_TITLES.contains("NBA 2K27 (XBOX Series X|S)")
         )
     }
+
+    @Test
+    fun testIsoQrCodeGeneratorAndFastVpnSecurityAndStreamPause() {
+        // 1. Kiểm tra bộ tạo mã QR chuẩn ISO/IEC 18004 tạo đúng kích thước Version và Finder Pattern 3 góc
+        val webMatrix = com.example.ui.components.QrCodeGenerator.encodeToMatrix("https://muitenvn.github.io/CloudPlay-App/")
+        assertEquals(29, webMatrix.size) // 41 bytes -> Version 3 (29x29)
+        // Finder góc trên-trái (7x7) và tâm (3,3) đen, viền trắng (7, 0..7)
+        assertTrue(webMatrix[0][0])
+        assertTrue(webMatrix[3][3])
+        assertTrue(webMatrix[6][6])
+        org.junit.Assert.assertFalse(webMatrix[7][0])
+        org.junit.Assert.assertFalse(webMatrix[0][7])
+        // Dark module cố định ở (size - 8, 8)
+        assertTrue(webMatrix[webMatrix.size - 8][8])
+
+        // 2. Kiểm tra nhanh bảo mật IP & vùng quốc gia của VPN
+        val (safeJp, ccJp) = com.example.vpn.GeoIpDetector.fastCheckIpSecurityAndRegion("219.100.37.10", "JP")
+        assertTrue(safeJp)
+        assertEquals("JP", ccJp)
+
+        val (safePrivate, _) = com.example.vpn.GeoIpDetector.fastCheckIpSecurityAndRegion("192.168.1.1", "JP")
+        org.junit.Assert.assertFalse(safePrivate)
+
+        // 3. Khi vào game (setInGameStreamActive(true)), tạm dừng đồng bộ nền để tối ưu tốc độ giải mã video
+        VpnManager.setInGameStreamActive(true)
+        assertTrue(VpnManager.isStreamActive())
+        org.junit.Assert.assertFalse(VpnManager.state.value.isAutoSyncingLiveProxies)
+        org.junit.Assert.assertFalse(VpnManager.state.value.isTestingPings)
+        VpnManager.setInGameStreamActive(false)
+        org.junit.Assert.assertFalse(VpnManager.isStreamActive())
+    }
 }
+

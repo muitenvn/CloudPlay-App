@@ -531,15 +531,17 @@ object GameLibraryRepository {
      * Ingests a batch of game cards scraped live from the Xbox Cloud web DOM (metadata only, no image downloads).
      */
     fun ingestDiscoveredWebGames(jsonArrayStr: String) {
-        if (jsonArrayStr.isBlank()) return
+        if (jsonArrayStr.isBlank() || isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return
         ioScope.launch {
             try {
+                if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
                 val arr = JSONArray(jsonArrayStr)
                 if (arr.length() == 0) return@launch
                 val currentList = _games.value.toMutableList()
                 var changed = false
 
                 for (i in 0 until arr.length()) {
+                    if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
                     val obj = arr.optJSONObject(i) ?: continue
                     val rawUrl = obj.optString("url", "").trim()
                     val rawTitle = obj.optString("title", "").trim()
@@ -599,7 +601,7 @@ object GameLibraryRepository {
                     }
                 }
 
-                if (changed) {
+                if (changed && !isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
                     _games.value = currentList
                     saveSyncedGames(currentList)
                     _xboxStatus.value = _xboxStatus.value.copy(syncedCatalogCount = currentList.size)
@@ -611,24 +613,32 @@ object GameLibraryRepository {
 
     @Volatile
     private var isStreamActive: Boolean = false
+    private var catalogSyncJob: kotlinx.coroutines.Job? = null
 
     fun setStreamActive(active: Boolean) {
         isStreamActive = active
+        if (active) {
+            catalogSyncJob?.cancel()
+            _isSyncingCatalog.value = false
+        }
     }
 
     /**
      * Tự động quét toàn bộ kho game Xbox Cloud theo từng lô (streaming batches)
      * và chỉ lấy thông tin game (tên, thể loại, nhà phát hành, mô tả, link chơi),
      * hoàn toàn không tải ảnh bìa để tiết kiệm dữ liệu mạng.
-     * Tự động tạm dừng ngay khi người dùng đang trong luồng chơi game để nhường 100% băng thông cho 4G/Wi-Fi.
+     * Tự động tạm dừng ngay khi người dùng đang trong luồng chơi game để nhường 100% băng thông và tốc độ giải mã video.
      */
     fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 500) {
-        if ((_isSyncingCatalog.value && !force) || isStreamActive) return
-        ioScope.launch {
+        if ((_isSyncingCatalog.value && !force) || isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return
+        catalogSyncJob?.cancel()
+        catalogSyncJob = ioScope.launch {
             _isSyncingCatalog.value = true
             val startPingMs = System.currentTimeMillis()
             try {
+                if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
                 val allCloudIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = 500)
+                if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
                 val catalogRtt = (System.currentTimeMillis() - startPingMs).toInt().coerceIn(15, 2500)
                 val touchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 300).toSet()
                 val popularIds = fetchSiglProductIds(POPULAR_CLOUD_SIGL_URL, maxCount = 100).toSet()
@@ -682,13 +692,14 @@ object GameLibraryRepository {
                 val runningSynced = existingWithImages.toMutableList()
                 var emittedFirstPreviewBatch = runningSynced.isNotEmpty()
                 for (batch in idsToFetch.chunked(40)) {
-                    if (isStreamActive) break
+                    if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) break
                     val batchResults = fetchDisplayCatalogProducts(
                         bigIds = batch,
                         touchIds = cachedTouchIds,
                         popularIds = cachedPopularIds,
                         recentIds = cachedRecentIds
                     )
+                    if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) break
                     if (batchResults.isNotEmpty()) {
                         runningSynced.addAll(batchResults)
                         if (!emittedFirstPreviewBatch) {
@@ -701,26 +712,28 @@ object GameLibraryRepository {
                     }
                 }
 
-                if (runningSynced.isNotEmpty()) {
+                if (runningSynced.isNotEmpty() && !isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
                     val finalDeduped = runningSynced
                         .filter { !it.imageUrl.isNullOrBlank() }
                         .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
                     rebuildMergedGames(customList, finalDeduped)
                 }
 
-                saveSyncedGames(_games.value)
-                val nowMs = System.currentTimeMillis()
-                _xboxStatus.value = _xboxStatus.value.copy(
-                    cloudServiceOnline = true,
-                    cloudLatencyMs = catalogRtt,
-                    totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
-                    syncedCatalogCount = _games.value.size,
-                    lastSyncTimeMs = nowMs
-                )
-                sharedPrefs?.edit()
-                    ?.putLong(KEY_LAST_CATALOG_SYNC_MS, nowMs)
-                    ?.putInt(KEY_XBOX_TOTAL_CLOUD, totalCloud.coerceAtLeast(_games.value.size))
-                    ?.apply()
+                if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
+                    saveSyncedGames(_games.value)
+                    val nowMs = System.currentTimeMillis()
+                    _xboxStatus.value = _xboxStatus.value.copy(
+                        cloudServiceOnline = true,
+                        cloudLatencyMs = catalogRtt,
+                        totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
+                        syncedCatalogCount = _games.value.size,
+                        lastSyncTimeMs = nowMs
+                    )
+                    sharedPrefs?.edit()
+                        ?.putLong(KEY_LAST_CATALOG_SYNC_MS, nowMs)
+                        ?.putInt(KEY_XBOX_TOTAL_CLOUD, totalCloud.coerceAtLeast(_games.value.size))
+                        ?.apply()
+                }
             } catch (_: Exception) {
                 _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = false)
             } finally {
@@ -733,7 +746,7 @@ object GameLibraryRepository {
      * Loads the next batch of unsynced Xbox Cloud games from Microsoft's full Cloud SIGL feed.
      */
     fun loadMoreXboxCatalogGames(batchSize: Int = 40) {
-        if (_isSyncingCatalog.value) return
+        if (_isSyncingCatalog.value || isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return
         ioScope.launch {
             _isSyncingCatalog.value = true
             try {

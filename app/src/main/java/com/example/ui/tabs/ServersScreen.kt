@@ -862,7 +862,11 @@ fun ServersScreen(
             measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED
         }?.id
 
-        items(filteredServers, key = { it.id }) { server ->
+        items(
+            items = filteredServers,
+            key = { it.id },
+            contentType = { "server_row_card" }
+        ) { server ->
             val isSelected = server.id == currentServer.id
             val isGameActiveOnThisServer = networkStatus.isLowLatencyStreamActive &&
                 vpnState.activeStreamServerId == server.id

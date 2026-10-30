@@ -89,6 +89,9 @@ object LiveProxyFetcher {
      * 4. Chấm điểm uy tín (`trustScore` 85..99) và gắn nhãn an toàn (`safetyBadge`).
      */
     suspend fun fetchAndClassifyTrustedProxies(countryCode: String = "ALL"): LiveProxySyncResult = withContext(Dispatchers.IO) {
+        if (VpnManager.isStreamActive()) {
+            return@withContext LiveProxySyncResult(emptyList(), 0)
+        }
         val normalizedFilter = countryCode.trim().uppercase(Locale.ROOT)
         val filterByCountry = normalizedFilter.isNotEmpty() && normalizedFilter != "ALL" && normalizedFilter != "CUSTOM"
         val targetCountries = if (filterByCountry) {
@@ -97,128 +100,161 @@ object LiveProxyFetcher {
             listOf("JP", "KR", "US")
         }
 
-        val candidates = mutableListOf<CandidateNode>()
-        val seenIpPort = HashSet<String>()
+        val candidates = java.util.Collections.synchronizedList(mutableListOf<CandidateNode>())
+        val seenIpPort = java.util.Collections.synchronizedSet(HashSet<String>())
         val filteredErrorCounter = AtomicInteger(0)
 
-        // 1. Nguồn 1: VPNGate Academic Backbone API qua HTTPS (Uy tín cao)
-        try {
-            val url = URL("https://www.vpngate.net/api/iphone/")
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 4500
-                readTimeout = 4500
-                setRequestProperty("User-Agent", "Mozilla/5.0")
-            }
-            if (conn.responseCode == 200) {
-                BufferedReader(InputStreamReader(conn.inputStream)).useLines { lines ->
-                    for (line in lines) {
-                        val trimmed = line.trim()
-                        if (trimmed.isEmpty() || trimmed.startsWith("*") || trimmed.startsWith("#")) continue
-                        val parts = trimmed.split(",")
-                        if (parts.size > 14) {
-                            val ip = parts[1].trim()
-                            val b64Config = parts[14].trim()
-                            val port = extractPortFromOvpnBase64(b64Config) ?: 443
-                            if (!isSafeAndReputableEndpoint(ip, port)) {
-                                filteredErrorCounter.incrementAndGet()
-                                continue
-                            }
-                            val speedBps = parts[4].trim().toLongOrNull() ?: 0L
-                            val sourceCc = parts[6].trim().uppercase(Locale.ROOT)
-                            val resolvedCc = GeoIpDetector.resolveIpCountryCode(ip, allowNetworkFallback = false)
-                                .ifBlank { sourceCc }
-                            if (filterByCountry && resolvedCc != normalizedFilter) continue
-                            if (!filterByCountry && resolvedCc.isNotBlank() && resolvedCc !in targetCountries && sourceCc !in targetCountries) continue
+        // 1. Thu thập song song từ VPNGate Academic Backbone + ProxyScrape (giảm thời gian chờ từ ~18s xuống ~1.8s)
+        kotlinx.coroutines.coroutineScope {
+            val fetchJobs = mutableListOf<kotlinx.coroutines.Deferred<Unit>>()
 
-                            val key = "$ip:$port"
-                            if (seenIpPort.add(key)) {
-                                val mbps = (speedBps / 1_000_000L).toInt().coerceIn(MIN_VERIFIED_SPEED_MBPS, 1000)
-                                candidates.add(
-                                    CandidateNode(
-                                        countryCode = resolvedCc,
-                                        ip = ip,
-                                        port = port,
-                                        protocol = "http",
-                                        sourceLabel = "VPNGate Academic",
-                                        speedMbpsHint = mbps,
-                                        isAcademicBackbone = true
-                                    )
-                                )
-                            }
+            fetchJobs.add(
+                async {
+                    try {
+                        val url = URL("https://www.vpngate.net/api/iphone/")
+                        val conn = (url.openConnection() as HttpURLConnection).apply {
+                            connectTimeout = 2400
+                            readTimeout = 2400
+                            setRequestProperty("User-Agent", "Mozilla/5.0")
                         }
-                    }
-                }
-            }
-            conn.disconnect()
-        } catch (_: Exception) {
-        }
-
-        // 2. Nguồn 2: ProxyScrape (tách riêng protocol=http và protocol=socks5)
-        val protocols = listOf("http", "socks5")
-        for (cc in targetCountries) {
-            val currentCountForCc = candidates.count { it.countryCode == cc }
-            if (currentCountForCc >= 12) continue
-            for (proto in protocols) {
-                try {
-                    val url = URL(
-                        "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=$proto&timeout=2500&country=$cc&ssl=all&anonymity=all"
-                    )
-                    val conn = (url.openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 3500
-                        readTimeout = 3500
-                        setRequestProperty("User-Agent", "Mozilla/5.0")
-                    }
-                    if (conn.responseCode == 200) {
-                        var addedForProto = 0
-                        BufferedReader(InputStreamReader(conn.inputStream)).useLines { lines ->
-                            for (line in lines) {
-                                val trimmed = line.trim()
-                                if (trimmed.isNotBlank() && trimmed.contains(":")) {
-                                    val parts = trimmed.split(":")
-                                    if (parts.size == 2) {
-                                        val ip = parts[0].trim()
-                                        val port = parts[1].trim().toIntOrNull()
-                                        if (port == null || !isSafeAndReputableEndpoint(ip, port)) {
+                        if (conn.responseCode == 200) {
+                            BufferedReader(InputStreamReader(conn.inputStream)).useLines { lines ->
+                                for (line in lines) {
+                                    val trimmed = line.trim()
+                                    if (trimmed.isEmpty() || trimmed.startsWith("*") || trimmed.startsWith("#")) continue
+                                    val parts = trimmed.split(",")
+                                    if (parts.size > 14) {
+                                        val ip = parts[1].trim()
+                                        val b64Config = parts[14].trim()
+                                        val port = extractPortFromOvpnBase64(b64Config) ?: 443
+                                        if (!isSafeAndReputableEndpoint(ip, port)) {
                                             filteredErrorCounter.incrementAndGet()
                                             continue
                                         }
-                                        val resolvedCc = GeoIpDetector.resolveIpCountryCode(ip, allowNetworkFallback = false)
-                                        val effectiveCc = resolvedCc.ifBlank { cc }
-                                        if (filterByCountry && effectiveCc != normalizedFilter) continue
+                                        val speedBps = parts[4].trim().toLongOrNull() ?: 0L
+                                        val sourceCc = parts[6].trim().uppercase(Locale.ROOT)
+                                        val (isRegionSafe, resolvedCc) = GeoIpDetector.fastCheckIpSecurityAndRegion(
+                                            ip = ip,
+                                            declaredCountryCode = sourceCc,
+                                            allowFastNetworkFallback = false
+                                        )
+                                        if (!isRegionSafe || resolvedCc.isBlank()) {
+                                            filteredErrorCounter.incrementAndGet()
+                                            continue
+                                        }
+                                        if (filterByCountry && resolvedCc != normalizedFilter) continue
+                                        if (!filterByCountry && resolvedCc !in targetCountries && sourceCc !in targetCountries) continue
+
                                         val key = "$ip:$port"
                                         if (seenIpPort.add(key)) {
+                                            GeoIpDetector.cacheResolvedIpCountry(ip, resolvedCc)
+                                            val mbps = (speedBps / 1_000_000L).toInt().coerceIn(MIN_VERIFIED_SPEED_MBPS, 1000)
                                             candidates.add(
                                                 CandidateNode(
-                                                    countryCode = effectiveCc,
+                                                    countryCode = resolvedCc,
                                                     ip = ip,
                                                     port = port,
-                                                    protocol = proto,
-                                                    sourceLabel = "Direct Relay",
-                                                    speedMbpsHint = MIN_VERIFIED_SPEED_MBPS,
-                                                    isAcademicBackbone = false
+                                                    protocol = "http",
+                                                    sourceLabel = "VPNGate Academic",
+                                                    speedMbpsHint = mbps,
+                                                    isAcademicBackbone = true
                                                 )
                                             )
-                                            addedForProto++
-                                            if (addedForProto >= 6) break
                                         }
                                     }
                                 }
                             }
                         }
+                        conn.disconnect()
+                    } catch (_: Exception) {
                     }
-                    conn.disconnect()
-                } catch (_: Exception) {
+                }
+            )
+
+            val protocols = listOf("http", "socks5")
+            for (cc in targetCountries) {
+                for (proto in protocols) {
+                    fetchJobs.add(
+                        async {
+                            try {
+                                val url = URL(
+                                    "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=$proto&timeout=2000&country=$cc&ssl=all&anonymity=all"
+                                )
+                                val conn = (url.openConnection() as HttpURLConnection).apply {
+                                    connectTimeout = 2000
+                                    readTimeout = 2000
+                                    setRequestProperty("User-Agent", "Mozilla/5.0")
+                                }
+                                if (conn.responseCode == 200) {
+                                    var addedForProto = 0
+                                    BufferedReader(InputStreamReader(conn.inputStream)).useLines { lines ->
+                                        for (line in lines) {
+                                            val trimmed = line.trim()
+                                            if (trimmed.isNotBlank() && trimmed.contains(":")) {
+                                                val parts = trimmed.split(":")
+                                                if (parts.size == 2) {
+                                                    val ip = parts[0].trim()
+                                                    val port = parts[1].trim().toIntOrNull()
+                                                    if (port == null || !isSafeAndReputableEndpoint(ip, port)) {
+                                                        filteredErrorCounter.incrementAndGet()
+                                                        continue
+                                                    }
+                                                    val (isRegionSafe, effectiveCc) = GeoIpDetector.fastCheckIpSecurityAndRegion(
+                                                        ip = ip,
+                                                        declaredCountryCode = cc,
+                                                        allowFastNetworkFallback = false
+                                                    )
+                                                    if (!isRegionSafe || effectiveCc.isBlank()) {
+                                                        filteredErrorCounter.incrementAndGet()
+                                                        continue
+                                                    }
+                                                    if (filterByCountry && effectiveCc != normalizedFilter) continue
+                                                    val key = "$ip:$port"
+                                                    if (seenIpPort.add(key)) {
+                                                        GeoIpDetector.cacheResolvedIpCountry(ip, effectiveCc)
+                                                        candidates.add(
+                                                            CandidateNode(
+                                                                countryCode = effectiveCc,
+                                                                ip = ip,
+                                                                port = port,
+                                                                protocol = proto,
+                                                                sourceLabel = "Direct Relay",
+                                                                speedMbpsHint = MIN_VERIFIED_SPEED_MBPS,
+                                                                isAcademicBackbone = false
+                                                            )
+                                                        )
+                                                        addedForProto++
+                                                        if (addedForProto >= 6) break
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                conn.disconnect()
+                            } catch (_: Exception) {
+                            }
+                        }
+                    )
                 }
             }
+
+            fetchJobs.awaitAll()
+        }
+
+        if (VpnManager.isStreamActive()) {
+            return@withContext LiveProxySyncResult(emptyList(), 0)
         }
 
         // Ưu tiên ứng viên từ trục Academic và tốc độ cao trước
-        val prioritizedCandidates = candidates
-            .sortedWith(
-                compareByDescending<CandidateNode> { it.isAcademicBackbone }
-                    .thenByDescending { it.speedMbpsHint }
-            )
-            .take(20)
+        val prioritizedCandidates = synchronized(candidates) {
+            candidates
+                .sortedWith(
+                    compareByDescending<CandidateNode> { it.isAcademicBackbone }
+                        .thenByDescending { it.speedMbpsHint }
+                )
+                .take(18)
+        }
 
         if (prioritizedCandidates.isEmpty()) {
             return@withContext LiveProxySyncResult(
@@ -234,14 +270,16 @@ object LiveProxyFetcher {
             false
         }
 
-        // Xác minh kết nối TCP cổng chính, lọc lỗi & chấm điểm uy tín/an toàn
+        // Xác minh nhanh kết nối TCP cổng chính song song (không chặn luồng bằng HTTP GeoIP tuần tự)
         val verifiedServers = prioritizedCandidates.map { node ->
             async {
-                val realCc = GeoIpDetector.resolveIpCountryCode(node.ip, allowNetworkFallback = true)
-                    .ifBlank { node.countryCode }
-                    .trim()
-                    .uppercase(Locale.ROOT)
-                if (realCc.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(realCc)) {
+                if (VpnManager.isStreamActive()) return@async null
+                val (isSafeRegion, realCc) = GeoIpDetector.fastCheckIpSecurityAndRegion(
+                    ip = node.ip,
+                    declaredCountryCode = node.countryCode,
+                    allowFastNetworkFallback = false
+                )
+                if (!isSafeRegion || (realCc.isNotBlank() && !GeoIpDetector.SUPPORTED_COUNTRIES.contains(realCc))) {
                     filteredErrorCounter.incrementAndGet()
                     return@async null
                 }

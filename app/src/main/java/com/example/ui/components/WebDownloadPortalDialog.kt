@@ -282,6 +282,13 @@ fun WebDownloadPortalDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
+                                        var qrUseDirectApk by rememberSaveable { mutableStateOf(false) }
+                                        val activeQrUrl = if (qrUseDirectApk) {
+                                            config.customApkDownloadUrl.ifBlank { "https://muitenvn.github.io/CloudPlay-App/" }
+                                        } else {
+                                            config.publicWebPortalUrl.ifBlank { "https://muitenvn.github.io/CloudPlay-App/" }
+                                        }
+
                                         Text(
                                             text = if (isEn) "SCAN QR TO DOWNLOAD" else "QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG",
                                             color = XboxNeonGreen,
@@ -290,25 +297,59 @@ fun WebDownloadPortalDialog(
                                             fontWeight = FontWeight.ExtraBold
                                         )
 
+                                        // Toggle QR mode: Web Portal (faster scan, fewer modules) vs Direct APK file
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            listOf(
+                                                false to (if (isEn) "🌐 Web Download" else "🌐 Trang Web tải"),
+                                                true to (if (isEn) "📥 Direct APK" else "📥 Link file APK")
+                                            ).forEach { (isDirectMode, modeLabel) ->
+                                                val selected = qrUseDirectApk == isDirectMode
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(999.dp))
+                                                        .clickable { qrUseDirectApk = isDirectMode },
+                                                    shape = RoundedCornerShape(999.dp),
+                                                    color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant,
+                                                    border = androidx.compose.foundation.BorderStroke(
+                                                        1.dp,
+                                                        if (selected) XboxNeonGreen else XboxCardBorder
+                                                    )
+                                                ) {
+                                                    Text(
+                                                        text = modeLabel,
+                                                        color = if (selected) XboxNeonGreen else TextSecondary,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
                                         Box(
                                             modifier = Modifier
-                                                .size(156.dp)
-                                                .clip(RoundedCornerShape(14.dp))
+                                                .size(212.dp)
+                                                .clip(RoundedCornerShape(16.dp))
                                                 .background(Color.White)
-                                                .padding(12.dp),
+                                                .border(2.dp, XboxNeonGreen.copy(alpha = 0.65f), RoundedCornerShape(16.dp))
+                                                .padding(10.dp)
+                                                .testTag("qr_code_matrix_box"),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             DeterministicQrMatrixCanvas(
-                                                seedText = config.customApkDownloadUrl,
+                                                seedText = activeQrUrl,
                                                 modifier = Modifier.fillMaxSize()
                                             )
                                         }
 
                                         Text(
                                             text = if (isEn) {
-                                                "Scan the QR code with another phone or copy the link below to download CloudPlay."
+                                                "Standard ISO QR Code • Open Camera or Zalo on another phone and point at the QR code above."
                                             } else {
-                                                "Dùng điện thoại khác quét mã QR hoặc sao chép đường dẫn bên dưới để tải ứng dụng."
+                                                "Mã QR chuẩn quốc tế • Mở Camera hoặc Zalo trên điện thoại khác để quét trực tiếp."
                                             },
                                             color = TextSecondary,
                                             fontSize = 11.5.sp,
@@ -510,62 +551,33 @@ private fun DeterministicQrMatrixCanvas(
     seedText: String,
     modifier: Modifier = Modifier
 ) {
+    val qrMatrix = remember(seedText) {
+        QrCodeGenerator.encodeToMatrix(seedText)
+    }
     Canvas(modifier = modifier) {
-        val gridSize = 21
-        val cellSize = size.width / gridSize
-        val darkColor = Color(0xFF07140C)
-        val accentColor = Color(0xFF0D8A38)
+        val matrixSize = qrMatrix.size
+        // Chuẩn ISO/IEC 18004: lề trắng tĩnh (Quiet Zone) xung quanh ma trận 29x29 giúp mọi camera bắt nét tức thì
+        val quietZoneModules = 3
+        val totalModules = matrixSize + quietZoneModules * 2
+        val boardSide = minOf(size.width, size.height)
+        val originX = (size.width - boardSide) / 2f
+        val originY = (size.height - boardSide) / 2f
+        val cellSize = boardSide / totalModules
 
-        fun isFinderPattern(r: Int, c: Int): Boolean {
-            val inTopLeft = r in 0..6 && c in 0..6
-            val inTopRight = r in 0..6 && c in (gridSize - 7) until gridSize
-            val inBottomLeft = r in (gridSize - 7) until gridSize && c in 0..6
-            return inTopLeft || inTopRight || inBottomLeft
-        }
+        drawRect(color = Color.White, size = size)
 
-        fun drawFinder(startR: Int, startC: Int) {
-            for (r in 0..6) {
-                for (c in 0..6) {
-                    val isBorder = r == 0 || r == 6 || c == 0 || c == 6
-                    val isInner = r in 2..4 && c in 2..4
-                    if (isBorder || isInner) {
-                        drawRoundRect(
-                            color = if (isInner) accentColor else darkColor,
-                            topLeft = Offset((startC + c) * cellSize, (startR + r) * cellSize),
-                            size = Size(cellSize * 0.94f, cellSize * 0.94f),
-                            cornerRadius = CornerRadius(cellSize * 0.2f, cellSize * 0.2f)
-                        )
-                    }
-                }
-            }
-        }
-
-        drawFinder(0, 0)
-        drawFinder(0, gridSize - 7)
-        drawFinder(gridSize - 7, 0)
-
-        val bytes = seedText.ifBlank { "https://github.com" }.encodeToByteArray()
-        for (r in 0 until gridSize) {
-            for (c in 0 until gridSize) {
-                if (isFinderPattern(r, c)) continue
-                if (r == 6 || c == 6) {
-                    if ((r + c) % 2 == 0) {
-                        drawRect(
-                            color = darkColor,
-                            topLeft = Offset(c * cellSize, r * cellSize),
-                            size = Size(cellSize * 0.9f, cellSize * 0.9f)
-                        )
-                    }
-                    continue
-                }
-                val idx = (r * gridSize + c) % bytes.size
-                val hash = ((bytes[idx].toInt() and 0xFF) xor (r * 31 + c * 17))
-                if (hash % 2 == 0) {
-                    drawRoundRect(
-                        color = darkColor,
-                        topLeft = Offset(c * cellSize, r * cellSize),
-                        size = Size(cellSize * 0.9f, cellSize * 0.9f),
-                        cornerRadius = CornerRadius(cellSize * 0.18f, cellSize * 0.18f)
+        for (r in 0 until matrixSize) {
+            val row = qrMatrix[r]
+            val y0 = kotlin.math.floor(originY + (r + quietZoneModules) * cellSize)
+            val y1 = kotlin.math.ceil(originY + (r + 1 + quietZoneModules) * cellSize)
+            for (c in 0 until matrixSize) {
+                if (row[c]) {
+                    val x0 = kotlin.math.floor(originX + (c + quietZoneModules) * cellSize)
+                    val x1 = kotlin.math.ceil(originX + (c + 1 + quietZoneModules) * cellSize)
+                    drawRect(
+                        color = Color.Black,
+                        topLeft = Offset(x = x0, y = y0),
+                        size = Size(width = x1 - x0, height = y1 - y0)
                     )
                 }
             }

@@ -1,6 +1,6 @@
 {
-  "summary":  "Cập nhật implementation_plan.md chính xác theo 5 điểm rà soát: (1) giữ nguyên khóa JSON telemetry thật (rttMs, jitterMs, decodeTimeMs, bitrateMbps, framesDropped...) và chỉ thêm hasStatsSample; (2) dán kết quả grep thật và dùng đúng tên hàm/trường thật trong codebase (getInjectionScript, notify('onStreamTelemetry'), QualityAdapter.applyAdaptiveBitrate, ClarityPreset.OFF/BALANCED/ULTRA_SHARP/OLED_PUNCH, CustomProxyDialog, SettingsRepository.init...); (3) sửa truyền cứng 'vi' ở XboxBridge.kt dòng 2313 & 2337, đảm bảo getTargetTranslateLanguageCode() không trả chuỗi rỗng và chỉ dùng từ điển tĩnh tiếng Việt khi ngôn ngữ đích là 'vi'; (4) khôi phục mục 7 (b, d, e) và chuyển việc giả navigator.language/Accept-Language + tự đánh dấu thị trường sang mục Đề xuất thêm; (5) chỉ giữ ánh xạ azureEndpoint có sẵn cho JP và KR, các quốc gia khác để rỗng.",
-  "updatedAt":  "2026-10-29T11:01:56.342432600Z",
+  "summary":  "Cập nhật kế hoạch tối ưu giao diện toàn diện bổ sung hệ thống Tay cầm ảo tùy biến từng nút độc lập: kéo thả từng nút, tách rời hoặc gộp chùm A/B/X/Y (và D-Pad), chỉnh kích thước riêng từng nút, xóa nút không dùng và thêm lại nút từ kho nút.",
+  "updatedAt":  "2026-10-30T07:19:13.483005156Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

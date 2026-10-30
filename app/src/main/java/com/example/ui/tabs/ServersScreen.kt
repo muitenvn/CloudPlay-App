@@ -313,9 +313,9 @@ fun ServersScreen(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 14.dp),
+        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (fasterServerSuggestion != null) {
             val (fasterServer, fasterPing) = fasterServerSuggestion
@@ -330,14 +330,14 @@ fun ServersScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("faster_server_suggestion_card"),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = Color(0xFF0A1912),
                     border = androidx.compose.foundation.BorderStroke(1.2.dp, XboxNeonGreen.copy(alpha = 0.75f))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -382,14 +382,14 @@ fun ServersScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("unlock_fail_prompt_card"),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = Color(0xFF1A0D10),
                     border = androidx.compose.foundation.BorderStroke(1.2.dp, JapanRed.copy(alpha = 0.75f))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -458,20 +458,20 @@ fun ServersScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .xboxSlideFadeIn(enabled = motionEnabled, key = "servers_header_deck", durationMillis = 170)
-                    .clip(RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .border(
                         1.2.dp,
                         Brush.horizontalGradient(
                             listOf(XboxNeonGreen.copy(alpha = 0.55f), XboxCardBorder, DirectCyan.copy(alpha = 0.55f))
                         ),
-                        RoundedCornerShape(22.dp)
+                        RoundedCornerShape(20.dp)
                     ),
                 colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.96f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(13.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

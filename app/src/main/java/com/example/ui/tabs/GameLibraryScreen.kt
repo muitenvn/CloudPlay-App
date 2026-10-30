@@ -183,8 +183,8 @@ fun GameLibraryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Segmented switch: "Thư viện" | "Lịch sử"
             Row(
@@ -196,14 +196,14 @@ fun GameLibraryScreen(
                     modifier = Modifier
                         .weight(1f)
                         .testTag("game_tab_segmented_bar"),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = XboxSurfaceVariant.copy(alpha = 0.9f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(4.dp),
+                            .padding(3.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         val sections = listOf(
@@ -221,27 +221,27 @@ fun GameLibraryScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(9.dp))
                                     .clickable { activeSection = section }
                                     .testTag(
                                         if (section == GameTabSection.LIBRARY) "segment_library_button"
                                         else "segment_history_button"
                                     ),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(9.dp),
                                 color = segmentBg,
                                 border = if (isSelected) {
                                     androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f))
                                 } else null
                             ) {
                                 Box(
-                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    modifier = Modifier.padding(vertical = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = label,
                                         color = if (isSelected) Color.White else TextSecondary,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -254,19 +254,19 @@ fun GameLibraryScreen(
 
                 if (activeSection == GameTabSection.LIBRARY) {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = DirectCyan.copy(alpha = 0.14f),
                         border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f)),
                         modifier = Modifier
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable(enabled = !isSyncingCatalog) {
                                 GameLibraryRepository.syncLiveXboxCatalog(force = true)
                             }
                             .testTag("sync_xbox_catalog_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -319,7 +319,7 @@ fun GameLibraryScreen(
             } else {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                 // 1. High-Tech Console Search Bar (no fixed 52.dp clipping)
                 OutlinedTextField(

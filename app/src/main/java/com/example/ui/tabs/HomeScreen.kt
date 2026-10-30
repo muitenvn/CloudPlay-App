@@ -99,6 +99,8 @@ import com.example.vpn.NetworkMode
 import com.example.vpn.VpnConnectionState
 import com.example.vpn.VpnEngine
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+
 private const val RECENT_GAME_PREFS = "cloudplay_recent_game_prefs"
 private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
 
@@ -183,101 +185,139 @@ fun HomeScreen(
     val isEn = config.isEnglishUI()
     val updateState by com.example.data.UpdateChecker.state.collectAsState()
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 26.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
-        if (availableUpdate != null) {
-            item(key = "home_update_banner") {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                        .clickable {
-                            try {
-                                val intent = android.content.Intent(
-                                    android.content.Intent.ACTION_VIEW,
-                                    android.net.Uri.parse(availableUpdate.releaseUrl)
-                                ).apply {
-                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                            } catch (_: Exception) {
-                            }
-                        }
-                        .testTag("home_update_available_banner"),
-                    color = XboxNeonGreen.copy(alpha = 0.12f)
-                ) {
-                    Row(
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 640.dp
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(11.dp)
+        ) {
+            val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
+            if (availableUpdate != null) {
+                item(key = "home_update_banner") {
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                            .clickable {
+                                try {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(availableUpdate.releaseUrl)
+                                    ).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                }
+                            }
+                            .testTag("home_update_available_banner"),
+                        color = XboxNeonGreen.copy(alpha = 0.12f)
                     ) {
-                        Text(
-                            text = if (isEn) {
-                                "New version ${availableUpdate.latestVersion} available · View"
-                            } else {
-                                "Có bản mới ${availableUpdate.latestVersion} · Xem"
-                            },
-                            color = XboxNeonGreen,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "↗",
-                            color = XboxNeonGreen,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (isEn) {
+                                    "New version ${availableUpdate.latestVersion} available · View"
+                                } else {
+                                    "Có bản mới ${availableUpdate.latestVersion} · Xem"
+                                },
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "↗",
+                                color = XboxNeonGreen,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và thanh chỉnh nhanh Video 16:9 / Quay Luồng / Đồ họa
-        item(key = "home_hero_deck") {
-            HeroConsolePlayDeck(
-                vpnState = vpnState,
-                gamepadStatus = gamepadStatus,
-                onOpenXboxCloud = onOpenXboxCloud,
-                onLaunchFortnite = {
-                    val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
-                    recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
-                    localLastPlayedId = "fortnite"
-                    GameLibraryRepository.recordLastPlayed("fortnite")
-                    onLaunchGame(fortniteUrl)
-                },
-                onNavigateToSettings = onNavigateToSettings,
-                onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
-            )
-        }
+            if (isWideScreen) {
+                item(key = "home_wide_top_deck") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Box(modifier = Modifier.weight(1.15f)) {
+                            HeroConsolePlayDeck(
+                                vpnState = vpnState,
+                                gamepadStatus = gamepadStatus,
+                                onOpenXboxCloud = onOpenXboxCloud,
+                                onLaunchFortnite = {
+                                    val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
+                                    recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
+                                    localLastPlayedId = "fortnite"
+                                    GameLibraryRepository.recordLastPlayed("fortnite")
+                                    onLaunchGame(fortniteUrl)
+                                },
+                                onNavigateToSettings = onNavigateToSettings,
+                                onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
+                            )
+                        }
+                        Box(modifier = Modifier.weight(0.85f)) {
+                            QuickNetworkCockpitCard(
+                                vpnState = vpnState,
+                                onConnectVpn = onConnectVpn,
+                                onDisconnectVpn = onDisconnectVpn,
+                                onNavigateToServers = onNavigateToServers
+                            )
+                        }
+                    }
+                }
+            } else {
+                // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và thanh chỉnh nhanh Video 16:9 / Quay Luồng / Đồ họa
+                item(key = "home_hero_deck") {
+                    HeroConsolePlayDeck(
+                        vpnState = vpnState,
+                        gamepadStatus = gamepadStatus,
+                        onOpenXboxCloud = onOpenXboxCloud,
+                        onLaunchFortnite = {
+                            val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
+                            recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
+                            localLastPlayedId = "fortnite"
+                            GameLibraryRepository.recordLastPlayed("fortnite")
+                            onLaunchGame(fortniteUrl)
+                        },
+                        onNavigateToSettings = onNavigateToSettings,
+                        onOpenGuide = { onOpenGuide(GuideSection.QUICK_START) }
+                    )
+                }
 
-        // 2. Bảng điều khiển mạng UI 3.0: cột sóng + tên máy chủ + ping + nút bật/tắt VPN & đổi máy chủ
-        item(key = "home_network_cockpit") {
-            QuickNetworkCockpitCard(
-                vpnState = vpnState,
-                onConnectVpn = onConnectVpn,
-                onDisconnectVpn = onDisconnectVpn,
-                onNavigateToServers = onNavigateToServers
-            )
-        }
+                // 2. Bảng điều khiển mạng UI 3.0: cột sóng + tên máy chủ + ping + nút bật/tắt VPN & đổi máy chủ
+                item(key = "home_network_cockpit") {
+                    QuickNetworkCockpitCard(
+                        vpnState = vpnState,
+                        onConnectVpn = onConnectVpn,
+                        onDisconnectVpn = onDisconnectVpn,
+                        onNavigateToServers = onNavigateToServers
+                    )
+                }
+            }
 
-        // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho các game vừa chơi gần nhất
-        item(key = "home_featured_games") {
-            FeaturedGamesSection(
-                featuredGames = sortedFeaturedGames,
-                favoriteIds = favoriteIds,
-                lastPlayedGame = lastPlayedGame,
-                recentGames = recentQuickGames,
-                onLaunchBookmark = recordAndLaunch,
-                onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
-                onNavigateToLibrary = onNavigateToLibrary
-            )
+            // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho các game vừa chơi gần nhất
+            item(key = "home_featured_games") {
+                FeaturedGamesSection(
+                    featuredGames = sortedFeaturedGames,
+                    favoriteIds = favoriteIds,
+                    lastPlayedGame = lastPlayedGame,
+                    recentGames = recentQuickGames,
+                    onLaunchBookmark = recordAndLaunch,
+                    onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
+                    onNavigateToLibrary = onNavigateToLibrary
+                )
+            }
         }
     }
 }
@@ -336,21 +376,21 @@ private fun HeroConsolePlayDeck(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(236.dp)
+                    .height(198.dp)
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(236.dp)
+                    .height(198.dp)
                     .background(heroScrimBrush)
             )
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Hàng trạng thái trên cùng của Hero Deck
                 Row(
@@ -375,7 +415,7 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -420,7 +460,7 @@ private fun HeroConsolePlayDeck(
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -430,7 +470,7 @@ private fun HeroConsolePlayDeck(
                         color = Color(0xD90B150F),
                         border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(28.dp)
                             .clip(CircleShape)
                             .clickable { onOpenGuide() }
                     ) {
@@ -439,27 +479,27 @@ private fun HeroConsolePlayDeck(
                                 imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                                 contentDescription = stringResource(R.string.guide_button),
                                 tint = DirectCyan,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(2.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Text(
                         text = stringResource(R.string.hero_title),
                         color = TextPrimary,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 20.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Black,
                         maxLines = 1
                     )
                     Text(
                         text = stringResource(R.string.hero_subtitle),
                         color = Color(0xFFD6EAE0),
-                        fontSize = 12.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1
                     )
@@ -468,34 +508,34 @@ private fun HeroConsolePlayDeck(
                 // Hai nút khởi chạy chính với phụ đề thông số Console
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = onOpenXboxCloud,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
+                            .height(46.dp)
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                             .testTag("hero_launch_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxGreen,
                             contentColor = Color.White
                         ),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        shape = RoundedCornerShape(13.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             Text(
                                 text = stringResource(R.string.btn_launch_xcloud),
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Black,
                                 maxLines = 1
                             )
@@ -503,7 +543,7 @@ private fun HeroConsolePlayDeck(
                                 text = config.tr("Full HD • Mượt 60FPS", "Full HD • Smooth 60FPS"),
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 8.5.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
@@ -514,28 +554,28 @@ private fun HeroConsolePlayDeck(
                         onClick = onLaunchFortnite,
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp)
+                            .height(46.dp)
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                             .testTag("hero_launch_fortnite_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EpicBlue,
                             contentColor = Color.White
                         ),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        shape = RoundedCornerShape(13.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Bolt,
                             contentDescription = null,
                             tint = GoldStar,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             Text(
                                 text = stringResource(R.string.btn_play_fortnite),
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Black,
                                 maxLines = 1
                             )
@@ -543,7 +583,7 @@ private fun HeroConsolePlayDeck(
                                 text = config.tr("Miễn phí • Vào ngay", "Free • Instant Play"),
                                 color = GoldStar.copy(alpha = 0.95f),
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 8.5.sp,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )

@@ -625,6 +625,10 @@ data class AppConfig(
     val gamepadGyroSensitivity: Float = 1.0f,
     val gamepadSprintLockEnabled: Boolean = true,
     val gamepadCustomOffsets: String = "",
+    val gamepadButtonScales: String = "",
+    val gamepadHiddenButtons: String = "",
+    val gamepadAbxySplitMode: Boolean = false,
+    val gamepadDpadSplitMode: Boolean = false,
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
@@ -844,6 +848,10 @@ object SettingsRepository {
             gamepadGyroSensitivity = sp.getFloat("gamepad_gyro_sensitivity", 1.0f).coerceIn(0.40f, 2.50f),
             gamepadSprintLockEnabled = sp.getBoolean("gamepad_sprint_lock", true),
             gamepadCustomOffsets = sp.getString("gamepad_custom_offsets", "") ?: "",
+            gamepadButtonScales = sp.getString("gamepad_button_scales", "") ?: "",
+            gamepadHiddenButtons = sp.getString("gamepad_hidden_buttons", "") ?: "",
+            gamepadAbxySplitMode = sp.getBoolean("gamepad_abxy_split_mode", false),
+            gamepadDpadSplitMode = sp.getBoolean("gamepad_dpad_split_mode", false),
             systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
             stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
             autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),
@@ -962,6 +970,10 @@ object SettingsRepository {
             putFloat("gamepad_gyro_sensitivity", c.gamepadGyroSensitivity)
             putBoolean("gamepad_sprint_lock", c.gamepadSprintLockEnabled)
             putString("gamepad_custom_offsets", c.gamepadCustomOffsets)
+            putString("gamepad_button_scales", c.gamepadButtonScales)
+            putString("gamepad_hidden_buttons", c.gamepadHiddenButtons)
+            putBoolean("gamepad_abxy_split_mode", c.gamepadAbxySplitMode)
+            putBoolean("gamepad_dpad_split_mode", c.gamepadDpadSplitMode)
             putBoolean("system_revolution", c.systemRevolutionEnabled)
             putBoolean("stealth_headers", c.stealthHeadersEnabled)
             putBoolean("auto_healing_mesh", c.autoHealingProxyMesh)
@@ -1412,8 +1424,36 @@ object SettingsRepository {
         persist(_config.value)
     }
 
+    fun updateGamepadButtonScales(scales: String) {
+        _config.update { it.copy(gamepadButtonScales = scales) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadHiddenButtons(hidden: String) {
+        _config.update { it.copy(gamepadHiddenButtons = hidden) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadAbxySplitMode(split: Boolean) {
+        _config.update { it.copy(gamepadAbxySplitMode = split) }
+        persist(_config.value)
+    }
+
+    fun updateGamepadDpadSplitMode(split: Boolean) {
+        _config.update { it.copy(gamepadDpadSplitMode = split) }
+        persist(_config.value)
+    }
+
     fun resetGamepadCustomOffsets() {
-        _config.update { it.copy(gamepadCustomOffsets = "") }
+        _config.update {
+            it.copy(
+                gamepadCustomOffsets = "",
+                gamepadButtonScales = "",
+                gamepadHiddenButtons = "",
+                gamepadAbxySplitMode = false,
+                gamepadDpadSplitMode = false
+            )
+        }
         persist(_config.value)
     }
 

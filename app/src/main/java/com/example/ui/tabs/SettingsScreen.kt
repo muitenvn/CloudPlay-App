@@ -64,6 +64,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,21 +104,40 @@ fun SettingsScreen(
     var customInputText by remember(config.customLocale) {
         mutableStateOf(if (config.useSystemLanguage) "xbox.com/en-US" else "xbox.com/${config.customLocale}")
     }
-    var showTermsDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showAppLogDialog by remember { mutableStateOf(false) }
     var showResetGamepadConfirmDialog by remember { mutableStateOf(false) }
 
-    // 5 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
+    // 6 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
     var expandNetwork by rememberSaveable { mutableStateOf(false) }
     var expandControls by rememberSaveable { mutableStateOf(false) }
     var expandAdvanced by rememberSaveable { mutableStateOf(false) }
     var expandRecording by rememberSaveable { mutableStateOf(false) }
+    var expandTermsPrivacy by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val resolvedSystemLocale = remember { SettingsRepository.resolveSystemXboxLocale() }
     val isEn = config.isSettingsEnglishUI()
+    val termsWebUrl = "https://muitenvn.github.io/CloudPlay-App/terms.html"
+
+    fun openExternalTermsPage() {
+        try {
+            val intent = android.content.Intent(
+                android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse(termsWebUrl)
+            ).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(
+                context,
+                if (isEn) "Could not open browser: $termsWebUrl" else "Không mở được trình duyệt: $termsWebUrl",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -391,6 +412,9 @@ fun SettingsScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định"
+                            }
                             .testTag("advanced_reset_video_defaults_btn"),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -717,6 +741,9 @@ fun SettingsScreen(
                             onClick = { showResetGamepadConfirmDialog = true },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .semantics {
+                                    contentDescription = if (isEn) "Reset Default Layout" else "Đặt lại bố cục mặc định"
+                                }
                                 .testTag("settings_reset_gamepad_positions_btn"),
                             shape = RoundedCornerShape(10.dp)
                         ) {
@@ -1012,6 +1039,9 @@ fun SettingsScreen(
                                     onClick = { SettingsRepository.resetXboxMarketToDefault() },
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .semantics {
+                                            contentDescription = if (isEn) "Return to en-US market" else "Quay về thị trường en-US"
+                                        }
                                         .testTag("settings_reset_xbox_market_en_us_btn"),
                                     colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
                                     shape = RoundedCornerShape(8.dp)
@@ -1144,7 +1174,15 @@ fun SettingsScreen(
 
                     Button(
                         onClick = onClearCookies,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "Sign Out and Clear Login Session"
+                                } else {
+                                    "Xóa phiên và Đăng nhập lại Xbox"
+                                }
+                            },
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -1159,15 +1197,23 @@ fun SettingsScreen(
                     }
 
                     Button(
-                        onClick = { showTermsDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { openExternalTermsPage() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "View Full Terms of Use and Privacy in external browser"
+                                } else {
+                                    "Xem điều khoản đầy đủ và quyền riêng tư trên trình duyệt ngoài"
+                                }
+                            },
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                             Text(
-                                text = if (isEn) "Terms of Use & Risk Notice" else "Điều khoản sử dụng & Lưu ý rủi ro",
+                                text = if (isEn) "View Full Terms" else "Xem điều khoản đầy đủ",
                                 color = TextPrimary,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -1179,6 +1225,13 @@ fun SettingsScreen(
                         onClick = { showAppLogDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "System Activity Log"
+                                } else {
+                                    "Nhật ký hệ thống"
+                                }
+                            }
                             .testTag("open_app_log_advanced_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
                         shape = RoundedCornerShape(10.dp)
@@ -1232,6 +1285,13 @@ fun SettingsScreen(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "Copy Diagnostic Report"
+                                } else {
+                                    "Sao chép báo cáo chẩn đoán"
+                                }
+                            }
                             .testTag("copy_diagnostic_report_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
                         shape = RoundedCornerShape(10.dp)
@@ -1357,7 +1417,15 @@ fun SettingsScreen(
                             }
                             com.example.audio.BackgroundMusicManager.toggleManualPlayback()
                         },
-                        modifier = Modifier.testTag("settings_background_music_manual_play_btn"),
+                        modifier = Modifier
+                            .semantics {
+                                contentDescription = if (isMusicPlaying) {
+                                    if (isEn) "Stop background music" else "Dừng nhạc nền"
+                                } else {
+                                    if (isEn) "Play background music" else "Phát nhạc nền"
+                                }
+                            }
+                            .testTag("settings_background_music_manual_play_btn"),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         border = androidx.compose.foundation.BorderStroke(
@@ -1494,6 +1562,9 @@ fun SettingsScreen(
                         enabled = updateState !is com.example.data.UpdateCheckState.Checking,
                         modifier = Modifier
                             .weight(1f)
+                            .semantics {
+                                contentDescription = if (isEn) "Check for app updates now" else "Kiểm tra bản cập nhật ngay"
+                            }
                             .testTag("check_update_now_btn"),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp),
@@ -1517,6 +1588,9 @@ fun SettingsScreen(
                         onClick = { showWebPortalDialog = true },
                         modifier = Modifier
                             .weight(1f)
+                            .semantics {
+                                contentDescription = if (isEn) "Open Share and QR code dialog" else "Mở hộp thoại Mã QR và Chia sẻ"
+                            }
                             .testTag("open_web_portal_settings_btn"),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 10.dp),
@@ -1603,6 +1677,9 @@ fun SettingsScreen(
                     onClick = { showAppLogDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .semantics {
+                            contentDescription = if (isEn) "View System Activity Log" else "Xem nhật ký hệ thống"
+                        }
                         .testTag("open_app_log_settings_btn"),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 10.dp),
@@ -1627,16 +1704,88 @@ fun SettingsScreen(
             }
         }
 
-        item { Spacer(modifier = Modifier.height(24.dp)) }
-    }
+        // =========================================================================
+        // NHÓM 7: ĐIỀU KHOẢN & QUYỀN RIÊNG TƯ (Mặc định thu gọn, không chặn dùng app)
+        // =========================================================================
+        item {
+            CollapsibleSettingsGroup(
+                title = if (isEn) "Terms & Privacy" else "Điều khoản & Quyền riêng tư",
+                subtitle = if (isEn) {
+                    "Quick summary & link to full terms"
+                } else {
+                    "Tóm tắt nhanh & liên kết điều khoản đầy đủ"
+                },
+                icon = Icons.Default.Shield,
+                expanded = expandTermsPrivacy,
+                onToggle = { expandTermsPrivacy = !expandTermsPrivacy },
+                testTag = "settings_group_terms_privacy"
+            ) {
+                SettingsCard(title = if (isEn) "Quick Summary" else "Tóm tắt nhanh") {
+                    val summaryLines = if (isEn) {
+                        listOf(
+                            "• Independent app, not affiliated with Microsoft, Xbox, or Epic Games.",
+                            "• Using VPN/region switching may violate third-party terms; you are responsible for your own use.",
+                            "• Public servers are operated by independent third parties.",
+                            "• The app does not collect your account credentials or passwords.",
+                            "• IP geolocation by DB-IP.com (CC BY 4.0)."
+                        )
+                    } else {
+                        listOf(
+                            "• Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games.",
+                            "• Dùng VPN/đổi vùng có thể vi phạm điều khoản bên thứ ba; người dùng tự chịu trách nhiệm.",
+                            "• Máy chủ công cộng do bên thứ ba độc lập vận hành.",
+                            "• Ứng dụng không thu thập tài khoản hay mật khẩu của bạn.",
+                            "• Dữ liệu định vị IP: IP geolocation by DB-IP.com (CC BY 4.0)."
+                        )
+                    }
 
-    if (showTermsDialog) {
-        com.example.ui.components.UserTermsAgreementDialog(
-            onAccept = { showTermsDialog = false },
-            onDecline = { showTermsDialog = false },
-            isDismissible = true,
-            onDismissRequest = { showTermsDialog = false }
-        )
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        summaryLines.forEach { line ->
+                            Text(
+                                text = line,
+                                color = TextSecondary,
+                                fontSize = 11.5.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { openExternalTermsPage() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "View Full Terms in external browser"
+                                } else {
+                                    "Xem điều khoản đầy đủ trên trình duyệt ngoài"
+                                }
+                            }
+                            .testTag("settings_view_full_terms_btn"),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.7f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = XboxNeonGreen.copy(alpha = 0.12f)
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
+                            Text(
+                                text = if (isEn) "View Full Terms" else "Xem điều khoản đầy đủ",
+                                color = XboxNeonGreen,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
     if (showWebPortalDialog) {
@@ -1687,7 +1836,11 @@ fun SettingsScreen(
                             Toast.LENGTH_SHORT
                         ).show()
                     },
-                    modifier = Modifier.testTag("confirm_reset_gamepad_btn")
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = if (isEn) "Confirm reset default layout" else "Xác nhận đặt lại bố cục mặc định"
+                        }
+                        .testTag("confirm_reset_gamepad_btn")
                 ) {
                     Text(
                         text = if (isEn) "Reset" else "Đặt lại",
@@ -1699,7 +1852,11 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(
                     onClick = { showResetGamepadConfirmDialog = false },
-                    modifier = Modifier.testTag("cancel_reset_gamepad_btn")
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = if (isEn) "Cancel reset default layout" else "Hủy đặt lại bố cục mặc định"
+                        }
+                        .testTag("cancel_reset_gamepad_btn")
                 ) {
                     Text(
                         text = if (isEn) "Cancel" else "Hủy",
@@ -1721,6 +1878,7 @@ private fun CollapsibleSettingsGroup(
     testTag: String,
     content: @Composable () -> Unit
 ) {
+    val isEnGroup = SettingsRepository.config.value.isSettingsEnglishUI()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Surface(
             modifier = Modifier
@@ -1732,6 +1890,13 @@ private fun CollapsibleSettingsGroup(
                     RoundedCornerShape(16.dp)
                 )
                 .clickable { onToggle() }
+                .semantics {
+                    contentDescription = if (expanded) {
+                        if (isEnGroup) "$title, expanded, tap to collapse" else "$title, đang mở, bấm để thu gọn"
+                    } else {
+                        if (isEnGroup) "$title, collapsed, tap to expand" else "$title, đang thu gọn, bấm để mở rộng"
+                    }
+                }
                 .testTag(testTag),
             color = XboxSurface.copy(alpha = 0.96f)
         ) {

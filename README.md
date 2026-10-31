@@ -57,6 +57,7 @@ Chi tiết được trình bày tại [SECURITY.md](SECURITY.md):
 - **Dự án cộng đồng độc lập:** Ứng dụng này không liên kết, không được tài trợ hay phê duyệt bởi Microsoft Corporation hay Xbox. Các nhãn hiệu *Xbox*, *Xbox Cloud Gaming* và *Fortnite* thuộc về chủ sở hữu tương ứng.
 - **Trách nhiệm sử dụng:** Người dùng tự chịu trách nhiệm tuân thủ Điều khoản Dịch vụ của Microsoft khi sử dụng dịch vụ.
 - **Giấy phép mã nguồn mở:** Phát hành theo [Giấy phép MIT (MIT License)](https://opensource.org/licenses/MIT), cung cấp "nguyên trạng" (AS-IS) không kèm theo bất kỳ cam kết bảo đảm nào.
+- **Điều khoản & Quyền riêng tư:** Xem chi tiết tại [Điều khoản sử dụng & Quyền riêng tư (Terms & Privacy)](https://muitenvn.github.io/CloudPlay-App/terms.html).
 
 ---
 

@@ -513,6 +513,30 @@ fun WebDownloadPortalDialog(
                                                 settings.javaScriptEnabled = true
                                                 settings.domStorageEnabled = true
                                                 webViewClient = object : WebViewClient() {
+                                                    private fun handleExternalUri(uri: Uri?): Boolean {
+                                                        val scheme = uri?.scheme?.lowercase() ?: return false
+                                                        if (scheme == "http" || scheme == "https") {
+                                                            try {
+                                                                ctx.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                })
+                                                            } catch (_: Exception) {}
+                                                            return true
+                                                        }
+                                                        return false
+                                                    }
+
+                                                    override fun shouldOverrideUrlLoading(
+                                                        view: WebView?,
+                                                        request: android.webkit.WebResourceRequest?
+                                                    ): Boolean = handleExternalUri(request?.url)
+
+                                                    @Deprecated("Deprecated in Java")
+                                                    override fun shouldOverrideUrlLoading(
+                                                        view: WebView?,
+                                                        url: String?
+                                                    ): Boolean = handleExternalUri(url?.let { Uri.parse(it) })
+
                                                     override fun onPageFinished(view: WebView?, url: String?) {
                                                         super.onPageFinished(view, url)
                                                         val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")

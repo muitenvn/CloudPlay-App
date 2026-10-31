@@ -71,24 +71,8 @@ fun UpdateAvailableDialog(
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val context = LocalContext.current
     val notesScrollState = rememberScrollState()
-    val mirrorChipsScrollState = rememberScrollState()
     val downloadState by UpdateChecker.downloadState.collectAsState()
     val githubReleasesUrl = UpdateChecker.FALLBACK_RELEASES_URL
-    var selectedMirrorId by remember { mutableStateOf("auto") }
-
-    val mirrorOptions = remember(isEn) {
-        buildList {
-            add("auto" to (if (isEn) "⚡ Auto Switch" else "⚡ Tự động đổi"))
-            UpdateChecker.FAST_MIRROR_NODES.forEach { node ->
-                val label = if (node.isDirectGitHub) {
-                    if (isEn) "GitHub Direct" else "GitHub gốc"
-                } else {
-                    node.name
-                }
-                add(node.id to label)
-            }
-        }
-    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -178,58 +162,11 @@ fun UpdateAvailableDialog(
                     }
                 }
 
-                // Bộ chọn kênh tải nhanh (tự động xoay vòng gh-proxy.com -> ghproxy.net -> ghfast.top -> mirror.ghproxy.com -> kkgithub.com -> GitHub)
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(
-                        text = if (isEn) {
-                            "Fast Download Mirror (auto-switches if a mirror is down):"
-                        } else {
-                            "Cổng tải nhanh (tự chuyển sang cổng khác nếu ghfast.top/proxy lỗi):"
-                        },
-                        color = TextSecondary,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(mirrorChipsScrollState),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        mirrorOptions.forEach { (mirrorId, label) ->
-                            val isSelected = selectedMirrorId == mirrorId
-                            Surface(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .clickable { selectedMirrorId = mirrorId }
-                                    .testTag("mirror_chip_$mirrorId"),
-                                shape = RoundedCornerShape(999.dp),
-                                color = if (isSelected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (isSelected) XboxNeonGreen else XboxCardBorder
-                                )
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (isSelected) XboxNeonGreen else TextSecondary,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
                 // Hiển thị tiến độ tải / kiểm tra SHA-256 / thông báo lỗi xác thực
                 when (val dl = downloadState) {
                     is ApkDownloadState.Downloading -> {
                         val mbDone = dl.downloadedBytes / (1024f * 1024f)
                         val mbTotal = if (dl.totalBytes > 0) dl.totalBytes / (1024f * 1024f) else -1f
-                        val mirrorDisplay = dl.activeMirrorName.ifBlank {
-                            if (dl.usingFallbackGitHub) "GitHub Direct" else "gh-proxy.com"
-                        }
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -245,9 +182,9 @@ fun UpdateAvailableDialog(
                             ) {
                                 Text(
                                     text = if (isEn) {
-                                        "⚡ Via $mirrorDisplay (${dl.mirrorIndex}/${dl.totalMirrors})..."
+                                        "⚡ Downloading via mirror..."
                                     } else {
-                                        "⚡ Đang tải qua $mirrorDisplay (${dl.mirrorIndex}/${dl.totalMirrors})..."
+                                        "⚡ Đang tải nhanh qua máy chủ phụ..."
                                     },
                                     color = DirectCyan,
                                     fontSize = 11.sp,
@@ -378,14 +315,14 @@ fun UpdateAvailableDialog(
                     ApkDownloadState.Idle -> {}
                 }
 
-                // Nút tải nhanh có tự động chuyển đổi cổng dự phòng và kiểm tra SHA-256 trước khi cài
+                // Nút tải nhanh có tự động chuyển đổi cổng dự phòng ngầm và kiểm tra SHA-256 trước khi cài
                 if (downloadState !is ApkDownloadState.Downloading && downloadState !is ApkDownloadState.Verifying) {
                     Button(
                         onClick = {
                             UpdateChecker.startVerifiedApkDownload(
                                 context = context,
                                 updateInfo = updateInfo,
-                                preferredMirrorId = selectedMirrorId
+                                preferredMirrorId = "auto"
                             )
                         },
                         modifier = Modifier
@@ -396,9 +333,9 @@ fun UpdateAvailableDialog(
                     ) {
                         Text(
                             text = if (isEn) {
-                                "⚡ Fast Download (Auto-Failover + SHA-256)"
+                                "⚡ Fast download via mirror"
                             } else {
-                                "⚡ Tải nhanh (Tự đổi cổng nếu lỗi + Kiểm tra SHA-256)"
+                                "⚡ Tải nhanh qua máy chủ phụ"
                             },
                             color = Color.White,
                             fontSize = 12.sp,
@@ -406,18 +343,6 @@ fun UpdateAvailableDialog(
                         )
                     }
                 }
-
-                // Dòng ghi chú minh bạch
-                Text(
-                    text = if (isEn) {
-                        "Auto-switches across gh-proxy.com, ghproxy.net, ghfast.top, mirror.ghproxy.com, kkgithub.com & GitHub with mandatory SHA-256 verification."
-                    } else {
-                        "Tự động xoay vòng qua gh-proxy.com, ghproxy.net, ghfast.top, mirror.ghproxy.com, kkgithub.com & GitHub gốc kèm đối chiếu mã SHA-256."
-                    },
-                    color = TextSecondary,
-                    fontSize = 10.sp,
-                    lineHeight = 13.5.sp
-                )
 
                 Spacer(modifier = Modifier.height(1.dp))
 

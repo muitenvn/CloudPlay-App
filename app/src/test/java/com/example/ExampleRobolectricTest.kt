@@ -1025,4 +1025,51 @@ class ExampleRobolectricTest {
         SettingsRepository.updateUserAcceptedTerms(false)
         org.junit.Assert.assertFalse(SettingsRepository.config.value.userAcceptedTerms)
     }
+
+    @Test
+    fun testMultiMirrorFailoverChainAndApkValidation() {
+        val directUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v1.0.5/CloudPlay-v1.0.5.apk"
+
+        // 1. Auto mode puts gh-proxy.com first (since ghfast.top has downtime) and includes all 6 mirrors
+        val defaultChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
+            directGitHubUrl = directUrl,
+            preferredMirrorId = "auto",
+            lastWorkingMirrorId = ""
+        )
+        assertEquals(6, defaultChain.size)
+        assertEquals("gh_proxy_com", defaultChain[0].first.id)
+        assertEquals("https://gh-proxy.com/$directUrl", defaultChain[0].second)
+        assertEquals("github_direct", defaultChain.last().first.id)
+        assertEquals(directUrl, defaultChain.last().second)
+
+        // 2. If user or previous download found a working mirror (e.g. ghproxy_net), prioritize it first
+        val rememberedChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
+            directGitHubUrl = directUrl,
+            preferredMirrorId = "auto",
+            lastWorkingMirrorId = "ghproxy_net"
+        )
+        assertEquals("ghproxy_net", rememberedChain[0].first.id)
+        assertEquals(6, rememberedChain.map { it.first.id }.distinct().size)
+
+        // 3. All mirror URLs are allowed only when allowGhFast=true, and blocked when allowGhFast=false (e.g. SHA-256 check)
+        for ((node, candidateUrl) in defaultChain) {
+            assertTrue(
+                "Mirror ${node.name} URL must be allowed when mirror mode is active",
+                com.example.data.UpdateChecker.isAllowedHttpsUrl(java.net.URL(candidateUrl), allowGhFast = true)
+            )
+            if (node.id != "github_direct") {
+                org.junit.Assert.assertFalse(
+                    "Mirror ${node.name} must NOT be allowed for official SHA-256 verification",
+                    com.example.data.UpdateChecker.isAllowedHttpsUrl(java.net.URL(candidateUrl), allowGhFast = false)
+                )
+            }
+        }
+
+        // 4. ZIP/APK magic header check rejects HTML error pages returned by broken mirrors
+        val validZipHeader = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x14, 0x00)
+        val htmlErrorHeader = "<!DOCTYPE html><html>".toByteArray(Charsets.UTF_8)
+        assertTrue(com.example.data.UpdateChecker.hasValidApkZipMagicHeader(validZipHeader, validZipHeader.size))
+        org.junit.Assert.assertFalse(com.example.data.UpdateChecker.hasValidApkZipMagicHeader(htmlErrorHeader, htmlErrorHeader.size))
+    }
 }
+

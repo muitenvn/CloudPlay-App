@@ -68,6 +68,11 @@
   .btn.ghost{background:var(--bg);color:var(--text);border-color:var(--line);flex:1 1 150px}
   .btn.ghost:hover{background:var(--surface)}
   .btn svg{width:20px;height:20px}
+  .mirrors{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .mirrors-lbl{font-size:12.5px;color:var(--muted);font-weight:600;margin-right:2px}
+  .m-chip{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .m-chip:hover{border-color:var(--accent);color:var(--text)}
+  .m-chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700}
   .hint{font-size:13px;color:var(--muted);margin-top:10px}
   .hash{display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:12.5px;color:var(--muted)}
   .hash b{color:var(--text);font-weight:600;flex:none}
@@ -179,12 +184,21 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16"/></svg>
           <span data-i="dl">Tải APK</span>
         </a>
-        <a class="btn ghost" id="dlfast" href="https://ghfast.top/https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener">
+        <a class="btn ghost" id="dlfast" href="https://gh-proxy.com/https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
-          <span data-i="fast">Tải qua máy chủ phụ</span>
+          <span data-i="fast" id="dlfast-txt">Tải qua máy chủ phụ</span>
         </a>
       </div>
-      <p class="hint" data-i="hint">Mạng chậm? Dùng máy chủ phụ (bên thứ ba). Nếu dùng, hãy đối chiếu mã SHA-256 bên dưới trước khi cài.</p>
+      <div class="mirrors" id="mirrors" role="group" aria-label="Download mirrors">
+        <span class="mirrors-lbl" data-i="m_lbl">Cổng tải nhanh:</span>
+        <button type="button" class="m-chip" data-m="auto" aria-pressed="true" data-i="m_auto">⚡ Tự động đổi</button>
+        <button type="button" class="m-chip" data-m="gh_proxy" aria-pressed="false">gh-proxy.com</button>
+        <button type="button" class="m-chip" data-m="ghproxy_net" aria-pressed="false">ghproxy.net</button>
+        <button type="button" class="m-chip" data-m="ghfast" aria-pressed="false">ghfast.top</button>
+        <button type="button" class="m-chip" data-m="mirror_ghproxy" aria-pressed="false">mirror.ghproxy</button>
+        <button type="button" class="m-chip" data-m="kkgithub" aria-pressed="false">kkgithub.com</button>
+      </div>
+      <p class="hint" data-i="hint">Mạng chậm hoặc lỗi cổng? Hệ thống tự chuyển qua gh-proxy.com, ghproxy.net, ghfast.top, kkgithub.com. Hãy đối chiếu mã SHA-256 bên dưới trước khi cài.</p>
       <div class="hash" id="hash">
         <b>SHA-256</b><code id="hashv" data-i="hashna">Chưa lấy được mã kiểm tra</code>
         <button type="button" id="copy" data-i="copy" hidden>Sao chép</button>
@@ -288,8 +302,8 @@
   var D={
     vi:{by:"Ứng dụng cho Android",
       tagline:"Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android: hiển thị số đo thật khi chơi, tự chỉnh chất lượng hình ảnh và gợi ý nguyên nhân lag.",
-      dl:"Tải APK",fast:"Tải qua máy chủ phụ",
-      hint:"Mạng chậm? Dùng máy chủ phụ (bên thứ ba). Nếu dùng, hãy đối chiếu mã SHA-256 bên dưới trước khi cài.",
+      dl:"Tải APK",fast:"Tải qua máy chủ phụ",m_lbl:"Cổng tải nhanh:",m_auto:"⚡ Tự động đổi",
+      hint:"Mạng chậm hoặc lỗi cổng? Hệ thống tự chuyển qua gh-proxy.com, ghproxy.net, ghfast.top, kkgithub.com. Hãy đối chiếu mã SHA-256 bên dưới trước khi cài.",
       hashna:"Chưa lấy được mã kiểm tra",copy:"Sao chép",copied:"Đã chép",
       f1:"Phiên bản",f2:"Dung lượng",free:"Miễn phí",f4:"Giá",
       h_shots:"Ảnh chụp",c1:"Trang chủ",c2:"Thư viện game",c3:"Cài đặt đồ họa",
@@ -312,8 +326,8 @@
       alts:["Màn hình trang chủ","Thư viện game","Cài đặt đồ họa và FPS"]},
     en:{by:"App for Android",
       tagline:"A helper for playing Xbox Cloud Gaming on Android: shows real measurements while you play, adjusts image quality and suggests the cause of lag.",
-      dl:"Download APK",fast:"Download via mirror",
-      hint:"Slow network? Use the mirror (third party). If you do, compare the SHA-256 below before installing.",
+      dl:"Download APK",fast:"Download via mirror",m_lbl:"Fast mirrors:",m_auto:"⚡ Auto-switch",
+      hint:"Slow network or mirror down? Auto-switches across gh-proxy.com, ghproxy.net, ghfast.top, kkgithub.com. Verify the SHA-256 below before installing.",
       hashna:"Checksum not available",copy:"Copy",copied:"Copied",
       f1:"Version",f2:"Size",free:"Free",f4:"Price",
       h_shots:"Screenshots",c1:"Home",c2:"Game library",c3:"Graphics settings",
@@ -371,6 +385,66 @@
     try{navigator.clipboard.writeText(hashHex).then(function(){cp.setAttribute("data-copied","1");cp.textContent=D[lang].copied;setTimeout(function(){cp.removeAttribute("data-copied");cp.textContent=D[lang].copy;},1500);});}catch(e){}
   });
   function show(h){hashHex=h.toLowerCase();var el=document.getElementById("hashv");el.textContent=hashHex;el.removeAttribute("data-i");cp.hidden=false;}
+  // multi-mirror auto-failover & selector
+  var directApkUrl="https://github.com/muitenvn/CloudPlay-App/releases/latest";
+  var MIRRORS=[
+    {id:"gh_proxy",name:"gh-proxy.com",probe:"https://gh-proxy.com/",build:function(u){return "https://gh-proxy.com/"+u;}},
+    {id:"ghproxy_net",name:"ghproxy.net",probe:"https://ghproxy.net/",build:function(u){return "https://ghproxy.net/"+u;}},
+    {id:"ghfast",name:"ghfast.top",probe:"https://ghfast.top/",build:function(u){return "https://ghfast.top/"+u;}},
+    {id:"mirror_ghproxy",name:"mirror.ghproxy.com",probe:"https://mirror.ghproxy.com/",build:function(u){return "https://mirror.ghproxy.com/"+u;}},
+    {id:"kkgithub",name:"kkgithub.com",probe:"https://kkgithub.com/",build:function(u){return u.replace(/^https:\/\/github\.com\//i,"https://kkgithub.com/");}}
+  ];
+  var selectedMirrorMode="auto",autoCursor=0,healthyIds=["gh_proxy","ghproxy_net","ghfast","mirror_ghproxy","kkgithub"];
+  var dlfastEl=document.getElementById("dlfast"),dlfastTxt=document.getElementById("dlfast-txt");
+  function getMirrorById(id){for(var i=0;i<MIRRORS.length;i++){if(MIRRORS[i].id===id)return MIRRORS[i];}return MIRRORS[0];}
+  function resolveActiveMirror(){
+    if(selectedMirrorMode!=="auto")return getMirrorById(selectedMirrorMode);
+    var id=healthyIds[autoCursor%healthyIds.length]||"gh_proxy";
+    return getMirrorById(id);
+  }
+  function syncMirrorLink(){
+    var m=resolveActiveMirror();
+    if(dlfastEl)dlfastEl.href=m.build(directApkUrl);
+    if(dlfastTxt){
+      var base=(D[lang]&&D[lang].fast)||"Tải qua máy chủ phụ";
+      dlfastTxt.textContent=base+" ("+m.name+")";
+    }
+  }
+  [].forEach.call(document.querySelectorAll(".m-chip"),function(btn){
+    btn.addEventListener("click",function(){
+      selectedMirrorMode=btn.getAttribute("data-m")||"auto";
+      [].forEach.call(document.querySelectorAll(".m-chip"),function(b){
+        b.setAttribute("aria-pressed",b===btn?"true":"false");
+      });
+      syncMirrorLink();
+    });
+  });
+  if(dlfastEl){
+    dlfastEl.addEventListener("click",function(){
+      if(selectedMirrorMode==="auto"&&healthyIds.length>1){
+        setTimeout(function(){autoCursor=(autoCursor+1)%healthyIds.length;syncMirrorLink();},400);
+      }
+    });
+  }
+  // Probe mirrors in background to prioritize responsive nodes and deprioritize broken ones
+  function probeMirrors(){
+    if(!("fetch" in window))return;
+    var alive=[];
+    MIRRORS.forEach(function(m){
+      var c=("AbortController" in window)?new AbortController():null;
+      var t=setTimeout(function(){if(c)c.abort();},3500);
+      fetch(m.probe,{mode:"no-cors",cache:"no-store",signal:c?c.signal:undefined}).then(function(){
+        clearTimeout(t);
+        alive.push(m.id);
+        healthyIds=alive.slice();
+        if(selectedMirrorMode==="auto")syncMirrorLink();
+      }).catch(function(){clearTimeout(t);});
+    });
+  }
+  syncMirrorLink();
+  probeMirrors();
+  // Re-sync mirror label when language changes
+  [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.addEventListener("click",syncMirrorLink);});
   // live release data (fails silently)
   var ctl=("AbortController" in window)?new AbortController():null;var tm=setTimeout(function(){if(ctl)ctl.abort();},8000);
   fetch("https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest",{headers:{Accept:"application/vnd.github+json"},signal:ctl?ctl.signal:undefined})
@@ -380,9 +454,10 @@
     var apk=null,sha=null;(j.assets||[]).forEach(function(a){if(/\.apk$/i.test(a.name))apk=a;if(/\.apk\.sha256$/i.test(a.name))sha=a;});
     if(apk){
       document.getElementById("f-size").textContent=(Math.round(apk.size/1048576*10)/10)+" MB";
+      directApkUrl=apk.browser_download_url;
       document.getElementById("dl").href=apk.browser_download_url;
       document.getElementById("dl2").href=apk.browser_download_url;
-      document.getElementById("dlfast").href="https://ghfast.top/"+apk.browser_download_url;
+      syncMirrorLink();
       var m=/^sha256:([0-9a-f]{64})$/i.exec(apk.digest||"");if(m)show(m[1]);
     }
     if(!hashHex&&sha){fetch(sha.browser_download_url).then(function(r){return r.text();}).then(function(x){var m=/\b([0-9a-f]{64})\b/i.exec(x);if(m)show(m[1]);}).catch(function(){});}

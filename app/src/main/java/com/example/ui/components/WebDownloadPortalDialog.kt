@@ -110,9 +110,9 @@ fun WebDownloadPortalDialog(
 
     fun sharePortalLink() {
         val shareText = if (isEn) {
-            "🎮 Download CloudPlay for Xbox Cloud Gaming (Low Latency • Virtual Controller & Touch):\n🌐 Web: ${config.publicWebPortalUrl}\n📥 Direct APK: ${config.customApkDownloadUrl}"
+            "Download CloudPlay for Xbox Cloud Gaming:\nWeb: ${config.publicWebPortalUrl}\nAPK: ${config.customApkDownloadUrl}"
         } else {
-            "🎮 Tải CloudPlay cho Xbox Cloud Gaming (Giảm độ trễ • Tay cầm ảo & Cảm ứng):\n🌐 Trang Web: ${config.publicWebPortalUrl}\n📥 Tải trực tiếp APK: ${config.customApkDownloadUrl}"
+            "Link tải ứng dụng CloudPlay (hỗ trợ Xbox Cloud Gaming):\nTrang web: ${config.publicWebPortalUrl}\nFile APK: ${config.customApkDownloadUrl}"
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -347,9 +347,9 @@ fun WebDownloadPortalDialog(
 
                                         Text(
                                             text = if (isEn) {
-                                                "Standard ISO QR Code • Open Camera or Zalo on another phone and point at the QR code above."
+                                                "Open Camera or a QR scanner app on another phone to open the download link."
                                             } else {
-                                                "Mã QR chuẩn quốc tế • Mở Camera hoặc Zalo trên điện thoại khác để quét trực tiếp."
+                                                "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải."
                                             },
                                             color = TextSecondary,
                                             fontSize = 11.5.sp,

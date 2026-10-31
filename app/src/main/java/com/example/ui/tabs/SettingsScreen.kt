@@ -139,7 +139,7 @@ fun SettingsScreen(
                 testTag = "settings_group_graphics"
             ) {
                 // 1.1 Độ phân giải & Đồ họa (gộp 1) + Nhịp FPS
-                SettingsCard(title = if (isEn) "Resolution & Graphics (4G/5G/Wi-Fi Low Lag)" else "Độ phân giải & Đồ họa (Giảm trễ 4G/5G/Wi-Fi)") {
+                SettingsCard(title = if (isEn) "Resolution & Bitrate (Wi-Fi / 4G / 5G)" else "Độ phân giải & Băng thông (Wi-Fi / 4G / 5G)") {
                     val selectedMode = config.cellularMode
                     val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
 
@@ -411,17 +411,17 @@ fun SettingsScreen(
         item {
             CollapsibleSettingsGroup(
                 title = if (isEn) "Network & Region Unlock" else "Mạng & Mở khóa vùng",
-                subtitle = if (isEn) "Smart VPN, Low Ping" else "VPN thông minh, vào game mượt",
+                subtitle = if (isEn) "Auto VPN & Server Selection" else "Tự bật/tắt VPN & Chọn máy chủ",
                 icon = Icons.Default.Public,
                 expanded = expandNetwork,
                 onToggle = { expandNetwork = !expandNetwork },
                 testTag = "settings_group_network"
             ) {
-                // 2.1 VPN thông minh
-                SettingsCard(title = if (isEn) "Smart VPN" else "VPN thông minh") {
+                // 2.1 Tự động bật/tắt VPN
+                SettingsCard(title = if (isEn) "Auto VPN" else "Tự động bật/tắt VPN") {
                     SettingToggleRow(
-                        title = if (isEn) "Smart VPN (Auto Unlock ➔ Auto Direct)" else "VPN thông minh (Tự mở khóa ➔ Tự tắt khi vào trận)",
-                        subtitle = if (isEn) "Auto connects to open game, then switches to direct network for lowest ping" else "Tự bật khi mở game, tự chuyển sang mạng trực tiếp khi vào trận để ping thấp nhất",
+                        title = if (isEn) "Auto VPN (Unlock on launch ➔ Turn off in-game)" else "Tự bật VPN khi mở game ➔ Tự tắt khi vào chơi",
+                        subtitle = if (isEn) "Connects VPN to open the game, then switches back to direct network" else "Bật VPN lúc mở game để qua bước kiểm tra vùng, sau đó tắt VPN để dùng mạng trực tiếp",
                         checked = config.smartVpnEnabled && config.autoBypassEnabled,
                         onCheckedChange = { enabled ->
                             SettingsRepository.updateSmartVpnEnabled(enabled)
@@ -483,8 +483,8 @@ fun SettingsScreen(
                     listOf(
                         Triple(
                             VpnEngine.SMART_BYPASS,
-                            if (isEn) "Smart Unlock 🇯🇵 (Recommended)" else "Mở khóa thông minh 🇯🇵 (Khuyên dùng)",
-                            if (isEn) "Direct unlock without extra ping" else "Vào thẳng nhanh, không làm tăng ping"
+                            if (isEn) "Unlock on Launch Only 🇯🇵 (Recommended)" else "Chỉ mở khóa lúc vào game 🇯🇵 (Khuyên dùng)",
+                            if (isEn) "Uses proxy only during game launch" else "Chỉ đi qua máy chủ trung gian lúc mới mở game"
                         ),
                         Triple(
                             VpnEngine.PROXY_TUNNEL,
@@ -745,7 +745,7 @@ fun SettingsScreen(
                 testTag = "settings_group_advanced"
             ) {
                 // 4.1 Bộ dịch đa ngôn ngữ & hiển thị
-                SettingsCard(title = if (isEn) "Smart Cloud Translator" else "Bộ dịch đa ngôn ngữ") {
+                SettingsCard(title = if (isEn) "Xbox Menu Translator" else "Dịch giao diện trang Xbox") {
                     val activeTargetLangCode = if (config.isEffectiveTranslateEnabled()) config.getTargetTranslateLanguageCode() else SettingsRepository.TRANSLATE_LANG_OFF
                     SettingToggleRow(
                         title = if (isEn) "Auto-translate Xbox interface" else "Tự động dịch giao diện Xbox",
@@ -965,7 +965,7 @@ fun SettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isEn) "🇺🇸 Verified Default Market (en-US • Recommended)" else "🇺🇸 Thị trường chuẩn đã xác minh (en-US • Khuyên dùng)",
+                                    text = if (isEn) "🇺🇸 Default Market (en-US • Recommended)" else "🇺🇸 Thị trường mặc định (en-US • Khuyên dùng)",
                                     color = TextPrimary,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp
@@ -1308,9 +1308,9 @@ fun SettingsScreen(
 
                     Text(
                         text = if (isEn) {
-                            "⚡ Hardware VBR encoding & background load reduction run automatically while recording."
+                            "Reduces background animations while recording to save battery."
                         } else {
-                            "⚡ Tự động mã hóa phần cứng nhẹ (VBR) & tắt hiệu ứng nền khi đang quay để chống nóng máy."
+                            "Tạm giảm hiệu ứng chuyển động nền khi đang quay để đỡ nặng máy."
                         },
                         color = TextSecondary,
                         fontSize = 10.5.sp

@@ -93,21 +93,21 @@ enum class StreamGraphicsQuality(
         id = "auto",
         title = "Tự Động (Khuyên dùng)",
         shortLabel = "Tự Động",
-        subtitle = "Tự tối ưu theo mạng & giảm tải máy",
+        subtitle = "Tự chỉnh theo mạng Wi-Fi / 4G",
         targetBitrateMbps = 10,
-        deviceLoadLabel = "⚡ Tự động giảm tải chống nóng máy",
-        dataSavingNotice = "Tự động co giãn theo Wifi / 4G",
-        description = "Hệ thống tự động theo dõi điều kiện mạng Wifi / 4G và độ trễ giải mã GPU của máy để tự điều chỉnh đồ họa, giữ 60 FPS mượt mà và chống nóng máy."
+        deviceLoadLabel = "⚡ Tự điều chỉnh theo mạng",
+        dataSavingNotice = "Tự đổi giữa 720p và 1080p",
+        description = "Tự động hạ độ phân giải khi mạng yếu và tăng lại khi mạng ổn định."
     ),
     DATA_SAVER(
         id = "saver",
         title = "Tiết Kiệm Dung Lượng (Thấp)",
         shortLabel = "Tiết Kiệm (5M)",
-        subtitle = "Tiết kiệm data, mát máy, tốn ít pin",
+        subtitle = "Đỡ tốn data, mát máy, ít hao pin",
         targetBitrateMbps = 5,
-        deviceLoadLabel = "❄️ Mát máy • Tiết kiệm pin",
-        dataSavingNotice = "Tiết kiệm đến 60% dung lượng data di động",
-        description = "Giảm tải cho GPU và CPU điện thoại, giảm thời gian giải mã khung hình, máy ít nóng và tiết kiệm pin."
+        deviceLoadLabel = "❄️ Nhẹ máy • Đỡ hao pin",
+        dataSavingNotice = "Giới hạn băng thông ~5 Mbps",
+        description = "Giảm băng thông truyền tải xuống mức thấp, phù hợp khi dùng dữ liệu di động hoặc máy cấu hình thấp."
     ),
     MEDIUM(
         id = "medium",
@@ -115,29 +115,29 @@ enum class StreamGraphicsQuality(
         shortLabel = "Trung Bình (9M)",
         subtitle = "Cân bằng độ nét và nhiệt độ máy",
         targetBitrateMbps = 9,
-        deviceLoadLabel = "🌿 Máy chạy êm ái • Ít hao pin",
-        dataSavingNotice = "Tiết kiệm ~40% dung lượng data",
-        description = "Mức cân bằng lý tưởng cho các dòng máy tầm trung, đảm bảo 60 FPS mượt mà và giữ điện thoại không bị quá nhiệt khi chơi lâu."
+        deviceLoadLabel = "🌿 Mức trung bình • ~9 Mbps",
+        dataSavingNotice = "Giới hạn băng thông ~9 Mbps",
+        description = "Mức cân bằng cho các dòng máy tầm trung, giữ nhiệt độ máy ổn định khi chơi lâu."
     ),
     HIGH(
         id = "high",
         title = "Cao",
         shortLabel = "Cao (14M)",
-        subtitle = "1080p sắc nét, chi tiết cao",
+        subtitle = "Độ phân giải 1080p • 14 Mbps",
         targetBitrateMbps = 14,
-        deviceLoadLabel = "⚡ Tiêu chuẩn đồ họa 1080p60",
-        dataSavingNotice = "Tiêu chuẩn ~4.5GB/giờ",
-        description = "Hình ảnh sắc nét rõ từng chi tiết, đổ bóng và bề mặt vật thể tuyệt đẹp cho máy có chip xử lý đồ họa khá trở lên."
+        deviceLoadLabel = "⚡ Độ phân giải 1080p",
+        dataSavingNotice = "Băng thông ~14 Mbps (~4.5GB/giờ)",
+        description = "Độ phân giải 1080p cho mạng Wi-Fi ổn định và thiết bị tầm trung trở lên."
     ),
     ULTRA(
         id = "ultra",
         title = "Rất Cao (Tối Đa)",
         shortLabel = "Rất Cao (20M)",
-        subtitle = "Bung trọn vẹn đồ họa xCloud tối đa",
+        subtitle = "Mức băng thông cao nhất • 20 Mbps",
         targetBitrateMbps = 20,
-        deviceLoadLabel = "🔥 Tối đa công suất GPU",
-        dataSavingNotice = "Băng thông tối đa ~7GB/giờ",
-        description = "Chất lượng hình ảnh đỉnh cao nhất của Xbox Cloud Gaming, tối ưu cho máy cấu hình mạnh và mạng Wifi 5GHz / 5G cực khỏe."
+        deviceLoadLabel = "🔥 Băng thông 20 Mbps",
+        dataSavingNotice = "Băng thông ~20 Mbps (~7GB/giờ)",
+        description = "Mức bitrate cao nhất của Xbox Cloud Gaming, phù hợp khi dùng mạng Wi-Fi 5GHz ổn định."
     )
 }
 
@@ -292,16 +292,16 @@ enum class NetworkTuningMode(
     CELLULAR_DATA_SAVER(
         id = "cell_saver",
         title = "Thấp (Tiết Kiệm Dung Lượng)",
-        subtitle = "Tiết kiệm 60% dung lượng, mát máy & nhẹ GPU",
+        subtitle = "Giới hạn ~5 Mbps để đỡ tốn dữ liệu và mát máy",
         titleEn = "Low (Mobile Data Saver)",
-        subtitleEn = "Saves up to 60% data, cool & lightweight GPU decode"
+        subtitleEn = "Limits bitrate to ~5 Mbps to save data and keep phone cool"
     ),
     CELLULAR_MAX_SPEED(
         id = "cell_max",
-        title = "Rất Cao (Đồ Họa Tối Đa)",
-        subtitle = "Bung tối đa 20 Mbps cho hình ảnh sắc nét nhất",
-        titleEn = "Very High (Maximum Graphics)",
-        subtitleEn = "Unlocks full 20 Mbps for the sharpest visual quality"
+        title = "Rất Cao (20 Mbps)",
+        subtitle = "Cho phép mức băng thông tối đa 20 Mbps khi mạng mạnh",
+        titleEn = "Very High (20 Mbps)",
+        subtitleEn = "Allows up to 20 Mbps bitrate on fast connections"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else title
@@ -366,26 +366,26 @@ enum class GamepadLayoutPreset(
     STANDARD(
         "Chuẩn Xbox (Standard)",
         "Xbox Standard",
-        "Bố cục công thái học cân đối cho mọi thể loại game",
-        "Balanced ergonomic layout for all game genres"
+        "Bố cục nút bấm mặc định cho các thể loại game",
+        "Default button layout for general games"
     ),
     FPS_PRO(
-        "Bắn Súng (FPS Pro)",
-        "FPS / Shooter Pro",
-        "Tăng diện tích cần ngắm R (+18%), ưu tiên cò LT/RT & L3/R3",
+        "Bắn Súng (FPS)",
+        "FPS / Shooter",
+        "Cần ngắm phải R lớn hơn (+18%), ưu tiên cò LT/RT & L3/R3",
         "Larger Right Stick (+18%), prioritized LT/RT triggers & L3/R3"
     ),
     RACING(
-        "Đua Xe (Forza / Racing)",
+        "Đua Xe (Racing)",
         "Racing / Driving",
-        "Tối ưu cò ga/phanh LT/RT & cần lái L độ chính xác cao",
-        "Optimized LT/RT throttle/brake triggers & high-precision Left Stick"
+        "Ưu tiên cò ga/phanh LT/RT và cần lái bên trái L",
+        "Prioritized LT/RT throttle/brake triggers & Left Stick"
     ),
     COMPACT(
-        "Gọn Nhẹ (RPG / Turn-Based)",
+        "Gọn Nhẹ (Compact)",
         "Compact / RPG",
-        "Thu gọn kích thước cụm nút để tối đa tầm nhìn màn hình",
-        "Compact footprint to maximize visible game screen area"
+        "Thu nhỏ cụm nút để đỡ che màn hình",
+        "Smaller button clusters to leave more screen visible"
     );
 
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi

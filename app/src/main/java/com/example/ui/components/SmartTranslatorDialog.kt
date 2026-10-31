@@ -155,14 +155,14 @@ fun SmartTranslatorDialog(
                         }
                         Column {
                             Text(
-                                text = if (isEn) "SMART TRANSLATOR (GOOGLE TRANSLATE)" else "BỘ DỊCH THÔNG MINH (GOOGLE TRANSLATE)",
+                                text = if (isEn) "XBOX MENU TRANSLATOR" else "DỊCH GIAO DIỆN XBOX",
                                 color = TextPrimary,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.4.sp
                             )
                             Text(
-                                text = if (isEn) "Smooth Google Translate • Auto-preserves game titles & stream" else "Dịch mượt như Google Dịch • Tự động né tên game & stream",
+                                text = if (isEn) "Translates web menus • Keeps game titles original" else "Dịch menu trang web Xbox • Giữ nguyên tên game",
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -215,7 +215,7 @@ fun SmartTranslatorDialog(
                         onClick = { selectedTab = 1 },
                         text = {
                             Text(
-                                text = if (isEn) "Smart Rules" else "Quy Tắc Né & Sửa",
+                                text = if (isEn) "Rules" else "Quy Tắc Dịch",
                                 fontSize = 12.sp,
                                 fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
                             )
@@ -466,11 +466,11 @@ private fun LiveTranslateSection(
                     strokeWidth = 2.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (isEn) "Smart translating..." else "Đang dịch thông minh...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(if (isEn) "Translating..." else "Đang dịch...", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             } else {
                 Icon(Icons.Default.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (isEn) "TRANSLATE WITH GOOGLE TRANSLATE (PROTECTED)" else "DỊCH BẰNG GOOGLE TRANSLATE (CÓ BẢO VỆ)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text(if (isEn) "TRANSLATE TEXT (KEEP GAME TITLES)" else "DỊCH VĂN BẢN (GIỮ NGUYÊN TÊN GAME)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
 
@@ -538,7 +538,7 @@ private fun LiveTranslateSection(
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text(
-                                    text = if (isEn) "🛡️ PROTECTED TERMS (PRESERVED ORIGINAL):" else "🛡️ ĐÃ NÉ THÀNH CÔNG (GIỮ NGUYÊN GỐC):",
+                                    text = if (isEn) "KEPT ORIGINAL (NOT TRANSLATED):" else "CÁC TỪ GIỮ NGUYÊN KHÔNG DỊCH:",
                                     color = DirectCyan,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
@@ -604,7 +604,7 @@ private fun SmartRulesSection(isEn: Boolean) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = if (isEn) "SMART PROTECTION ENGINE (WHAT TO SKIP & WHAT TO TRANSLATE)" else "HỆ THỐNG PHÂN BIỆT THÔNG MINH (NÉ GÌ & DỊCH GÌ)",
+            text = if (isEn) "TRANSLATION RULES (WHAT IS KEPT & WHAT IS TRANSLATED)" else "QUY TẮC DỊCH (TỪ GIỮ NGUYÊN & TỪ ĐƯỢC DỊCH)",
             color = XboxNeonGreen,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
@@ -628,7 +628,7 @@ private fun SmartRulesSection(isEn: Boolean) {
                 ) {
                     Icon(Icons.Default.Security, contentDescription = null, tint = JapanRed, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "1. PROTECTED ITEMS (NEVER TRANSLATE)" else "1. CHỖ NÉ (TUYỆT ĐỐI KHÔNG DỊCH BỪA)",
+                        text = if (isEn) "1. KEPT ORIGINAL (NOT TRANSLATED)" else "1. CÁC MỤC GIỮ NGUYÊN GỐC",
                         color = JapanRed,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -681,7 +681,7 @@ private fun SmartRulesSection(isEn: Boolean) {
                 ) {
                     Icon(Icons.Default.GTranslate, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "2. TRANSLATED ITEMS (GOOGLE NEURAL TRANSLATE)" else "2. CHỖ NÊN DỊCH (DỊCH Y HỆT GOOGLE DỊCH)",
+                        text = if (isEn) "2. TRANSLATED ITEMS" else "2. CÁC MỤC ĐƯỢC DỊCH",
                         color = XboxNeonGreen,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -734,7 +734,7 @@ private fun SmartRulesSection(isEn: Boolean) {
                 ) {
                     Icon(Icons.Default.Speed, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
                     Text(
-                        text = if (isEn) "HOW THE SMART ENGINE WORKS" else "CƠ CHẾ HOẠT ĐỘNG THÔNG MINH",
+                        text = if (isEn) "HOW IT WORKS" else "CÁCH HOẠT ĐỘNG",
                         color = DirectCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold

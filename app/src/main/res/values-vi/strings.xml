@@ -96,11 +96,11 @@
     <string name="server_testing">Đang đo ping...</string>
 
     <!-- Settings Screen -->
-    <string name="section_auto_bypass">VPN THÔNG MINH &amp; MẠNG</string>
-    <string name="smart_vpn_title">VPN thông minh</string>
-    <string name="smart_vpn_desc">Tự bật VPN để mở game, sau đó tắt VPN để chơi mượt hơn.</string>
-    <string name="stealth_headers_title">Mở khóa vùng nhanh</string>
-    <string name="stealth_headers_desc">Hỗ trợ vào game nhanh và giảm nghẽn mạng.</string>
+    <string name="section_auto_bypass">TỰ BẬT/TẮT VPN &amp; MẠNG</string>
+    <string name="smart_vpn_title">Tự bật/tắt VPN</string>
+    <string name="smart_vpn_desc">Tự bật VPN để mở game, sau đó tắt VPN để dùng mạng trực tiếp.</string>
+    <string name="stealth_headers_title">Mở khóa vùng</string>
+    <string name="stealth_headers_desc">Hỗ trợ qua bước kiểm tra vùng khi mở game.</string>
     <string name="section_cellular_wifi">ĐỒ HỌA &amp; HIỆU NĂNG MÁY</string>
     <string name="section_graphics_quality">ĐỒ HỌA &amp; HIỆU NĂNG MÁY</string>
     <string name="graphics_quality_auto">Tự động (Khuyên dùng)</string>

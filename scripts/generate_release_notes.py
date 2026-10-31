@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Generates an accurate, diff-driven APK release description and packages the APK for GitHub Releases.
-- Extracts exact resolved versionName & versionCode from Gradle's output-metadata.json
-- Inspects the REAL git diff (prev_tag..HEAD) — added functions, comments, UI strings, and commits
-- Calls AI (Gemini 2.5 Flash / Flash-Lite or GitHub Models via built-in GITHUB_TOKEN)
-  with strict instructions to ONLY summarize changes present in the current git diff
-- Never repeats stale CHANGELOG.md entries from older releases unless those lines were newly added in this diff
-- Includes a smart semantic git-diff analyzer fallback so release notes are 100% accurate even without API keys
+Generates a diff-based APK release summary and packages the APK for GitHub Releases.
+- Reads versionName & versionCode from Gradle's output-metadata.json
+- Inspects git diff (prev_tag..HEAD) and recent commits
+- Summarizes actual changes from the current diff with a local fallback when no API key is set
 """
 
 import datetime
@@ -229,9 +226,8 @@ def analyze_git_diff_smart_bullets(
         or "isgenuinemp4file" in diff_lower
     ):
         smart_bullets.append(
-            "- **Khắc phục triệt để lỗi lưu video `.webm` & Mất âm thanh khi quay:** "
-            "Thu trực tiếp âm thanh nổi Stereo 48kHz từ luồng game (WebRTC / AudioContext) kết hợp bộ mã hóa phần cứng AAC-LC & H.264, "
-            "đóng gói chuẩn `.MP4` quốc tế (`ftyp` ISO) có đầy đủ tiếng và hình trên mọi thiết bị Android."
+            "- **Sửa lỗi quay màn hình và âm thanh:** "
+            "Thu âm thanh từ luồng game qua AAC-LC & H.264 và lưu video dưới định dạng `.mp4`."
         )
 
     # 2. Check for Anti-Stutter / Preserving Live Gameplay Screen Aspect Ratio
@@ -243,9 +239,8 @@ def analyze_git_diff_smart_bullets(
         or "giữ nguyên khung hình" in diff_lower
     ):
         smart_bullets.append(
-            "- **Chống giật khung hình & Giữ nguyên màn hình khi đang chơi:** "
-            "Loại bỏ việc tự động ép đổi tỉ lệ CSS `<video>` hoặc tính toán lại bố cục khi đang chơi và khi bấm quay clip; "
-            "tách biệt rõ chế độ Quay Full Screen toàn màn hình (Mặc định) và Quay 16:9 chuẩn quốc tế."
+            "- **Giữ nguyên khung hình khi đang chơi:** "
+            "Tránh thay đổi lại thuộc tính CSS của thẻ `<video>` trong lúc đang phát luồng game hoặc khi bấm quay màn hình."
         )
 
     # 3. Check for Priority Reordering in HUD / In-Game Quick Settings / Settings Screen
@@ -257,9 +252,8 @@ def analyze_git_diff_smart_bullets(
     ):
         if "tính năng phụ" in diff_lower or "onToggleGpuLoadReduction".lower() in diff_lower or "in_game_quick_settings_dialog" in diff_lower:
             smart_bullets.append(
-                "- **Sắp xếp lại thứ tự ưu tiên tính năng hợp lý & Gọn gàng:** "
-                "Đưa nhóm Đồ họa, Chất lượng luồng 4G/Wi-Fi, Khung hình 60/120 FPS và Giảm tải GPU lên ưu tiên đầu tiên; "
-                "loại bỏ các thẻ cài đặt trùng lặp và xếp Quay Video vào nhóm tính năng phụ thu gọn ở cuối."
+                "- **Sắp xếp lại giao diện và mục Cài đặt:** "
+                "Đưa các tùy chọn độ phân giải, khung hình (FPS) và chế độ máy yếu lên đầu; gộp gọn các mục ít dùng."
             )
 
     # 4. Check for Clarity Boost / Adaptive Bitrate / WebView Performance bug fixes
@@ -270,31 +264,29 @@ def analyze_git_diff_smart_bullets(
         or "savednextsessionmbps" in diff_lower
     ):
         smart_bullets.append(
-            "- **Sửa lỗi hệ thống & Tối ưu độ mượt luồng Stream:** "
-            "Khắc phục lỗi Clarity Boost tự bật lại khi tải trang, ngăn nạp trùng lặp script 70KB trong WebView "
-            "và loại bỏ hiện tượng ghi đĩa/vẽ lại giao diện giữa trận khi bộ điều phối mạng tự cân chỉnh."
+            "- **Sửa lỗi WebView và bộ lọc hình ảnh:** "
+            "Khắc phục lỗi bộ lọc làm nét tự bật lại khi tải trang và tránh nạp lặp lại script trong WebView."
         )
 
     # 5. Check for Release Notes / CI workflow improvements
     if "generate_release_notes.py" in files_joined or "build-and-release-apk.yml" in files_joined:
         smart_bullets.append(
-            "- **Nâng cấp AI tạo mô tả bản cập nhật tự động theo Git Diff thực tế:** "
-            "Phân tích trực tiếp code thay đổi (`git diff`) của từng bản build để viết mô tả chính xác tuyệt đối, "
-            "không lặp lại nội dung cũ từ các phiên bản trước."
+            "- **Cập nhật kịch bản tạo ghi chú phát hành:** "
+            "Tóm tắt ngắn gọn các thay đổi thực tế từ `git diff` và lịch sử commit của bản dựng."
         )
 
     # 6. Check for VPN / Proxy / Region Unlock changes if touched
     if any(k in files_joined for k in ("vpnmanager", "xboxcloudvpnservice", "geoipdetector", "serversscreen")):
         smart_bullets.append(
-            "- **Cải tiến kết nối Smart VPN & Mở khóa vùng máy chủ:** "
-            "Tối ưu tốc độ bắt luồng mở khóa vùng Xbox Cloud và tự động chuyển về mạng trực tiếp để giảm ping."
+            "- **Cập nhật phần kết nối máy chủ mở khóa vùng:** "
+            "Cải thiện kiểm tra kết nối proxy/VPN và tự tắt chuyển tiếp sau khi vào game."
         )
 
     # 7. Check for Virtual Gamepad / Controls changes if touched
     if "virtualgamepad.kt" in files_joined or "gamepaddetector.kt" in files_joined:
         smart_bullets.append(
-            "- **Tối ưu Tay cầm ảo & Cảm ứng đa điểm:** "
-            "Cải thiện độ nhạy cần xoay, phản hồi nút bấm và khả năng tương thích điều khiển trong game."
+            "- **Cập nhật tay cầm ảo trên màn hình:** "
+            "Chỉnh lại bố cục nút bấm, độ nhạy cần điều khiển và tùy chọn đặt lại vị trí mặc định."
         )
 
     # If none of the specific domain detectors matched, build bullets from added comments / UI strings / commits
@@ -302,7 +294,7 @@ def analyze_git_diff_smart_bullets(
         for c in comments_added[:3]:
             if len(c) > 20 and re.search(r"[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]", c):
                 clean_c = c.rstrip(".") + "."
-                bullet = f"- **Cập nhật & Tối ưu:** {clean_c}"
+                bullet = f"- **Thay đổi trong mã nguồn:** {clean_c}"
                 if bullet not in smart_bullets:
                     smart_bullets.append(bullet)
 
@@ -314,7 +306,7 @@ def analyze_git_diff_smart_bullets(
 
     if not smart_bullets:
         smart_bullets.append(
-            f"- **Cập nhật phiên bản v{app_ver}:** Sửa lỗi, tối ưu độ ổn định luồng stream 60 FPS và cải thiện trải nghiệm người dùng."
+            f"- **Bản dựng v{app_ver}:** Sửa lỗi nhỏ và cập nhật giao diện."
         )
 
     return smart_bullets[:5]
@@ -385,18 +377,18 @@ def generate_ai_description(
     full_context = "\n\n".join(context_parts)[:3800]
 
     system_instruction = (
-        "Bạn là kỹ sư phát hành ứng dụng Android CloudPlay Xbox. "
-        "Nhiệm vụ của bạn là viết 3 đến 5 gạch đầu dòng bằng Tiếng Việt (dạng `- **Tiêu đề ngắn:** Nội dung chi tiết.`) "
-        "tóm tắt CHÍNH XÁC những thay đổi, sửa lỗi và cải tiến THỰC SỰ có trong bản cập nhật này dựa trên Git Diff được cung cấp.\n"
-        "QUY TẮC BẮT BUỘC:\n"
-        "1. CHỈ viết về những gì thực sự thay đổi trong Git Diff, Hàm vừa sửa, Ghi chú kỹ thuật và Commit của bản này.\n"
-        "2. TUYỆT ĐỐI KHÔNG bịa đặt và KHÔNG lặp lại các tính năng cũ từ các phiên bản trước nếu chúng không xuất hiện trong phần thay đổi lần này.\n"
-        "3. Viết rõ ràng, súc tích, đúng trọng tâm kỹ thuật nhưng dễ hiểu cho người dùng."
+        "Bạn là người viết ghi chú phát hành (release notes) cho ứng dụng Android CloudPlay. "
+        "Hãy viết 3 đến 5 gạch đầu dòng bằng Tiếng Việt (dạng `- **Tiêu đề ngắn:** Nội dung.`) "
+        "liệt kê các thay đổi và sửa lỗi có trong Git Diff được cung cấp.\n"
+        "QUY TẮC:\n"
+        "1. Chỉ nêu đúng những thay đổi có trong Git Diff và Commit của bản này.\n"
+        "2. Không lặp lại tính năng từ các phiên bản cũ nếu không sửa trong lần này.\n"
+        "3. Dùng văn phong bình thường, trung thực, khiêm tốn; tuyệt đối không dùng từ ngữ quảng cáo hay phóng đại (như 'đỉnh cao', 'tuyệt đối', 'siêu tốc', 'độc quyền', 'thông minh', 'chuẩn quốc tế')."
     )
 
     user_prompt = (
-        f"Hãy viết mô tả cập nhật (3-5 gạch đầu dòng Tiếng Việt) cho bản phát hành "
-        f"CloudPlay Xbox v{app_ver} (so với bản trước {prev_tag or 'trước đó'}) dựa trên dữ liệu thay đổi thực tế sau:\n\n"
+        f"Hãy tóm tắt ngắn gọn (3-5 gạch đầu dòng Tiếng Việt) các thay đổi trong bản "
+        f"CloudPlay v{app_ver} (so với {prev_tag or 'bản trước'}) dựa trên dữ liệu sau:\n\n"
         f"{full_context}"
     )
 
@@ -586,10 +578,10 @@ def main() -> None:
     )
 
     lines = [
-        f"## 🎮 Bản cập nhật CloudPlay Xbox **v{app_ver}** (`{tag_name}`)",
-        f"> 📅 **Phát hành:** {build_date}  |  📦 **Kích thước APK:** `{apk_size_str}`  |  🔢 **Version Code:** `#{app_code}`  |  🔖 **Commit:** `{latest_hash}`",
+        f"## Bản phát hành CloudPlay **v{app_ver}** (`{tag_name}`)",
+        f"> **Ngày tạo:** {build_date}  |  **Dung lượng APK:** `{apk_size_str}`  |  **Version Code:** `#{app_code}`  |  **Commit:** `{latest_hash}`",
         "",
-        "### ✨ Mô tả bản cập nhật",
+        "### Nội dung thay đổi",
         summary_text,
         "",
     ]
@@ -597,17 +589,17 @@ def main() -> None:
     if commits:
         lines.extend(
             [
-                "### 🕒 Lịch sử Commit",
+                "### Các commit trong bản này",
                 "\n".join(commits[:8]),
                 "",
             ]
         )
 
     if diff_stat or changed_files:
-        lines.append(f"<details><summary>📂 <b>Chi tiết các file đã thay đổi ({compare_subtitle})</b></summary>")
+        lines.append(f"<details><summary><b>Danh sách file thay đổi ({compare_subtitle})</b></summary>")
         lines.append("")
         if diff_stat:
-            lines.append(f"**Tổng quan:** `{diff_stat}`")
+            lines.append(f"**Thống kê:** `{diff_stat}`")
             lines.append("")
         if changed_files:
             lines.extend(changed_files)
@@ -622,12 +614,12 @@ def main() -> None:
     lines.extend(
         [
             "---",
-            "### 📥 Tải về & Cài đặt đè trực tiếp (Có Link CDN Tốc Độ Cao)",
-            f"- ⚡ **[Tải Nhanh APK qua Server Châu Á (CDN #1 - Chống nghẽn mạng VNPT/Viettel)]({cdn_fast_1})**",
-            f"- 🚀 **[Tải Nhanh APK Dự Phòng (CDN #2)]({cdn_fast_2})**",
-            f"- 📦 **[Tải trực tiếp từ GitHub gốc (`{apk_ver_name}`)]({direct_gh_url})** *(hoặc mục **Assets** bên dưới)*",
-            "- **Cài đặt đè không mất dữ liệu:** APK được ký bằng chữ ký cố định — cài đặt đè trực tiếp lên bản cũ mà không cần gỡ ứng dụng.",
-            f"- **SHA-256:** `{apk_sha256}`",
+            "### Tải về và cài đặt",
+            f"- **[Tải file APK trực tiếp từ GitHub (`{apk_ver_name}`)]({direct_gh_url})** *(hoặc trong mục **Assets** bên dưới)*",
+            f"- **[Link tải dự phòng 1 (qua ghfast.top)]({cdn_fast_1})**",
+            f"- **[Link tải dự phòng 2 (qua gh-proxy.com)]({cdn_fast_2})**",
+            "- **Cách cập nhật:** Tải file APK về và cài đè lên phiên bản đang có trên máy (không cần gỡ bản cũ).",
+            f"- **Mã kiểm tra SHA-256:** `{apk_sha256}`",
             "",
         ]
     )

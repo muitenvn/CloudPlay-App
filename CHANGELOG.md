@@ -1,56 +1,51 @@
-# Nhật ký cập nhật / Update Changelog (CloudPlay Xbox)
+# Nhật ký cập nhật / Changelog (CloudPlay)
 
-Tài liệu này ghi nhận chi tiết các thay đổi thực tế của từng bản cập nhật và được hệ thống xuất APK tự động đối chiếu cùng `git diff` khi tạo trang phát hành (GitHub Releases).
+Tài liệu này ghi nhận các thay đổi và sửa lỗi theo từng phiên bản của ứng dụng.
 
-## [v1.4.0] - Sửa lỗi Quay Video .MP4 Có Tiếng, Chống Giật Khung Hình & Tối Ưu Thứ Tự Ưu Tiên Toàn Hệ Thống
-### 🛠️ Sửa lỗi hệ thống & Tối ưu độ mượt khi chơi (Core Stability & Anti-Stutter)
-- **Giữ nguyên màn hình chơi game 100% chống giật khung hình:** Loại bỏ hoàn toàn việc can thiệp lại CSS `transform` / `contain` trên phần tử `<video>` khi luồng game đang phát hoặc khi bấm quay clip, chấm dứt hiện tượng khựng hình do trình duyệt tính toán lại bố cục.
-- **Khắc phục lỗi Clarity Boost & Giảm tải luồng WebView:** Sửa lỗi bộ lọc làm nét tự bật lại khi chuyển trang, ngăn việc nạp lặp lại script 70KB trong `onPageFinished` và loại bỏ thao tác ghi đĩa giữa trận trong `AdaptiveQualityManager`.
-- **Sắp xếp lại thứ tự ưu tiên hợp lý trên toàn ứng dụng:** Đưa các tính năng cốt lõi (Đồ họa, Mức chất lượng 4G/Wi-Fi, Khung hình 60/120 FPS, Giảm tải GPU) lên vị trí ưu tiên số 1; gom gọn cài đặt Tỉ lệ màn hình & Màu sắc vào nhóm Hình ảnh (xóa bỏ thẻ trùng lặp ở mục Nâng cao) và xếp Quay Video vào nhóm tính năng phụ thu gọn ở cuối.
-- **Sửa lỗi lưu video `.webm` và mất tiếng:** Thu trực tiếp âm thanh nổi Stereo 48kHz từ WebRTC / AudioContext qua bộ mã hóa phần cứng AAC-LC & H.264, đóng gói chuẩn `.MP4` quốc tế (`ftyp` ISO) có đầy đủ tiếng ở cả chế độ Quay Full Screen toàn màn hình (Mặc định) và Quay 16:9 chuẩn quốc tế.
-- **Nâng cấp AI tạo mô tả bản phát hành theo Git Diff thực tế:** Phân tích trực tiếp các dòng code thay đổi (`git diff prev_tag..HEAD`) để viết mô tả bản cập nhật chính xác, không lặp lại mô tả của các phiên bản cũ.
-
----
-
-## [v1.3.0] - Tối ưu Độc quyền Fortnite Arena & Hệ thống Tay cầm Cảm ứng Pro
-### ⚡ Tối ưu Độc quyền Fortnite (Fortnite Arena Mode)
-- **Đệm khung hình 8ms Zero-Delay & Luồng 120 FPS:** Hạ bộ đệm WebRTC (`playoutDelayHint` & `jitterBufferTarget`) xuống `8ms` cho hình ảnh và `6ms` cho âm thanh, đồng thời thương lượng `a=framerate:120` trong SDP với máy chủ Xbox Series X cho Fortnite.
-- **Chuyển đổi 1 chạm giữa Cảm ứng Epic gốc & Tay cầm FPS Pro:** Khi chọn `👆 Cảm ứng Epic`, hệ thống tự động ngắt kết nối tay cầm giả lập (`gamepaddisconnected`) để Fortnite hiển thị đầy đủ bộ nút cảm ứng xây nhà/bắn súng gốc của Epic Games mà không bị xung đột; khi chọn `🎮 Tay cầm FPS Pro`, tự động kích hoạt bố cục ngắm bắn (cần phải R lớn hơn +15% & Auto-Sprint L3).
-- **Âm thanh Bước chân & Tiếng súng Định hướng (128kbps CBR Opus + FEC):** Nâng cấp luồng âm thanh Stereo Opus CBR 128kbps kèm chống mất gói In-Band FEC riêng cho Fortnite để nghe rõ tiếng bước chân và hướng giao tranh.
-- **Cảm ứng đa điểm Claw 4 ngón chống trễ:** Vô hiệu hóa hoàn toàn cử chỉ trình duyệt gây trễ (`touch-action: none`) và tự động bỏ qua hộp thoại cảnh báo thiếu tay cầm khi khởi động Fortnite.
-
-### 🎮 Cải tiến Hệ thống Điều khiển (Pro Control System - Chuẩn Fair-Play)
-- **D-Pad trượt 8 hướng & ABXY trượt/combo đa điểm:** Hỗ trợ trượt ngón tay mượt mà qua 8 hướng (bao gồm 4 hướng chéo) trên D-Pad và vuốt/nhấn tổ hợp 2 nút liền kề trên cụm ABXY.
-- **Bổ sung nút L3 / R3, Cò ga tuyến tính & Tự động chạy nhanh (Auto-Sprint L3):** Thêm nút L3/R3 chuyên dụng, cò ga/phanh tuyến tính (0–100%) trong chế độ Đua xe và tự kích hoạt chạy nhanh L3 khi đẩy kịch cần trái L.
-- **Ngắm bắn bằng cảm biến Con quay hồi chuyển (Gyroscope):** Kết hợp nghiêng máy thật (`Sensor.TYPE_GYROSCOPE`) để tinh chỉnh tâm ngắm cần phải R mượt mà.
-- **Bảng tùy chỉnh nhanh `⚙ Control` trong game & Kéo thả vị trí nút tự do:** Cho phép đổi nhanh 4 bố cục (`Xbox Standard`, `FPS Pro`, `Racing`, `Compact`), chỉnh kích thước (75%–135%), độ mờ, độ nhạy, vùng chết (Deadzone), cường độ rung và kéo thả từng cụm nút đến vị trí bất kỳ trên màn hình.
+## [v1.4.0] - Sửa lỗi quay màn hình .MP4, giảm khựng hình và sắp xếp lại giao diện cài đặt
+### Sửa lỗi & Cải thiện
+- **Giữ nguyên bố cục `<video>` khi đang chơi:** Bỏ việc thay đổi lại thuộc tính CSS `transform` / `contain` trên thẻ `<video>` lúc luồng game đang phát hoặc khi bắt đầu quay màn hình để tránh làm trình duyệt tính toán lại bố cục gây khựng hình.
+- **Sửa lỗi bộ lọc làm nét và giảm nạp lại script WebView:** Sửa lỗi Clarity Boost tự bật lại khi chuyển trang, tránh nạp lại script nhiều lần trong `onPageFinished` và bỏ thao tác ghi đĩa không cần thiết trong `AdaptiveQualityManager`.
+- **Sắp xếp lại mục Cài đặt:** Đưa nhóm Độ phân giải, FPS và chế độ máy yếu lên đầu; gộp phần chỉnh tỉ lệ màn hình và màu sắc vào chung nhóm hiển thị; chuyển phần quay màn hình xuống mục phụ phía dưới.
+- **Sửa lỗi quay video `.mp4` bị mất tiếng:** Thu âm thanh từ WebRTC / AudioContext qua bộ mã hóa AAC-LC & H.264 và lưu ra tệp `.mp4` thay vì `.webm`.
+- **Cập nhật kịch bản tạo ghi chú phát hành (Release Notes):** Lấy danh sách thay đổi từ `git diff` giữa hai phiên bản để tóm tắt đúng các mục vừa sửa thay vì lặp lại nội dung của bản cũ.
 
 ---
 
-## [v1.2.0] - Hoàn thiện 100% Tiếng Anh, Tối ưu Hiệu năng & Giảm Độ trễ, Sửa lỗi Log & Cải tiến Xuất APK
-### ✨ Tính năng & Trải nghiệm người dùng (UX & Localization)
-- **Hoàn thiện 100% ngôn ngữ Tiếng Anh (Full English UI):** Dịch đầy đủ toàn bộ các màn hình (`HomeScreen`, `GameLibraryScreen`, `ServersScreen`, `SettingsScreen`), hộp thoại (`CustomProxyDialog`, `HowToUseGuideDialog`, `SmartTranslatorDialog`, `UserTermsAgreementDialog`), màn hình chờ vào game (`InGameLoadingOverlay`), thanh `FloatingHud`, thông báo trạng thái (`StreamController`, `AdaptiveQualityManager`, `NetworkOptimizer`), và thông báo nền (`XboxCloudVpnService`).
-- **Tự động tắt dịch Tiếng Việt khi chọn Tiếng Anh:** Khi chọn ngôn ngữ ứng dụng là Tiếng Anh, bộ dịch trang web xCloud sang Tiếng Việt tự động ngắt hoàn toàn và khôi phục văn bản gốc tiếng Anh trên trang.
-- **Nút nổi (Floating HUD) tự do & ẩn sát rìa màn hình:** Cho phép kéo di chuyển nút nổi không giới hạn trên màn hình; khi kéo sát mép trái hoặc phải sẽ tự động thu gọn thành thanh gờ mỏng (vuốt nhẹ vào trong hoặc chạm để mở lại).
-- **Ẩn nhiệt độ máy ở dạng thu nhỏ:** Chỉ hiển thị nhiệt độ thiết bị khi mở bảng Cài đặt mở rộng của HUD để giữ thanh thu nhỏ gọn gàng.
-- **Nhãn "Mở khóa vùng" thực tế cho từng máy chủ/proxy:** Kiểm tra nhanh vùng IP thoát (`GeoIpDetector`), học kết quả mở khóa thực tế từ phản hồi `/v2/login/user` và DOM trang Xbox (`Đã mở khóa` / `Unlocked`, `Không mở khóa` / `Unlock Failed`, `Chưa thử` / `Untested`, `Sai vùng` / `Wrong Region`), tự động sắp xếp ưu tiên máy chủ đã mở khóa và gợi ý chuyển máy chủ khi gặp lỗi vùng.
+## [v1.3.0] - Hỗ trợ chế độ cảm ứng cho Fortnite và bổ sung tùy chỉnh tay cầm ảo
+### Thay đổi trong phiên bản
+- **Giảm kích thước bộ đệm WebRTC cho Fortnite:** Giảm thông số `playoutDelayHint` / `jitterBufferTarget` và hỗ trợ tùy chọn 120 FPS trên màn hình có tần số quét cao.
+- **Chuyển đổi giữa cảm ứng gốc và tay cầm ảo trong Fortnite:** Khi chọn chế độ cảm ứng của game, ứng dụng ngắt tín hiệu tay cầm giả lập (`gamepaddisconnected`) để giao diện nút chạm của Fortnite hiển thị bình thường; khi bật lại tay cầm ảo sẽ chuyển về bố cục nút bấm trên màn hình.
+- **Tùy chỉnh âm thanh Stereo Opus:** Cho phép cấu hình luồng âm thanh Stereo kèm sửa lỗi gói tin (FEC) khi mạng không ổn định.
+- **Tắt cử chỉ cuộn trang ngoài ý muốn khi bấm nhiều ngón:** Áp dụng `touch-action: none` trên vùng chơi game và tự đóng thông báo nhắc kết nối tay cầm khi vào bằng cảm ứng.
 
-### ⚡ Tối ưu hiệu năng & Giảm độ trễ (Performance & Low Latency)
-- **Loại bỏ việc nạp lặp lại script 65KB khi tải trang:** Ngăn `onProgressChanged` gọi `evaluateJavascript` liên tục 55 lần trong quá trình tải trang; chỉ tiêm script đúng 1 lần khi khởi tạo trang và cập nhật cấu hình qua hàm nhẹ `__updateNetworkProfile`.
-- **Giảm tải quét DOM & Layout Reflow:** Giới hạn số lần kiểm tra văn bản khóa vùng (`checkRegionLockDomState`) tối đa 4 lần trên mỗi URL bằng `textContent` (không gây reflow như `innerText`) và dừng hoàn toàn khi luồng game WebRTC đã kết nối.
-
-### 🐛 Sửa lỗi hệ thống trong Log (Log & Stability Fixes)
-- **Khắc phục lỗi WebView CSP Console Error:** Ngừng gọi `fetch('https://api.country.is/')` trực tiếp bên trong trang `xbox.com` (vốn bị chặn bởi Content-Security-Policy của Microsoft), chuyển hoàn toàn việc dò IP sang tầng mạng gốc của Android (`GeoIpDetector`).
-- **Khắc phục lỗi vòng đời Foreground Service (`XboxCloudVpnService`):** Ngăn lỗi `ForegroundServiceDidNotStartInTimeException` khi bật/tắt VPN liên tục bằng cách đảm bảo gọi `startForeground` an toàn trước khi dừng dịch vụ và xóa bỏ các cảnh báo log khi không có mạng.
-- **Tối ưu đồng bộ từ điển GitHub (`XboxTranslator`):** Bỏ qua việc tải từ điển tiếng Việt từ GitHub khi đang dùng giao diện Tiếng Anh và chuyển thông báo ngoại tuyến sang `Log.d`.
+### Cải thiện tay cầm ảo trên màn hình
+- **Hỗ trợ trượt trên cụm phím D-Pad và ABXY:** Cho phép vuốt ngón tay qua các hướng chéo trên D-Pad và giữa các nút ABXY liền kề.
+- **Bổ sung nút L3 / R3 và tùy chọn tự chạy nhanh:** Thêm nút L3/R3 rời và tùy chọn kích hoạt L3 khi đẩy hết cỡ cần điều khiển bên trái.
+- **Hỗ trợ ngắm bằng cảm biến con quay hồi chuyển (Gyroscope):** Cho phép dùng cảm biến nghiêng của điện thoại để hỗ trợ điều chỉnh hướng nhìn của cần phải.
+- **Lưu vị trí kéo thả nút bấm:** Cho phép chọn các mẫu bố cục có sẵn, chỉnh kích thước, độ mờ, độ nhạy và kéo từng cụm nút tới vị trí mong muốn.
 
 ---
 
-## [v1.1.0] - Chế độ Máy yếu (Low-End Device Mode) & Tối ưu Bộ dịch Web
-- Thêm công tắc **Chế độ máy yếu (Low-End Device Mode)** trong Cài đặt: khóa bitrate ~5 Mbps, ưu tiên codec H.264 nhẹ trong SDP, tắt hiệu ứng chuyển động vô hạn và tạm dừng bộ dịch khi chơi.
-- Tự động dừng bộ dịch DOM ngay khi luồng video WebRTC bắt đầu phát để bảo toàn 60 FPS.
+## [v1.2.0] - Bổ sung giao diện Tiếng Anh, giảm tải quét trang và sửa lỗi dịch vụ VPN
+### Giao diện & Ngôn ngữ
+- **Hỗ trợ giao diện Tiếng Anh:** Bổ sung bản dịch Tiếng Anh cho các màn hình chính, hộp thoại cài đặt, thanh công cụ nổi và thông báo trạng thái.
+- **Tự tắt dịch trang web khi để giao diện Tiếng Anh:** Khi ngôn ngữ ứng dụng là Tiếng Anh, tính năng dịch văn bản trên trang web Xbox sang Tiếng Việt sẽ tự tắt để giữ nguyên văn bản gốc.
+- **Thu gọn nút điều khiển nổi sát mép màn hình:** Khi kéo nút nổi sát cạnh trái hoặc phải, nút sẽ thu nhỏ lại để đỡ che màn hình chơi game.
+- **Hiển thị trạng thái mở khóa vùng của từng máy chủ:** Kiểm tra mã quốc gia của IP và ghi nhận kết quả mở khóa thực tế (`Đã mở khóa`, `Không mở khóa`, `Chưa thử`, `Sai vùng`) để người dùng dễ chọn lại khi gặp lỗi vùng.
+
+### Hiệu năng & Sửa lỗi
+- **Tránh nạp lại script nhiều lần khi trang đang tải:** Chỉ chạy script hỗ trợ một lần khi trang khởi tạo thay vì gọi lặp lại trong `onProgressChanged`.
+- **Giảm số lần quét văn bản kiểm tra khóa vùng:** Giới hạn kiểm tra bằng `textContent` tối đa 4 lần cho mỗi đường dẫn và dừng kiểm tra sau khi luồng video đã kết nối.
+- **Sửa lỗi kiểm tra IP bị chặn bởi CSP và lỗi dừng Foreground Service:** Chuyển việc kiểm tra địa chỉ IP sang tầng mạng Android (`GeoIpDetector`) và đảm bảo gọi `startForeground` đúng quy trình trong `XboxCloudVpnService`.
 
 ---
 
-## [v1.0.0] - Phiên bản Khởi đầu (Initial Release)
-- Ra mắt trình duyệt đám mây chuyên dụng cho Xbox Cloud Gaming với Smart VPN Bypass, Tay cầm ảo cảm ứng (Virtual Gamepad), Clarity Boost và Kho phím tắt game.
+## [v1.1.0] - Thêm chế độ máy yếu và tạm dừng dịch trang khi vào game
+- Thêm tùy chọn **Chế độ máy yếu** trong Cài đặt: giới hạn băng thông ở mức thấp (~5 Mbps), ưu tiên codec H.264 và giảm bớt hiệu ứng chuyển động trên giao diện.
+- Tự động tạm dừng việc quét dịch văn bản trên trang web ngay khi luồng video trò chơi bắt đầu phát.
+
+---
+
+## [v1.0.0] - Phiên bản đầu tiên
+- Đóng gói giao diện WebView truy cập Xbox Cloud Gaming kèm tính năng kết nối proxy/VPN mở khóa vùng, tay cầm ảo trên màn hình, bộ lọc tăng độ nét cơ bản và danh sách phím tắt mở game.

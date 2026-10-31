@@ -96,11 +96,11 @@
     <string name="server_testing">Testing ping...</string>
 
     <!-- Settings Screen -->
-    <string name="section_auto_bypass">SMART VPN &amp; NETWORK</string>
-    <string name="smart_vpn_title">Smart VPN</string>
-    <string name="smart_vpn_desc">Turns on VPN to open the game, then switches to direct network for smooth play.</string>
-    <string name="stealth_headers_title">Fast Region Unlock</string>
-    <string name="stealth_headers_desc">Unlocks game region quickly with minimal delay.</string>
+    <string name="section_auto_bypass">AUTO VPN &amp; NETWORK</string>
+    <string name="smart_vpn_title">Auto VPN</string>
+    <string name="smart_vpn_desc">Turns on VPN to open the game, then switches to direct network.</string>
+    <string name="stealth_headers_title">Region Unlock</string>
+    <string name="stealth_headers_desc">Uses proxy headers when launching games.</string>
     <string name="section_cellular_wifi">GRAPHICS &amp; PERFORMANCE</string>
     <string name="section_graphics_quality">GRAPHICS &amp; PERFORMANCE</string>
     <string name="graphics_quality_auto">Auto (Recommended)</string>

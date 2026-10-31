@@ -141,14 +141,14 @@ fun HowToUseGuideDialog(
                         }
                         Column {
                             Text(
-                                text = if (isVi) "HƯỚNG DẪN NHANH" else "QUICK GUIDE",
+                                text = if (isVi) "CÁCH DÙNG CƠ BẢN" else "HOW TO USE",
                                 color = TextPrimary,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.8.sp
                             )
                             Text(
-                                text = if (isVi) "Cách chơi Xbox Cloud mượt và dễ dàng" else "Simple tips for smooth Xbox Cloud play",
+                                text = if (isVi) "Các bước đăng nhập, mở khóa vùng và chỉnh nút điều khiển" else "Sign in, unlock region, and set up controls",
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -236,23 +236,23 @@ fun HowToUseGuideDialog(
                                     stepNum = "1",
                                     badge = if (isVi) "Tài khoản" else "Account",
                                     title = if (isVi) "Đăng nhập tài khoản Microsoft" else "Sign in with Microsoft account",
-                                    desc = if (isVi) "• Fortnite hoàn toàn miễn phí, chỉ cần tài khoản Microsoft thường.\n• Các game khác trong thư viện cần gói Game Pass." else "• Fortnite is completely free with a standard Microsoft account.\n• Other catalog games require a Game Pass subscription."
+                                    desc = if (isVi) "• Mở trang Xbox và đăng nhập tài khoản Microsoft của bạn.\n• Fortnite được chơi miễn phí trên đám mây; các game khác cần tài khoản có gói Game Pass." else "• Open the Xbox page and sign in with your Microsoft account.\n• Fortnite is free to play on cloud; other games require a Game Pass subscription."
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "2",
-                                    badge = if (isVi) "Vào game" else "Launch",
-                                    title = if (isVi) "Chọn game và bấm Chơi" else "Pick a game and tap Play",
-                                    desc = if (isVi) "• Ứng dụng tự động mở khóa vùng khi bạn bấm vào game.\n• Khi đã vào trận, mạng sẽ tự chuyển sang kết nối trực tiếp để giảm độ trễ." else "• The app automatically unlocks region access when you launch a game.\n• Once the game starts, it switches to direct connection for low delay."
+                                    badge = if (isVi) "Mở vùng" else "Region",
+                                    title = if (isVi) "Bật VPN/Proxy lúc mở game rồi tắt khi đã vào" else "Use VPN/Proxy to launch, then turn it off in-game",
+                                    desc = if (isVi) "• Xbox Cloud chưa hỗ trợ chính thức ở Việt Nam nên cần bật VPN/Proxy lúc bấm mở game.\n• Khi hình ảnh game đã hiện lên, hãy tắt VPN (hoặc bật 'Tự tắt VPN') để truyền hình ảnh trực tiếp qua mạng của bạn, đỡ bị trễ hơn." else "• If your region is unsupported, enable VPN/Proxy when launching a game.\n• Once video starts, turn off VPN (or use 'Auto turn off VPN') so the video stream uses your direct connection."
                                 )
                             }
                             item {
                                 GuideStepCard(
                                     stepNum = "3",
-                                    badge = if (isVi) "Tùy chỉnh" else "Controls",
-                                    title = if (isVi) "Dùng nút nổi trong lúc chơi" else "Use the floating menu in-game",
-                                    desc = if (isVi) "• Chạm nút tròn nổi trên màn hình để bật tay cầm cảm ứng, đổi mức hình ảnh hoặc mở Cài đặt nhanh." else "• Tap the floating button on screen to toggle touch controls, adjust image quality, or open Quick Settings."
+                                    badge = if (isVi) "Điều khiển" else "Controls",
+                                    title = if (isVi) "Bật tay cầm ảo hoặc gắn tay cầm rời" else "Enable touch buttons or connect a gamepad",
+                                    desc = if (isVi) "• Nếu không có tay cầm Bluetooth/USB-C, chạm vào nút tròn nổi trên màn hình khi vào game để bật các nút bấm cảm ứng." else "• If you don't have a Bluetooth/USB-C controller, tap the floating button in-game to show on-screen touch buttons."
                                 )
                             }
                         }
@@ -262,11 +262,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = if (isVi) "Giảm trễ tự động khi vào game" else "Automatic low-delay connection",
+                                    title = if (isVi) "Vì sao nên tắt VPN sau khi vào game?" else "Why turn off VPN after the game starts?",
                                     content = if (isVi) {
-                                        "Ứng dụng chỉ dùng máy chủ trung gian lúc mới mở game. Ngay khi hình ảnh hiện lên, kết nối sẽ chuyển về mạng trực tiếp của bạn để thao tác nhạy và mượt hơn."
+                                        "Xbox chỉ kiểm tra quốc gia lúc bạn bấm mở trò chơi. Khi đã vào trong game, việc tắt VPN giúp dữ liệu hình ảnh không phải đi vòng qua máy chủ trung gian nên thao tác đỡ trễ hơn."
                                     } else {
-                                        "The app only uses a relay server when starting the game. As soon as video appears, it switches to your direct internet connection for responsive controls."
+                                        "Xbox only checks your region when launching a game. Once video starts, turning off the relay avoids routing video traffic through an extra server."
                                     }
                                 )
                             }
@@ -274,11 +274,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Wifi,
                                     iconColor = XboxNeonGreen,
-                                    title = if (isVi) "Độ phân giải & Đồ họa gộp 1 (Giảm trễ 4G/5G/Wi-Fi)" else "Unified Resolution & Graphics (4G/5G/Wi-Fi Low Lag)",
+                                    title = if (isVi) "Chọn độ phân giải theo mạng đang dùng" else "Choose resolution based on your network",
                                     content = if (isVi) {
-                                        "• Tự động (720p ⇄ 1080p): Tự hạ độ phân giải để giảm trễ theo sóng.\n• 720p • Thấp / 900p • Vừa: Giảm độ trễ rõ rệt khi bật 4G, 5G lẫn Wi-Fi và nhẹ GPU.\n• 1080p • Cao / 1080p+ • Rất cao: Dành cho mạng Wi-Fi 5GHz/5G mạnh."
+                                        "• Tự động (720p ⇄ 1080p): Hạ xuống 720p khi mạng yếu và tăng lên 1080p khi mạng ổn định.\n• 720p • Thấp / 900p • Vừa: Hợp với 4G/5G hoặc khi muốn đỡ tốn dữ liệu và đỡ nóng máy.\n• 1080p • Cao / Rất cao: Chỉ nên chọn khi ngồi gần Wi-Fi 5GHz ổn định."
                                     } else {
-                                        "• Auto (720p ⇄ 1080p): Automatically scales resolution to cut lag.\n• 720p • Low / 900p • Med: Significantly reduces latency on 4G, 5G, and Wi-Fi.\n• 1080p • High / 1080p+ • Ultra: Best for fast 5GHz Wi-Fi and 5G."
+                                        "• Auto (720p ⇄ 1080p): Lowers to 720p on weak signal and restores 1080p when stable.\n• 720p • Low / 900p • Med: Good for mobile data or keeping the phone cooler.\n• 1080p • High / Very High: Best when connected to stable 5GHz Wi-Fi."
                                     }
                                 )
                             }
@@ -291,9 +291,9 @@ fun HowToUseGuideDialog(
                                     iconColor = XboxNeonGreen,
                                     title = if (isVi) "Tay cầm rời (Bluetooth / USB-C)" else "Physical Controller (Bluetooth / USB-C)",
                                     content = if (isVi) {
-                                        "Kết nối tay cầm Xbox, PlayStation hoặc tay cầm chơi game điện thoại qua Bluetooth/cổng sạc. Ứng dụng sẽ tự nhận diện ngay."
+                                        "Khi bạn nối tay cầm Xbox, PlayStation hoặc tay cầm điện thoại qua Bluetooth/USB-C, trang Xbox sẽ tự nhận tín hiệu tay cầm."
                                     } else {
-                                        "Connect any Xbox, PlayStation, or mobile gamepad via Bluetooth or USB-C. The app detects it automatically."
+                                        "When you connect an Xbox, PlayStation, or mobile controller via Bluetooth/USB-C, the Xbox page detects it automatically."
                                     }
                                 )
                             }
@@ -301,11 +301,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.CheckCircle,
                                     iconColor = DirectCyan,
-                                    title = if (isVi) "Tay cầm cảm ứng trên màn hình" else "On-Screen Touch Controller",
+                                    title = if (isVi) "Tay cầm ảo trên màn hình" else "On-Screen Touch Gamepad",
                                     content = if (isVi) {
-                                        "Không có tay cầm rời? Hãy bật biểu tượng Tay cầm trên thanh nổi khi đang chơi để hiện các nút bấm ảo trên màn hình."
+                                        "Bấm biểu tượng Tay cầm trên nút nổi khi đang chơi để bật/tắt nút ảo. Bạn có thể kéo đổi vị trí nút hoặc đặt lại bố cục mặc định trong mục Cài đặt."
                                     } else {
-                                        "No physical gamepad? Tap the Controller icon on the floating menu while playing to show on-screen touch buttons."
+                                        "Tap the Controller icon on the floating menu in-game to toggle virtual buttons. You can drag buttons to reposition them or reset the default layout in Settings."
                                     }
                                 )
                             }
@@ -316,11 +316,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Language,
                                     iconColor = JapanRed,
-                                    title = if (isVi) "Trang Xbox hiện tiếng nước ngoài?" else "Xbox page showing foreign language?",
+                                    title = if (isVi) "Đổi ngôn ngữ hoặc dịch menu trang Xbox" else "Change language or translate Xbox menus",
                                     content = if (isVi) {
-                                        "Bật công tắc 'Tự dịch tiếng Việt' trong Cài đặt nhanh, hoặc vào tab Cài đặt chọn lại ngôn ngữ trang Xbox."
+                                        "Bạn có thể bật tính năng dịch các mục menu trên trang web Xbox sang tiếng Việt trong mục Cài đặt hoặc trên thanh công cụ nổi."
                                     } else {
-                                        "Enable 'Auto Translate' in Quick Settings, or choose your preferred Xbox page language in the Settings tab."
+                                        "You can toggle menu translation or change the display language in the Settings tab or from the floating menu."
                                     }
                                 )
                             }
@@ -328,11 +328,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Speed,
                                     iconColor = WarningAmber,
-                                    title = if (isVi) "Báo lỗi vùng hoặc vào game chậm?" else "Region error or slow loading?",
+                                    title = if (isVi) "Báo lỗi vùng (Region) hoặc không vào được game?" else "Region error or game won't start?",
                                     content = if (isVi) {
-                                        "Sang tab 'Máy chủ' và chọn một máy chủ khác có đèn xanh, sau đó mở lại game."
+                                        "Máy chủ công cộng đôi khi bị quá tải hoặc ngừng hoạt động. Hãy sang tab 'Máy chủ' bấm Đo Ping để chọn máy chủ khác, hoặc dùng ứng dụng VPN riêng trên máy của bạn."
                                     } else {
-                                        "Open the 'Servers' tab, pick another server with a green status badge, and launch the game again."
+                                        "Public proxy servers can go offline or get crowded. Open the 'Servers' tab to test ping and pick another server, or use your own external VPN app."
                                     }
                                 )
                             }
@@ -340,11 +340,11 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = if (isVi) "Đứng hình hoặc mất tiếng?" else "Frozen screen or no audio?",
+                                    title = if (isVi) "Đứng hình hoặc mất tiếng khi đang chơi?" else "Frozen video or missing audio?",
                                     content = if (isVi) {
-                                        "Mở thanh điều khiển nổi trên màn hình chơi và bấm 'Tải lại' để kết nối lại ngay mà không mất phiên chơi."
+                                        "Mở menu nút nổi trên màn hình chơi và bấm 'Tải lại' để làm mới lại luồng phát mà không bị thoát khỏi trận đấu."
                                     } else {
-                                        "Open the floating menu in-game and tap 'Reload' to reconnect without losing your game session."
+                                        "Open the floating menu in-game and tap 'Reload' to refresh the video stream without leaving your active session."
                                     }
                                 )
                             }

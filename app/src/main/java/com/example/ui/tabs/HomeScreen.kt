@@ -461,7 +461,7 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Text(
-                                text = config.tr("⚡ Giảm trễ 4G/5G & Wi-Fi", "⚡ 4G/5G & Wi-Fi Low Lag"),
+                                text = config.tr("Hỗ trợ 4G/5G & Wi-Fi", "4G/5G & Wi-Fi"),
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.5.sp,

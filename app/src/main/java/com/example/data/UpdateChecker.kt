@@ -576,14 +576,22 @@ object UpdateChecker {
         }
     }
 
-    private fun sanitizeReleaseNotes(raw: String): String {
+    internal fun sanitizeReleaseNotes(raw: String): String {
         if (raw.isBlank()) return ""
+        val markdownLinkRegex = Regex("""\[([^\]]+)]\([^)]+\)""")
         return raw.lineSequence()
             .map { line ->
-                line.trim().removePrefix("###").removePrefix("##").removePrefix("#").removePrefix(">")
-                    .replace("**", "").replace("`", "").trim()
+                line.trim()
+                    .replace(Regex("""^#{1,6}\s*"""), "")
+                    .removePrefix(">")
+                    .replace(markdownLinkRegex, "$1")
+                    .replace("**", "")
+                    .replace("__", "")
+                    .replace("`", "")
+                    .trim()
             }
-            .filter { it.isNotBlank() && !it.startsWith("---") }
+            .filter { it.isNotBlank() && !it.startsWith("---") && !it.startsWith("***") }
+            .take(10)
             .joinToString("\n")
     }
 }

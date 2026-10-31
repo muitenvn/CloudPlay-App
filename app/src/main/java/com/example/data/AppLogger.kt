@@ -209,4 +209,140 @@ object AppLogger {
             "[${entry.timestamp}] [${entry.tag}] ${entry.message}"
         }
     }
+
+    // =========================================================================
+    // MỤC 4 & 5: LƯU CRASH GẦN NHẤT VÀO FILESDIR (1 FILE, <= 20 KB) & BÁO CÁO CHẨN ĐOÁN
+    // =========================================================================
+    const val LAST_CRASH_FILE_NAME = "last_crash_report.txt"
+    const val MAX_CRASH_FILE_BYTES = 20 * 1024 // ~20 KB
+    private val IPV4_REDACT_REGEX = Regex("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b")
+
+    @Volatile
+    private var crashHandlerInstalled = false
+
+    fun installCrashHandler(context: android.content.Context) {
+        if (crashHandlerInstalled) return
+        synchronized(this) {
+            if (crashHandlerInstalled) return
+            val appCtx = context.applicationContext
+            val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    saveCrashToInternalFile(appCtx, thread.name, throwable)
+                } catch (_: Throwable) {
+                } finally {
+                    previousHandler?.uncaughtException(thread, throwable)
+                }
+            }
+            crashHandlerInstalled = true
+        }
+    }
+
+    fun saveCrashToInternalFile(
+        context: android.content.Context,
+        threadName: String,
+        throwable: Throwable
+    ) {
+        try {
+            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val rawTrace = android.util.Log.getStackTraceString(throwable).ifBlank {
+                "${throwable.javaClass.name}: ${throwable.message.orEmpty()}"
+            }
+            val header = "Time: $timestamp | Thread: $threadName\nException: ${throwable.javaClass.name}\n"
+            val sanitized = IPV4_REDACT_REGEX.replace(sanitizeMessage(header + rawTrace), "[REDACTED_IP]")
+            val bytes = sanitized.toByteArray(Charsets.UTF_8)
+            val truncatedBytes = if (bytes.size > MAX_CRASH_FILE_BYTES) {
+                bytes.copyOf(MAX_CRASH_FILE_BYTES)
+            } else {
+                bytes
+            }
+            val file = java.io.File(context.filesDir, LAST_CRASH_FILE_NAME)
+            file.writeBytes(truncatedBytes)
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun readLastCrashLog(context: android.content.Context): String {
+        return try {
+            val file = java.io.File(context.filesDir, LAST_CRASH_FILE_NAME)
+            if (!file.exists() || !file.isFile) return ""
+            val bytes = file.readBytes()
+            val capped = if (bytes.size > MAX_CRASH_FILE_BYTES) {
+                bytes.copyOf(MAX_CRASH_FILE_BYTES)
+            } else {
+                bytes
+            }
+            val content = String(capped, Charsets.UTF_8).trim()
+            IPV4_REDACT_REGEX.replace(sanitizeMessage(content), "[REDACTED_IP]")
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
+    /**
+     * Tạo báo cáo chẩn đoán văn bản thuần (Mục 5):
+     * TUYỆT ĐỐI không đưa cookie, token, tài khoản hay địa chỉ IP của người dùng.
+     */
+    fun buildDiagnosticReport(
+        context: android.content.Context,
+        config: AppConfig = SettingsRepository.config.value,
+        vpnState: com.example.vpn.VpnConnectionState = com.example.vpn.VpnManager.state.value,
+        networkStatus: com.example.cloudplay.NetworkOptimizerStatus? = null,
+        latestSession: PlaySessionRecord? = SessionHistoryRepository.sessions.value.firstOrNull()
+    ): String {
+        val isEn = config.isSettingsEnglishUI()
+        val appVersion = UpdateChecker.getCurrentVersionName(context)
+        val androidVer = "Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})"
+        val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim()
+        val netType = when {
+            networkStatus?.isWifi == true -> "Wi-Fi"
+            networkStatus?.isCellular == true -> if (isEn) "Mobile Data (4G/5G)" else "Dữ liệu di động (4G/5G)"
+            else -> {
+                val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                val caps = runCatching { cm?.getNetworkCapabilities(cm.activeNetwork) }.getOrNull()
+                when {
+                    caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true -> "Wi-Fi"
+                    caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) == true ->
+                        if (isEn) "Mobile Data (4G/5G)" else "Dữ liệu di động (4G/5G)"
+                    caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+                    else -> if (isEn) "Offline / Other" else "Ngoại tuyến / Khác"
+                }
+            }
+        }
+        val xboxMarket = config.getEffectiveLocale()
+        val resolutionLabel = config.cellularMode.localizedTitle(isEn)
+        val fpsLabel = "${config.streamFpsCap.fps} FPS"
+        val vpnEnabledLabel = when (vpnState.mode) {
+            com.example.vpn.NetworkMode.VPN_JAPAN -> if (isEn) "ON (${vpnState.engine.name} • ${vpnState.currentServer.countryCode})" else "BẬT (${vpnState.engine.name} • ${vpnState.currentServer.countryCode})"
+            com.example.vpn.NetworkMode.DIRECT_NETWORK -> if (isEn) "OFF (Direct ISP)" else "TẮT (Mạng trực tiếp)"
+            com.example.vpn.NetworkMode.DISCONNECTED -> if (isEn) "OFF (Idle)" else "TẮT (Chờ)"
+        }
+
+        val sessionSummary = if (latestSession != null) {
+            if (isEn) {
+                "Duration: ${latestSession.durationSeconds}s | Avg FPS: ${latestSession.avgFps} | Avg Ping: ${latestSession.avgPingMs}ms | Jitter: ${latestSession.jitterMs}ms | Decode: ${latestSession.avgDecodeMs}ms | Dropped: ${latestSession.framesDropped} | Freezes: ${latestSession.freezeCount}"
+            } else {
+                "Thời lượng: ${latestSession.durationSeconds}s | FPS TB: ${latestSession.avgFps} | Ping TB: ${latestSession.avgPingMs}ms | Jitter: ${latestSession.jitterMs}ms | Giải mã: ${latestSession.avgDecodeMs}ms | Rớt khung: ${latestSession.framesDropped} | Đứng hình: ${latestSession.freezeCount}"
+            }
+        } else {
+            if (isEn) "No recorded session yet" else "Chưa có phiên chơi nào"
+        }
+
+        val lastCrash = readLastCrashLog(context).ifBlank {
+            if (isEn) "None" else "Không có"
+        }
+
+        return buildString {
+            appendLine("=== CLOUDPLAY DIAGNOSTIC REPORT ===")
+            appendLine(if (isEn) "App Version: v$appVersion" else "Phiên bản ứng dụng: v$appVersion")
+            appendLine(if (isEn) "Android Version: $androidVer" else "Phiên bản Android: $androidVer")
+            appendLine(if (isEn) "Device Model: $deviceModel" else "Tên máy: $deviceModel")
+            appendLine(if (isEn) "Network Type: $netType" else "Loại mạng: $netType")
+            appendLine(if (isEn) "Xbox Market: $xboxMarket" else "Thị trường Xbox đang chọn: $xboxMarket")
+            appendLine(if (isEn) "Main Settings: Resolution=$resolutionLabel | FPS=$fpsLabel | VPN=$vpnEnabledLabel" else "Cài đặt chính: Độ phân giải=$resolutionLabel | FPS=$fpsLabel | VPN=$vpnEnabledLabel")
+            appendLine(if (isEn) "Latest Session Telemetry: $sessionSummary" else "Tóm tắt telemetry phiên gần nhất: $sessionSummary")
+            appendLine(if (isEn) "--- Latest Crash Log ---" else "--- Crash gần nhất ---")
+            append(lastCrash)
+        }
+    }
 }

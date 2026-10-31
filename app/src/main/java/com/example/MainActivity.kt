@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
 
+        com.example.data.AppLogger.installCrashHandler(applicationContext)
         VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
         GameLibraryRepository.init(applicationContext)

@@ -356,7 +356,7 @@ fun GameLibraryScreen(
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
                                     Icons.Default.Clear,
-                                    contentDescription = "Clear",
+                                    contentDescription = if (isEn) "Clear search" else "Xóa tìm kiếm",
                                     tint = TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )

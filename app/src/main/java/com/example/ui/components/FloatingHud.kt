@@ -187,20 +187,8 @@ fun FloatingHud(
 
         val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             PowerManager.OnThermalStatusChangedListener { newStatus ->
-                val wasHot = thermalStatus >= PowerManager.THERMAL_STATUS_MODERATE
                 thermalStatus = newStatus
-                val isNowHot = newStatus >= PowerManager.THERMAL_STATUS_MODERATE
-                showThermalWarningBanner = isNowHot
-                if (isNowHot && !wasHot) {
-                    try {
-                        val isEnNow = com.example.data.SettingsRepository.config.value.isEnglishUI()
-                        Toast.makeText(
-                            context,
-                            if (isEnNow) "Device is hot, take a break or lower quality" else "Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } catch (_: Exception) {}
-                }
+                showThermalWarningBanner = newStatus >= PowerManager.THERMAL_STATUS_MODERATE
             }
         } else {
             null
@@ -256,6 +244,74 @@ fun FloatingHud(
         lowEndDeviceMode = lowEndDeviceMode || config.lowEndDeviceMode,
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
+
+    // Mục 6 & 7: Cảnh báo nhỏ không chặn trên FloatingHud, tự ẩn sau vài giây
+    // Mục 6: Mỗi phiên tối đa 1 lần cho cảnh báo nhiệt độ (THERMAL_STATUS_SEVERE) và 1 lần cho cảnh báo pin yếu (<= 15%, không sạc)
+    var hasShownSevereThermalAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
+    var hasShownLowBatteryAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
+    var lastStreamNetworkIsWifi by rememberSaveable(isGameActive) { mutableStateOf<Boolean?>(null) }
+    var autoHudBannerText by remember { mutableStateOf<String?>(null) }
+    var autoHudBannerTag by remember { mutableStateOf("hud_transient_alert_banner") }
+
+    LaunchedEffect(isGameActive, isThermalSupported, thermalStatus, batteryPercent, isBatteryCharging, isEn) {
+        if (!isGameActive) {
+            hasShownSevereThermalAlert = false
+            hasShownLowBatteryAlert = false
+            return@LaunchedEffect
+        }
+        val severeHot = isThermalSupported &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE
+        if (severeHot && !hasShownSevereThermalAlert) {
+            hasShownSevereThermalAlert = true
+            autoHudBannerTag = "hud_thermal_battery_alert_banner"
+            autoHudBannerText = if (isEn) {
+                "Device hot/low battery, consider lowering FPS or resolution"
+            } else {
+                "Máy nóng/pin yếu, nên giảm FPS hoặc độ phân giải"
+            }
+        } else if (batteryPercent in 1..15 && !isBatteryCharging && !hasShownLowBatteryAlert) {
+            hasShownLowBatteryAlert = true
+            autoHudBannerTag = "hud_thermal_battery_alert_banner"
+            autoHudBannerText = if (isEn) {
+                "Device hot/low battery, consider lowering FPS or resolution"
+            } else {
+                "Máy nóng/pin yếu, nên giảm FPS hoặc độ phân giải"
+            }
+        }
+    }
+
+    // Mục 7: Khi mạng đổi giữa Wi-Fi và di động lúc đang stream
+    LaunchedEffect(isGameActive, networkStatus.isWifi, networkStatus.isCellular, isEn) {
+        val currentIsWifi: Boolean? = when {
+            networkStatus.isWifi -> true
+            networkStatus.isCellular -> false
+            else -> null
+        }
+        if (!isGameActive) {
+            lastStreamNetworkIsWifi = currentIsWifi
+            return@LaunchedEffect
+        }
+        if (currentIsWifi != null) {
+            val previous = lastStreamNetworkIsWifi
+            if (previous != null && previous != currentIsWifi) {
+                autoHudBannerTag = "hud_network_switch_alert_banner"
+                autoHudBannerText = if (isEn) {
+                    "Network switched, if laggy please retry"
+                } else {
+                    "Mạng vừa đổi, nếu giật hãy thử lại"
+                }
+            }
+            lastStreamNetworkIsWifi = currentIsWifi
+        }
+    }
+
+    LaunchedEffect(autoHudBannerText) {
+        if (autoHudBannerText != null) {
+            delay(4500)
+            autoHudBannerText = null
+        }
+    }
 
     // Phân loại biểu tượng nhiệt trên HUD: mát / ấm / nóng
     val thermalIcon = when {
@@ -605,7 +661,7 @@ fun FloatingHud(
                         )
                         Icon(
                             imageVector = Icons.Default.Gamepad,
-                            contentDescription = null,
+                            contentDescription = if (isEn) "Expand quick controls" else "Mở điều khiển nhanh",
                             tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
                             modifier = Modifier.size(11.5.dp)
                         )
@@ -1182,6 +1238,32 @@ fun FloatingHud(
                                 )
                             }
                         }
+                    }
+                }
+
+                // Banner cảnh báo nhỏ tự ẩn sau vài giây (Mục 6: Máy nóng/pin yếu; Mục 7: Đổi mạng Wi-Fi/di động)
+                val currentBanner = autoHudBannerText
+                if (currentBanner != null) {
+                    Surface(
+                        modifier = Modifier
+                            .padding(top = 3.dp)
+                            .widthIn(max = 250.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { autoHudBannerText = null }
+                            .testTag(autoHudBannerTag),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xEB18241D),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFFFB300).copy(alpha = 0.85f))
+                    ) {
+                        Text(
+                            text = currentBanner,
+                            color = Color(0xFFFFE082),
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            lineHeight = 13.5.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            maxLines = 2
+                        )
                     }
                 }
             }

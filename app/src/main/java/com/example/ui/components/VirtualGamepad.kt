@@ -1500,6 +1500,61 @@ private fun ControlQuickTunerPanel(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showResetConfirmDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            containerColor = XboxSurface,
+            titleContentColor = Color.White,
+            textContentColor = TextSecondary,
+            title = {
+                Text(
+                    text = if (isEn) "Reset Default Layout?" else "Đặt lại bố cục mặc định?",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp
+                )
+            },
+            text = {
+                Text(
+                    text = if (isEn) {
+                        "Restore custom button coordinates to default positions? Split modes and hidden buttons will be preserved."
+                    } else {
+                        "Khôi phục tọa độ vị trí tùy chỉnh của các nút về mặc định? Chế độ tách nút và nút ẩn vẫn được giữ nguyên."
+                    },
+                    fontSize = 12.5.sp
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        onResetPositions()
+                    },
+                    modifier = Modifier.testTag("tuner_confirm_reset_positions_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Reset" else "Đặt lại",
+                        color = XboxNeonGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showResetConfirmDialog = false },
+                    modifier = Modifier.testTag("tuner_cancel_reset_positions_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Cancel" else "Hủy",
+                        color = TextSecondary
+                    )
+                }
+            }
+        )
+    }
+
     Surface(
         modifier = modifier
             .widthIn(max = 430.dp)
@@ -1547,7 +1602,9 @@ private fun ControlQuickTunerPanel(
                         shape = RoundedCornerShape(6.dp),
                         color = Color(0xFF1A2820),
                         border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder),
-                        modifier = Modifier.clickable { onResetPositions() }
+                        modifier = Modifier
+                            .clickable { showResetConfirmDialog = true }
+                            .testTag("tuner_reset_default_layout_btn")
                     ) {
                         Text(
                             text = if (isEn) "Reset" else "Mặc định",

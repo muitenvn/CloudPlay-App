@@ -131,13 +131,21 @@ fun UpdateAvailableDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 210.dp)
+                            .testTag("update_dialog_whats_new_section")
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .verticalScroll(notesScrollState)
-                                .padding(12.dp)
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            Text(
+                                text = if (isEn) "What's new" else "Có gì mới",
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
                             Text(
                                 text = updateInfo.releaseNotes,
                                 color = TextPrimary,

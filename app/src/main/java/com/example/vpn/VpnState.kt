@@ -9,7 +9,7 @@ enum class NetworkMode {
 }
 
 enum class VpnEngine {
-    PROXY_TUNNEL,    // Proxy Route: Routes traffic through verified Japan/International proxy servers with multi-server backup
+    PROXY_TUNNEL,    // Proxy Route: Routes traffic through connectivity-checked Japan/International proxy servers with multi-server backup
     SMART_BYPASS,    // Better-xCloud Smart Header & Region Spoof (Guaranteed Japan East, 0 lag, no dead proxy)
     EXTERNAL_VPN     // External VPN Assistant: Use with Warp, Proton, Kiwi, etc. with auto-detect and zero-reload handoff
 }

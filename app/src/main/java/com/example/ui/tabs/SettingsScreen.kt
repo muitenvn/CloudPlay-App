@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -103,6 +105,7 @@ fun SettingsScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showAppLogDialog by remember { mutableStateOf(false) }
+    var showResetGamepadConfirmDialog by remember { mutableStateOf(false) }
 
     // 5 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
@@ -711,19 +714,14 @@ fun SettingsScreen(
 
                     if (config.gamepadCustomOffsets.isNotBlank()) {
                         OutlinedButton(
-                            onClick = {
-                                SettingsRepository.resetGamepadCustomOffsets()
-                                Toast.makeText(
-                                    context,
-                                    if (isEn) "Reset button positions" else "Đã đặt lại vị trí nút",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { showResetGamepadConfirmDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("settings_reset_gamepad_positions_btn"),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
-                                text = if (isEn) "Reset Button Positions" else "Đặt lại vị trí nút mặc định",
+                                text = if (isEn) "Reset Default Layout" else "Đặt lại bố cục mặc định",
                                 color = DirectCyan,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -1195,6 +1193,59 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    Button(
+                        onClick = {
+                            val reportText = com.example.data.AppLogger.buildDiagnosticReport(
+                                context = context,
+                                config = config,
+                                vpnState = vpnState
+                            )
+                            try {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                clipboard?.setPrimaryClip(
+                                    android.content.ClipData.newPlainText("CloudPlay Diagnostic Report", reportText)
+                                )
+                                Toast.makeText(
+                                    context,
+                                    if (isEn) "Copied diagnostic report to clipboard" else "Đã sao chép báo cáo chẩn đoán vào bộ nhớ tạm",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (_: Exception) {}
+                            try {
+                                val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(
+                                        android.content.Intent.EXTRA_SUBJECT,
+                                        if (isEn) "CloudPlay Diagnostic Report" else "Báo cáo chẩn đoán CloudPlay"
+                                    )
+                                    putExtra(android.content.Intent.EXTRA_TEXT, reportText)
+                                }
+                                val chooser = android.content.Intent.createChooser(
+                                    sendIntent,
+                                    if (isEn) "Share Diagnostic Report" else "Chia sẻ báo cáo chẩn đoán"
+                                ).apply {
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(chooser)
+                            } catch (_: Exception) {}
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("copy_diagnostic_report_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Public, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = if (isEn) "Copy Diagnostic Report" else "Sao chép báo cáo chẩn đoán",
+                                color = DirectCyan,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1600,6 +1651,64 @@ fun SettingsScreen(
             onDismiss = { showAppLogDialog = false }
         )
     }
+
+    if (showResetGamepadConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetGamepadConfirmDialog = false },
+            containerColor = XboxSurface,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = {
+                Text(
+                    text = if (isEn) "Reset Default Layout?" else "Đặt lại bố cục mặc định?",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Text(
+                    text = if (isEn) {
+                        "Restore custom button coordinates to their default positions? Split modes and hidden buttons will be kept."
+                    } else {
+                        "Khôi phục tọa độ vị trí các nút về mặc định? Chế độ tách nút và danh sách nút ẩn sẽ được giữ nguyên."
+                    },
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        SettingsRepository.resetGamepadCustomOffsets()
+                        showResetGamepadConfirmDialog = false
+                        Toast.makeText(
+                            context,
+                            if (isEn) "Reset default button positions" else "Đã đặt lại vị trí nút mặc định",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    modifier = Modifier.testTag("confirm_reset_gamepad_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Reset" else "Đặt lại",
+                        color = XboxNeonGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetGamepadConfirmDialog = false },
+                    modifier = Modifier.testTag("cancel_reset_gamepad_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Cancel" else "Hủy",
+                        color = TextSecondary
+                    )
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -1669,9 +1778,14 @@ private fun CollapsibleSettingsGroup(
                         )
                     }
                 }
+                val isEnGroup = SettingsRepository.config.value.isSettingsEnglishUI()
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
+                    contentDescription = if (expanded) {
+                        if (isEnGroup) "Collapse section" else "Thu gọn nhóm"
+                    } else {
+                        if (isEnGroup) "Expand section" else "Mở rộng nhóm"
+                    },
                     tint = if (expanded) XboxNeonGreen else TextSecondary,
                     modifier = Modifier.size(22.dp)
                 )

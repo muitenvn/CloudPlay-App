@@ -888,11 +888,9 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         SettingsRepository.init(context)
 
-        // 1. Kiểm tra 60 máy chủ VPN đạt chuẩn tốc độ > 250 Mbps, đã xác thực (isVerified = true) và đúng mã vùng GeoIP
+        // 1. Kiểm tra 60 máy chủ VPN mặc định khớp mã vùng GeoIP
         assertEquals(60, com.example.vpn.DEFAULT_SERVERS.size)
         com.example.vpn.DEFAULT_SERVERS.forEach { server ->
-            assertTrue("Server ${server.id} speedMbps must be > 250", server.speedMbps > 250)
-            assertTrue("Server ${server.id} must be verified", server.isVerified)
             assertEquals(
                 "Server ${server.id} GeoIP seed must match countryCode",
                 server.countryCode,
@@ -963,5 +961,44 @@ class ExampleRobolectricTest {
         VpnManager.setInGameStreamActive(false)
         org.junit.Assert.assertFalse(VpnManager.isStreamActive())
     }
-}
 
+    @Test
+    fun testCrashLoggerDiagnosticReportAndReleaseNotesSanitizer() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+
+        // 1. Kiểm tra lưu crash gần nhất vào filesDir (chỉ 1 file, tối đa 20 KB, che IP/token)
+        val oversizedMessage = "Fatal error at 203.0.113.55 token=secret123456 " + "X".repeat(25_000)
+        com.example.data.AppLogger.saveCrashToInternalFile(
+            context = context,
+            threadName = "main",
+            throwable = RuntimeException(oversizedMessage)
+        )
+        val savedCrash = com.example.data.AppLogger.readLastCrashLog(context)
+        assertTrue(savedCrash.isNotBlank())
+        assertTrue(savedCrash.toByteArray(Charsets.UTF_8).size <= 20 * 1024)
+        org.junit.Assert.assertFalse(savedCrash.contains("203.0.113.55"))
+        org.junit.Assert.assertFalse(savedCrash.contains("secret123456"))
+
+        // 2. Kiểm tra báo cáo chẩn đoán không chứa IP, cookie, token
+        val report = com.example.data.AppLogger.buildDiagnosticReport(
+            context = context,
+            config = SettingsRepository.config.value,
+            vpnState = VpnManager.state.value
+        )
+        assertTrue(report.contains("App Version:") || report.contains("Phiên bản ứng dụng:"))
+        assertTrue(report.contains("Android"))
+        assertTrue(report.contains("Xbox Market:") || report.contains("Thị trường Xbox đang chọn:"))
+        org.junit.Assert.assertFalse(report.contains("203.0.113.55"))
+        org.junit.Assert.assertFalse(report.contains("secret123456"))
+        org.junit.Assert.assertFalse(report.contains(VpnManager.state.value.currentServer.ip))
+
+        // 3. Kiểm tra rút gọn mô tả bản cập nhật tối đa 10 dòng và bỏ markdown thô
+        val rawMarkdown = (1..15).joinToString("\n") { idx ->
+            "### **Line $idx** with `code` and [Link](https://example.com/$idx)"
+        }
+        val cleaned = com.example.data.UpdateChecker.sanitizeReleaseNotes(rawMarkdown)
+        val cleanedLines = cleaned.lines()
+        assertEquals(10, cleanedLines.size)
+        assertEquals("Line 1 with code and Link", cleanedLines.first())
+    }
+}

@@ -555,10 +555,20 @@ object XboxTranslator {
                     'INPUT', 'TEXTAREA', 'SELECT', 'CODE', 'PRE', 'SVG', 'PATH'
                 ]);
 
-                // Never hide or scrub Xbox Cloud's native Decode warning or stream notifications
+                // Ẩn lớp phủ thông số luồng & biểu tượng cảnh báo Decode/Network gốc của trang web Xbox khi người dùng bật công tắc "Ẩn thông số luồng trên màn hình"
                 function updateStatsScrubber(hide) {
-                    const oldStyle = document.getElementById('cloudplay-stats-scrubber-style');
-                    if (oldStyle) oldStyle.remove();
+                    try {
+                        const existing = document.getElementById('cloudplay-stats-scrubber-style');
+                        if (!hide) {
+                            if (existing) existing.remove();
+                            return;
+                        }
+                        if (existing) return;
+                        const style = document.createElement('style');
+                        style.id = 'cloudplay-stats-scrubber-style';
+                        style.textContent = '[class*="StreamStats" i], [class*="NetworkQualityIndicator" i], [data-testid*="stream-stats" i], [data-testid*="network-quality" i], [data-testid*="NetworkQuality" i], [class*="MediaStats" i] { display: none !important; opacity: 0 !important; pointer-events: none !important; }';
+                        (document.head || document.documentElement).appendChild(style);
+                    } catch (e) {}
                 }
 
                 function isInsideStreamPlayer(node) {

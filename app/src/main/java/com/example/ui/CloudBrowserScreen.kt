@@ -290,8 +290,6 @@ fun CloudBrowserScreen(
 
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
-    val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
-    val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
 
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
@@ -462,24 +460,7 @@ fun CloudBrowserScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 object : WebView(ctx) {
-                    private var touchEventCountInSec = 0
-                    private var lastTouchCountLogMs = 0L
                     private var lastUnbufferedMotionDeviceId = -1
-
-                    override fun onTouchEvent(event: android.view.MotionEvent?): Boolean {
-                        if (event != null) {
-                            touchEventCountInSec++
-                            val now = android.os.SystemClock.uptimeMillis()
-                            if (lastTouchCountLogMs == 0L) {
-                                lastTouchCountLogMs = now
-                            } else if (now - lastTouchCountLogMs >= 1000L) {
-                                android.util.Log.d("CloudBrowserTouch", "onTouchEvent/s: $touchEventCountInSec")
-                                touchEventCountInSec = 0
-                                lastTouchCountLogMs = now
-                            }
-                        }
-                        return super.onTouchEvent(event)
-                    }
 
                     override fun onGenericMotionEvent(event: android.view.MotionEvent?): Boolean {
                         if (event != null &&
@@ -931,8 +912,8 @@ fun CloudBrowserScreen(
             }
         }
 
-        // In-game Floating HUD Pill (draggable)
-        FloatingHud(
+        // In-game Floating HUD Pill (isolated state collection so WebView never recomposes on telemetry ticks)
+        IsolatedFloatingHud(
             vpnState = vpnState,
             isGameActive = streamUiState.isGameActive,
             virtualControllerEnabled = config.showVirtualController,
@@ -979,8 +960,6 @@ fun CloudBrowserScreen(
                 )
             },
             networkStatus = networkStatus,
-            telemetry = telemetry,
-            adaptiveQualityState = adaptiveQualityState,
             onSelectLadderStep = { stepIdx ->
                 com.example.cloudplay.AdaptiveQualityManager.setStepManually(stepIdx)
             },
@@ -1563,4 +1542,77 @@ fun CloudBrowserScreen(
         }
     }
 }
+
+@Composable
+private fun IsolatedFloatingHud(
+    vpnState: com.example.vpn.VpnConnectionState,
+    isGameActive: Boolean,
+    virtualControllerEnabled: Boolean,
+    physicalControllerConnected: Boolean,
+    controllerName: String,
+    onToggleNetwork: () -> Unit,
+    onToggleVirtualController: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onNavigateHome: () -> Unit,
+    onReloadPage: () -> Unit,
+    onToggleClarityBoost: (Boolean) -> Unit,
+    clarityBoostActive: Boolean,
+    translationActive: Boolean,
+    translatedCount: Int,
+    onToggleTranslation: (Boolean) -> Unit,
+    hideStreamStats: Boolean,
+    onToggleHideStreamStats: (Boolean) -> Unit,
+    networkStatus: com.example.cloudplay.NetworkOptimizerStatus,
+    onSelectLadderStep: (Int) -> Unit,
+    onToggleAutoAdapting: (Boolean) -> Unit,
+    onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
+    onToggleWifiSpeedFirst: (Boolean) -> Unit,
+    gameProfile: com.example.data.GameOptimizationProfile?,
+    onOpenTranslator: () -> Unit,
+    onToggleOrientation: () -> Unit,
+    videoTopRatio: Float,
+    lowEndDeviceMode: Boolean,
+    onSelectFortniteControlMode: (Boolean) -> Unit,
+    recorderState: com.example.cloudplay.ScreenRecorderState,
+    onToggleRecording: () -> Unit
+) {
+    val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
+    val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
+
+    FloatingHud(
+        vpnState = vpnState,
+        isGameActive = isGameActive,
+        virtualControllerEnabled = virtualControllerEnabled,
+        physicalControllerConnected = physicalControllerConnected,
+        controllerName = controllerName,
+        onToggleNetwork = onToggleNetwork,
+        onToggleVirtualController = onToggleVirtualController,
+        onOpenSettings = onOpenSettings,
+        onNavigateHome = onNavigateHome,
+        onReloadPage = onReloadPage,
+        onToggleClarityBoost = onToggleClarityBoost,
+        clarityBoostActive = clarityBoostActive,
+        translationActive = translationActive,
+        translatedCount = translatedCount,
+        onToggleTranslation = onToggleTranslation,
+        hideStreamStats = hideStreamStats,
+        onToggleHideStreamStats = onToggleHideStreamStats,
+        networkStatus = networkStatus,
+        telemetry = telemetry,
+        adaptiveQualityState = adaptiveQualityState,
+        onSelectLadderStep = onSelectLadderStep,
+        onToggleAutoAdapting = onToggleAutoAdapting,
+        onSelectCellularMode = onSelectCellularMode,
+        onToggleWifiSpeedFirst = onToggleWifiSpeedFirst,
+        gameProfile = gameProfile,
+        onOpenTranslator = onOpenTranslator,
+        onToggleOrientation = onToggleOrientation,
+        videoTopRatio = videoTopRatio,
+        lowEndDeviceMode = lowEndDeviceMode,
+        onSelectFortniteControlMode = onSelectFortniteControlMode,
+        recorderState = recorderState,
+        onToggleRecording = onToggleRecording
+    )
+}
+
 

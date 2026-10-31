@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch triển khai 10 hạng mục rà soát (Dọn dẹp cấu hình build & R8, Độ bền & Chẩn đoán hệ thống, Tiện dụng & Trợ năng) dựa trên kiểm tra mã nguồn thực tế và các lựa chọn đã xác nhận.",
-  "updatedAt":  "2026-10-31T07:54:59.859950940Z",
+  "summary":  "Kế hoạch thiết kế chi tiết theo từng bước nhằm khắc phục triệt để lỗi cảnh báo Decode khi chơi Xbox Cloud Gaming: sửa thời điểm thương lượng H.264 Constrained Baseline trước khi tạo SDP, sửa thứ tự dòng băng thông chuẩn RFC 4566, cô lập việc vẽ lại giao diện HUD khỏi màn hình WebView, tối ưu vòng lặp đo thông số và khôi phục công tắc ẩn cảnh báo trên màn hình.",
+  "updatedAt":  "2026-10-31T12:38:12.096637652Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

@@ -1633,11 +1633,11 @@ private fun DenseCoreTelemetrySection(
     } else {
         "— • $bufferLabel ${liveBufMs}ms"
     }
-    // Chuẩn ITU-T G.1072 / 60Hz (16.6ms): < 8ms Xanh, 8-16ms Vàng, > 16ms Đỏ
+    // Chuẩn 60Hz: < 12ms Xanh, 12-18ms Vàng, > 18ms Đỏ
     val decodeColor = when {
         !hasRealSample || telemetry.decodeTimeMs <= 0.0 -> TextSecondary
-        telemetry.decodeTimeMs < 8.0 -> XboxNeonGreen
-        telemetry.decodeTimeMs <= 16.0 -> Color(0xFFFFB300)
+        telemetry.decodeTimeMs < 12.0 -> XboxNeonGreen
+        telemetry.decodeTimeMs <= 18.0 -> Color(0xFFFFB300)
         else -> JapanRed
     }
 
@@ -1697,8 +1697,8 @@ private fun DenseCoreTelemetrySection(
     val pVal = effectivePing ?: 0
     val jVal = telemetry.jitterMs
     val dVal = telemetry.decodeTimeMs
-    val isRedState = pVal > 120 || jVal > 20 || dVal > 16.0
-    val isYellowState = !isRedState && (pVal in 80..120 || jVal in 8..20 || dVal in 8.0..16.0)
+    val isRedState = pVal > 120 || jVal > 20 || dVal > 18.0
+    val isYellowState = !isRedState && (pVal in 80..120 || jVal in 8..20 || dVal in 12.0..18.0)
     val statusAssessmentColor = when {
         pVal <= 0 && dVal <= 0.0 -> TextSecondary
         isRedState -> JapanRed
@@ -1717,10 +1717,10 @@ private fun DenseCoreTelemetrySection(
             } else {
                 "Độ trễ mạng tăng cao (${pVal}ms). Gợi ý: Tắt VPN ngay sau khi vào game để giảm trễ."
             }
-            dVal > 16.0 -> if (isEn) {
-                "Slow hardware decode (${String.format("%.1f", dVal)}ms > 16.6ms). Tip: Switch to 720p or cool down device."
+            dVal > 18.0 -> if (isEn) {
+                "Slow hardware decode (${String.format("%.1f", dVal)}ms > 18.0ms). Tip: Switch to 720p or cool down device."
             } else {
-                "Thời gian giải mã cao (${String.format("%.1f", dVal)}ms > 16.6ms). Gợi ý: Chuyển về 720p hoặc để máy hạ nhiệt."
+                "Thời gian giải mã cao (${String.format("%.1f", dVal)}ms > 18.0ms). Gợi ý: Chuyển về 720p hoặc để máy hạ nhiệt."
             }
             jVal > 20 -> if (isEn) {
                 "High network jitter (${jVal}ms). Tip: Move closer to Wi-Fi or stronger 4G area."
@@ -2050,11 +2050,11 @@ private fun DenseQualityModeSection(
                 val isPeakHour = currentHour in 20..23
 
                 // Lớp 1: Môi trường thiết bị (Tiết kiệm pin / Giải mã phần cứng)
-                val layer1Bad = isPowerSave || (telemetry.hasStatsSample && telemetry.decodeTimeMs > 16.0)
+                val layer1Bad = isPowerSave || (telemetry.hasStatsSample && telemetry.decodeTimeMs > 18.0)
                 val layer1Text = when {
                     isPowerSave -> if (isEn) "1. Device: Battery Saver ON (throttles decoder)" else "1. Thiết bị: Đang bật Tiết kiệm pin (bóp xung giải mã)"
                     !telemetry.hasStatsSample || telemetry.decodeTimeMs <= 0.0 -> if (isEn) "1. Device: 60Hz VSync locked • Decode —" else "1. Thiết bị: Đã khóa 60Hz • Giải mã —"
-                    telemetry.decodeTimeMs > 16.0 -> if (isEn) "1. Device: Slow decode (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)" else "1. Thiết bị: Giải mã quá tải (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 16.6ms)"
+                    telemetry.decodeTimeMs > 18.0 -> if (isEn) "1. Device: Slow decode (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 18.0ms)" else "1. Thiết bị: Giải mã quá tải (${String.format("%.1f", telemetry.decodeTimeMs)}ms > 18.0ms)"
                     else -> if (isEn) "1. Device: 60Hz VSync locked • Decode OK (${String.format("%.1f", telemetry.decodeTimeMs)}ms)" else "1. Thiết bị: Đã khóa 60Hz • Giải mã tốt (${String.format("%.1f", telemetry.decodeTimeMs)}ms)"
                 }
 

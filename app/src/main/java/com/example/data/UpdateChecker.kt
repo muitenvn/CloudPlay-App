@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +24,7 @@ import java.net.HttpURLConnection
 import java.net.Proxy
 import java.net.URL
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.coroutineContext
 
 sealed class UpdateCheckState {
@@ -68,8 +70,10 @@ object UpdateChecker {
     private const val KEY_CACHED_APK_DIRECT_URL = "cached_apk_direct_url"
     private const val KEY_CACHED_OFFICIAL_SHA256 = "cached_official_sha256"
     private const val KEY_CACHED_SHA256_ASSET_URL = "cached_sha256_asset_url"
+    private const val KEY_CACHED_ETAG = "cached_github_api_etag"
 
     private const val CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L
+    private const val MANUAL_RAPID_TAP_REUSE_MS = 15_000L
     private const val TIMEOUT_MS = 8000
     private const val GHFAST_TIMEOUT_MS = 15000 // 15 giây cho ghfast.top trước khi tự chuyển sang GitHub
     private const val GITHUB_DOWNLOAD_TIMEOUT_MS = 20000
@@ -77,10 +81,15 @@ object UpdateChecker {
     private const val MAX_REDIRECT_HOPS = 5
 
     private const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest"
+    private const val LATEST_RELEASE_WEB_URL = "https://github.com/muitenvn/CloudPlay-App/releases/latest"
     const val FALLBACK_RELEASES_URL = "https://github.com/muitenvn/CloudPlay-App/releases"
     private const val FAST_CDN_PREFIX = "https://ghfast.top/"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val isChecking = AtomicBoolean(false)
+
+    @Volatile
+    private var lastSuccessfulCheckRealtimeMs: Long = 0L
 
     private val _state = MutableStateFlow<UpdateCheckState>(UpdateCheckState.Idle)
     val state: StateFlow<UpdateCheckState> = _state.asStateFlow()
@@ -182,7 +191,8 @@ object UpdateChecker {
         initialUrlString: String,
         allowGhFast: Boolean,
         timeoutMs: Int,
-        acceptHeader: String = "*/*"
+        acceptHeader: String = "*/*",
+        ifNoneMatchEtag: String = ""
     ): HttpURLConnection {
         var currentUrl = URL(initialUrlString)
         if (!isAllowedHttpsUrl(currentUrl, allowGhFast)) {
@@ -198,6 +208,9 @@ object UpdateChecker {
                 useCaches = false
                 setRequestProperty("Accept", acceptHeader)
                 setRequestProperty("User-Agent", "CloudPlay-Android")
+                if (ifNoneMatchEtag.isNotBlank() && redirects == 0) {
+                    setRequestProperty("If-None-Match", ifNoneMatchEtag)
+                }
             }
             val code = conn.responseCode
             if (code in listOf(301, 302, 303, 307, 308)) {
@@ -215,6 +228,39 @@ object UpdateChecker {
             return conn
         }
         throw SecurityException("Too many redirects")
+    }
+
+    /**
+     * Dự phòng khi api.github.com bị giới hạn tần suất (HTTP 403/429 khi bấm liên tục):
+     * kiểm tra qua URL web github.com/.../releases/latest (chuyển hướng 302 tới /releases/tag/vX.Y.Z,
+     * không bị giới hạn 60 request/giờ của REST API).
+     */
+    private fun fetchLatestVersionViaWebRedirect(): String {
+        var conn: HttpURLConnection? = null
+        return try {
+            val url = URL(LATEST_RELEASE_WEB_URL)
+            conn = (url.openConnection(Proxy.NO_PROXY) as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                requestMethod = "HEAD"
+                connectTimeout = TIMEOUT_MS
+                readTimeout = TIMEOUT_MS
+                useCaches = false
+                setRequestProperty("User-Agent", "CloudPlay-Android")
+            }
+            val code = conn.responseCode
+            val location = conn.getHeaderField("Location")?.trim().orEmpty()
+            if (code in listOf(301, 302, 303, 307, 308) && location.contains("/releases/tag/")) {
+                val rawTag = location.substringAfter("/releases/tag/").substringBefore("?").substringBefore("#").trim()
+                val clean = normalizeVersionString(rawTag)
+                if (parseNumericParts(clean).isNotEmpty()) clean else ""
+            } else {
+                ""
+            }
+        } catch (_: Throwable) {
+            ""
+        } finally {
+            try { conn?.disconnect() } catch (_: Throwable) {}
+        }
     }
 
     private fun fetchSha256FromGitHubAsset(sha256AssetUrl: String): String {
@@ -235,6 +281,57 @@ object UpdateChecker {
         } finally {
             try { conn?.disconnect() } catch (_: Throwable) {}
         }
+    }
+
+    private fun applyCachedOrResolvedVersionState(
+        context: Context,
+        currentVersion: String,
+        resolvedLatestVersion: String,
+        openDialogIfNewer: Boolean
+    ): Boolean {
+        val cleanLatest = normalizeVersionString(resolvedLatestVersion)
+        if (cleanLatest.isBlank() || parseNumericParts(cleanLatest).isEmpty()) return false
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cachedLatest = sp.getString(KEY_CACHED_LATEST_VER, "") ?: ""
+        val sameAsCached = cachedLatest.equals(cleanLatest, ignoreCase = true)
+
+        val releaseUrl = if (sameAsCached) {
+            sp.getString(KEY_CACHED_RELEASE_URL, FALLBACK_RELEASES_URL) ?: FALLBACK_RELEASES_URL
+        } else {
+            "https://github.com/muitenvn/CloudPlay-App/releases/tag/v$cleanLatest"
+        }
+        val releaseNotes = if (sameAsCached) sp.getString(KEY_CACHED_RELEASE_NOTES, "") ?: "" else ""
+        val apkDirectUrl = if (sameAsCached) {
+            (sp.getString(KEY_CACHED_APK_DIRECT_URL, "") ?: "").ifBlank {
+                "https://github.com/muitenvn/CloudPlay-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
+            }
+        } else {
+            "https://github.com/muitenvn/CloudPlay-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
+        }
+        val officialSha = if (sameAsCached) sp.getString(KEY_CACHED_OFFICIAL_SHA256, "") ?: "" else ""
+        val shaAssetUrl = if (sameAsCached) {
+            (sp.getString(KEY_CACHED_SHA256_ASSET_URL, "") ?: "").ifBlank { "$apkDirectUrl.sha256" }
+        } else {
+            "$apkDirectUrl.sha256"
+        }
+
+        lastSuccessfulCheckRealtimeMs = System.currentTimeMillis()
+        if (isNewerVersion(currentVersion, cleanLatest)) {
+            _state.value = UpdateCheckState.UpdateAvailable(
+                currentVersion = currentVersion,
+                latestVersion = cleanLatest,
+                releaseUrl = releaseUrl,
+                releaseNotes = releaseNotes,
+                apkDirectUrl = apkDirectUrl,
+                fastCdnApkUrl = buildFastCdnUrl(apkDirectUrl, cleanLatest),
+                officialSha256 = officialSha,
+                sha256AssetUrl = shaAssetUrl
+            )
+            if (openDialogIfNewer) _showUpdateDialog.value = true
+        } else {
+            _state.value = UpdateCheckState.UpToDate(currentVersion = currentVersion)
+        }
+        return true
     }
 
     fun checkOnAppLaunchIfNeeded(context: Context) {
@@ -270,18 +367,45 @@ object UpdateChecker {
             }
             return
         }
-        scope.launch { performCheck(appContext, isManual = false) }
+        if (!isChecking.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                performCheck(appContext, isManual = false)
+            } finally {
+                isChecking.set(false)
+            }
+        }
     }
 
     fun checkNowManual(context: Context) {
-        if (_state.value is UpdateCheckState.Checking) return
+        if (!isChecking.compareAndSet(false, true)) return
+        _state.value = UpdateCheckState.Checking
         val appContext = context.applicationContext
-        scope.launch { performCheck(appContext, isManual = true) }
+        scope.launch {
+            try {
+                val now = System.currentTimeMillis()
+                val sp = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val cachedLatest = sp.getString(KEY_CACHED_LATEST_VER, "") ?: ""
+                if (now - lastSuccessfulCheckRealtimeMs in 1..MANUAL_RAPID_TAP_REUSE_MS && cachedLatest.isNotBlank()) {
+                    delay(220L)
+                    val currentVersion = getCurrentVersionName(appContext)
+                    if (applyCachedOrResolvedVersionState(appContext, currentVersion, cachedLatest, openDialogIfNewer = true)) {
+                        return@launch
+                    }
+                }
+                performCheck(appContext, isManual = true)
+            } finally {
+                isChecking.set(false)
+            }
+        }
     }
 
     private fun performCheck(context: Context, isManual: Boolean) {
         val currentVersion = getCurrentVersionName(context)
         if (isManual) _state.value = UpdateCheckState.Checking
+        val sp = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cachedEtag = sp.getString(KEY_CACHED_ETAG, "") ?: ""
+        val cachedLatest = sp.getString(KEY_CACHED_LATEST_VER, "") ?: ""
 
         var connection: HttpURLConnection? = null
         try {
@@ -289,18 +413,33 @@ object UpdateChecker {
                 initialUrlString = LATEST_RELEASE_API_URL,
                 allowGhFast = false,
                 timeoutMs = TIMEOUT_MS,
-                acceptHeader = "application/vnd.github+json"
+                acceptHeader = "application/vnd.github+json",
+                ifNoneMatchEtag = if (cachedLatest.isNotBlank()) cachedEtag else ""
             )
-            if (connection.responseCode !in 200..299) {
-                handleCheckFailure(currentVersion, isManual)
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED && cachedLatest.isNotBlank()) {
+                sp.edit().putLong(KEY_LAST_CHECK_MS, System.currentTimeMillis()).apply()
+                if (applyCachedOrResolvedVersionState(context, currentVersion, cachedLatest, openDialogIfNewer = true)) {
+                    return
+                }
+            }
+            if (responseCode !in 200..299) {
+                val redirectVer = fetchLatestVersionViaWebRedirect().ifBlank { cachedLatest }
+                if (!applyCachedOrResolvedVersionState(context, currentVersion, redirectVer, openDialogIfNewer = true)) {
+                    handleCheckFailure(currentVersion, isManual)
+                }
                 return
             }
 
+            val newEtag = connection.getHeaderField("ETag")?.trim().orEmpty()
             val responseBody = BufferedReader(InputStreamReader(connection.inputStream, Charsets.UTF_8)).use { it.readText() }
             val json = JSONObject(responseBody)
             val latestVersion = normalizeVersionString(json.optString("tag_name", ""))
             if (latestVersion.isBlank() || parseNumericParts(latestVersion).isEmpty()) {
-                handleCheckFailure(currentVersion, isManual)
+                val redirectVer = fetchLatestVersionViaWebRedirect().ifBlank { cachedLatest }
+                if (!applyCachedOrResolvedVersionState(context, currentVersion, redirectVer, openDialogIfNewer = true)) {
+                    handleCheckFailure(currentVersion, isManual)
+                }
                 return
             }
 
@@ -347,14 +486,15 @@ object UpdateChecker {
                 apkDirectUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
             }
             if (sha256AssetUrl.isBlank()) sha256AssetUrl = "$apkDirectUrl.sha256"
-            if (!isValidSha256Hex(officialSha256)) {
+            val newerAvailable = isNewerVersion(currentVersion, latestVersion)
+            if (newerAvailable && !isValidSha256Hex(officialSha256)) {
                 officialSha256 = fetchSha256FromGitHubAsset(sha256AssetUrl)
             }
 
             val fastCdnUrl = buildFastCdnUrl(apkDirectUrl, latestVersion)
             val cleanNotes = sanitizeReleaseNotes(json.optString("body", "").trim())
 
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            sp.edit()
                 .putLong(KEY_LAST_CHECK_MS, System.currentTimeMillis())
                 .putString(KEY_CACHED_LATEST_VER, latestVersion)
                 .putString(KEY_CACHED_RELEASE_URL, releaseUrl)
@@ -362,9 +502,13 @@ object UpdateChecker {
                 .putString(KEY_CACHED_APK_DIRECT_URL, apkDirectUrl)
                 .putString(KEY_CACHED_OFFICIAL_SHA256, officialSha256)
                 .putString(KEY_CACHED_SHA256_ASSET_URL, sha256AssetUrl)
+                .apply {
+                    if (newEtag.isNotBlank()) putString(KEY_CACHED_ETAG, newEtag)
+                }
                 .apply()
 
-            if (isNewerVersion(currentVersion, latestVersion)) {
+            lastSuccessfulCheckRealtimeMs = System.currentTimeMillis()
+            if (newerAvailable) {
                 _state.value = UpdateCheckState.UpdateAvailable(
                     currentVersion = currentVersion,
                     latestVersion = latestVersion,
@@ -380,7 +524,10 @@ object UpdateChecker {
                 _state.value = UpdateCheckState.UpToDate(currentVersion = currentVersion)
             }
         } catch (_: Throwable) {
-            handleCheckFailure(currentVersion, isManual)
+            val redirectVer = fetchLatestVersionViaWebRedirect().ifBlank { cachedLatest }
+            if (!applyCachedOrResolvedVersionState(context, currentVersion, redirectVer, openDialogIfNewer = true)) {
+                handleCheckFailure(currentVersion, isManual)
+            }
         } finally {
             try { connection?.disconnect() } catch (_: Throwable) {}
         }

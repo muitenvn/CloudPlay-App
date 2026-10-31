@@ -332,20 +332,20 @@ object AdaptiveQualityManager {
         val isCellular = netStatus.isCellular || (!netStatus.isWifi && netStatus.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
 
         val grade = when {
-            deltaFreezes > 0 || loss > 1.5 || effectiveDecode > 12.0 || effectiveJitter > 20.0 -> if (isEn) "Adapting Queue" else "Đang Giảm Tải Đường Truyền"
-            deltaDropped >= 3 || effectiveDecode > 9.0 || effectiveJitter > 11.0 || rttTrendDelta >= 12.0 -> if (isEn) "Stabilizing Stream" else "Đang Ổn Định Khung Hình"
-            isCellular && effectiveDecode <= 8.0 && loss <= 0.4 && effectiveJitter <= 12.0 -> if (isEn) "4G Fast Response" else "4G Ổn Định • Phản Hồi Nhanh"
-            effectiveDecode in 0.1..7.5 && loss <= 0.2 && effectiveRtt in 1.0..85.0 && effectiveJitter <= 8.0 -> if (isEn) "Optimal Stream" else "Ổn Định • Độ Trễ Thấp"
+            deltaFreezes > 0 || loss > 1.5 || effectiveDecode > 18.0 || effectiveJitter > 20.0 -> if (isEn) "Adapting Queue" else "Đang Giảm Tải Đường Truyền"
+            deltaDropped >= 3 || effectiveDecode > 14.5 || effectiveJitter > 11.0 || rttTrendDelta >= 12.0 -> if (isEn) "Stabilizing Stream" else "Đang Ổn Định Khung Hình"
+            isCellular && effectiveDecode <= 11.0 && loss <= 0.4 && effectiveJitter <= 12.0 -> if (isEn) "4G Fast Response" else "4G Ổn Định • Phản Hồi Nhanh"
+            effectiveDecode in 0.1..10.5 && loss <= 0.2 && effectiveRtt in 1.0..85.0 && effectiveJitter <= 8.0 -> if (isEn) "Optimal Stream" else "Ổn Định • Độ Trễ Thấp"
             else -> if (isEn) "Stable" else "Ổn Định"
         }
 
         var steppedDownForNextSession = false
         var fixedDecodeSlowHint = false
-        if (deltaFreezes > 0 || effectiveDecode > 12.0 || emaLossPercent > 1.0 || effectiveJitter > 16.0 || rttTrendDelta >= 20.0) {
+        if (deltaFreezes > 0 || effectiveDecode > 18.0 || emaLossPercent > 1.0 || effectiveJitter > 16.0 || rttTrendDelta >= 20.0) {
             val now = System.currentTimeMillis()
             if (highDecodeStartMs == 0L) highDecodeStartMs = now
             highDecodeTicks++
-            if (highDecodeTicks >= 2) {
+            if (highDecodeTicks >= 3) {
                 if (current.isAutoAdapting) {
                     val baseMbps = (savedNextSessionMbps ?: current.smoothBitrateMbps.roundToInt()).coerceAtLeast(5)
                     val nextLowerMbps = when {
@@ -394,17 +394,17 @@ object AdaptiveQualityManager {
 
             val isHeavyPressure = deltaFreezes > 0 ||
                 deltaDropped >= 4 ||
-                effectiveDecode > 12.0 ||
-                decodeTime > 14.0 ||
+                effectiveDecode > 18.0 ||
+                decodeTime > 20.0 ||
                 emaLossPercent > 0.8 ||
                 loss > 1.2 ||
                 rttTrendDelta >= (if (isCellular) 12.0 else 18.0) ||
                 effectiveJitter > (if (isCellular) 15.0 else 18.0) ||
-                (fps in 1..48 && (loss > 0.3 || effectiveDecode > 10.0))
+                (fps in 1..48 && (loss > 0.3 || effectiveDecode > 16.5))
 
             val isEarlyWarmup = deltaDropped in 2..3 ||
-                (effectiveDecode in 9.5..12.0) ||
-                (decodeTime >= 9.0 && decodeTrendDelta >= 1.5) ||
+                (effectiveDecode in 14.5..18.0) ||
+                (decodeTime >= 14.0 && decodeTrendDelta >= 2.0) ||
                 (effectiveJitter in (if (isCellular) 9.0 else 10.0)..15.0) ||
                 (jitterTrendDelta >= 4.0 && jitter >= 8.0) ||
                 (rttTrendDelta >= (if (isCellular) 8.0 else 10.0)) ||
@@ -424,7 +424,7 @@ object AdaptiveQualityManager {
                 if (isCellular) {
                     multiplicativeTargetMbps = (current.smoothBitrateMbps * 0.55).coerceIn(4.0, 6.0)
                 } else {
-                    deltaBitrateMbps = if (netStatus.isWeakWifiSignal || effectiveDecode > 13.0) -2.5 else -2.0
+                    deltaBitrateMbps = if (netStatus.isWeakWifiSignal || effectiveDecode > 18.5) -2.5 else -2.0
                 }
                 actionNote = if (isCellular) {
                     if (isEn) "4G jitter: adjusting receiver buffer now; SDP cap (4-6M) applies next session" else "Sóng 4G dao động: điều chỉnh đệm nhận ngay; trần SDP (4-6M) áp dụng phiên sau"

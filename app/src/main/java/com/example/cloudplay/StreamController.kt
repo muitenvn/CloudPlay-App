@@ -422,7 +422,7 @@ class StreamController(private val context: Context) {
             avgPingMs = avgPing,
             avgFps = avgFps,
             avgDecodeMs = avgDecode,
-            isSlowDecode = avgDecode > 12.0,
+            isSlowDecode = avgDecode > 18.0,
             isThermalHot = sessionThermalHot,
             pingSamples = samplesSnapshot,
             framesDropped = sessionMaxFramesDropped,

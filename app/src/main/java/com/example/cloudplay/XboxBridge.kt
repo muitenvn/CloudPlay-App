@@ -305,8 +305,16 @@ class XboxBridge(
                         if (window.__applyGpuAndRenderScaleCss) window.__applyGpuAndRenderScaleCss();
                     };
 
+                    let cachedStreamVideo = null;
                     function findActiveStreamVideo() {
-                        return document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                        if (cachedStreamVideo && cachedStreamVideo.isConnected && cachedStreamVideo.readyState >= 1) {
+                            return cachedStreamVideo;
+                        }
+                        const v = document.querySelector('video#stream-video, video[data-testid="stream-video"], #segmented-video video, video');
+                        if (v && v.isConnected) {
+                            cachedStreamVideo = v;
+                        }
+                        return v;
                     }
                     window.__findActiveStreamVideo = findActiveStreamVideo;
 
@@ -564,15 +572,28 @@ class XboxBridge(
                                     if (config && config.video && config.video.contentType) {
                                         const ct = config.video.contentType.toLowerCase();
                                         if (ct.indexOf('avc1') !== -1 || ct.indexOf('h264') !== -1) {
-                                            let profileSupported = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main || hwCodecCaps.h264High;
-                                            if (ct.indexOf('avc1.64') !== -1) {
-                                                profileSupported = hwCodecCaps.h264High;
+                                            const hasFastBaselineOrMain = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main;
+                                            if (ct.indexOf('avc1.42') !== -1) {
+                                                const supported = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main || hwCodecCaps.h264High;
+                                                if (supported) {
+                                                    return { supported: true, smooth: true, powerEfficient: true };
+                                                }
                                             } else if (ct.indexOf('avc1.4d') !== -1) {
-                                                profileSupported = hwCodecCaps.h264Main || hwCodecCaps.h264High;
-                                            } else if (ct.indexOf('avc1.42') !== -1) {
-                                                profileSupported = hwCodecCaps.h264Baseline || hwCodecCaps.h264Main || hwCodecCaps.h264High;
-                                            }
-                                            if (profileSupported) {
+                                                const supported = hwCodecCaps.h264Main || hwCodecCaps.h264Baseline || hwCodecCaps.h264High;
+                                                if (supported) {
+                                                    return { supported: true, smooth: true, powerEfficient: true };
+                                                }
+                                            } else if (ct.indexOf('avc1.64') !== -1) {
+                                                // Báo powerEfficient = false cho High Profile khi máy có hỗ trợ Baseline/Main
+                                                // để máy chủ Xbox ưu tiên cấp luồng Constrained Baseline (không giữ khung hình trong bộ đệm DPB).
+                                                if (hwCodecCaps.h264High) {
+                                                    return {
+                                                        supported: true,
+                                                        smooth: true,
+                                                        powerEfficient: !hasFastBaselineOrMain
+                                                    };
+                                                }
+                                            } else if (hasFastBaselineOrMain || hwCodecCaps.h264High) {
                                                 return { supported: true, smooth: true, powerEfficient: true };
                                             }
                                             return origDecodingInfo(config);
@@ -599,24 +620,45 @@ class XboxBridge(
 
                     function prioritizeHardwareH264Codecs(pc) {
                         try {
-                            if (!window.RTCRtpReceiver || typeof RTCRtpReceiver.getCapabilities !== 'function') return;
+                            if (!pc || !window.RTCRtpReceiver || typeof RTCRtpReceiver.getCapabilities !== 'function') return;
                             const caps = RTCRtpReceiver.getCapabilities('video');
                             if (!caps || !Array.isArray(caps.codecs) || caps.codecs.length === 0) return;
 
-                            // Giữ nguyên thứ tự profile H.264 gốc của trình duyệt (để ưu tiên đúng MediaCodec phần cứng của thiết bị),
-                            // chỉ đưa nhóm codec H.264 + gói phục hồi lỗi (rtx/red/ulpfec) lên trước VP8/VP9/AV1.
-                            const h264AndFec = [];
+                            // Sắp xếp H.264 ưu tiên Constrained Baseline (42e0 / 4200) -> Main (4d) -> High (64)
+                            // nhằm triệt tiêu độ trễ giữ khung hình trong bộ đệm giải mã phần cứng (DPB reordering = 0).
+                            const h264Baseline = [];
+                            const h264Main = [];
+                            const h264Other = [];
+                            const fecCodecs = [];
                             const others = [];
+
                             for (let i = 0; i < caps.codecs.length; i++) {
                                 const c = caps.codecs[i];
                                 const mime = (c.mimeType || '').toLowerCase();
-                                if (mime === 'video/h264' || mime === 'video/rtx' || mime === 'video/red' || mime === 'video/ulpfec') {
-                                    h264AndFec.push(c);
+                                const fmtp = (c.sdpFmtpLine || '').toLowerCase();
+                                if (mime === 'video/h264') {
+                                    if (fmtp.indexOf('profile-level-id=42e0') !== -1 || fmtp.indexOf('profile-level-id=4200') !== -1 || fmtp.indexOf('profile-level-id=42') !== -1) {
+                                        if (fmtp.indexOf('packetization-mode=1') !== -1) {
+                                            h264Baseline.unshift(c);
+                                        } else {
+                                            h264Baseline.push(c);
+                                        }
+                                    } else if (fmtp.indexOf('profile-level-id=4d') !== -1) {
+                                        if (fmtp.indexOf('packetization-mode=1') !== -1) {
+                                            h264Main.unshift(c);
+                                        } else {
+                                            h264Main.push(c);
+                                        }
+                                    } else {
+                                        h264Other.push(c);
+                                    }
+                                } else if (mime === 'video/rtx' || mime === 'video/red' || mime === 'video/ulpfec') {
+                                    fecCodecs.push(c);
                                 } else {
                                     others.push(c);
                                 }
                             }
-                            const sortedCodecs = h264AndFec.concat(others);
+                            const sortedCodecs = h264Baseline.concat(h264Main, h264Other, fecCodecs, others);
 
                             const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
                             for (let i = 0; i < transceivers.length; i++) {
@@ -644,14 +686,33 @@ class XboxBridge(
                             const activeMbps = Math.max(4, Math.min(maxSafeMbps, Math.round(rawMbps)));
                             const targetKbps = activeMbps * 1000;
 
-                            // Chỉ thêm gợi ý băng thông b=AS vào Local SDP Answer mà KHÔNG sửa đổi profile-level-id hay a=framerate
-                            // nhằm tránh xung đột thông số H.264 khiến phần cứng MediaCodec bị khựng hoặc chuyển sang giải mã CPU.
-                            if (sdp.indexOf('m=video ') !== -1 && sdp.indexOf('b=AS:') === -1) {
-                                sdp = sdp.replace(
-                                    /m=video (.*)\r\n/g,
-                                    'm=video $1\r\nb=AS:' + targetKbps + '\r\n'
-                                );
+                            // Chuẩn RFC 4566 Section 5: dòng b=AS:<kbps> trong khối m=video PHẢI đứng SAU dòng c=IN ...
+                            // Nếu đặt b=AS: trước c=IN ..., bộ phân tích JSEP của Chromium sẽ từ chối hoặc bỏ qua.
+                            const videoIdx = sdp.indexOf('m=video ');
+                            if (videoIdx !== -1) {
+                                const beforeVideo = sdp.substring(0, videoIdx);
+                                const fromVideo = sdp.substring(videoIdx);
+                                const nextMediaRelIdx = fromVideo.substring(8).search(/\r?\nm=/);
+                                let videoSection = nextMediaRelIdx !== -1 ? fromVideo.substring(0, nextMediaRelIdx + 8) : fromVideo;
+                                const afterVideo = nextMediaRelIdx !== -1 ? fromVideo.substring(nextMediaRelIdx + 8) : '';
+
+                                if (videoSection.indexOf('\nb=AS:') === -1 && videoSection.indexOf('\nb=TIAS:') === -1) {
+                                    if (/c=IN [^\r\n]+\r\n/.test(videoSection)) {
+                                        videoSection = videoSection.replace(/(c=IN [^\r\n]+\r\n)/, '$1b=AS:' + targetKbps + '\r\n');
+                                    } else {
+                                        videoSection = videoSection.replace(/(m=video [^\r\n]+\r\n)/, '$1b=AS:' + targetKbps + '\r\n');
+                                    }
+                                }
+                                sdp = beforeVideo + videoSection + afterVideo;
                             }
+
+                            // Bổ sung sprop-max-don-diff=0 cho các dòng a=fmtp của H.264 để báo MediaCodec xuất frame ngay
+                            sdp = sdp.replace(/(a=fmtp:\d+ [^\r\n]*profile-level-id=[0-9a-fA-F]+[^\r\n]*)/g, function(line) {
+                                if (line.indexOf('sprop-max-don-diff') === -1) {
+                                    return line + ';sprop-max-don-diff=0';
+                                }
+                                return line;
+                            });
 
                             if (isLowEndMode && window.__pauseTranslator) {
                                 window.__pauseTranslator();
@@ -736,6 +797,7 @@ class XboxBridge(
                         let lastFrames = 0;
                         let lastTotalDecodeTime = 0;
                         let lastFramesDecodedForDecode = 0;
+                        let smoothedDecodeMs = 0.0;
                         let lastJitterBufferDelay = 0;
                         let lastJitterBufferEmitted = 0;
                         let lastStunResponses = 0;
@@ -859,19 +921,26 @@ class XboxBridge(
                                 lastTimestamp = now;
                                 lastFrames = framesDecoded;
 
-                                // Measure real hardware decode time per frame without artificial clamping or fake fallback
-                                let decodeTimeMs = 0.0;
+                                // Đo thời gian giải mã phần cứng thực tế kết hợp lọc nhiễu khi ít khung hình (màn hình chờ / chuyển cảnh)
+                                let decodeTimeMs = smoothedDecodeMs;
                                 if (lastTotalDecodeTime > 0 && currentTotalDecodeTime >= lastTotalDecodeTime &&
                                     lastFramesDecodedForDecode > 0 && framesDecoded > lastFramesDecodedForDecode) {
                                     const deltaDecodeSec = currentTotalDecodeTime - lastTotalDecodeTime;
                                     const deltaFrames = framesDecoded - lastFramesDecodedForDecode;
-                                    if (deltaFrames > 0 && deltaDecodeSec >= 0) {
-                                        const rawDecodeMs = (deltaDecodeSec / deltaFrames) * 1000.0;
-                                        decodeTimeMs = parseFloat(Math.max(0.5, rawDecodeMs).toFixed(1));
+                                    // Chỉ cập nhật phép chia khi có từ 12 khung hình giải mã trở lên trong chu kỳ để tránh sai số vọt ảo lúc chuyển cảnh
+                                    if (deltaFrames >= 12 && deltaDecodeSec >= 0) {
+                                        const rawDecodeMs = Math.min(28.0, Math.max(0.5, (deltaDecodeSec / deltaFrames) * 1000.0));
+                                        smoothedDecodeMs = smoothedDecodeMs > 0.0
+                                            ? (smoothedDecodeMs * 0.70 + rawDecodeMs * 0.30)
+                                            : rawDecodeMs;
+                                        decodeTimeMs = parseFloat(smoothedDecodeMs.toFixed(1));
+                                        lastTotalDecodeTime = currentTotalDecodeTime;
+                                        lastFramesDecodedForDecode = framesDecoded;
                                     }
+                                } else if (lastFramesDecodedForDecode === 0 && framesDecoded > 0) {
+                                    lastTotalDecodeTime = currentTotalDecodeTime;
+                                    lastFramesDecodedForDecode = framesDecoded;
                                 }
-                                lastTotalDecodeTime = currentTotalDecodeTime;
-                                lastFramesDecodedForDecode = framesDecoded;
 
                                 // Measure real WebRTC jitter buffer delay (ms)
                                 let jitterBufferDelayMs = 0.0;
@@ -921,23 +990,24 @@ class XboxBridge(
                                     window.__lastKnownRttMs = rtt;
                                     window.__lastKnownJitterMs = jitter;
 
-                                    // Mục 4: Tự động tắt bộ lọc làm nét khi decodeTimeMs > 12.0ms cần >= 3 mẫu liên tiếp
-                                    // và thông báo về Kotlin để đồng bộ trạng thái cài đặt & giao diện.
-                                    if (decodeTimeMs > 12.0) {
+                                    // Chỉ tự động giảm nhẹ bộ lọc làm nét khi decodeTimeMs > 18.0ms kéo dài >= 5 mẫu liên tiếp kèm tụt FPS thực tế
+                                    const prevSnap = window.__lastSentTelemetrySnapshot;
+                                    const hasRealDropOrLowFps = (fps > 0 && fps < 52) || (prevSnap && framesDropped > prevSnap.framesDropped + 2);
+                                    if (decodeTimeMs > 18.0 && hasRealDropOrLowFps) {
                                         window.__highDecodeStreakForClarity = (window.__highDecodeStreakForClarity || 0) + 1;
-                                        if (window.__highDecodeStreakForClarity >= 3 && window.__clarityBoostActive && window.__setClarityPreset) {
+                                        if (window.__highDecodeStreakForClarity >= 5 && window.__clarityBoostActive && window.__setClarityPreset) {
                                             window.__highDecodeStreakForClarity = 0;
                                             window.__clarityBoostActive = false;
                                             window.__setClarityPreset('OFF');
                                             notify('onClarityAutoDisabled', String(decodeTimeMs));
                                         }
-                                    } else {
+                                    } else if (decodeTimeMs <= 16.0) {
                                         window.__highDecodeStreakForClarity = 0;
                                     }
 
                                     const prev = window.__lastSentTelemetrySnapshot;
                                     const elapsedSinceSent = now - (window.__lastTelemetrySentAt || 0);
-                                    const isOverThreshold = (decodeTimeMs > 12.0 || jitter > 15 || (prev && framesDropped > prev.framesDropped) || lostPercent > 2.0);
+                                    const isOverThreshold = (decodeTimeMs > 18.0 || jitter > 15 || (prev && framesDropped > prev.framesDropped) || lostPercent > 2.0);
                                     const hasMeaningfulDelta = !prev ||
                                         elapsedSinceSent >= 4500 ||
                                         (isOverThreshold && elapsedSinceSent >= 2000) ||
@@ -969,7 +1039,7 @@ class XboxBridge(
                                     }
                                 }
                             } catch(err) {}
-                        }, 2000);
+                        }, 2500);
                         window.__activeStatsIntervalId = statsIntervalId;
                         return pc;
                     }
@@ -983,12 +1053,68 @@ class XboxBridge(
                                 proto.__cpProtoHooked = true;
                                 const origProtoSetRemote = proto.setRemoteDescription;
                                 proto.setRemoteDescription = function(desc) {
+                                    const self = this;
                                     try {
-                                        attachPeerConnectionHooks(this);
-                                        // KHÔNG sửa đổi SDP của máy chủ trong setRemoteDescription để bảo toàn cấu hình H.264 gốc của Xbox
+                                        attachPeerConnectionHooks(self);
                                     } catch (e) {}
-                                    return origProtoSetRemote.call(this, desc);
+                                    const res = origProtoSetRemote.apply(self, arguments);
+                                    if (res && typeof res.then === 'function') {
+                                        return res.then(function(val) {
+                                            try { prioritizeHardwareH264Codecs(self); } catch (e) {}
+                                            return val;
+                                        });
+                                    }
+                                    try { prioritizeHardwareH264Codecs(self); } catch (e) {}
+                                    return res;
                                 };
+
+                                if (typeof proto.createAnswer === 'function') {
+                                    const origCreateAnswer = proto.createAnswer;
+                                    proto.createAnswer = function() {
+                                        const self = this;
+                                        try {
+                                            attachPeerConnectionHooks(self);
+                                            prioritizeHardwareH264Codecs(self);
+                                        } catch (e) {}
+                                        const p = origCreateAnswer.apply(self, arguments);
+                                        if (p && typeof p.then === 'function') {
+                                            return p.then(function(answer) {
+                                                try {
+                                                    if (answer && answer.sdp) {
+                                                        const munged = mungeSdpForLowLatencyHardwareDecode(answer.sdp);
+                                                        return { type: answer.type, sdp: munged };
+                                                    }
+                                                } catch (e) {}
+                                                return answer;
+                                            });
+                                        }
+                                        return p;
+                                    };
+                                }
+
+                                if (typeof proto.createOffer === 'function') {
+                                    const origCreateOffer = proto.createOffer;
+                                    proto.createOffer = function() {
+                                        const self = this;
+                                        try {
+                                            attachPeerConnectionHooks(self);
+                                            prioritizeHardwareH264Codecs(self);
+                                        } catch (e) {}
+                                        const p = origCreateOffer.apply(self, arguments);
+                                        if (p && typeof p.then === 'function') {
+                                            return p.then(function(offer) {
+                                                try {
+                                                    if (offer && offer.sdp) {
+                                                        const munged = mungeSdpForLowLatencyHardwareDecode(offer.sdp);
+                                                        return { type: offer.type, sdp: munged };
+                                                    }
+                                                } catch (e) {}
+                                                return offer;
+                                            });
+                                        }
+                                        return p;
+                                    };
+                                }
 
                                 if (typeof proto.setLocalDescription === 'function') {
                                     const origProtoSetLocal = proto.setLocalDescription;
@@ -998,10 +1124,10 @@ class XboxBridge(
                                             prioritizeHardwareH264Codecs(this);
                                             if (desc && desc.sdp) {
                                                 const munged = mungeSdpForLowLatencyHardwareDecode(desc.sdp);
-                                                desc = new RTCSessionDescription({ type: desc.type, sdp: munged });
+                                                return origProtoSetLocal.call(this, { type: desc.type, sdp: munged });
                                             }
                                         } catch (e) {}
-                                        return origProtoSetLocal.call(this, desc);
+                                        return origProtoSetLocal.apply(this, arguments);
                                     };
                                 }
 
@@ -1372,10 +1498,9 @@ class XboxBridge(
                                         notify('onStreamConnected', 'video_active');
                                     }
                                 }
-                                // Fallback telemetry if WebRTC getStats() hasn't emitted in the last 2.8s:
-                                // Mục 2: Không bịa vFps = 60, profMbps hay estDecode = 4.1 / 2.7. Đánh dấu hasStatsSample = false để HUD hiện "—" và không đưa vào EMA/phiên.
+                                // Fallback telemetry chỉ kích hoạt khi vòng lặp WebRTC getStats() chính không hoạt động (quá 5.5s chưa có mẫu)
                                 const nowMs = Date.now();
-                                if (video.videoWidth > 0 && !video.paused && (nowMs - (window.__lastTelemetrySentAt || 0) > 2800)) {
+                                if (video.videoWidth > 0 && !video.paused && !window.__activeStatsIntervalId && (nowMs - (window.__lastTelemetrySentAt || 0) > 5500)) {
                                     try {
                                         let vFps = 0;
                                         let vDropped = 0;

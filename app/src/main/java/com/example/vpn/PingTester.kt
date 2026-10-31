@@ -65,26 +65,35 @@ data class EndpointPingMeasurement(
 
     /**
      * Nhãn hiển thị trung thực trên giao diện (phân biệt rõ cổng chính, cổng phụ :443/:80 và mạng chập chờn).
+     * Khi `showPort = false` (ở giao diện thường), ẩn số cổng để giao diện gọn gàng; ở màn chi tiết (`showPort = true`), hiện đầy đủ số cổng.
      */
-    fun formatDisplayBadge(isEn: Boolean): String {
+    fun formatDisplayBadge(isEn: Boolean, showPort: Boolean = true): String {
         return when (status) {
             ServerPingStatus.UNTESTED -> if (isEn) "Not tested" else "Chưa đo"
             ServerPingStatus.TESTING -> if (isEn) "Testing..." else "Đang đo..."
             ServerPingStatus.EXPIRED -> if (isEn) "Expired" else "Đã hết hạn"
             ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
             ServerPingStatus.MEASURED_PRIMARY -> {
-                val portSuffix = "(:$measuredPort)"
+                val portSuffix = if (showPort) " (:$measuredPort)" else ""
                 if (isUnstable) {
-                    if (isEn) "${rttMs}ms $portSuffix • Unstable" else "${rttMs}ms $portSuffix • Chập chờn"
+                    if (isEn) "${rttMs}ms$portSuffix • Unstable" else "${rttMs}ms$portSuffix • Chập chờn"
                 } else {
-                    "${rttMs}ms $portSuffix"
+                    "${rttMs}ms$portSuffix"
                 }
             }
             ServerPingStatus.MEASURED_FALLBACK_ONLY -> {
-                if (isEn) {
-                    "${rttMs}ms (:$measuredPort • Main :$configuredPort closed)"
+                if (showPort) {
+                    if (isEn) {
+                        "${rttMs}ms (:$measuredPort • Main :$configuredPort closed)"
+                    } else {
+                        "${rttMs}ms (:$measuredPort • Cổng :$configuredPort đóng)"
+                    }
                 } else {
-                    "${rttMs}ms (:$measuredPort • Cổng :$configuredPort đóng)"
+                    if (isEn) {
+                        "${rttMs}ms (Fallback port)"
+                    } else {
+                        "${rttMs}ms (Cổng phụ)"
+                    }
                 }
             }
         }

@@ -8,8 +8,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -197,7 +199,9 @@ fun SettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         manualModes.chunked(2).forEach { rowModes ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Max),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 rowModes.forEach { mode ->
@@ -209,6 +213,7 @@ fun SettingsScreen(
                                     Surface(
                                         modifier = Modifier
                                             .weight(1f)
+                                            .fillMaxHeight()
                                             .clip(RoundedCornerShape(10.dp))
                                             .border(
                                                 1.dp,
@@ -224,8 +229,10 @@ fun SettingsScreen(
                                         }
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .padding(horizontal = 10.dp, vertical = 9.dp),
+                                            verticalArrangement = Arrangement.spacedBy(3.dp)
                                         ) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
@@ -235,7 +242,7 @@ fun SettingsScreen(
                                                 Text(
                                                     text = mode.localizedTitle(isEn),
                                                     color = if (isSelected) accent else TextPrimary,
-                                                    fontSize = 12.5.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 if (isSelected) {
@@ -250,8 +257,9 @@ fun SettingsScreen(
                                             Text(
                                                 text = mode.localizedSubtitle(isEn),
                                                 color = TextSecondary,
-                                                fontSize = 10.sp,
-                                                maxLines = 2
+                                                fontSize = 9.5.sp,
+                                                lineHeight = 12.5.sp,
+                                                maxLines = 3
                                             )
                                         }
                                     }
@@ -268,7 +276,9 @@ fun SettingsScreen(
                     )
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
@@ -276,6 +286,7 @@ fun SettingsScreen(
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
+                                    .fillMaxHeight()
                                     .clip(RoundedCornerShape(10.dp))
                                     .border(
                                         1.dp,
@@ -287,7 +298,9 @@ fun SettingsScreen(
                                 color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
@@ -301,6 +314,7 @@ fun SettingsScreen(
                                         text = fpsCap.localizedDesc(isEn),
                                         color = TextSecondary,
                                         fontSize = 9.sp,
+                                        lineHeight = 11.5.sp,
                                         textAlign = TextAlign.Center,
                                         maxLines = 2
                                     )
@@ -447,6 +461,18 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    SettingToggleRow(
+                        title = if (isEn) "Allow public server auto-sync on mobile data" else "Cho phép tự cập nhật máy chủ công cộng bằng 4G/5G",
+                        subtitle = if (isEn) {
+                            "Default OFF (auto-sync runs on Wi-Fi every 60 min; manual refresh always works)"
+                        } else {
+                            "Mặc định TẮT (chỉ tự đồng bộ trên Wi-Fi mỗi 60 phút; nút cập nhật thủ công luôn hoạt động)"
+                        },
+                        checked = config.allowCellularLiveProxySync,
+                        onCheckedChange = { SettingsRepository.updateAllowCellularLiveProxySync(it) },
+                        switchTestTag = "settings_switch_cellular_live_proxy_sync"
+                    )
                 }
 
                 // 2.2 Chế độ mở khóa vùng

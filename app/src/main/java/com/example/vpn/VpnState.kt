@@ -63,29 +63,47 @@ data class ServerLocation(
     val isVerified: Boolean = true,
     val unlockStatus: RegionUnlockStatus = RegionUnlockStatus.UNTESTED,
     val trustScore: Int = 96,
-    val safetyBadge: String = "An toàn • Uy tín"
+    val safetyBadge: String = "Đã kiểm tra kết nối"
 ) {
     val addressPortKey: String
         get() = ServerUnlockRecord.keyFor(ip, port)
 
     fun localizedSafetyBadge(isEn: Boolean): String {
-        if (!isEn) return safetyBadge
-        return safetyBadge
-            .replace("Uy tín cao • Đã lọc lỗi", "High Trust • Error-Filtered")
-            .replace("An toàn • Đã xác minh", "Safe • Verified")
-            .replace("An toàn • Uy tín", "Safe • Trusted")
-            .replace("Tự thêm • Đã kiểm tra", "Custom • Checked")
+        val normalizedVi = when {
+            safetyBadge.contains("Tự thêm", ignoreCase = true) -> "Tự thêm • Đã kiểm tra kết nối"
+            else -> "Đã kiểm tra kết nối"
+        }
+        if (!isEn) return normalizedVi
+        return when {
+            safetyBadge.contains("Tự thêm", ignoreCase = true) ||
+                safetyBadge.contains("Custom", ignoreCase = true) -> "Custom • Connectivity checked"
+            else -> "Connectivity checked"
+        }
     }
 
     fun localizedDescription(isEn: Boolean): String {
-        if (!isEn) return description
-        return description
-            .replace("Đã xác minh IP Tokyo", "Verified Tokyo IP")
-            .replace("Đã xác minh IP Nhật Bản", "Verified Japan IP")
-            .replace("Đã xác minh IP Osaka", "Verified Osaka IP")
+        val cleaned = description
+            .replace(Regex("\\s*•\\s*Cổng\\s*:\\d+"), "")
+            .replace(Regex("\\s*\\(Cổng\\s*:\\d+\\)"), "")
+            .replace(Regex("\\s*\\(:\\d+\\)"), "")
+            .replace("Đã xác minh IP Tokyo", "Tokyo, Nhật Bản")
+            .replace("Đã xác minh IP Nhật Bản", "Nhật Bản")
+            .replace("Đã xác minh IP Osaka", "Osaka, Nhật Bản")
+            .replace("Uy tín cao • Đã lọc lỗi", "Đã kiểm tra kết nối")
+            .replace("An toàn • Đã xác minh", "Đã kiểm tra kết nối")
+            .replace("An toàn • Uy tín", "Đã kiểm tra kết nối")
+        if (!isEn) return cleaned
+        return cleaned
+            .replace("Đại học Tsukuba Academic", "Tsukuba University Academic")
+            .replace("Đại học Tsukuba", "Tsukuba University")
+            .replace("Đã kiểm tra kết nối", "Connectivity checked")
+            .replace("Tokyo, Nhật Bản", "Tokyo, Japan")
+            .replace("Osaka, Nhật Bản", "Osaka, Japan")
+            .replace("Nhật Bản", "Japan")
+            .replace("Hàn Quốc", "South Korea")
+            .replace("Hoa Kỳ", "United States")
             .replace("Khuyên dùng", "Recommended")
             .replace("Dự phòng", "Backup")
-            .replace("Đại học Tsukuba Academic", "Tsukuba Academic Node")
             .replace("Trục cáp quang", "Fiber Backbone")
             .replace("Cụm máy chủ", "Server Cluster")
             .replace("Độ trễ thấp cho VN", "Low Latency Regional Route")
@@ -93,16 +111,16 @@ data class ServerLocation(
             .replace("Đầu mối quốc tế tốc độ cao", "High-Speed International Node")
             .replace("Mạng lưới toàn cầu", "Global Edge Network")
             .replace("Cổng kết nối ổn định", "Stable Gateway")
-            .replace("Cổng :", "Port :")
+            .replace("Proxy cá nhân", "Custom proxy")
             .replace("Máy chủ SOCKS5 do người dùng tự thêm", "User-added custom SOCKS5 proxy")
             .replace("Máy chủ HTTP do người dùng tự thêm", "User-added custom HTTP proxy")
             .replace("do người dùng tự thêm", "User-added custom proxy")
     }
 }
 
-// Danh sách 60 máy chủ chuẩn đã xác minh cổng chính mở, độ trễ < 250ms, băng thông > 250Mbps & hoạt động ổn định (JP: 28, KR: 18, US: 14)
+// Danh sách 60 máy chủ mặc định đã kiểm tra kết nối cổng chính (JP: 28, KR: 18, US: 14)
 val DEFAULT_SERVERS = listOf(
-    // === NHẬT BẢN (JAPAN) - 28 MÁY CHỦ TỐC ĐỘ CAO TOKYO / TSUKUBA / OSAKA ===
+    // === NHẬT BẢN (JAPAN) - 28 MÁY CHỦ TOKYO / TSUKUBA / OSAKA ===
     ServerLocation(
         id = "jp_tsukuba_softether_7",
         name = "Japan Tsukuba #7",
@@ -147,7 +165,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tokyo Academic Fiber • Đã xác minh IP Tokyo (Cổng :443)",
+        description = "Tokyo Academic Fiber • Tokyo, Nhật Bản",
         speedMbps = 380,
         countryCode = "JP"
     ),
@@ -159,7 +177,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tokyo Bay Backbone • Đã xác minh IP Tokyo (Cổng :443)",
+        description = "Tokyo Bay Backbone • Tokyo, Nhật Bản",
         speedMbps = 360,
         countryCode = "JP"
     ),
@@ -171,7 +189,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tsukuba High-Speed Core • Đã xác minh IP Nhật Bản (:443)",
+        description = "Tsukuba Core • Nhật Bản",
         speedMbps = 390,
         countryCode = "JP"
     ),
@@ -183,7 +201,7 @@ val DEFAULT_SERVERS = listOf(
         port = 443,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tokyo Express 500Mbps • Đã xác minh IP Tokyo (:443)",
+        description = "Tokyo Express • Tokyo, Nhật Bản",
         speedMbps = 500,
         countryCode = "JP"
     ),
@@ -423,7 +441,7 @@ val DEFAULT_SERVERS = listOf(
         port = 7551,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tokyo NTT OCN Backbone • Đã xác minh IP Nhật Bản (:7551)",
+        description = "Tokyo NTT OCN Backbone • Nhật Bản",
         speedMbps = 310,
         countryCode = "JP"
     ),
@@ -435,12 +453,12 @@ val DEFAULT_SERVERS = listOf(
         port = 1468,
         protocol = "http",
         azureEndpoint = "japaneast.cloudapp.azure.com",
-        description = "Tokyo KDDI Hikari 650Mbps • Đã xác minh IP Tokyo (:1468)",
+        description = "Tokyo KDDI Hikari • Tokyo, Nhật Bản",
         speedMbps = 650,
         countryCode = "JP"
     ),
 
-    // === HÀN QUỐC (SOUTH KOREA) - 18 MÁY CHỦ TỐC ĐỘ CAO SEOUL / INCHEON / BUSAN ===
+    // === HÀN QUỐC (SOUTH KOREA) - 18 MÁY CHỦ SEOUL / INCHEON / BUSAN ===
     ServerLocation(
         id = "kr_seoul_kt_1",
         name = "South Korea Incheon SSL #1",
@@ -449,7 +467,7 @@ val DEFAULT_SERVERS = listOf(
         port = 995,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Incheon Korea Telecom SSL Backbone • Cổng :995 (Khuyên dùng #1)",
+        description = "Incheon Korea Telecom SSL Backbone (Khuyên dùng #1)",
         speedMbps = 420,
         countryCode = "KR"
     ),
@@ -461,7 +479,7 @@ val DEFAULT_SERVERS = listOf(
         port = 1828,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Incheon Gyeonggi 700Mbps Fiber Gateway (Khuyên dùng #2)",
+        description = "Incheon Gyeonggi Fiber Gateway (Khuyên dùng #2)",
         speedMbps = 700,
         countryCode = "KR"
     ),
@@ -569,7 +587,7 @@ val DEFAULT_SERVERS = listOf(
         port = 995,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Seoul SK Broadband 410Mbps SSL (:995)",
+        description = "Seoul SK Broadband SSL",
         speedMbps = 410,
         countryCode = "KR"
     ),
@@ -581,7 +599,7 @@ val DEFAULT_SERVERS = listOf(
         port = 1594,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Pangyo Techno Valley Fiber Relay (:1594)",
+        description = "Pangyo Techno Valley Fiber Relay",
         speedMbps = 340,
         countryCode = "KR"
     ),
@@ -593,7 +611,7 @@ val DEFAULT_SERVERS = listOf(
         port = 995,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Pohang Academic Research Backbone (:995)",
+        description = "Pohang Academic Research Backbone",
         speedMbps = 380,
         countryCode = "KR"
     ),
@@ -605,7 +623,7 @@ val DEFAULT_SERVERS = listOf(
         port = 995,
         protocol = "http",
         azureEndpoint = "koreacentral.cloudapp.azure.com",
-        description = "Daejeon Central 450Mbps Fiber SSL (:995)",
+        description = "Daejeon Central Fiber SSL",
         speedMbps = 450,
         countryCode = "KR"
     ),
@@ -658,7 +676,7 @@ val DEFAULT_SERVERS = listOf(
         countryCode = "KR"
     ),
 
-    // === HOA KỲ (UNITED STATES) - 14 MÁY CHỦ DỰ PHÒNG ĐÃ XÁC MINH CỔNG MỞ (< 220ms) ===
+    // === HOA KỲ (UNITED STATES) - 14 MÁY CHỦ DỰ PHÒNG ===
     ServerLocation(
         id = "us_california_1",
         name = "United States Silicon Valley #1",

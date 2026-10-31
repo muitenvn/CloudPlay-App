@@ -322,6 +322,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun HeroConsolePlayDeck(
     vpnState: VpnConnectionState,
@@ -351,9 +352,9 @@ private fun HeroConsolePlayDeck(
     val heroScrimBrush = remember {
         Brush.verticalGradient(
             colorStops = arrayOf(
-                0.0f to Color(0x22040806),
-                0.30f to Color(0xA8050A07),
-                0.62f to Color(0xEB060B08),
+                0.0f to Color(0xDE040806),
+                0.32f to Color(0xC8050A07),
+                0.64f to Color(0xEB060B08),
                 1.0f to XboxSurface
             )
         )
@@ -374,15 +375,16 @@ private fun HeroConsolePlayDeck(
                 painter = painterResource(id = R.drawable.gamepass_hub_banner_1791394609676),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                alpha = 0.55f,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(198.dp)
+                    .matchParentSize()
             )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(198.dp)
+                    .matchParentSize()
                     .background(heroScrimBrush)
             )
 
@@ -392,19 +394,22 @@ private fun HeroConsolePlayDeck(
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Hàng trạng thái trên cùng của Hero Deck
+                // Hàng trạng thái trên cùng của Hero Deck (FlowRow tự xuống dòng khi màn hình hẹp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Row(
+                    androidx.compose.foundation.layout.FlowRow(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
                             shape = RoundedCornerShape(20.dp),
-                            color = Color(0xEB09120D),
+                            color = Color(0xF207100B),
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 when (vpnState.mode) {
@@ -415,9 +420,9 @@ private fun HeroConsolePlayDeck(
                             )
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -439,8 +444,9 @@ private fun HeroConsolePlayDeck(
                                     },
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -448,7 +454,7 @@ private fun HeroConsolePlayDeck(
                         // Nhãn hiển thị công nghệ giảm trễ 4G/5G & Wi-Fi
                         Surface(
                             shape = RoundedCornerShape(20.dp),
-                            color = Color(0xD907130E),
+                            color = Color(0xF206110C),
                             border = androidx.compose.foundation.BorderStroke(
                                 0.8.dp,
                                 DirectCyan.copy(alpha = 0.55f)
@@ -458,8 +464,9 @@ private fun HeroConsolePlayDeck(
                                 text = config.tr("⚡ Giảm trễ 4G/5G & Wi-Fi", "⚡ 4G/5G & Wi-Fi Low Lag"),
                                 color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 9.sp,
+                                fontSize = 8.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -467,7 +474,7 @@ private fun HeroConsolePlayDeck(
 
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xD90B150F),
+                        color = Color(0xEB0B150F),
                         border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
                         modifier = Modifier
                             .size(28.dp)
@@ -685,33 +692,35 @@ private fun QuickNetworkCockpitCard(
                     .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onNavigateToServers() }
-                    .padding(end = 8.dp),
+                    .padding(end = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(text = vpnState.currentServer.flag, fontSize = 19.sp)
 
                 Column(
-                    modifier = Modifier.weight(1f, fill = false),
-                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
                         text = vpnState.currentServer.name,
                         color = TextPrimary,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
+                        lineHeight = 14.5.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = when {
                             isStreaming -> config.tr("RTT WebRTC • Chạm để đổi", "WebRTC RTT • Tap to switch")
-                            lastSessionPing != null -> "${config.tr("Ping lần chơi gần nhất", "Last session ping")}: $lastSessionPing ms"
-                            else -> "${config.tr("Ping lần chơi gần nhất", "Last session ping")}: --"
+                            lastSessionPing != null -> "${config.tr("Ping gần nhất", "Last ping")}: $lastSessionPing ms"
+                            else -> "${config.tr("Ping gần nhất", "Last ping")}: --"
                         },
                         color = TextSecondary,
                         fontSize = 9.5.sp,
+                        lineHeight = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -727,7 +736,7 @@ private fun QuickNetworkCockpitCard(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.5.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -772,20 +781,20 @@ private fun QuickNetworkCockpitCard(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isConnected) XboxSurfaceElevated else XboxGreen
                 ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(11.dp)
             ) {
                 Icon(
                     imageVector = if (isConnected) Icons.Default.CheckCircle else Icons.Default.VpnKey,
                     contentDescription = null,
                     tint = if (isConnected) XboxNeonGreen else Color.White,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(13.dp)
                 )
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = if (isConnected) stringResource(R.string.btn_switch_direct) else stringResource(R.string.btn_enable_vpn),
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 11.5.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
                     maxLines = 1
@@ -1223,8 +1232,8 @@ private fun FeaturedGameCard(
                 if (localizedBadge != null) {
                     Surface(
                         shape = RoundedCornerShape(bottomEnd = 10.dp),
-                        color = Color(0xD9060B08),
-                        border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.55f)),
+                        color = Color(0xF0050A07),
+                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.65f)),
                         modifier = Modifier.align(Alignment.TopStart)
                     ) {
                         Text(

@@ -624,7 +624,7 @@ fun GameLibraryScreen(
                     LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Adaptive(minSize = 152.dp),
-                        contentPadding = PaddingValues(bottom = 112.dp),
+                        contentPadding = PaddingValues(bottom = 160.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.weight(1f)
@@ -985,15 +985,23 @@ private fun LibraryGameCard(
                 } else {
                     "XBOX CLOUD"
                 }
-                Text(
-                    text = badgeText,
-                    color = if (localizedBadge != null || game.freeToPlay) XboxNeonGreen else DirectCyan.copy(alpha = 0.9f),
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val badgeAccentColor = if (localizedBadge != null || game.freeToPlay) XboxNeonGreen else DirectCyan.copy(alpha = 0.9f)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xEB050A07),
+                    border = androidx.compose.foundation.BorderStroke(0.6.dp, badgeAccentColor.copy(alpha = 0.55f))
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = badgeAccentColor,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
 
                 Text(
                     text = game.title,

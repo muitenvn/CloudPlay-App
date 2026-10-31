@@ -668,7 +668,8 @@ data class AppConfig(
     val enableGlobalpingProbe: Boolean = false, // A4: Mặc định TẮT đo qua trạm Globalping bên thứ ba
     val hideUnreachableDynamicServers: Boolean = false, // A8: Tùy chọn ẩn máy chủ động không đo được
     val enableGeoIpHttpsFallback: Boolean = true,
-    val allowDbIpCellularDownload: Boolean = false
+    val allowDbIpCellularDownload: Boolean = false,
+    val allowCellularLiveProxySync: Boolean = false
 ) {
     val targetRegionUrl: String
         get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
@@ -934,7 +935,8 @@ object SettingsRepository {
             enableGlobalpingProbe = sp.getBoolean("enable_globalping_probe", false),
             hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false),
             enableGeoIpHttpsFallback = sp.getBoolean("enable_geoip_https_fallback", true),
-            allowDbIpCellularDownload = sp.getBoolean("allow_dbip_cellular_download", false)
+            allowDbIpCellularDownload = sp.getBoolean("allow_dbip_cellular_download", false),
+            allowCellularLiveProxySync = sp.getBoolean("allow_cellular_live_proxy_sync", false)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -1020,6 +1022,7 @@ object SettingsRepository {
             putBoolean("hide_unreachable_dynamic_servers", c.hideUnreachableDynamicServers)
             putBoolean("enable_geoip_https_fallback", c.enableGeoIpHttpsFallback)
             putBoolean("allow_dbip_cellular_download", c.allowDbIpCellularDownload)
+            putBoolean("allow_cellular_live_proxy_sync", c.allowCellularLiveProxySync)
             apply()
         }
     }
@@ -1553,6 +1556,11 @@ object SettingsRepository {
 
     fun updateAllowDbIpCellularDownload(allowed: Boolean) {
         _config.update { it.copy(allowDbIpCellularDownload = allowed) }
+        persist(_config.value)
+    }
+
+    fun updateAllowCellularLiveProxySync(allowed: Boolean) {
+        _config.update { it.copy(allowCellularLiveProxySync = allowed) }
         persist(_config.value)
     }
 }

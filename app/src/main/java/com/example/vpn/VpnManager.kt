@@ -31,7 +31,7 @@ object VpnManager {
     private var lazyPingJob: Job? = null
     private var ipCheckJob: Job? = null
     private var autoSyncLiveJob: Job? = null
-    private const val AUTO_SYNC_LIVE_INTERVAL_MS = 10L * 60L * 1000L
+    const val AUTO_SYNC_LIVE_INTERVAL_MS = 60L * 60L * 1000L
     private val proxyExecutor = Executors.newSingleThreadExecutor()
     private var appContext: Context? = null
 
@@ -92,14 +92,28 @@ object VpnManager {
         if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
             testAllServers(autoPickBest = false, context = context.applicationContext, forceRefresh = false)
         }
-        autoSyncTrustedProxiesIfNeeded(context = context.applicationContext, force = false)
+        autoSyncPublicProxiesIfNeeded(context = context.applicationContext, force = false)
+    }
+
+    fun isWifiConnected(context: Context?): Boolean {
+        val ctx = context ?: appContext ?: return false
+        return try {
+            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager ?: return false
+            val activeNet = cm.activeNetwork ?: return false
+            val caps = cm.getNetworkCapabilities(activeNet) ?: return false
+            caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
-     * Tự động cập nhật, lọc lỗi, kiểm tra độ an toàn & phân loại độ uy tín của các máy chủ VPN/Proxy
-     * hoàn toàn tự động trong nền mà không cần người dùng bấm nút Cập nhật thủ công.
+     * Tự động quét và kiểm tra kết nối các máy chủ từ danh sách công cộng (VPNGate, ProxyScrape):
+     * - Khi chạy tự động (`force = false`): chỉ chạy khi đang kết nối Wi-Fi (hoặc khi người dùng bật cho phép dùng dữ liệu di động),
+     *   với chu kỳ tối thiểu 60 phút (`AUTO_SYNC_LIVE_INTERVAL_MS`).
+     * - Khi người dùng bấm nút cập nhật thủ công (`force = true`): luôn hoạt động mọi lúc.
      */
-    fun autoSyncTrustedProxiesIfNeeded(
+    fun autoSyncPublicProxiesIfNeeded(
         context: Context? = null,
         countryFilter: String = "ALL",
         force: Boolean = false
@@ -108,10 +122,20 @@ object VpnManager {
         val now = System.currentTimeMillis()
         val currentState = _state.value
         if (currentState.isAutoSyncingLiveProxies) return
-        if (!force && currentState.lastAutoSyncTimestampMs > 0L &&
-            (now - currentState.lastAutoSyncTimestampMs) < AUTO_SYNC_LIVE_INTERVAL_MS
-        ) {
-            return
+        if (!force) {
+            val allowCellular = try {
+                com.example.data.SettingsRepository.config.value.allowCellularLiveProxySync
+            } catch (_: Exception) {
+                false
+            }
+            if (!isWifiConnected(context) && !allowCellular) {
+                return
+            }
+            if (currentState.lastAutoSyncTimestampMs > 0L &&
+                (now - currentState.lastAutoSyncTimestampMs) < AUTO_SYNC_LIVE_INTERVAL_MS
+            ) {
+                return
+            }
         }
 
         autoSyncLiveJob?.cancel()
@@ -119,14 +143,14 @@ object VpnManager {
 
         autoSyncLiveJob = scope.launch(Dispatchers.IO) {
             try {
-                val syncResult = LiveProxyFetcher.fetchAndClassifyTrustedProxies(countryFilter)
+                val syncResult = LiveProxyFetcher.fetchAndCheckPublicProxies(countryFilter)
                 val staticAndCustomKeys = (_state.value.customServers + DEFAULT_SERVERS)
                     .map { it.addressPortKey.lowercase() }
                     .toSet()
                 val records = _state.value.unlockRecords
                 val measurements = _state.value.serverMeasurements
 
-                // Giữ lại các máy chủ động cũ vẫn đang sống cổng chính & hợp lệ, loại bỏ tự động các máy chủ lỗi/sai vùng/chết cổng
+                // Giữ lại các máy chủ công cộng cũ vẫn đang phản hồi cổng chính & hợp lệ
                 val healthyExistingLive = _state.value.liveVerifiedServers.filter { srv ->
                     val unlockSt = getServerUnlockStatus(srv, records)
                     val meas = measurements[srv.id]
@@ -160,11 +184,11 @@ object VpnManager {
                 if (syncResult.verifiedServers.isNotEmpty()) {
                     com.example.data.AppLogger.success(
                         "VPN_AUTO",
-                        "Đã tự động lọc & lưu ${mergedLive.size} VPN uy tín vào dữ liệu ứng dụng (mới: +${syncResult.verifiedServers.size}, loại bỏ lỗi: ${syncResult.filteredOutErrorCount})"
+                        "Đã lưu ${mergedLive.size} máy chủ công cộng đã kiểm tra kết nối (mới: +${syncResult.verifiedServers.size}, không phản hồi: ${syncResult.filteredOutErrorCount})"
                     )
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "autoSyncTrustedProxiesIfNeeded failed", e)
+                Log.w(TAG, "autoSyncPublicProxiesIfNeeded failed", e)
                 _state.value = _state.value.copy(
                     isAutoSyncingLiveProxies = false,
                     lastAutoSyncTimestampMs = System.currentTimeMillis()
@@ -1109,13 +1133,17 @@ object VpnManager {
                     val port = obj.optInt("port", 0)
                     val key = "${ip.lowercase()}:$port"
                     if (id.isBlank() ||
-                        !LiveProxyFetcher.isSafeAndReputableEndpoint(ip, port) ||
+                        !LiveProxyFetcher.isValidPublicEndpoint(ip, port) ||
                         !GeoIpDetector.SUPPORTED_COUNTRIES.contains(cc) ||
                         key in defaultKeys ||
                         key in customKeys
                     ) {
                         continue
                     }
+                    val rawDesc = obj.optString("description", "Đã kiểm tra kết nối")
+                        .replace("Uy tín cao • Đã lọc lỗi", "Đã kiểm tra kết nối")
+                        .replace("An toàn • Đã xác minh", "Đã kiểm tra kết nối")
+                        .replace("An toàn • Uy tín", "Đã kiểm tra kết nối")
                     liveList.add(
                         ServerLocation(
                             id = id,
@@ -1126,13 +1154,13 @@ object VpnManager {
                             protocol = obj.optString("protocol", "http"),
                             countryCode = cc,
                             azureEndpoint = obj.optString("azureEndpoint", GeoIpDetector.getAzureEndpointForCountry(cc)),
-                            description = obj.optString("description", "Cổng :$port"),
-                            speedMbps = obj.optInt("speedMbps", LiveProxyFetcher.MIN_VERIFIED_SPEED_MBPS),
+                            description = rawDesc,
+                            speedMbps = 0,
                             lastPingMs = obj.optInt("lastPingMs", -1).takeIf { it > 0 },
                             isCustom = false,
-                            isVerified = true,
-                            trustScore = obj.optInt("trustScore", 92),
-                            safetyBadge = obj.optString("safetyBadge", "An toàn • Đã xác minh")
+                            isVerified = false,
+                            trustScore = obj.optInt("trustScore", 90),
+                            safetyBadge = "Đã kiểm tra kết nối"
                         )
                     )
                 }

@@ -124,6 +124,7 @@ fun ServersScreen(
 
     var selectedCategory by remember { mutableStateOf("ALL") }
     var showCustomDialog by remember { mutableStateOf(false) }
+    var detailServer by remember { mutableStateOf<ServerLocation?>(null) }
 
     val jpLabel = stringResource(R.string.cat_japan)
     val krLabel = stringResource(R.string.cat_korea)
@@ -145,12 +146,12 @@ fun ServersScreen(
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // Tự động đo ping sơ bộ (bước 1 + 2) và tự động quét, lọc lỗi & phân loại VPN an toàn/uy tín trong nền
+    // Tự động đo ping sơ bộ (bước 1 + 2) và tự động quét, lọc lỗi & kiểm tra kết nối máy chủ công cộng trong nền
     LaunchedEffect(Unit) {
         if (serverPings.isEmpty() && !isTestingAll) {
             VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
-        VpnManager.autoSyncTrustedProxiesIfNeeded(context = context, countryFilter = "ALL", force = false)
+        VpnManager.autoSyncPublicProxiesIfNeeded(context = context, countryFilter = "ALL", force = false)
     }
 
     // A4: Globalping tắt mặc định; khi bật trong Cài đặt thì hiển thị ước lượng từ trạm gần nhất cho máy chủ đang chọn
@@ -494,17 +495,19 @@ fun ServersScreen(
                                     text = stringResource(R.string.servers_title).uppercase(),
                                     color = XboxNeonGreen,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 12.sp,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 14.sp,
                                     fontWeight = FontWeight.Black,
-                                    letterSpacing = 0.8.sp,
-                                    maxLines = 1,
+                                    letterSpacing = 0.6.sp,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "${allServers.size} " + stringResource(R.string.servers_subtitle),
                                     color = TextSecondary,
-                                    fontSize = 11.sp,
-                                    maxLines = 1,
+                                    fontSize = 10.5.sp,
+                                    lineHeight = 13.sp,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
@@ -573,12 +576,12 @@ fun ServersScreen(
                         }
                         currentMeasurement != null && currentMeasurement.status != ServerPingStatus.UNTESTED -> {
                             val prefix = if (isEn) "Network latency: " else "Độ trễ mạng: "
-                            prefix + currentMeasurement.formatDisplayBadge(isEn)
+                            prefix + currentMeasurement.formatDisplayBadge(isEn, showPort = false)
                         }
                         hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
-                            "Network latency: ${currentPingMs}ms (:${currentServer.port})"
+                            "Network latency: ${currentPingMs}ms"
                         } else {
-                            "Độ trễ mạng: ${currentPingMs}ms (:${currentServer.port})"
+                            "Độ trễ mạng: ${currentPingMs}ms"
                         }
                         isTestingAll -> if (isEn) "Testing network latency..." else "Đang đo độ trễ mạng..."
                         hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
@@ -599,7 +602,10 @@ fun ServersScreen(
                     }
 
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { detailServer = currentServer },
                         shape = RoundedCornerShape(12.dp),
                         color = Color(0xFF08100C),
                         border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
@@ -628,7 +634,7 @@ fun ServersScreen(
                                 )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
                                     Text(
                                         text = currentUnlockText,
@@ -636,6 +642,7 @@ fun ServersScreen(
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
+                                        softWrap = false,
                                         maxLines = 1
                                     )
                                     Text(
@@ -655,7 +662,7 @@ fun ServersScreen(
                                         fontFamily = JetBrainsMonoFontFamily,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        maxLines = 2,
+                                        maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
@@ -850,6 +857,74 @@ fun ServersScreen(
                         }
                     }
                 }
+
+                item(key = "manual_sync_public_proxies_chip") {
+                    Surface(
+                        modifier = Modifier
+                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable(enabled = !vpnState.isAutoSyncingLiveProxies) {
+                                VpnManager.autoSyncPublicProxiesIfNeeded(
+                                    context = context,
+                                    countryFilter = "ALL",
+                                    force = true
+                                )
+                            }
+                            .testTag("manual_sync_public_proxies_chip"),
+                        color = XboxSurfaceVariant.copy(alpha = 0.88f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudDownload,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = if (vpnState.isAutoSyncingLiveProxies) {
+                                    config.tr("Đang cập nhật...", "Updating...")
+                                } else {
+                                    config.tr("Cập nhật danh sách", "Refresh Public List")
+                                },
+                                color = XboxNeonGreen,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Cảnh báo ngắn cạnh phần máy chủ live công cộng (Mục 4)
+        item(key = "public_proxy_third_party_warning") {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("public_proxy_warning_banner"),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFF141108),
+                border = androidx.compose.foundation.BorderStroke(0.8.dp, WarningAmber.copy(alpha = 0.5f))
+            ) {
+                Text(
+                    text = config.tr(
+                        "Máy chủ từ danh sách công cộng, bên thứ ba vận hành. Không dùng cho tài khoản/dữ liệu nhạy cảm ngoài Xbox.",
+                        "Servers from public lists, operated by third parties. Do not use for sensitive accounts/data outside Xbox."
+                    ),
+                    color = WarningAmber,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 10.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
             }
         }
 
@@ -920,6 +995,20 @@ fun ServersScreen(
                 onSelectServer(custom)
                 showCustomDialog = false
             }
+        )
+    }
+
+    detailServer?.let { srv ->
+        val srvMeasurement = serverMeasurements[srv.id]
+        val srvPing = serverPings[srv.id] ?: -1
+        val srvUnlock = VpnManager.getServerUnlockStatus(srv, vpnState.unlockRecords)
+        ServerDetailDialog(
+            server = srv,
+            measurement = srvMeasurement,
+            pingMs = srvPing,
+            unlockStatus = srvUnlock,
+            isEn = isEn,
+            onDismiss = { detailServer = null }
         )
     }
 }
@@ -1075,6 +1164,8 @@ private fun ServerCard(
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
+                                    softWrap = false,
+                                    maxLines = 1,
                                     modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
                                 )
                             }
@@ -1090,23 +1181,29 @@ private fun ServerCard(
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.ExtraBold,
+                                softWrap = false,
+                                maxLines = 1,
                                 modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
                             )
                         }
                         Surface(
+                            modifier = Modifier.defaultMinSize(minWidth = 52.dp),
                             shape = RoundedCornerShape(5.dp),
                             color = unlockBadgeColor.copy(alpha = 0.16f),
                             border = androidx.compose.foundation.BorderStroke(0.7.dp, unlockBadgeColor.copy(alpha = 0.6f))
                         ) {
-                            Text(
-                                text = unlockLabel,
-                                color = unlockBadgeColor,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = unlockLabel,
+                                    color = unlockBadgeColor,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    softWrap = false,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
+                                )
+                            }
                         }
                     }
 
@@ -1157,7 +1254,7 @@ private fun ServerCard(
                             isGameActiveNow && pingMs > 0 -> "${animatedPingMs}ms"
                             isGameActiveNow -> "--"
                             isServerCurrentlyTesting -> "..."
-                            isFallbackPortOnly && pingMs > 0 -> "${animatedPingMs}ms (:${measurement?.measuredPort ?: 443})"
+                            isFallbackPortOnly && pingMs > 0 -> "${animatedPingMs}ms"
                             pingMs > 0 && isUnstablePing -> "${animatedPingMs}ms • ${config.tr("Mạng chập chờn", "Unstable")}"
                             pingMs > 0 -> "${animatedPingMs}ms"
                             hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> config.tr("Không đo được", "Unreachable")
@@ -1175,10 +1272,9 @@ private fun ServerCard(
 
                     val metricLabelText = when {
                         isGameActiveNow -> "RTT WebRTC"
-                        isServerCurrentlyTesting -> if (isEn) "Testing... • :${server.port}" else "Đang đo... • :${server.port}"
+                        isServerCurrentlyTesting -> if (isEn) "Testing..." else "Đang đo..."
                         isFallbackPortOnly -> {
-                            val fbPort = measurement?.measuredPort ?: 443
-                            if (isEn) "Fallback :$fbPort • :${server.port} closed" else "Cổng phụ :$fbPort • Cổng :${server.port} đóng"
+                            if (isEn) "Fallback port • Primary closed" else "Cổng phụ • Cổng chính đóng"
                         }
                         measurement?.status == ServerPingStatus.MEASURED_PRIMARY && pingMs > 0 -> {
                             val qualityTag = when {
@@ -1187,12 +1283,12 @@ private fun ServerCard(
                                 pingMs <= 120 -> if (isEn) "Fair" else "Trung bình"
                                 else -> if (isEn) "High" else "Cao"
                             }
-                            if (isEn) "Latency ($qualityTag) • :${measurement.measuredPort}" else "Độ trễ mạng ($qualityTag) • :${measurement.measuredPort}"
+                            if (isEn) "Latency ($qualityTag)" else "Độ trễ mạng ($qualityTag)"
                         }
-                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency • :${server.port}" else "Độ trễ mạng • :${server.port}"
-                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable • :${server.port}" else "Không đo được • :${server.port}"
+                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency" else "Độ trễ mạng"
+                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
                         isSmartBypass && pingMs > 0 -> if (isEn) "Last session latency" else "Độ trễ phiên gần nhất"
-                        else -> if (isEn) "Not tested • :${server.port}" else "Chưa đo • :${server.port}"
+                        else -> if (isEn) "Not tested" else "Chưa đo"
                     }
 
                     if (isSelected) {
@@ -1382,7 +1478,7 @@ private fun CustomProxyDialog(
                     OutlinedTextField(
                         value = speedMbps,
                         onValueChange = { speedMbps = it },
-                        label = { Text(if (isEn) "Speed (Mbps)" else "Tốc độ (Mbps)") },
+                        label = { Text(if (isEn) "Estimated Speed (Mbps)" else "Tốc độ ước tính (Mbps)") },
                         modifier = Modifier.weight(1f),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
@@ -1478,7 +1574,7 @@ private fun CustomProxyDialog(
                         speedMbps = speed,
                         countryCode = cc,
                         isCustom = true,
-                        isVerified = true
+                        isVerified = false
                     )
                     onAddServer(server)
                 },
@@ -1496,4 +1592,75 @@ private fun CustomProxyDialog(
         containerColor = XboxSurface
     )
 }
+
+@Composable
+private fun ServerDetailDialog(
+    server: ServerLocation,
+    measurement: EndpointPingMeasurement?,
+    pingMs: Int,
+    unlockStatus: RegionUnlockStatus,
+    isEn: Boolean,
+    onDismiss: () -> Unit
+) {
+    val detailBadge = measurement?.formatDisplayBadge(isEn = isEn, showPort = true)
+        ?: if (pingMs > 0) "${pingMs}ms (:${server.port})" else if (isEn) "Not tested (:${server.port})" else "Chưa đo (:${server.port})"
+    val unlockText = when (unlockStatus) {
+        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
+        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
+        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested" else "Chưa thử mở khóa"
+        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "${server.flag} ${server.name}",
+                color = TextPrimary,
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "${if (isEn) "Address & Port" else "Địa chỉ & Cổng"}: ${server.ip}:${server.port} (${server.protocol.uppercase()})",
+                    color = TextPrimary,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${if (isEn) "Measured Latency" else "Độ trễ đo thực tế"}: $detailBadge",
+                    color = XboxNeonGreen,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${if (isEn) "Region Unlock Status" else "Trạng thái mở khóa vùng"}: $unlockText",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${if (isEn) "Check Status" else "Trạng thái kiểm tra"}: ${server.localizedSafetyBadge(isEn)}",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${if (isEn) "Description" else "Mô tả"}: ${server.localizedDescription(isEn)}",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isEn) "Close" else "Đóng", color = XboxNeonGreen)
+            }
+        },
+        containerColor = XboxSurface
+    )
+}
+
 

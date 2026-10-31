@@ -37,7 +37,7 @@
 ## Bản phát hành & Cập nhật (Releases)
 
 - **Cách đóng gói bản phát hành:** Mỗi khi có thay đổi mã nguồn trên nhánh chính hoặc tạo thẻ phiên bản (`v*`), GitHub Actions sẽ tự động biên dịch tệp cài đặt APK và đăng lên mục **GitHub Releases**.
-- **Mô tả bản phát hành (Release Notes):** Nội dung mô tả của từng bản phát hành chỉ liệt kê ngắn gọn các thay đổi, sửa lỗi thực tế trong mã nguồn (`git diff` và lịch sử commit) của bản dựng đó, kèm theo mã kiểm tra toàn vẹn tệp `SHA-256`.
+- **🤖 AI mô tả bản phát hành (`scripts/generate_release_notes.py`):** Khi tạo bản phát hành mới, con AI (sử dụng Gemini / GitHub Models) sẽ đọc trực tiếp `git diff` và lịch sử commit của bản dựng đó để tóm tắt thành các gạch đầu dòng ngắn gọn, trung thực về những lỗi vừa sửa hoặc tính năng vừa thêm (không lặp lại mô tả cũ và không dùng từ ngữ quảng cáo phóng đại), kèm theo mã kiểm tra `SHA-256`.
 - **Cài đặt cập nhật:** Các bản APK được ký bằng cùng một khóa ký cố định của dự án để người dùng có thể tải tệp APK mới về và cài đè lên phiên bản cũ mà không cần gỡ ứng dụng hay đăng nhập lại từ đầu.
 
 ---

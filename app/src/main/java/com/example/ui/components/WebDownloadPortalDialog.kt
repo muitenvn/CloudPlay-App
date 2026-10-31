@@ -174,7 +174,7 @@ fun WebDownloadPortalDialog(
                             }
                             Column {
                                 Text(
-                                    text = if (isEn) "Share CloudPlay App" else "Chia sẻ ứng dụng CloudPlay",
+                                    text = config.tr("Chia sẻ ứng dụng CloudPlay", "Share CloudPlay App"),
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 15.sp,
@@ -183,7 +183,7 @@ fun WebDownloadPortalDialog(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (isEn) "Scan QR code or send download link" else "Quét mã QR hoặc gửi link tải cho bạn bè",
+                                    text = config.tr("Quét mã QR hoặc gửi link tải cho bạn bè", "Scan QR code or send download link"),
                                     color = DirectCyan,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -197,7 +197,7 @@ fun WebDownloadPortalDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = if (isEn) "Close" else "Đóng",
+                                contentDescription = config.tr("Đóng", "Close"),
                                 tint = TextSecondary
                             )
                         }
@@ -212,8 +212,8 @@ fun WebDownloadPortalDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val tabs = listOf(
-                        Triple(0, if (isEn) "QR Code & Link" else "Mã QR & Link tải", Icons.Default.QrCode2),
-                        Triple(1, if (isEn) "Web Page" else "Trang giới thiệu", Icons.Default.Language)
+                        Triple(0, config.tr("Mã QR & Link tải", "QR Code & Link"), Icons.Default.QrCode2),
+                        Triple(1, config.tr("Trang giới thiệu", "Web Page"), Icons.Default.Language)
                     )
                     tabs.forEach { (index, label, icon) ->
                         val active = selectedTab == index
@@ -290,7 +290,7 @@ fun WebDownloadPortalDialog(
                                         }
 
                                         Text(
-                                            text = if (isEn) "SCAN QR TO DOWNLOAD" else "QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG",
+                                            text = config.tr("QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG", "SCAN QR TO DOWNLOAD"),
                                             color = XboxNeonGreen,
                                             fontFamily = SpaceGroteskFontFamily,
                                             fontSize = 12.sp,
@@ -303,8 +303,8 @@ fun WebDownloadPortalDialog(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             listOf(
-                                                false to (if (isEn) "🌐 Web Download" else "🌐 Trang Web tải"),
-                                                true to (if (isEn) "📥 Direct APK" else "📥 Link file APK")
+                                                false to config.tr("🌐 Trang Web tải", "🌐 Web Download"),
+                                                true to config.tr("📥 Link file APK", "📥 Direct APK")
                                             ).forEach { (isDirectMode, modeLabel) ->
                                                 val selected = qrUseDirectApk == isDirectMode
                                                 Surface(
@@ -346,11 +346,10 @@ fun WebDownloadPortalDialog(
                                         }
 
                                         Text(
-                                            text = if (isEn) {
+                                            text = config.tr(
+                                                "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải.",
                                                 "Open Camera or a QR scanner app on another phone to open the download link."
-                                            } else {
-                                                "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải."
-                                            },
+                                            ),
                                             color = TextSecondary,
                                             fontSize = 11.5.sp,
                                             textAlign = TextAlign.Center
@@ -370,7 +369,7 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = if (isEn) "🌐 Download Web Page" else "🌐 Trang web giới thiệu & tải ứng dụng",
+                                                        text = config.tr("🌐 Trang web giới thiệu & tải ứng dụng", "🌐 Download Web Page"),
                                                         color = DirectCyan,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -411,7 +410,7 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = if (isEn) "📥 Direct APK File Link" else "📥 Link tải trực tiếp file APK",
+                                                        text = config.tr("📥 Link tải trực tiếp file APK", "📥 Direct APK File Link"),
                                                         color = XboxNeonGreen,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -453,7 +452,7 @@ fun WebDownloadPortalDialog(
                                                 Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.size(6.dp))
                                                 Text(
-                                                    text = if (isEn) "Share Link" else "Chia sẻ Link",
+                                                    text = config.tr("Chia sẻ Link", "Share Link"),
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -470,7 +469,7 @@ fun WebDownloadPortalDialog(
                                                     } catch (_: Exception) {
                                                         Toast.makeText(
                                                             context,
-                                                            if (isEn) "Invalid URL" else "Link không hợp lệ",
+                                                            config.tr("Link không hợp lệ", "Invalid URL"),
                                                             Toast.LENGTH_SHORT
                                                         ).show()
                                                     }
@@ -481,7 +480,7 @@ fun WebDownloadPortalDialog(
                                                 Icon(Icons.Default.Download, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.size(6.dp))
                                                 Text(
-                                                    text = if (isEn) "Download APK" else "Tải file APK",
+                                                    text = config.tr("Tải file APK", "Download APK"),
                                                     color = DirectCyan,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold

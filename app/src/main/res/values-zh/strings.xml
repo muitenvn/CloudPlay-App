@@ -1,51 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
-    <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="app_subtitle">Xbox 云游戏</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">首页</string>
     <string name="tab_library">游戏库</string>
     <string name="tab_servers">节点</string>
     <string name="tab_settings">设置</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">应用语言</string>
+    <string name="app_language_desc">根据系统自动选择语言或手动设置。</string>
+    <string name="lang_system_default">跟随系统 (自动)</string>
+    <string name="lang_vietnamese">Tiếng Việt (越南语)</string>
+    <string name="lang_english">English (英语)</string>
     <string name="current_language">语言</string>
-    <string name="hero_tag">XBOX 云游戏</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">XBOX 网页语言</string>
+    <string name="xbox_web_language_desc">选择 Xbox 页面显示语言，防止被强制切换为日语菜单。</string>
+    <string name="xbox_lang_system_match">跟随设备语言 (默认 en-US)</string>
+    <string name="xbox_lang_custom">自定义 Xbox 语言</string>
+    <string name="anti_japanese_enforcer">防止强制日语</string>
+    <string name="anti_japanese_enforcer_desc">自动保持 Xbox 页面为英语而非日语。</string>
+
+    <!-- Hero / Quick Play -->
+    <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">畅玩 XBOX 云游戏</string>
-    <string name="hero_subtitle">跨区解锁 • 进入游戏后自动直连</string>
-    <string name="btn_launch_xcloud">立即开玩</string>
-    <string name="btn_play_fortnite">Fortnite</string>
+    <string name="hero_subtitle">解锁地区 • 自动关闭 VPN</string>
+    <string name="btn_launch_xcloud">立即游玩</string>
+    <string name="btn_play_fortnite">堡垒之夜</string>
     <string name="btn_continue_game">继续游戏</string>
+
+    <!-- Network & Hardware Cockpit -->
     <string name="cockpit_title">网络与手柄</string>
+    <string name="cockpit_subtitle">解锁地区 • 自动关闭 VPN</string>
     <string name="net_mode_direct">直连网络</string>
     <string name="net_mode_vpn">VPN 已开启</string>
+    <string name="net_desc_direct">已启用直连网络，游戏画面更流畅。</string>
+    <string name="net_desc_vpn">已启用地区解锁，用于启动游戏。</string>
     <string name="btn_enable_vpn">开启 VPN</string>
     <string name="btn_switch_direct">关闭 VPN</string>
     <string name="vpn_status_connected">VPN 已开启</string>
     <string name="vpn_status_disconnected">直连网络</string>
+    <string name="auto_bypass_enabled">启动后自动关闭 VPN</string>
+    <string name="auto_bypass_triggered">游戏已启动！已切换至直连网络。</string>
     <string name="hardware_controller">手柄</string>
     <string name="controller_connected">已连接</string>
     <string name="controller_disconnected">未连接</string>
     <string name="controller_touch">触控</string>
-    <string name="featured_games_title">精选云游戏</string>
-    <string name="featured_games_subtitle">一键快速启动</string>
+    <string name="gamepad_none">无</string>
+    <string name="gamepad_default_name">Xbox 手柄</string>
+    <string name="guide_button">指南</string>
+
+    <!-- Featured Games -->
+    <string name="featured_games_title">精选游戏</string>
+    <string name="featured_games_subtitle">快速启动游戏</string>
     <string name="btn_view_all">查看全部</string>
-    <string name="btn_play_now">立即玩</string>
+    <string name="btn_play_now">立即游玩</string>
     <string name="badge_free">免费</string>
-    <string name="badge_touch">支持触控</string>
+    <string name="badge_touch">触控</string>
     <string name="badge_pass">Game Pass</string>
-    <string name="search_games_placeholder">搜索游戏库中的游戏...</string>
+
+    <!-- Game Library Screen -->
+    <string name="search_games_placeholder">在游戏库中搜索...</string>
     <string name="filter_all">全部</string>
     <string name="filter_free">免费游玩</string>
-    <string name="filter_touch">原生触控</string>
+    <string name="filter_touch">支持触控</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
     <string name="btn_add_game">添加游戏</string>
+    <string name="dialog_add_game_title">添加自定义游戏</string>
+    <string name="input_game_title">游戏名称</string>
+    <string name="input_game_url">Xbox 游戏链接</string>
+    <string name="input_game_category">分类</string>
+    <string name="input_game_cover">封面图片链接 (可选)</string>
     <string name="btn_save">保存</string>
     <string name="btn_cancel">取消</string>
     <string name="btn_delete">删除</string>
-    <string name="servers_title">跨区解锁服务器</string>
-    <string name="btn_ping_all">测速 Ping</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">地区解锁节点</string>
+    <string name="servers_subtitle">个可用节点用于解锁游戏地区</string>
+    <string name="cat_japan">日本 (东京/大阪)</string>
+    <string name="cat_korea">韩国 (首尔)</string>
+    <string name="cat_sea">东南亚 (新加坡)</string>
+    <string name="cat_usa">美国</string>
+    <string name="btn_ping_all">延迟测速</string>
     <string name="btn_fetch_live">更新节点</string>
+    <string name="btn_add_custom_server">添加节点</string>
     <string name="server_active">已连接</string>
-    <string name="server_optimal">最优</string>
+    <string name="server_optimal">推荐</string>
+    <string name="server_testing">正在测速...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">自动 VPN 与网络</string>
+    <string name="smart_vpn_title">自动 VPN</string>
+    <string name="smart_vpn_desc">启动游戏时开启 VPN，进入画面后自动切回直连网络。</string>
+    <string name="stealth_headers_title">地区解锁请求头</string>
+    <string name="stealth_headers_desc">启动游戏时附加代理请求头。</string>
+    <string name="section_cellular_wifi">画质与性能</string>
+    <string name="section_graphics_quality">画质与性能</string>
+    <string name="graphics_quality_auto">自动 (推荐)</string>
+    <string name="graphics_quality_auto_desc">根据网络质量自动调整，减少手机发热。</string>
+    <string name="graphics_quality_saver">省流模式 (低)</string>
+    <string name="graphics_quality_saver_desc">降低流量消耗，保持机身凉爽并省电。</string>
+    <string name="graphics_quality_medium">均衡</string>
+    <string name="graphics_quality_medium_desc">兼顾画面清晰度与手机温度。</string>
+    <string name="graphics_quality_high">高清</string>
+    <string name="graphics_quality_high_desc">清晰的 1080p 画面细节。</string>
+    <string name="graphics_quality_ultra">超清 (最高)</string>
+    <string name="graphics_quality_ultra_desc">最高画质，适合高速网络与高性能手机。</string>
+    <string name="cellular_mode_saver">省流模式 (低)</string>
+    <string name="cellular_mode_saver_desc">节省移动流量并减少手机发热。</string>
+    <string name="cellular_mode_max">超清 (最高)</string>
+    <string name="cellular_mode_max_desc">适合高速网络的最高画质。</string>
+    <string name="wifi_speed_first">优先流畅响应</string>
+    <string name="wifi_speed_first_desc">网络波动时减少操作延迟。</string>
+    <string name="section_clarity">画面清晰度与控制</string>
+    <string name="clarity_boost_title">画面锐化 (Clarity Boost)</string>
+    <string name="clarity_boost_desc">使云游戏画面边缘更清晰。</string>
+    <string name="preset_off">关闭</string>
+    <string name="preset_balanced">均衡 (推荐)</string>
+    <string name="preset_sharp">高锐度</string>
+    <string name="preset_oled">鲜艳色彩</string>
+    <string name="section_controls">控制与实用工具</string>
+    <string name="anti_afk_title">防挂机断开</string>
+    <string name="anti_afk_desc">挂机时保持游戏会话活跃。</string>
+    <string name="polling_boost_title">手柄快速响应</string>
+    <string name="polling_boost_desc">提升按键响应速度。</string>
+    <string name="floating_hud_title">局内快捷栏 (HUD)</string>
+    <string name="floating_hud_desc">游玩时显示实时延迟、帧率与快捷设置。</string>
+    <string name="virtual_gamepad_title">虚拟触控手柄</string>
+    <string name="virtual_gamepad_desc">未连接实体手柄时使用屏幕虚拟按键游玩。</string>
+    <string name="section_storage">缓存与账号</string>
+    <string name="clear_cookies_title">清除缓存与 Cookie</string>
+    <string name="clear_cookies_desc">清除已保存的登录数据以修复加载异常。</string>
+    <string name="btn_clear_cookies">立即清除数据</string>
+    <string name="toast_cookies_cleared">已清除缓存与 Cookie！</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">延迟</string>
+    <string name="hud_controller">手柄</string>
+    <string name="hud_clarity_boost">锐化</string>
+    <string name="hud_vietnamese_translator">翻译</string>
+    <string name="hud_return_home">返回首页</string>
+    <string name="hud_reload">刷新页面</string>
+    <string name="hud_virtual_gamepad">虚拟手柄</string>
+    <string name="hud_network_switch">切换网络</string>
     <string name="dialog_exit_title">退出游戏？</string>
-    <string name="btn_confirm_exit">退出</string>
+    <string name="dialog_exit_message">确定要退出游戏并返回首页吗？</string>
+    <string name="btn_confirm_exit">退出游戏</string>
     <string name="loading_stream">正在连接 Xbox Cloud...</string>
+    <string name="loading_tip">提示：游戏画面启动后将自动关闭 VPN 以获得更低延迟。</string>
 </resources>

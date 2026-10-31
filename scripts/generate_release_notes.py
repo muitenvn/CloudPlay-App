@@ -450,6 +450,7 @@ def generate_ai_description(
             ("https://models.github.ai/inference/chat/completions", "openai/gpt-4o-mini"),
             ("https://models.github.ai/inference/chat/completions", "openai/gpt-4o"),
             ("https://models.inference.ai.azure.com/chat/completions", "gpt-4o-mini"),
+            ("https://models.inference.ai.azure.com/chat/completions", "gpt-4o"),
         ):
             try:
                 payload = {
@@ -466,6 +467,9 @@ def generate_ai_description(
                     data=json.dumps(payload).encode("utf-8"),
                     headers={
                         "Content-Type": "application/json",
+                        "Accept": "application/vnd.github+json",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                        "User-Agent": "CloudPlay-Release-Bot",
                         "Authorization": f"Bearer {gh_token}",
                     },
                     method="POST",
@@ -478,7 +482,34 @@ def generate_ai_description(
             except Exception:
                 pass
 
-    # 3. If newly added CHANGELOG bullets exist in THIS commit's git diff, prefer them combined with smart diff bullets
+    # 3. Try keyless OpenAI-compatible AI endpoint if tokens were unavailable or rate-limited
+    try:
+        payload = {
+            "model": "openai",
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.2,
+        }
+        req = urllib.request.Request(
+            "https://text.pollinations.ai/openai",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "CloudPlay-Release-Bot",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=18) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            text = data["choices"][0]["message"]["content"].strip()
+            if is_valid_ai_summary(text, compact_diff):
+                return text
+    except Exception:
+        pass
+
+    # 4. If newly added CHANGELOG bullets exist in THIS commit's git diff, prefer them combined with smart diff bullets
     if newly_added_changelog:
         combined = list(newly_added_changelog)
         for b in smart_fallback_bullets:
@@ -486,7 +517,7 @@ def generate_ai_description(
                 combined.append(b)
         return "\n".join(combined[:5])
 
-    # 4. Accurate deterministic Git-Diff Analyzer fallback (never returns stale CHANGELOG.md bullets)
+    # 5. Accurate deterministic Git-Diff Analyzer fallback (never returns stale CHANGELOG.md bullets)
     return "\n".join(smart_fallback_bullets)
 
 
@@ -581,7 +612,7 @@ def main() -> None:
         f"## Bản phát hành CloudPlay **v{app_ver}** (`{tag_name}`)",
         f"> **Ngày tạo:** {build_date}  |  **Dung lượng APK:** `{apk_size_str}`  |  **Version Code:** `#{app_code}`  |  **Commit:** `{latest_hash}`",
         "",
-        "### Nội dung thay đổi",
+        "### 🤖 Mô tả bản cập nhật bằng AI (AI Release Summary)",
         summary_text,
         "",
     ]

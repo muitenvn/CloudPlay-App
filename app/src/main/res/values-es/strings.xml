@@ -1,59 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
     <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">Inicio</string>
     <string name="tab_library">Biblioteca</string>
     <string name="tab_servers">Servidores</string>
     <string name="tab_settings">Ajustes</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">IDIOMA DE LA APP</string>
+    <string name="app_language_desc">Selecciona el idioma automáticamente según el sistema o configúralo manualmente.</string>
+    <string name="lang_system_default">Predeterminado del sistema (Auto)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Vietnamita)</string>
+    <string name="lang_english">English (Inglés)</string>
     <string name="current_language">Idioma</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">IDIOMA DE PÁGINA XBOX</string>
+    <string name="xbox_web_language_desc">Elige el idioma de las páginas de Xbox y evita menús forzados en japonés.</string>
+    <string name="xbox_lang_system_match">Seguir idioma del dispositivo (Por defecto en-US)</string>
+    <string name="xbox_lang_custom">Idioma de Xbox personalizado</string>
+    <string name="anti_japanese_enforcer">Evitar japonés forzado</string>
+    <string name="anti_japanese_enforcer_desc">Mantiene automáticamente las páginas de Xbox en tu idioma en lugar de japonés.</string>
+
+    <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">JUGAR XBOX CLOUD</string>
-    <string name="hero_subtitle">Desbloqueo regional • VPN automática</string>
-    <string name="btn_launch_xcloud">Jugar ahora</string>
+    <string name="hero_subtitle">Desbloqueo regional • Apagado auto de VPN</string>
+    <string name="btn_launch_xcloud">Jugar Ahora</string>
     <string name="btn_play_fortnite">Fortnite</string>
     <string name="btn_continue_game">Continuar</string>
+
+    <!-- Network & Hardware Cockpit -->
     <string name="cockpit_title">Red y Mando</string>
-    <string name="cockpit_subtitle">Desbloqueo regional • Apagado automático VPN</string>
+    <string name="cockpit_subtitle">Desbloqueo regional • Apagado auto de VPN</string>
     <string name="net_mode_direct">Red Directa</string>
-    <string name="net_mode_vpn">VPN Activa</string>
+    <string name="net_mode_vpn">VPN Activada</string>
+    <string name="net_desc_direct">Conexión directa activa para jugar con fluidez.</string>
+    <string name="net_desc_vpn">Desbloqueo regional activo para abrir juegos.</string>
     <string name="btn_enable_vpn">Activar VPN</string>
-    <string name="btn_switch_direct">Desactivar VPN</string>
-    <string name="vpn_status_connected">VPN Activa</string>
+    <string name="btn_switch_direct">Apagar VPN</string>
+    <string name="vpn_status_connected">VPN Activada</string>
     <string name="vpn_status_disconnected">Red Directa</string>
+    <string name="auto_bypass_enabled">Apagar VPN al iniciar juego</string>
+    <string name="auto_bypass_triggered">¡Juego iniciado! Cambiado a red directa.</string>
     <string name="hardware_controller">Mando</string>
     <string name="controller_connected">Conectado</string>
-    <string name="controller_disconnected">Sin mando</string>
+    <string name="controller_disconnected">No conectado</string>
     <string name="controller_touch">Táctil</string>
+    <string name="gamepad_none">Ninguno</string>
+    <string name="gamepad_default_name">Mando Xbox</string>
+    <string name="guide_button">Guía</string>
+
+    <!-- Featured Games -->
     <string name="featured_games_title">Juegos Destacados</string>
-    <string name="featured_games_subtitle">Inicio rápido en la nube</string>
-    <string name="btn_view_all">Ver todo</string>
-    <string name="btn_play_now">Jugar</string>
+    <string name="featured_games_subtitle">Inicio rápido de juegos</string>
+    <string name="btn_view_all">Ver Todo</string>
+    <string name="btn_play_now">Jugar Ahora</string>
     <string name="badge_free">Gratis</string>
     <string name="badge_touch">Táctil</string>
     <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
     <string name="search_games_placeholder">Buscar juegos en la biblioteca...</string>
     <string name="filter_all">Todos</string>
     <string name="filter_free">Gratis</string>
     <string name="filter_touch">Control Táctil</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
-    <string name="btn_add_game">Añadir juego</string>
-    <string name="dialog_add_game_title">Añadir Juego Personalizado</string>
+    <string name="btn_add_game">Añadir Juego</string>
+    <string name="dialog_add_game_title">Añadir marcador personalizado</string>
+    <string name="input_game_title">Título del juego</string>
+    <string name="input_game_url">URL del juego de Xbox</string>
+    <string name="input_game_category">Categoría</string>
+    <string name="input_game_cover">URL de portada (Opcional)</string>
     <string name="btn_save">Guardar</string>
     <string name="btn_cancel">Cancelar</string>
     <string name="btn_delete">Eliminar</string>
-    <string name="servers_title">Servidores Regionales</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">Servidores de Desbloqueo</string>
     <string name="servers_subtitle">servidores disponibles para desbloquear región</string>
+    <string name="cat_japan">Japón (Tokio/Osaka)</string>
+    <string name="cat_korea">Corea (Seúl)</string>
+    <string name="cat_sea">Sudeste Asiático (Singapur)</string>
+    <string name="cat_usa">Estados Unidos</string>
     <string name="btn_ping_all">Medir Ping</string>
     <string name="btn_fetch_live">Actualizar</string>
-    <string name="btn_add_custom_server">Añadir</string>
+    <string name="btn_add_custom_server">Añadir Servidor</string>
     <string name="server_active">Conectado</string>
     <string name="server_optimal">Óptimo</string>
-    <string name="server_testing">Midiendo ping...</string>
-    <string name="hud_return_home">Volver al inicio</string>
+    <string name="server_testing">Probando ping...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">VPN AUTOMÁTICA Y RED</string>
+    <string name="smart_vpn_title">VPN Automática</string>
+    <string name="smart_vpn_desc">Activa la VPN para abrir el juego y luego cambia a red directa.</string>
+    <string name="stealth_headers_title">Desbloqueo de Región</string>
+    <string name="stealth_headers_desc">Usa encabezados proxy al iniciar juegos.</string>
+    <string name="section_cellular_wifi">GRÁFICOS Y RENDIMIENTO</string>
+    <string name="section_graphics_quality">GRÁFICOS Y RENDIMIENTO</string>
+    <string name="graphics_quality_auto">Auto (Recomendado)</string>
+    <string name="graphics_quality_auto_desc">Se adapta a la calidad de red y ayuda a mantener el teléfono fresco.</string>
+    <string name="graphics_quality_saver">Ahorro de datos (Bajo)</string>
+    <string name="graphics_quality_saver_desc">Bajo uso de datos, mantiene el teléfono fresco y ahorra batería.</string>
+    <string name="graphics_quality_medium">Medio</string>
+    <string name="graphics_quality_medium_desc">Claridad de imagen equilibrada y temperatura controlada.</string>
+    <string name="graphics_quality_high">Alto</string>
+    <string name="graphics_quality_high_desc">Imagen nítida en 1080p con detalles claros.</string>
+    <string name="graphics_quality_ultra">Ultra (Máx)</string>
+    <string name="graphics_quality_ultra_desc">Máxima calidad visual para redes rápidas y teléfonos potentes.</string>
+    <string name="cellular_mode_saver">Ahorro de datos (Bajo)</string>
+    <string name="cellular_mode_saver_desc">Ahorra datos móviles y mantiene el teléfono fresco.</string>
+    <string name="cellular_mode_max">Ultra (Máx)</string>
+    <string name="cellular_mode_max_desc">Máxima calidad gráfica para redes potentes.</string>
+    <string name="wifi_speed_first">Prioridad de respuesta fluida</string>
+    <string name="wifi_speed_first_desc">Reduce el retraso de entrada cuando la red fluctúa.</string>
+    <string name="section_clarity">CALIDAD DE IMAGEN Y CONTROLES</string>
+    <string name="clarity_boost_title">Clarity Boost (Nitidez)</string>
+    <string name="clarity_boost_desc">Hace que las imágenes del juego sean más nítidas y claras.</string>
+    <string name="preset_off">Apagado</string>
+    <string name="preset_balanced">Equilibrado (Recomendado)</string>
+    <string name="preset_sharp">Ultra Nítido</string>
+    <string name="preset_oled">Colores Vivos</string>
+    <string name="section_controls">CONTROLES Y UTILIDADES</string>
+    <string name="anti_afk_title">Evitar desconexión por inactividad</string>
+    <string name="anti_afk_desc">Mantiene activa la sesión de juego durante pausas.</string>
+    <string name="polling_boost_title">Respuesta rápida del mando</string>
+    <string name="polling_boost_desc">Mejora la velocidad de respuesta de los botones.</string>
+    <string name="floating_hud_title">Barra rápida en juego (HUD)</string>
+    <string name="floating_hud_desc">Muestra ping en vivo, FPS y ajustes rápidos mientras juegas.</string>
+    <string name="virtual_gamepad_title">Mando Táctil</string>
+    <string name="virtual_gamepad_desc">Juega con botones en pantalla cuando no hay mando conectado.</string>
+    <string name="section_storage">CACHÉ Y CUENTA</string>
+    <string name="clear_cookies_title">Borrar caché y cookies</string>
+    <string name="clear_cookies_desc">Borra los datos de inicio de sesión guardados para corregir errores de carga.</string>
+    <string name="btn_clear_cookies">Borrar datos ahora</string>
+    <string name="toast_cookies_cleared">¡Caché y cookies borradas!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">PING</string>
+    <string name="hud_controller">MANDO</string>
+    <string name="hud_clarity_boost">NITIDEZ</string>
+    <string name="hud_vietnamese_translator">TRADUCTOR</string>
+    <string name="hud_return_home">Volver al Inicio</string>
     <string name="hud_reload">Recargar página</string>
+    <string name="hud_virtual_gamepad">Mando Táctil</string>
+    <string name="hud_network_switch">Cambiar Red</string>
     <string name="dialog_exit_title">¿Salir del juego?</string>
-    <string name="dialog_exit_message">¿Quieres salir del juego y volver a la pantalla principal?</string>
-    <string name="btn_confirm_exit">Salir</string>
+    <string name="dialog_exit_message">¿Quieres salir del juego y volver a la pantalla de inicio?</string>
+    <string name="btn_confirm_exit">Salir del juego</string>
     <string name="loading_stream">Conectando a Xbox Cloud...</string>
+    <string name="loading_tip">Consejo: La VPN se apaga automáticamente al iniciar el juego para mayor fluidez.</string>
 </resources>

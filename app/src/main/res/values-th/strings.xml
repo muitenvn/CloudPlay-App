@@ -1,51 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
     <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">หน้าแรก</string>
     <string name="tab_library">คลังเกม</string>
     <string name="tab_servers">เซิร์ฟเวอร์</string>
     <string name="tab_settings">ตั้งค่า</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">ภาษาของแอป</string>
+    <string name="app_language_desc">เลือกภาษาอัตโนมัติตามระบบหรือตั้งค่าด้วยตนเอง</string>
+    <string name="lang_system_default">ค่าเริ่มต้นของระบบ (อัตโนมัติ)</string>
+    <string name="lang_vietnamese">Tiếng Việt (ภาษาเวียดนาม)</string>
+    <string name="lang_english">English (ภาษาอังกฤษ)</string>
     <string name="current_language">ภาษา</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">ภาษาหน้าเว็บ XBOX</string>
+    <string name="xbox_web_language_desc">เลือกภาษาที่แสดงบนหน้า Xbox และป้องกันการบังคับเปลี่ยนเป็นเมนูภาษาญี่ปุ่น</string>
+    <string name="xbox_lang_system_match">ตามภาษาเครื่อง (ค่าเริ่มต้น en-US)</string>
+    <string name="xbox_lang_custom">กำหนดภาษา Xbox เอง</string>
+    <string name="anti_japanese_enforcer">ป้องกันการบังคับภาษาญี่ปุ่น</string>
+    <string name="anti_japanese_enforcer_desc">คงภาษาหน้า Xbox เป็นภาษาที่เลือกแทนภาษาญี่ปุ่นโดยอัตโนมัติ</string>
+
+    <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">เล่น XBOX CLOUD</string>
-    <string name="hero_subtitle">ปลดล็อกโซน • ปิด VPN อัตโนมัติเมื่อเข้าเกม</string>
+    <string name="hero_subtitle">ปลดล็อกโซน • ปิด VPN อัตโนมัติ</string>
     <string name="btn_launch_xcloud">เล่นเลย</string>
     <string name="btn_play_fortnite">Fortnite</string>
     <string name="btn_continue_game">เล่นต่อ</string>
-    <string name="cockpit_title">เครือข่ายและจอย</string>
+
+    <!-- Network & Hardware Cockpit -->
+    <string name="cockpit_title">เครือข่ายและจอยเกม</string>
+    <string name="cockpit_subtitle">ปลดล็อกโซน • ปิด VPN อัตโนมัติ</string>
     <string name="net_mode_direct">เน็ตตรง</string>
-    <string name="net_mode_vpn">เปิด VPN</string>
+    <string name="net_mode_vpn">เปิด VPN อยู่</string>
+    <string name="net_desc_direct">เชื่อมต่อโดยตรงเพื่อการเล่นที่ลื่นไหล</string>
+    <string name="net_desc_vpn">เปิดปลดล็อกโซนเพื่อใช้เข้าเกม</string>
     <string name="btn_enable_vpn">เปิด VPN</string>
     <string name="btn_switch_direct">ปิด VPN</string>
-    <string name="vpn_status_connected">เปิด VPN</string>
+    <string name="vpn_status_connected">เปิด VPN อยู่</string>
     <string name="vpn_status_disconnected">เน็ตตรง</string>
+    <string name="auto_bypass_enabled">ปิด VPN อัตโนมัติเมื่อเข้าเกม</string>
+    <string name="auto_bypass_triggered">เริ่มเกมแล้ว! สลับเป็นเน็ตตรงเรียบร้อย</string>
     <string name="hardware_controller">จอยเกม</string>
     <string name="controller_connected">เชื่อมต่อแล้ว</string>
-    <string name="controller_disconnected">ยังไม่เชื่อมต่อ</string>
+    <string name="controller_disconnected">ไม่ได้เชื่อมต่อ</string>
     <string name="controller_touch">ทัชสกรีน</string>
+    <string name="gamepad_none">ไม่มี</string>
+    <string name="gamepad_default_name">จอย Xbox</string>
+    <string name="guide_button">วิธีใช้</string>
+
+    <!-- Featured Games -->
     <string name="featured_games_title">เกมแนะนำ</string>
-    <string name="featured_games_subtitle">เข้าเล่นเกมอย่างรวดเร็ว</string>
+    <string name="featured_games_subtitle">เข้าเกมด่วน</string>
     <string name="btn_view_all">ดูทั้งหมด</string>
     <string name="btn_play_now">เล่นเลย</string>
     <string name="badge_free">ฟรี</string>
-    <string name="badge_touch">ทัชสกรีน</string>
+    <string name="badge_touch">ทัช</string>
     <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
     <string name="search_games_placeholder">ค้นหาเกมในคลัง...</string>
     <string name="filter_all">ทั้งหมด</string>
     <string name="filter_free">เล่นฟรี</string>
-    <string name="filter_touch">รองรับการสัมผัส</string>
+    <string name="filter_touch">รองรับทัชสกรีน</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
     <string name="btn_add_game">เพิ่มเกม</string>
+    <string name="dialog_add_game_title">เพิ่มลิงก์เกมกำหนดเอง</string>
+    <string name="input_game_title">ชื่อเกม</string>
+    <string name="input_game_url">URL เกม Xbox</string>
+    <string name="input_game_category">หมวดหมู่</string>
+    <string name="input_game_cover">URL รูปปก (ไม่บังคับ)</string>
     <string name="btn_save">บันทึก</string>
     <string name="btn_cancel">ยกเลิก</string>
     <string name="btn_delete">ลบ</string>
+
+    <!-- Servers Screen -->
     <string name="servers_title">เซิร์ฟเวอร์ปลดล็อกโซน</string>
-    <string name="btn_ping_all">เช็ค Ping</string>
+    <string name="servers_subtitle">เซิร์ฟเวอร์พร้อมใช้งานสำหรับปลดล็อกโซนเกม</string>
+    <string name="cat_japan">ญี่ปุ่น (โตเกียว/โอซาก้า)</string>
+    <string name="cat_korea">เกาหลี (โซล)</string>
+    <string name="cat_sea">เอเชียตะวันออกเฉียงใต้ (สิงคโปร์)</string>
+    <string name="cat_usa">สหรัฐอเมริกา</string>
+    <string name="btn_ping_all">เช็กปิง</string>
     <string name="btn_fetch_live">อัปเดตเซิร์ฟเวอร์</string>
-    <string name="server_active">เชื่อมต่ออยู่</string>
+    <string name="btn_add_custom_server">เพิ่มเซิร์ฟเวอร์</string>
+    <string name="server_active">เชื่อมต่อแล้ว</string>
     <string name="server_optimal">เหมาะสม</string>
-    <string name="dialog_exit_title">ออกจากเกม?</string>
+    <string name="server_testing">กำลังวัดปิง...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">VPN อัตโนมัติและเครือข่าย</string>
+    <string name="smart_vpn_title">VPN อัตโนมัติ</string>
+    <string name="smart_vpn_desc">เปิด VPN เพื่อเข้าเกม แล้วสลับเป็นเน็ตตรงอัตโนมัติเมื่อเริ่มสตรีม</string>
+    <string name="stealth_headers_title">ปลดล็อกโซน</string>
+    <string name="stealth_headers_desc">ใช้เฮดเดอร์พร็อกซีขณะเปิดเกม</string>
+    <string name="section_cellular_wifi">กราฟิกและประสิทธิภาพ</string>
+    <string name="section_graphics_quality">กราฟิกและประสิทธิภาพ</string>
+    <string name="graphics_quality_auto">อัตโนมัติ (แนะนำ)</string>
+    <string name="graphics_quality_auto_desc">ปรับตามคุณภาพเน็ตและช่วยลดความร้อนของเครื่อง</string>
+    <string name="graphics_quality_saver">ประหยัดเน็ต (ต่ำ)</string>
+    <string name="graphics_quality_saver_desc">ใช้ข้อมูลน้อย เครื่องไม่ร้อน และประหยัดแบตเตอรี่</string>
+    <string name="graphics_quality_medium">ปานกลาง</string>
+    <string name="graphics_quality_medium_desc">สมดุลระหว่างความคมชัดและอุณหภูมิเครื่อง</string>
+    <string name="graphics_quality_high">สูง</string>
+    <string name="graphics_quality_high_desc">ภาพคมชัดระดับ 1080p</string>
+    <string name="graphics_quality_ultra">อัลตร้า (สูงสุด)</string>
+    <string name="graphics_quality_ultra_desc">คุณภาพสูงสุดสำหรับเน็ตแรงและเครื่องสเปกสูง</string>
+    <string name="cellular_mode_saver">ประหยัดเน็ต (ต่ำ)</string>
+    <string name="cellular_mode_saver_desc">ประหยัดเน็ตมือถือและลดความร้อนของเครื่อง</string>
+    <string name="cellular_mode_max">อัลตร้า (สูงสุด)</string>
+    <string name="cellular_mode_max_desc">คุณภาพกราฟิกสูงสุดสำหรับเครือข่ายที่เสถียร</string>
+    <string name="wifi_speed_first">เน้นการตอบสนองที่ลื่นไหล</string>
+    <string name="wifi_speed_first_desc">ลดอาการหน่วงของปุ่มกดเมื่อสัญญาณเน็ตแกว่ง</string>
+    <string name="section_clarity">ความคมชัดและการควบคุม</string>
+    <string name="clarity_boost_title">Clarity Boost (เพิ่มความคมชัด)</string>
+    <string name="clarity_boost_desc">ทำให้ภาพในเกมคมชัดขึ้น</string>
+    <string name="preset_off">ปิด</string>
+    <string name="preset_balanced">สมดุล (แนะนำ)</string>
+    <string name="preset_sharp">คมชัดพิเศษ</string>
+    <string name="preset_oled">สีสันสดใส</string>
+    <string name="section_controls">การควบคุมและเครื่องมือ</string>
+    <string name="anti_afk_title">ป้องกันการหลุดเมื่อไม่ได้ขยับ</string>
+    <string name="anti_afk_desc">รักษาเซสชันเกมไว้เมื่อวางจอยชั่วคราว</string>
+    <string name="polling_boost_title">จอยตอบสนองไว</string>
+    <string name="polling_boost_desc">เพิ่มความเร็วในการตอบสนองของปุ่มกด</string>
+    <string name="floating_hud_title">แถบเมนูด่วนในเกม (HUD)</string>
+    <string name="floating_hud_desc">แสดงปิง, FPS และการตั้งค่าด่วนขณะเล่น</string>
+    <string name="virtual_gamepad_title">ปุ่มจอยจำลองบนหน้าจอ</string>
+    <string name="virtual_gamepad_desc">เล่นด้วยปุ่มสัมผัสบนหน้าจอเมื่อไม่ได้ต่อจอยจริง</string>
+    <string name="section_storage">แคชและบัญชี</string>
+    <string name="clear_cookies_title">ล้างแคชและคุกกี้</string>
+    <string name="clear_cookies_desc">ล้างข้อมูลการเข้าสู่ระบบที่บันทึกไว้เพื่อแก้ปัญหาหน้าเว็บค้าง</string>
+    <string name="btn_clear_cookies">ล้างข้อมูลทันที</string>
+    <string name="toast_cookies_cleared">ล้างแคชและคุกกี้เรียบร้อยแล้ว!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">PING</string>
+    <string name="hud_controller">จอยเกม</string>
+    <string name="hud_clarity_boost">ความคมชัด</string>
+    <string name="hud_vietnamese_translator">แปลภาษา</string>
+    <string name="hud_return_home">กลับหน้าแรก</string>
+    <string name="hud_reload">โหลดหน้าใหม่</string>
+    <string name="hud_virtual_gamepad">จอยบนจอ</string>
+    <string name="hud_network_switch">สลับเครือข่าย</string>
+    <string name="dialog_exit_title">ออกจากเกมหรือไม่?</string>
+    <string name="dialog_exit_message">คุณต้องการออกจากเกมและกลับไปยังหน้าแรกหรือไม่?</string>
     <string name="btn_confirm_exit">ออกจากเกม</string>
     <string name="loading_stream">กำลังเชื่อมต่อ Xbox Cloud...</string>
+    <string name="loading_tip">เคล็ดลับ: ระบบจะปิด VPN อัตโนมัติเมื่อเริ่มเกมเพื่อให้เล่นได้ลื่นขึ้น</string>
 </resources>

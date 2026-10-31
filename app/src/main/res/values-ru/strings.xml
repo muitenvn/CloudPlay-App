@@ -1,51 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
     <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">Главная</string>
-    <string name="tab_library">Библиотека</string>
+    <string name="tab_library">Игры</string>
     <string name="tab_servers">Серверы</string>
     <string name="tab_settings">Настройки</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">ЯЗЫК ПРИЛОЖЕНИЯ</string>
+    <string name="app_language_desc">Автоматический выбор языка системы или ручная настройка.</string>
+    <string name="lang_system_default">Системный (Авто)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Вьетнамский)</string>
+    <string name="lang_english">English (Английский)</string>
     <string name="current_language">Язык</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">ЯЗЫК СТРАНИЦЫ XBOX</string>
+    <string name="xbox_web_language_desc">Выберите язык страниц Xbox и предотвратите принудительный японский интерфейс.</string>
+    <string name="xbox_lang_system_match">Язык устройства (по умолчанию en-US)</string>
+    <string name="xbox_lang_custom">Свой язык Xbox</string>
+    <string name="anti_japanese_enforcer">Защита от японского меню</string>
+    <string name="anti_japanese_enforcer_desc">Автоматически сохраняет английский язык вместо японского.</string>
+
+    <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">ИГРАТЬ В XBOX CLOUD</string>
-    <string name="hero_subtitle">Разблокировка региона • Умный VPN</string>
+    <string name="hero_subtitle">Разблокировка региона • Авто-отключение VPN</string>
     <string name="btn_launch_xcloud">Играть</string>
     <string name="btn_play_fortnite">Fortnite</string>
     <string name="btn_continue_game">Продолжить</string>
+
+    <!-- Network & Hardware Cockpit -->
     <string name="cockpit_title">Сеть и Геймпад</string>
+    <string name="cockpit_subtitle">Разблокировка региона • Авто-отключение VPN</string>
     <string name="net_mode_direct">Прямая сеть</string>
-    <string name="net_mode_vpn">VPN Вкл.</string>
+    <string name="net_mode_vpn">VPN включён</string>
+    <string name="net_desc_direct">Прямое соединение активно для плавной игры.</string>
+    <string name="net_desc_vpn">Разблокировка региона активна для запуска игр.</string>
     <string name="btn_enable_vpn">Включить VPN</string>
     <string name="btn_switch_direct">Выключить VPN</string>
-    <string name="vpn_status_connected">VPN Вкл.</string>
+    <string name="vpn_status_connected">VPN включён</string>
     <string name="vpn_status_disconnected">Прямая сеть</string>
+    <string name="auto_bypass_enabled">Авто-отключение VPN при запуске</string>
+    <string name="auto_bypass_triggered">Игра запущена! Переключено на прямую сеть.</string>
     <string name="hardware_controller">Геймпад</string>
-    <string name="controller_connected">Подключен</string>
-    <string name="controller_disconnected">Не подключен</string>
+    <string name="controller_connected">Подключён</string>
+    <string name="controller_disconnected">Не подключён</string>
     <string name="controller_touch">Сенсор</string>
+    <string name="gamepad_none">Нет</string>
+    <string name="gamepad_default_name">Геймпад Xbox</string>
+    <string name="guide_button">Гид</string>
+
+    <!-- Featured Games -->
     <string name="featured_games_title">Популярные игры</string>
-    <string name="featured_games_subtitle">Быстрый запуск в облаке</string>
-    <string name="btn_view_all">Все</string>
+    <string name="featured_games_subtitle">Быстрый запуск</string>
+    <string name="btn_view_all">Все игры</string>
     <string name="btn_play_now">Играть</string>
     <string name="badge_free">Бесплатно</string>
     <string name="badge_touch">Сенсор</string>
     <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
     <string name="search_games_placeholder">Поиск игр в библиотеке...</string>
     <string name="filter_all">Все</string>
     <string name="filter_free">Бесплатные</string>
-    <string name="filter_touch">Сенсорное упр.</string>
+    <string name="filter_touch">Сенсорное управление</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
-    <string name="btn_add_game">Добавить</string>
+    <string name="btn_add_game">Добавить игру</string>
+    <string name="dialog_add_game_title">Добавить свою закладку</string>
+    <string name="input_game_title">Название игры</string>
+    <string name="input_game_url">URL игры Xbox</string>
+    <string name="input_game_category">Категория</string>
+    <string name="input_game_cover">URL обложки (необязательно)</string>
     <string name="btn_save">Сохранить</string>
     <string name="btn_cancel">Отмена</string>
     <string name="btn_delete">Удалить</string>
-    <string name="servers_title">Региональные серверы</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">Серверы разблокировки</string>
+    <string name="servers_subtitle">серверов доступно для разблокировки региона</string>
+    <string name="cat_japan">Япония (Токио/Осака)</string>
+    <string name="cat_korea">Корея (Сеул)</string>
+    <string name="cat_sea">ЮВА (Сингапур)</string>
+    <string name="cat_usa">США</string>
     <string name="btn_ping_all">Проверить пинг</string>
-    <string name="btn_fetch_live">Обновить</string>
+    <string name="btn_fetch_live">Обновить серверы</string>
+    <string name="btn_add_custom_server">Добавить сервер</string>
     <string name="server_active">Подключено</string>
-    <string name="server_optimal">Оптимально</string>
+    <string name="server_optimal">Оптимальный</string>
+    <string name="server_testing">Проверка пинга...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">АВТО-VPN И СЕТЬ</string>
+    <string name="smart_vpn_title">Авто-VPN</string>
+    <string name="smart_vpn_desc">Включает VPN для открытия игры, затем переключает на прямую сеть.</string>
+    <string name="stealth_headers_title">Разблокировка региона</string>
+    <string name="stealth_headers_desc">Использует прокси-заголовки при запуске игр.</string>
+    <string name="section_cellular_wifi">ГРАФИКА И ПРОИЗВОДИТЕЛЬНОСТЬ</string>
+    <string name="section_graphics_quality">ГРАФИКА И ПРОИЗВОДИТЕЛЬНОСТЬ</string>
+    <string name="graphics_quality_auto">Авто (Рекомендуется)</string>
+    <string name="graphics_quality_auto_desc">Подстраивается под сеть и снижает нагрев телефона.</string>
+    <string name="graphics_quality_saver">Экономия трафика (Низкое)</string>
+    <string name="graphics_quality_saver_desc">Малый расход данных, экономия заряда и меньше нагрева.</string>
+    <string name="graphics_quality_medium">Среднее</string>
+    <string name="graphics_quality_medium_desc">Баланс чёткости картинки и температуры устройства.</string>
+    <string name="graphics_quality_high">Высокое</string>
+    <string name="graphics_quality_high_desc">Чёткое изображение 1080p.</string>
+    <string name="graphics_quality_ultra">Ультра (Макс.)</string>
+    <string name="graphics_quality_ultra_desc">Максимальное качество для быстрого интернета.</string>
+    <string name="cellular_mode_saver">Экономия трафика (Низкое)</string>
+    <string name="cellular_mode_saver_desc">Экономит мобильные данные и снижает нагрев.</string>
+    <string name="cellular_mode_max">Ультра (Макс.)</string>
+    <string name="cellular_mode_max_desc">Максимальное качество графики для быстрой сети.</string>
+    <string name="wifi_speed_first">Приоритет плавного отклика</string>
+    <string name="wifi_speed_first_desc">Снижает задержку ввода при нестабильной сети.</string>
+    <string name="section_clarity">КАЧЕСТВО КАРТИНКИ И УПРАВЛЕНИЕ</string>
+    <string name="clarity_boost_title">Clarity Boost (Резкость)</string>
+    <string name="clarity_boost_desc">Делает изображение в игре более чётким.</string>
+    <string name="preset_off">Выкл.</string>
+    <string name="preset_balanced">Баланс (Рекомендуется)</string>
+    <string name="preset_sharp">Высокая резкость</string>
+    <string name="preset_oled">Яркие цвета</string>
+    <string name="section_controls">УПРАВЛЕНИЕ И ФУНКЦИИ</string>
+    <string name="anti_afk_title">Защита от отключения за простой</string>
+    <string name="anti_afk_desc">Поддерживает активность сессии во время паузы.</string>
+    <string name="polling_boost_title">Быстрый отклик геймпада</string>
+    <string name="polling_boost_desc">Ускоряет реакцию на нажатия кнопок.</string>
+    <string name="floating_hud_title">Быстрая панель в игре (HUD)</string>
+    <string name="floating_hud_desc">Показывает пинг, FPS и быстрые настройки во время игры.</string>
+    <string name="virtual_gamepad_title">Экранный геймпад</string>
+    <string name="virtual_gamepad_desc">Управление кнопками на экране без физического геймпада.</string>
+    <string name="section_storage">КЭШ И АККАУНТ</string>
+    <string name="clear_cookies_title">Очистить кэш и cookies</string>
+    <string name="clear_cookies_desc">Удаляет сохранённые данные входа для устранения ошибок загрузки.</string>
+    <string name="btn_clear_cookies">Очистить данные</string>
+    <string name="toast_cookies_cleared">Кэш и cookies очищены!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">ПИНГ</string>
+    <string name="hud_controller">ГЕЙМПАД</string>
+    <string name="hud_clarity_boost">РЕЗКОСТЬ</string>
+    <string name="hud_vietnamese_translator">ПЕРЕВОД</string>
+    <string name="hud_return_home">На главную</string>
+    <string name="hud_reload">Обновить страницу</string>
+    <string name="hud_virtual_gamepad">Экранный геймпад</string>
+    <string name="hud_network_switch">Сменить сеть</string>
     <string name="dialog_exit_title">Выйти из игры?</string>
-    <string name="btn_confirm_exit">Выйти</string>
+    <string name="dialog_exit_message">Вы хотите выйти из игры и вернуться на главный экран?</string>
+    <string name="btn_confirm_exit">Выйти из игры</string>
     <string name="loading_stream">Подключение к Xbox Cloud...</string>
+    <string name="loading_tip">Совет: VPN автоматически отключается после запуска игры для снижения пинга.</string>
 </resources>

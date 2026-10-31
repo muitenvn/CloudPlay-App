@@ -127,7 +127,7 @@ jobs:
             gradle assembleDebug --no-daemon --no-configuration-cache --stacktrace
           fi
 
-      - name: Prepare APK and Generate Release Notes
+      - name: Prepare APK and Generate AI Release Notes
         id: release_info
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

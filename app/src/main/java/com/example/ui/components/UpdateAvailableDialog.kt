@@ -63,6 +63,7 @@ fun UpdateAvailableDialog(
     isEn: Boolean,
     onDismiss: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
     val context = LocalContext.current
     val notesScrollState = rememberScrollState()
     val downloadState by UpdateChecker.downloadState.collectAsState()
@@ -104,7 +105,7 @@ fun UpdateAvailableDialog(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isEn) "New Update Available" else "Đã có phiên bản mới",
+                            text = config.tr("Đã có phiên bản mới", "New Update Available"),
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 16.sp,
@@ -141,7 +142,7 @@ fun UpdateAvailableDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = if (isEn) "What's new" else "Có gì mới",
+                                text = config.tr("🤖 Mô tả bản cập nhật (AI)", "🤖 AI Update Summary"),
                                 color = XboxNeonGreen,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold

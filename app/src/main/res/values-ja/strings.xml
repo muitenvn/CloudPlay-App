@@ -1,51 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
     <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">ホーム</string>
     <string name="tab_library">ライブラリ</string>
     <string name="tab_servers">サーバー</string>
     <string name="tab_settings">設定</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">アプリの言語</string>
+    <string name="app_language_desc">システム設定に応じて自動選択するか、手動で設定します。</string>
+    <string name="lang_system_default">システム標準 (自動)</string>
+    <string name="lang_vietnamese">Tiếng Việt (ベトナム語)</string>
+    <string name="lang_english">English (英語)</string>
     <string name="current_language">言語</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">XBOX ページの言語</string>
+    <string name="xbox_web_language_desc">Xbox ページの表示言語を選択します。</string>
+    <string name="xbox_lang_system_match">端末の言語に合わせる (標準 en-US)</string>
+    <string name="xbox_lang_custom">カスタム Xbox 言語</string>
+    <string name="anti_japanese_enforcer">日本語への強制切替を防止</string>
+    <string name="anti_japanese_enforcer_desc">日本サーバー経由時も Xbox ページを指定言語に保ちます。</string>
+
+    <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
     <string name="hero_title">XBOX CLOUD をプレイ</string>
-    <string name="hero_subtitle">地域ロック解除 • 自動VPNオフ</string>
+    <string name="hero_subtitle">地域ロック解除 • VPN 自動オフ</string>
     <string name="btn_launch_xcloud">今すぐプレイ</string>
     <string name="btn_play_fortnite">Fortnite</string>
-    <string name="btn_continue_game">再開する</string>
-    <string name="cockpit_title">ネットワーク＆コントローラー</string>
-    <string name="net_mode_direct">ダイレクト接続</string>
+    <string name="btn_continue_game">再開</string>
+
+    <!-- Network & Hardware Cockpit -->
+    <string name="cockpit_title">ネットワークとコントローラー</string>
+    <string name="cockpit_subtitle">地域ロック解除 • VPN 自動オフ</string>
+    <string name="net_mode_direct">直接接続</string>
     <string name="net_mode_vpn">VPN オン</string>
-    <string name="btn_enable_vpn">VPNを起動</string>
-    <string name="btn_switch_direct">VPNを停止</string>
+    <string name="net_desc_direct">スムーズなプレイのため直接接続を使用しています。</string>
+    <string name="net_desc_vpn">ゲーム起動用の地域ロック解除が有効です。</string>
+    <string name="btn_enable_vpn">VPN をオン</string>
+    <string name="btn_switch_direct">VPN をオフ</string>
     <string name="vpn_status_connected">VPN オン</string>
-    <string name="vpn_status_disconnected">ダイレクト接続</string>
+    <string name="vpn_status_disconnected">直接接続</string>
+    <string name="auto_bypass_enabled">起動後に VPN を自動オフ</string>
+    <string name="auto_bypass_triggered">ゲームが起動しました！直接接続に切り替えました。</string>
     <string name="hardware_controller">コントローラー</string>
     <string name="controller_connected">接続済み</string>
     <string name="controller_disconnected">未接続</string>
     <string name="controller_touch">タッチ</string>
+    <string name="gamepad_none">なし</string>
+    <string name="gamepad_default_name">Xbox コントローラー</string>
+    <string name="guide_button">ガイド</string>
+
+    <!-- Featured Games -->
     <string name="featured_games_title">注目のゲーム</string>
-    <string name="featured_games_subtitle">クラウドですぐに起動</string>
-    <string name="btn_view_all">すべて表示</string>
-    <string name="btn_play_now">プレイ</string>
+    <string name="featured_games_subtitle">クイック起動</string>
+    <string name="btn_view_all">すべて見る</string>
+    <string name="btn_play_now">今すぐプレイ</string>
     <string name="badge_free">無料</string>
     <string name="badge_touch">タッチ対応</string>
     <string name="badge_pass">Game Pass</string>
-    <string name="search_games_placeholder">ライブラリのゲームを検索...</string>
+
+    <!-- Game Library Screen -->
+    <string name="search_games_placeholder">ライブラリ内のゲームを検索...</string>
     <string name="filter_all">すべて</string>
     <string name="filter_free">基本無料</string>
-    <string name="filter_touch">タッチ操作対応</string>
+    <string name="filter_touch">タッチ対応</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
     <string name="btn_add_game">ゲーム追加</string>
+    <string name="dialog_add_game_title">カスタムゲームを追加</string>
+    <string name="input_game_title">ゲーム名</string>
+    <string name="input_game_url">Xbox ゲーム URL</string>
+    <string name="input_game_category">カテゴリ</string>
+    <string name="input_game_cover">カバー画像 URL (任意)</string>
     <string name="btn_save">保存</string>
     <string name="btn_cancel">キャンセル</string>
     <string name="btn_delete">削除</string>
-    <string name="servers_title">リージョンサーバー</string>
-    <string name="btn_ping_all">Ping測定</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">地域ロック解除サーバー</string>
+    <string name="servers_subtitle">台のサーバーが地域ロック解除に利用可能</string>
+    <string name="cat_japan">日本 (東京/大阪)</string>
+    <string name="cat_korea">韓国 (ソウル)</string>
+    <string name="cat_sea">東南アジア (シンガポール)</string>
+    <string name="cat_usa">アメリカ</string>
+    <string name="btn_ping_all">Ping 測定</string>
     <string name="btn_fetch_live">サーバー更新</string>
-    <string name="server_active">接続中</string>
-    <string name="server_optimal">最適</string>
+    <string name="btn_add_custom_server">サーバー追加</string>
+    <string name="server_active">接続済み</string>
+    <string name="server_optimal">推奨</string>
+    <string name="server_testing">Ping 測定中...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">自動 VPN とネットワーク</string>
+    <string name="smart_vpn_title">自動 VPN</string>
+    <string name="smart_vpn_desc">起動時に VPN をオンにし、開始後に直接接続へ切り替えます。</string>
+    <string name="stealth_headers_title">地域ロック解除ヘッダー</string>
+    <string name="stealth_headers_desc">ゲーム起動時にプロキシヘッダーを使用します。</string>
+    <string name="section_cellular_wifi">画質とパフォーマンス</string>
+    <string name="section_graphics_quality">画質とパフォーマンス</string>
+    <string name="graphics_quality_auto">自動 (推奨)</string>
+    <string name="graphics_quality_auto_desc">回線品質に合わせて調整し、端末の発熱を抑えます。</string>
+    <string name="graphics_quality_saver">通信量節約 (低)</string>
+    <string name="graphics_quality_saver_desc">データ使用量を抑え、バッテリーと発熱を軽減します。</string>
+    <string name="graphics_quality_medium">標準</string>
+    <string name="graphics_quality_medium_desc">画質と端末温度のバランスを取ります。</string>
+    <string name="graphics_quality_high">高画質</string>
+    <string name="graphics_quality_high_desc">くっきりとした 1080p 画質。</string>
+    <string name="graphics_quality_ultra">最高画質 (最大)</string>
+    <string name="graphics_quality_ultra_desc">高速回線と高性能端末向けの最高画質。</string>
+    <string name="cellular_mode_saver">通信量節約 (低)</string>
+    <string name="cellular_mode_saver_desc">モバイルデータを節約し、発熱を抑えます。</string>
+    <string name="cellular_mode_max">最高画質 (最大)</string>
+    <string name="cellular_mode_max_desc">高速回線向けの最高画質。</string>
+    <string name="wifi_speed_first">応答速度を優先</string>
+    <string name="wifi_speed_first_desc">回線が不安定なときの入力遅延を軽減します。</string>
+    <string name="section_clarity">画質補正と操作</string>
+    <string name="clarity_boost_title">シャープネス補正 (Clarity Boost)</string>
+    <string name="clarity_boost_desc">ゲーム映像の輪郭をくっきり表示します。</string>
+    <string name="preset_off">オフ</string>
+    <string name="preset_balanced">バランス (推奨)</string>
+    <string name="preset_sharp">高シャープ</string>
+    <string name="preset_oled">鮮やかな色</string>
+    <string name="section_controls">操作と便利機能</string>
+    <string name="anti_afk_title">放置切断の防止</string>
+    <string name="anti_afk_desc">待機中もゲームセッションを維持します。</string>
+    <string name="polling_boost_title">コントローラー高速応答</string>
+    <string name="polling_boost_desc">ボタン入力の反応速度を向上させます。</string>
+    <string name="floating_hud_title">ゲーム内クイックバー (HUD)</string>
+    <string name="floating_hud_desc">プレイ中に Ping、FPS、クイック設定を表示します。</string>
+    <string name="virtual_gamepad_title">仮想タッチコントローラー</string>
+    <string name="virtual_gamepad_desc">コントローラー未接続時に画面上のボタンで操作します。</string>
+    <string name="section_storage">キャッシュとアカウント</string>
+    <string name="clear_cookies_title">キャッシュと Cookie を消去</string>
+    <string name="clear_cookies_desc">保存されたログイン情報を消去して読み込み不具合を修正します。</string>
+    <string name="btn_clear_cookies">データを今すぐ消去</string>
+    <string name="toast_cookies_cleared">キャッシュと Cookie を消去しました！</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">PING</string>
+    <string name="hud_controller">パッド</string>
+    <string name="hud_clarity_boost">シャープ</string>
+    <string name="hud_vietnamese_translator">翻訳</string>
+    <string name="hud_return_home">ホームへ戻る</string>
+    <string name="hud_reload">再読み込み</string>
+    <string name="hud_virtual_gamepad">仮想パッド</string>
+    <string name="hud_network_switch">回線切替</string>
     <string name="dialog_exit_title">ゲームを終了しますか？</string>
-    <string name="btn_confirm_exit">終了</string>
+    <string name="dialog_exit_message">ゲームを終了してホーム画面に戻りますか？</string>
+    <string name="btn_confirm_exit">終了する</string>
     <string name="loading_stream">Xbox Cloud に接続中...</string>
+    <string name="loading_tip">ヒント：ゲーム開始後に VPN は自動でオフになり、遅延が軽減されます。</string>
 </resources>

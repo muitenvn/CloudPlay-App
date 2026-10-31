@@ -1,51 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App & General -->
     <string name="app_name">CloudPlay</string>
-    <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="app_subtitle">Xbox 클라우드 게이밍</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
     <string name="tab_home">홈</string>
     <string name="tab_library">라이브러리</string>
     <string name="tab_servers">서버</string>
     <string name="tab_settings">설정</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">앱 언어</string>
+    <string name="app_language_desc">시스템에 따라 언어를 자동 선택하거나 직접 설정합니다.</string>
+    <string name="lang_system_default">시스템 기본값 (자동)</string>
+    <string name="lang_vietnamese">Tiếng Việt (베트남어)</string>
+    <string name="lang_english">English (영어)</string>
     <string name="current_language">언어</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">XBOX 페이지 언어</string>
+    <string name="xbox_web_language_desc">Xbox 페이지 표시 언어를 선택하고 일본어 메뉴 강제 전환을 방지합니다.</string>
+    <string name="xbox_lang_system_match">기기 언어 따르기 (기본값 en-US)</string>
+    <string name="xbox_lang_custom">사용자 지정 Xbox 언어</string>
+    <string name="anti_japanese_enforcer">일본어 강제 전환 방지</string>
+    <string name="anti_japanese_enforcer_desc">Xbox 페이지를 일본어 대신 선택한 언어로 유지합니다.</string>
+
+    <!-- Hero / Quick Play -->
     <string name="hero_tag">XBOX CLOUD</string>
-    <string name="hero_title">XBOX CLOUD 플레이</string>
-    <string name="hero_subtitle">지역 잠금 해제 • 스마트 VPN</string>
+    <string name="hero_title">XBOX 클라우드 플레이</string>
+    <string name="hero_subtitle">지역 잠금 해제 • VPN 자동 끄기</string>
     <string name="btn_launch_xcloud">지금 플레이</string>
-    <string name="btn_play_fortnite">Fortnite</string>
+    <string name="btn_play_fortnite">포트나이트</string>
     <string name="btn_continue_game">이어하기</string>
+
+    <!-- Network & Hardware Cockpit -->
     <string name="cockpit_title">네트워크 및 컨트롤러</string>
+    <string name="cockpit_subtitle">지역 잠금 해제 • VPN 자동 끄기</string>
     <string name="net_mode_direct">직접 연결</string>
     <string name="net_mode_vpn">VPN 켜짐</string>
+    <string name="net_desc_direct">원활한 게임을 위해 직접 연결이 활성화되었습니다.</string>
+    <string name="net_desc_vpn">게임 실행을 위한 지역 잠금 해제가 활성화되었습니다.</string>
     <string name="btn_enable_vpn">VPN 켜기</string>
     <string name="btn_switch_direct">VPN 끄기</string>
     <string name="vpn_status_connected">VPN 켜짐</string>
     <string name="vpn_status_disconnected">직접 연결</string>
+    <string name="auto_bypass_enabled">실행 시 VPN 자동 끄기</string>
+    <string name="auto_bypass_triggered">게임 시작됨! 직접 연결로 전환되었습니다.</string>
     <string name="hardware_controller">컨트롤러</string>
     <string name="controller_connected">연결됨</string>
     <string name="controller_disconnected">연결 안 됨</string>
     <string name="controller_touch">터치</string>
+    <string name="gamepad_none">없음</string>
+    <string name="gamepad_default_name">Xbox 컨트롤러</string>
+    <string name="guide_button">가이드</string>
+
+    <!-- Featured Games -->
     <string name="featured_games_title">추천 게임</string>
-    <string name="featured_games_subtitle">클라우드 빠른 실행</string>
-    <string name="btn_view_all">전체 보기</string>
-    <string name="btn_play_now">플레이</string>
+    <string name="featured_games_subtitle">빠른 게임 실행</string>
+    <string name="btn_view_all">모두 보기</string>
+    <string name="btn_play_now">지금 플레이</string>
     <string name="badge_free">무료</string>
-    <string name="badge_touch">터치 지원</string>
+    <string name="badge_touch">터치</string>
     <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
     <string name="search_games_placeholder">라이브러리에서 게임 검색...</string>
     <string name="filter_all">전체</string>
     <string name="filter_free">무료 플레이</string>
-    <string name="filter_touch">터치 컨트롤</string>
+    <string name="filter_touch">터치 지원</string>
     <string name="filter_gamepass">Xbox Game Pass</string>
     <string name="btn_add_game">게임 추가</string>
+    <string name="dialog_add_game_title">맞춤 북마크 추가</string>
+    <string name="input_game_title">게임 제목</string>
+    <string name="input_game_url">Xbox 게임 URL</string>
+    <string name="input_game_category">카테고리</string>
+    <string name="input_game_cover">표지 이미지 URL (선택)</string>
     <string name="btn_save">저장</string>
     <string name="btn_cancel">취소</string>
     <string name="btn_delete">삭제</string>
-    <string name="servers_title">지역 해제 서버</string>
-    <string name="btn_ping_all">핑 측정</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">지역 잠금 해제 서버</string>
+    <string name="servers_subtitle">개의 서버로 지역 잠금 해제 가능</string>
+    <string name="cat_japan">일본 (도쿄/오사카)</string>
+    <string name="cat_korea">한국 (서울)</string>
+    <string name="cat_sea">동남아시아 (싱가포르)</string>
+    <string name="cat_usa">미국</string>
+    <string name="btn_ping_all">핑 테스트</string>
     <string name="btn_fetch_live">서버 업데이트</string>
+    <string name="btn_add_custom_server">서버 추가</string>
     <string name="server_active">연결됨</string>
     <string name="server_optimal">최적</string>
+    <string name="server_testing">핑 측정 중...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">자동 VPN 및 네트워크</string>
+    <string name="smart_vpn_title">자동 VPN</string>
+    <string name="smart_vpn_desc">게임을 열 때 VPN을 켜고, 시작되면 직접 연결로 전환합니다.</string>
+    <string name="stealth_headers_title">지역 잠금 해제</string>
+    <string name="stealth_headers_desc">게임 실행 시 프록시 헤더를 사용합니다.</string>
+    <string name="section_cellular_wifi">그래픽 및 성능</string>
+    <string name="section_graphics_quality">그래픽 및 성능</string>
+    <string name="graphics_quality_auto">자동 (권장)</string>
+    <string name="graphics_quality_auto_desc">네트워크 품질에 맞춰 조정하고 기기 발열을 줄입니다.</string>
+    <string name="graphics_quality_saver">데이터 절약 (낮음)</string>
+    <string name="graphics_quality_saver_desc">데이터 사용량을 줄이고 배터리와 발열을 절약합니다.</string>
+    <string name="graphics_quality_medium">보통</string>
+    <string name="graphics_quality_medium_desc">화질 선명도와 기기 온도의 균형을 맞춥니다.</string>
+    <string name="graphics_quality_high">높음</string>
+    <string name="graphics_quality_high_desc">선명한 1080p 화질을 제공합니다.</string>
+    <string name="graphics_quality_ultra">울트라 (최대)</string>
+    <string name="graphics_quality_ultra_desc">빠른 네트워크와 고성능 기기를 위한 최고 화질입니다.</string>
+    <string name="cellular_mode_saver">데이터 절약 (낮음)</string>
+    <string name="cellular_mode_saver_desc">모바일 데이터를 절약하고 발열을 줄입니다.</string>
+    <string name="cellular_mode_max">울트라 (최대)</string>
+    <string name="cellular_mode_max_desc">안정적인 네트워크를 위한 최고 그래픽 품질입니다.</string>
+    <string name="wifi_speed_first">부드러운 응답 우선</string>
+    <string name="wifi_speed_first_desc">네트워크가 불안정할 때 입력 지연을 줄입니다.</string>
+    <string name="section_clarity">화질 및 컨트롤</string>
+    <string name="clarity_boost_title">선명도 향상 (샤프닝)</string>
+    <string name="clarity_boost_desc">게임 화면을 더 또렷하게 표시합니다.</string>
+    <string name="preset_off">끄기</string>
+    <string name="preset_balanced">균형 (권장)</string>
+    <string name="preset_sharp">매우 선명함</string>
+    <string name="preset_oled">생생한 색상</string>
+    <string name="section_controls">컨트롤 및 유틸리티</string>
+    <string name="anti_afk_title">자리 비움 연결 끊김 방지</string>
+    <string name="anti_afk_desc">대기 중에도 게임 세션을 활성 상태로 유지합니다.</string>
+    <string name="polling_boost_title">빠른 컨트롤러 응답</string>
+    <string name="polling_boost_desc">버튼 입력 반응 속도를 높입니다.</string>
+    <string name="floating_hud_title">인게임 빠른 실행 바 (HUD)</string>
+    <string name="floating_hud_desc">플레이 중 실시간 핑, FPS 및 빠른 설정을 표시합니다.</string>
+    <string name="virtual_gamepad_title">가상 터치 컨트롤러</string>
+    <string name="virtual_gamepad_desc">컨트롤러가 없을 때 화면 터치 버튼으로 플레이합니다.</string>
+    <string name="section_storage">캐시 및 계정</string>
+    <string name="clear_cookies_title">캐시 및 쿠키 삭제</string>
+    <string name="clear_cookies_desc">로딩 문제를 해결하기 위해 저장된 로그인 데이터를 지웁니다.</string>
+    <string name="btn_clear_cookies">지금 데이터 삭제</string>
+    <string name="toast_cookies_cleared">캐시 및 쿠키가 삭제되었습니다!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">PING</string>
+    <string name="hud_controller">컨트롤러</string>
+    <string name="hud_clarity_boost">선명도</string>
+    <string name="hud_vietnamese_translator">번역기</string>
+    <string name="hud_return_home">홈으로 이동</string>
+    <string name="hud_reload">새로고침</string>
+    <string name="hud_virtual_gamepad">터치 게임패드</string>
+    <string name="hud_network_switch">네트워크 전환</string>
     <string name="dialog_exit_title">게임을 종료할까요?</string>
-    <string name="btn_confirm_exit">종료</string>
+    <string name="dialog_exit_message">게임을 종료하고 홈 화면으로 돌아가시겠습니까?</string>
+    <string name="btn_confirm_exit">게임 종료</string>
     <string name="loading_stream">Xbox Cloud 연결 중...</string>
+    <string name="loading_tip">팁: 게임이 시작되면 원활한 플레이를 위해 VPN이 자동으로 꺼집니다.</string>
 </resources>

@@ -5,4 +5,5 @@
     <exclude domain="database" path="webview.db" />
     <exclude domain="database" path="webviewCookiesChromium.db" />
     <exclude domain="sharedpref" path="WebView" />
+    <exclude domain="sharedpref" path="cloudplay_settings_store.xml" />
 </full-backup-content>

@@ -263,13 +263,27 @@ fun MainContent(
     val updateState by com.example.data.UpdateChecker.state.collectAsState()
     val showUpdateDialog by com.example.data.UpdateChecker.showUpdateDialog.collectAsState()
 
-    LaunchedEffect(config.autoCheckUpdatesOnLaunch) {
-        if (config.autoCheckUpdatesOnLaunch) {
+    if (!config.userAcceptedTerms) {
+        com.example.ui.components.UserTermsAgreementDialog(
+            isDismissible = false,
+            onAccept = {
+                SettingsRepository.updateUserAcceptedTerms(true)
+            },
+            onDecline = {
+                VpnManager.disconnect(context)
+                activity.finishAndRemoveTask()
+                activity.finishAffinity()
+            }
+        )
+    }
+
+    LaunchedEffect(config.userAcceptedTerms, config.autoCheckUpdatesOnLaunch) {
+        if (config.userAcceptedTerms && config.autoCheckUpdatesOnLaunch) {
             com.example.data.UpdateChecker.checkOnAppLaunchIfNeeded(context)
         }
     }
     val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
-    if (showUpdateDialog && availableUpdate != null) {
+    if (config.userAcceptedTerms && showUpdateDialog && availableUpdate != null) {
         com.example.ui.components.UpdateAvailableDialog(
             updateInfo = availableUpdate,
             isEn = config.isEnglishUI(),
@@ -277,8 +291,8 @@ fun MainContent(
         )
     }
 
-    LaunchedEffect(Unit) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+    LaunchedEffect(config.userAcceptedTerms) {
+        if (config.userAcceptedTerms && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             if (androidx.core.content.ContextCompat.checkSelfPermission(
                     context,
                     android.Manifest.permission.POST_NOTIFICATIONS
@@ -293,13 +307,14 @@ fun MainContent(
 
     // Synchronize BackgroundMusicManager with settings (auto-start, volume, play-in-game, low-end mode)
     LaunchedEffect(
+        config.userAcceptedTerms,
         config.backgroundMusicEnabled,
         config.backgroundMusicVolume,
         config.backgroundMusicPlayInGame,
         config.lowEndDeviceMode
     ) {
         com.example.audio.BackgroundMusicManager.onSettingsUpdated(
-            autoStartEnabled = config.backgroundMusicEnabled,
+            autoStartEnabled = config.userAcceptedTerms && config.backgroundMusicEnabled,
             volume = config.backgroundMusicVolume,
             playInGameEnabled = config.backgroundMusicPlayInGame,
             lowEndMode = config.lowEndDeviceMode

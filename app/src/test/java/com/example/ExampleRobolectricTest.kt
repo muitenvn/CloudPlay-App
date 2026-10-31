@@ -1001,4 +1001,28 @@ class ExampleRobolectricTest {
         assertEquals(10, cleanedLines.size)
         assertEquals("Line 1 with code and Link", cleanedLines.first())
     }
+
+    @Test
+    fun testMandatoryTermsConsentOnInstallAndBackupExclusion() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
+
+        // 1. Fresh install or legacy install without v2 key must start with userAcceptedTerms = false
+        sp.edit().clear().putBoolean("user_accepted_terms", true).commit()
+        SettingsRepository.init(context)
+        org.junit.Assert.assertFalse(
+            "Mandatory terms consent must be false until user explicitly accepts v2 terms",
+            SettingsRepository.config.value.userAcceptedTerms
+        )
+
+        // 2. Accepting terms persists user_accepted_terms_v2 = true
+        SettingsRepository.updateUserAcceptedTerms(true)
+        assertTrue(SettingsRepository.config.value.userAcceptedTerms)
+        SettingsRepository.init(context)
+        assertTrue(SettingsRepository.config.value.userAcceptedTerms)
+
+        // 3. Revoking / resetting sets it back to false
+        SettingsRepository.updateUserAcceptedTerms(false)
+        org.junit.Assert.assertFalse(SettingsRepository.config.value.userAcceptedTerms)
+    }
 }

@@ -1774,9 +1774,41 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
                             Text(
-                                text = if (isEn) "View Full Terms" else "Xem điều khoản đầy đủ",
+                                text = if (isEn) "View Full Terms (Web)" else "Xem điều khoản đầy đủ (Web)",
                                 color = XboxNeonGreen,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = { SettingsRepository.updateUserAcceptedTerms(false) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "Review or revoke Terms of Use agreement"
+                                } else {
+                                    "Mở lại hộp thoại đồng ý Điều khoản sử dụng"
+                                }
+                            }
+                            .testTag("settings_reopen_terms_consent_btn"),
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = DirectCyan.copy(alpha = 0.08f)
+                        )
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
+                            Text(
+                                text = if (isEn) "Re-open Terms Consent Dialog" else "Mở lại hộp thoại Đồng ý Điều khoản",
+                                color = DirectCyan,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp
                             )
                         }

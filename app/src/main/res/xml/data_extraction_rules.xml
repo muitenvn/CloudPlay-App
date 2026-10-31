@@ -5,11 +5,13 @@
         <exclude domain="root" path="app_webview" />
         <exclude domain="database" path="webview.db" />
         <exclude domain="database" path="webviewCookiesChromium.db" />
+        <exclude domain="sharedpref" path="cloudplay_settings_store.xml" />
     </cloud-backup>
     <device-transfer>
         <!-- Exclude sensitive WebView cookies from device transfer -->
         <exclude domain="root" path="app_webview" />
         <exclude domain="database" path="webview.db" />
         <exclude domain="database" path="webviewCookiesChromium.db" />
+        <exclude domain="sharedpref" path="cloudplay_settings_store.xml" />
     </device-transfer>
 </data-extraction-rules>

@@ -917,7 +917,7 @@ object SettingsRepository {
                 "github_repo_slug_v2",
                 "muitenvn/CloudPlay-App"
             ) ?: "muitenvn/CloudPlay-App",
-            userAcceptedTerms = sp.getBoolean("user_accepted_terms", false),
+            userAcceptedTerms = sp.getBoolean("user_accepted_terms_v2", false),
             autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true),
             backgroundMusicEnabled = if (effectiveLowEnd) {
                 sp.getBoolean("background_music_enabled_low_end", false)
@@ -1009,6 +1009,7 @@ object SettingsRepository {
             putString("public_web_portal_url_v2", c.publicWebPortalUrl)
             putString("github_repo_slug_v2", c.githubRepoSlug)
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
+            putBoolean("user_accepted_terms_v2", c.userAcceptedTerms)
             putBoolean("auto_check_updates_on_launch", c.autoCheckUpdatesOnLaunch)
             putBoolean("background_music_enabled", c.backgroundMusicEnabled)
             if (c.lowEndDeviceMode) {

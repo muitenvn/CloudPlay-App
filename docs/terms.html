@@ -19,61 +19,99 @@
 <meta property="og:image" content="https://muitenvn.github.io/CloudPlay-App/img/og.jpg">
 <style>
   :root{
-    --bg:#ffffff; --surface:#f5f7f6; --line:#e4e8e6; --text:#16191a; --muted:#5d6764;
+    --bg:#ffffff; --surface:#f5f7f6; --sum-bg:#eef2f0; --sum-hover:#e4ebe7;
+    --line:#d5ddd9; --text:#16191a; --muted:#46504d;
     --accent:#107c10; --accent-d:#0b5f0b; --accent-soft:#e8f3e8; --on-accent:#fff;
-    --warn-bg:#fff7e6; --warn-line:#f1dcae; --warn-text:#6b4a00; --bar:rgba(255,255,255,.94);
+    --warn-bg:#fff7e6; --warn-line:#e6c98a; --warn-text:#593d00; --bar:rgba(255,255,255,.95);
     --shadow:0 6px 18px rgba(0,0,0,.08); --r:16px;
   }
   @media (prefers-color-scheme:dark){
     :root{
-      --bg:#0b1210; --surface:#121b17; --line:#223029; --text:#eaf1ee; --muted:#9db0a8;
-      --accent:#3fb950; --accent-d:#2f9a40; --accent-soft:#12261a; --on-accent:#06130a;
-      --warn-bg:#241c0b; --warn-line:#4a3a12; --warn-text:#f0d594; --bar:rgba(11,18,16,.94);
+      --bg:#0b1210; --surface:#121b17; --sum-bg:#17231e; --sum-hover:#1d2c26;
+      --line:#283931; --text:#eaf1ee; --muted:#b2c5bd;
+      --accent:#3fb950; --accent-d:#2f9a40; --accent-soft:#132a1c; --on-accent:#06130a;
+      --warn-bg:#241c0b; --warn-line:#524014; --warn-text:#f3dca2; --bar:rgba(11,18,16,.95);
       --shadow:0 6px 18px rgba(0,0,0,.45);
     }
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:16px;padding-bottom:48px;overflow-wrap:anywhere}
-  .wrap{max-width:720px;margin:0 auto;padding:0 20px}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.62;font-size:16px;padding-bottom:48px;overflow-wrap:anywhere;word-break:break-word}
+  .wrap{max-width:720px;margin:0 auto;padding:0 16px}
   a{color:var(--accent)}
   :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
   /* top bar */
-  .top{position:sticky;top:0;z-index:20;background:var(--bar);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
-  .top .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:12px}
-  .brand{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:var(--text);text-decoration:none}
-  .brand img{width:28px;height:28px;border-radius:7px}
+  .top{position:sticky;top:0;z-index:30;background:var(--bar);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+  .top .wrap{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding-top:6px;padding-bottom:6px;gap:8px}
+  .brand{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:16.5px;color:var(--text);text-decoration:none;min-width:0}
+  .brand img{width:28px;height:28px;border-radius:7px;flex:none}
+  .brand span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top-actions{display:inline-flex;align-items:center;gap:8px;flex:none}
   .lang{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--bg);flex:none}
-  .lang button{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 12px;min-height:34px;cursor:pointer}
+  .lang button{font:inherit;font-size:13px;font-weight:700;border:0;background:transparent;color:var(--muted);padding:6px 10px;min-height:36px;cursor:pointer}
   .lang button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
+  .toc-trigger{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13.5px;font-weight:700;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;min-height:36px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s}
+  .toc-trigger:hover{background:var(--sum-hover);border-color:var(--accent)}
+  .toc-trigger[aria-expanded="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .toc-icon{font-size:15px;line-height:1}
+  /* TOC modal/drawer */
+  .toc-backdrop{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.48);opacity:0;pointer-events:none;transition:opacity .2s}
+  .toc-backdrop.open{opacity:1;pointer-events:auto}
+  .toc-panel{position:fixed;top:62px;right:12px;left:12px;max-width:420px;margin-left:auto;max-height:calc(100vh - 80px);z-index:45;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;transform:translateY(-8px);opacity:0;pointer-events:none;transition:transform .2s,opacity .2s}
+  .toc-panel.open{transform:translateY(0);opacity:1;pointer-events:auto}
+  .toc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .toc-head strong{font-size:15.5px;color:var(--text)}
+  .toc-close{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px;font-weight:700;cursor:pointer}
+  .toc-close:hover{background:var(--sum-hover);border-color:var(--accent)}
+  .toc-list{list-style:none;overflow-y:auto;padding:8px}
+  .toc-list li+li{margin-top:2px}
+  .toc-list a{display:block;padding:10px 12px;border-radius:10px;color:var(--text);text-decoration:none;font-size:14.5px;font-weight:600;line-height:1.35;transition:background .15s,color .15s}
+  .toc-list a:hover,.toc-list a:active{background:var(--accent-soft);color:var(--accent)}
   /* page header */
-  .page-head{padding:24px 0 12px}
-  .back-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;text-decoration:none;margin-bottom:10px}
-  h1{font-size:26px;line-height:1.2;letter-spacing:-.02em}
-  .meta{color:var(--muted);font-size:13.5px;margin-top:6px}
+  .page-head{padding:22px 0 12px}
+  .back-link{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:600;text-decoration:none;margin-bottom:10px}
+  h1{font-size:25px;line-height:1.22;letter-spacing:-.02em}
+  .meta{color:var(--muted);font-size:14px;margin-top:6px}
   /* legal notice banner */
-  .notice{margin-top:16px;padding:14px 16px;border-radius:var(--r);background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);font-size:14px}
-  .notice b{display:block;margin-bottom:3px;font-size:14.5px}
+  .notice{margin-top:16px;padding:14px 16px;border-radius:var(--r);background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);font-size:15px;line-height:1.6}
+  .notice b{display:block;margin-bottom:4px;font-size:15.5px}
   /* quick summary card */
   .summary-box{margin-top:16px;padding:16px 18px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
   .summary-box h2{font-size:17px;margin-bottom:10px;color:var(--text)}
   .summary-list{list-style:none;display:grid;gap:8px}
-  .summary-list li{position:relative;padding-left:18px;font-size:14.5px;color:var(--text)}
+  .summary-list li{position:relative;padding-left:18px;font-size:15.5px;line-height:1.6;color:var(--text)}
   .summary-list li::before{content:"•";position:absolute;left:2px;top:0;color:var(--accent);font-weight:700}
-  /* accordion sections */
+  /* accordion controls & sections */
   .terms-sec{margin-top:24px}
-  .acc-list{display:grid;gap:10px}
-  details{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;transition:border-color .2s}
-  details[open]{border-color:var(--accent)}
-  summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;font-weight:600;font-size:15.5px;min-height:54px;user-select:none}
+  .acc-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:12px}
+  .ctrl-btn{font:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 12px;min-height:38px;cursor:pointer;transition:background .15s,border-color .15s}
+  .ctrl-btn:hover{background:var(--sum-hover);border-color:var(--accent)}
+  .acc-list{display:grid;gap:12px}
+  details{border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;scroll-margin-top:70px;transition:border-color .2s,box-shadow .2s}
+  details[open]{border-color:var(--accent);box-shadow:var(--shadow)}
+  summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;font-weight:700;font-size:16.5px;line-height:1.35;min-height:54px;background:var(--sum-bg);color:var(--text);user-select:none;transition:background .15s,color .15s}
+  summary:hover{background:var(--sum-hover)}
   summary::-webkit-details-marker{display:none}
-  summary::after{content:"+";font-size:22px;font-weight:400;color:var(--muted);flex:none;line-height:1}
-  details[open] summary{border-bottom:1px solid var(--line);color:var(--accent)}
-  details[open] summary::after{content:"\2212";color:var(--accent)}
-  .acc-body{padding:14px 16px 16px;font-size:14.5px;color:var(--muted);display:grid;gap:10px}
-  .acc-body ul{padding-left:18px;display:grid;gap:6px}
-  .acc-body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--bg);padding:1px 5px;border-radius:5px;border:1px solid var(--line);color:var(--text)}
-  footer{margin-top:34px;padding:22px 0 10px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
+  .sum-title{flex:1;min-width:0}
+  .chev{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--text);flex:none;transition:transform .22s ease,background .15s,color .15s,border-color .15s}
+  .chev svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.4;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  details[open] summary{border-bottom:1px solid var(--line);background:var(--accent-soft);color:var(--accent)}
+  details[open] .chev{transform:rotate(180deg);background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .acc-body{padding:16px;font-size:15.5px;line-height:1.62;color:var(--text);display:grid;gap:12px;background:var(--bg)}
+  .acc-body p{color:var(--text)}
+  .acc-body ul{padding-left:20px;display:grid;gap:8px;color:var(--text)}
+  .sub-list{display:grid;gap:10px}
+  .sub-item{padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+  .example-box{padding:12px 14px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--line);color:var(--text)}
+  .acc-body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;background:var(--surface);padding:1px 5px;border-radius:5px;border:1px solid var(--line);color:var(--text)}
+  footer{margin-top:34px;padding:22px 0 10px;border-top:1px solid var(--line);color:var(--muted);font-size:14.5px;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
+  @media (max-width:380px){
+    .wrap{padding:0 12px}
+    .toc-trigger{padding:6px 10px;font-size:13px}
+    .lang button{padding:6px 8px;font-size:12.5px}
+    summary{padding:12px 14px;font-size:16px}
+    .acc-body{padding:14px;font-size:15px}
+  }
   @media (min-width:640px){
     .wrap{max-width:840px;padding:0 28px}
     h1{font-size:30px}
@@ -85,12 +123,43 @@
 <header class="top">
   <div class="wrap">
     <a class="brand" href="https://muitenvn.github.io/CloudPlay-App/"><img src="img/icon.png" alt="" width="28" height="28"><span>CloudPlay</span></a>
-    <div class="lang" role="group" aria-label="Language">
-      <button type="button" data-lang="en" aria-pressed="false">EN</button>
-      <button type="button" data-lang="vi" aria-pressed="true">VI</button>
+    <div class="top-actions">
+      <button type="button" id="toc-btn" class="toc-trigger" aria-expanded="false" aria-controls="toc-panel">
+        <span class="toc-icon" aria-hidden="true">☰</span>
+        <span data-i="toc_btn">Mục lục</span>
+      </button>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+        <button type="button" data-lang="vi" aria-pressed="true">VI</button>
+      </div>
     </div>
   </div>
 </header>
+
+<div id="toc-backdrop" class="toc-backdrop" aria-hidden="true"></div>
+<nav id="toc-panel" class="toc-panel" aria-labelledby="toc-heading" aria-hidden="true">
+  <div class="toc-head">
+    <strong id="toc-heading" data-i="toc_title">Mục lục (15 phần)</strong>
+    <button type="button" id="toc-close" class="toc-close" aria-label="Đóng" data-i-aria="toc_close">✕</button>
+  </div>
+  <ol class="toc-list">
+    <li><a href="#sec-1" data-sec="sec-1" data-i="s1_t">1. Chấp nhận điều khoản</a></li>
+    <li><a href="#sec-2" data-sec="sec-2" data-i="s2_t">2. Chức năng của ứng dụng</a></li>
+    <li><a href="#sec-3" data-sec="sec-3" data-i="s3_t">3. Điều kiện sử dụng và độ tuổi</a></li>
+    <li><a href="#sec-4" data-sec="sec-4" data-i="s4_t">4. Trách nhiệm của người dùng</a></li>
+    <li><a href="#sec-5" data-sec="sec-5" data-i="s5_t">5. Hành vi bị cấm</a></li>
+    <li><a href="#sec-6" data-sec="sec-6" data-i="s6_t">6. VPN, proxy và rủi ro với tài khoản</a></li>
+    <li><a href="#sec-7" data-sec="sec-7" data-i="s7_t">7. Máy chủ công cộng của bên thứ ba</a></li>
+    <li><a href="#sec-8" data-sec="sec-8" data-i="s8_t">8. Sở hữu trí tuệ và nhãn hiệu</a></li>
+    <li><a href="#sec-9" data-sec="sec-9" data-i="s9_t">9. Quyền riêng tư và dữ liệu</a></li>
+    <li><a href="#sec-10" data-sec="sec-10" data-i="s10_t">10. Dịch vụ và thư viện bên thứ ba</a></li>
+    <li><a href="#sec-11" data-sec="sec-11" data-i="s11_t">11. Miễn trừ bảo đảm</a></li>
+    <li><a href="#sec-12" data-sec="sec-12" data-i="s12_t">12. Giới hạn trách nhiệm</a></li>
+    <li><a href="#sec-13" data-sec="sec-13" data-i="s13_t">13. Bồi thường</a></li>
+    <li><a href="#sec-14" data-sec="sec-14" data-i="s14_t">14. Cập nhật và chấm dứt</a></li>
+    <li><a href="#sec-15" data-sec="sec-15" data-i="s15_t">15. Luật áp dụng [ĐIỀN] và liên hệ [ĐIỀN]</a></li>
+  </ol>
+</nav>
 
 <main class="wrap">
   <div class="page-head">
@@ -116,143 +185,213 @@
   </section>
 
   <section class="terms-sec" aria-label="Terms sections">
+    <div class="acc-toolbar">
+      <button type="button" id="btn-exp-all" class="ctrl-btn" data-i="exp_all">Mở tất cả</button>
+      <button type="button" id="btn-col-all" class="ctrl-btn" data-i="col_all">Thu gọn tất cả</button>
+    </div>
+
     <div class="acc-list">
-      <details>
-        <summary data-i="s1_t">1. Chấp nhận điều khoản</summary>
+      <!-- SECTION 1 (~280 words VI) -->
+      <details id="sec-1">
+        <summary><span class="sum-title" data-i="s1_t">1. Chấp nhận điều khoản</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s1_p1">Khi tải xuống, cài đặt hoặc sử dụng ứng dụng CloudPlay (“Ứng dụng”), bạn xác nhận đã đọc, hiểu và đồng ý với các điều khoản tại trang này. Nếu bạn không đồng ý với bất kỳ nội dung nào, vui lòng ngừng sử dụng và gỡ cài đặt Ứng dụng khỏi thiết bị của bạn.</p>
-          <p data-i="s1_p2">Điều khoản này chỉ điều chỉnh mối quan hệ giữa bạn và nhà phát triển Ứng dụng ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]), không thay thế cho điều khoản dịch vụ của Microsoft, Xbox, Epic Games hay bất kỳ nhà cung cấp dịch vụ bên thứ ba nào khác.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s1_1">1.1. Hành vi xác lập sự chấp thuận: Khi tải tệp cài đặt (APK), cài đặt hoặc mở ứng dụng CloudPlay (“Ứng dụng”), bạn xác nhận đã đọc, hiểu và đồng ý bị ràng buộc bởi Điều khoản này. Người dùng tự chịu trách nhiệm tìm hiểu nội dung điều khoản trước khi bật các tính năng kết nối mạng. Ngoại lệ: nếu bạn không đồng ý với bất kỳ điều khoản nào, bạn không có quyền sử dụng và phải gỡ cài đặt Ứng dụng khỏi thiết bị ngay lập tức.</div>
+            <div class="sub-item" data-i="s1_2">1.2. Phạm vi chủ thể và tính độc lập với bên thứ ba: Điều khoản này chỉ điều chỉnh mối quan hệ giữa bạn và nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]). Điều khoản này không thay thế, sửa đổi hay miễn trừ Thỏa thuận dịch vụ của Microsoft (Microsoft Services Agreement), Tiêu chuẩn cộng đồng Xbox, Điều khoản dịch vụ của Epic Games hoặc quy định của nhà phát hành trò chơi. Việc bạn chấp nhận Điều khoản của CloudPlay không tạo ra bất kỳ quyền miễn trừ nào trước các quy định của bên thứ ba.</div>
+            <div class="sub-item" data-i="s1_3">1.3. Chấp thuận theo từng tính năng tùy chọn và bản cập nhật: Các tính năng tắt mặc định (như Smart VPN/Proxy, trạm đo Globalping, dịch giao diện hoặc tải APK qua mirror) chỉ phát sinh hiệu lực khi bạn chủ động bật. Việc tiếp tục cài đặt bản cập nhật mới qua GitHub Releases hoặc mục Cài đặt đồng nghĩa với việc bạn chấp nhận điều khoản áp dụng cho phiên bản đó.</div>
+          </div>
+          <div class="example-box" data-i="s1_ex">Ví dụ thực tế: Khi bạn dùng CloudPlay để đăng nhập tài khoản Xbox cá nhân, giao diện ứng dụng chịu sự điều chỉnh của Điều khoản này, nhưng tài khoản và gói thuê bao Game Pass của bạn vẫn hoàn toàn chịu sự quản lý của Microsoft.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s2_t">2. Chức năng của ứng dụng</summary>
+      <!-- SECTION 2 (~360 words VI) -->
+      <details id="sec-2">
+        <summary><span class="sum-title" data-i="s2_t">2. Chức năng của ứng dụng</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s2_p1">CloudPlay là công cụ trình duyệt chuyên dụng hỗ trợ truy cập giao diện web Xbox Cloud Gaming trên thiết bị Android. Các chức năng chính bao gồm:</p>
-          <ul>
-            <li data-i="s2_l1">Hiển thị thông số kỹ thuật thực tế của luồng phát WebRTC (độ trễ mạng RTT, độ biến động Jitter, tốc độ khung hình FPS, thời gian giải mã khung hình và số khung hình bị rớt).</li>
-            <li data-i="s2_l2">Điều chỉnh giới hạn băng thông và độ phân giải luồng phát theo cấu hình người dùng chọn, đồng thời cung cấp lớp phủ tay cầm ảo trên màn hình cảm ứng.</li>
-            <li data-i="s2_l3">Hỗ trợ dịch văn bản menu giao diện Xbox trên trình duyệt và cung cấp công cụ tùy chọn kết nối máy chủ proxy/VPN công cộng chỉ trong giai đoạn kiểm tra vùng trước khi vào luồng chơi.</li>
-          </ul>
-          <p data-i="s2_p2">Ứng dụng không cung cấp trò chơi, không cung cấp gói thuê bao Game Pass và không can thiệp vào mã nguồn hay bộ nhớ máy chủ trò chơi.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s2_1">2.1. Trình duyệt WebView chuyên dụng: Ứng dụng sử dụng thành phần Android System WebView có sẵn trên hệ điều hành để tải cổng trò chơi đám mây chính thức tại www.xbox.com/play. Quá trình xác thực tài khoản qua login.live.com diễn ra trực tiếp với máy chủ Microsoft và phiên đăng nhập chỉ lưu tại bộ nhớ Cookie cục bộ trên thiết bị của người dùng.</div>
+            <div class="sub-item" data-i="s2_2">2.2. Giám sát thông số kỹ thuật và tối ưu luồng WebRTC: Thông qua giao diện RTCPeerConnection.getStats(), Ứng dụng đọc thống kê thời gian thực (FPS, RTT/Ping, Jitter, thời gian giải mã khung hình Decode ms, số khung hình bị rớt và Bitrate) để hiển thị trên màn hình. Tập lệnh cục bộ ưu tiên hồ sơ codec H.264 Constrained Baseline (42e01f) trong bản tin SDP để giảm độ trễ giải mã phần cứng MediaCodec và áp dụng mức trần băng thông (2–20 Mbps), độ phân giải (720p/1080p/1080p HQ), bộ lọc hình ảnh và khuếch đại âm thanh do người dùng tự chọn.</div>
+            <div class="sub-item" data-i="s2_3">2.3. Điều khiển cảm ứng và định tuyến vùng cấp trình duyệt: Ứng dụng cung cấp lớp phủ tay cầm ảo (Virtual Touch Controller), hỗ trợ rung (VIBRATE), cảm biến con quay hồi chuyển và tay cầm vật lý Bluetooth/USB. Khi người dùng chủ động bật VPN thông minh, thư viện AndroidX WebKit ProxyController chỉ định tuyến lưu lượng của riêng WebView bên trong Ứng dụng qua máy chủ proxy công cộng trong bước kiểm tra vùng, và tự động xóa cấu hình proxy (clearProxyOverride) khi luồng phát bắt đầu.</div>
+            <div class="sub-item" data-i="s2_4">2.4. Giới hạn chức năng và những điều KHÔNG được bảo đảm: CloudPlay không sở hữu trò chơi, không cung cấp tài khoản hay gói thuê bao Xbox Game Pass, không tạo đường hầm VPN toàn hệ thống Android (dịch vụ nền XboxCloudVpnService chỉ là Foreground Service giữ tiến trình không bị hệ điều hành đóng khi đang phát luồng) và không can thiệp vào máy chủ trò chơi.</div>
+          </div>
+          <div class="example-box" data-i="s2_ex">Ví dụ thực tế: Khi bạn bật “VPN thông minh” trong CloudPlay, chỉ có khung trình duyệt Xbox bên trong ứng dụng đi qua proxy khi kiểm tra vùng; các ứng dụng khác trên điện thoại (như ngân hàng, YouTube) hoàn toàn không bị ảnh hưởng.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s3_t">3. Điều kiện sử dụng và độ tuổi</summary>
+      <!-- SECTION 3 (~270 words VI) -->
+      <details id="sec-3">
+        <summary><span class="sum-title" data-i="s3_t">3. Điều kiện sử dụng và độ tuổi</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s3_p1">Bạn phải đủ độ tuổi thành niên hợp pháp tại quốc gia hoặc vùng lãnh thổ nơi bạn cư trú (hoặc từ [ĐIỀN: Độ tuổi tối thiểu theo quy định pháp luật áp dụng, ví dụ: 13 hoặc 18 tuổi] trở lên và có sự đồng ý, giám sát của cha mẹ hoặc người giám hộ hợp pháp) để sử dụng Ứng dụng.</p>
-          <p data-i="s3_p2">Ngoài ra, bạn phải đáp ứng đầy đủ yêu cầu về độ tuổi và điều kiện tài khoản của Microsoft/Xbox cũng như giới hạn độ tuổi (ESRB, PEGI hoặc hệ thống phân loại tương đương) của từng trò chơi mà bạn truy cập.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s3_1">3.1. Độ tuổi tối thiểu và trách nhiệm giám sát: Người dùng phải đạt độ tuổi thành niên hợp pháp tại nơi cư trú, hoặc tối thiểu từ [ĐIỀN: Độ tuổi tối thiểu theo quy định pháp luật áp dụng, ví dụ: 13 hoặc 18 tuổi] trở lên. Ngoại lệ: người chưa thành niên trong độ tuổi cho phép chỉ được sử dụng khi có sự đồng ý và giám sát trực tiếp của cha mẹ hoặc người giám hộ hợp pháp; cha mẹ/người giám hộ chịu hoàn toàn trách nhiệm thiết lập giới hạn thông qua Microsoft Family Safety.</div>
+            <div class="sub-item" data-i="s3_2">3.2. Điều kiện tài khoản bên thứ ba và phân loại độ tuổi trò chơi: Người dùng tự chịu trách nhiệm duy trì tài khoản Microsoft/Xbox hợp lệ và gói thuê bao phù hợp. Do danh mục Xbox Cloud Gaming chứa các trò chơi gắn nhãn 16+/18+ (theo chuẩn ESRB, PEGI, CERO), người dùng có nghĩa vụ kiểm tra nhãn độ tuổi trước khi mở từng trò chơi. Nhà phát triển không có quyền kiểm soát hay lọc danh mục tài khoản của Microsoft.</div>
+            <div class="sub-item" data-i="s3_3">3.3. Điều kiện thiết bị và pháp luật địa phương: Thiết bị phải có thành phần Android System WebView tương thích WebRTC và giải mã phần cứng H.264. Bạn không được sử dụng Ứng dụng nếu pháp luật tại nơi bạn cư trú cấm dịch vụ trò chơi đám mây hoặc công cụ định tuyến proxy.</div>
+          </div>
+          <div class="example-box" data-i="s3_ex">Ví dụ thực tế: Khi một thiếu niên 15 tuổi dùng CloudPlay, phụ huynh chịu trách nhiệm bật tính năng giới hạn độ tuổi trên tài khoản Microsoft Family để ngăn truy cập các tựa game gắn nhãn PEGI 18 / ESRB Mature 17+.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s4_t">4. Trách nhiệm của người dùng</summary>
+      <!-- SECTION 4 (~460 words VI - Priority Deep Section) -->
+      <details id="sec-4">
+        <summary><span class="sum-title" data-i="s4_t">4. Trách nhiệm của người dùng</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s4_p1">Người dùng tự chịu trách nhiệm về hành vi sử dụng Ứng dụng và tài khoản cá nhân của chính mình. Nhà phát triển không khuyến khích việc sử dụng Ứng dụng trái pháp luật hoặc trái với điều khoản dịch vụ của bất kỳ bên thứ ba nào.</p>
-          <p data-i="s4_p2">Bạn có trách nhiệm tự bảo mật thiết bị, thông tin đăng nhập tài khoản Microsoft/Xbox, kiểm tra mã băm SHA-256 khi tải file APK từ các nguồn lưu trữ và tự chi trả mọi cước phí dữ liệu di động (4G/5G) hoặc internet phát sinh trong quá trình sử dụng.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s4_1">4.1. Tự chịu trách nhiệm về hành vi và cấu hình: Người dùng tự đưa ra quyết định bật hoặc tắt các tùy chọn trong Ứng dụng và hoàn toàn chịu trách nhiệm về hành vi sử dụng của chính mình. Nhà phát triển không khuyến khích hành vi sử dụng trái pháp luật hoặc vi phạm điều khoản dịch vụ của bên thứ ba.</div>
+            <div class="sub-item" data-i="s4_2">4.2. Bảo mật phiên đăng nhập và an toàn khi thanh toán: Phiên đăng nhập Microsoft được lưu trong bộ nhớ Cookie cục bộ của WebView; người dùng chịu trách nhiệm đặt khóa màn hình thiết bị, bật xác thực hai yếu tố (2FA) và đăng xuất khi dùng chung thiết bị. Ngoại lệ an toàn kỹ thuật: dù mã nguồn (ProxyInjector) tự động ngắt proxy khi phát hiện URL thanh toán hoặc account.microsoft.com, cơ chế này không thay thế nghĩa vụ cẩn trọng của bạn — bạn bắt buộc phải tự kiểm tra và tắt hoàn toàn proxy/VPN công cộng trước khi nhập thông tin thẻ ngân hàng, mã quà tặng hoặc mật khẩu.</div>
+            <div class="sub-item" data-i="s4_3">4.3. Xác minh nguồn tải chính thức và mã băm SHA-256: Người dùng có trách nhiệm chỉ tải Ứng dụng từ GitHub Releases chính thức (github.com/muitenvn/CloudPlay-App/releases) hoặc trình cập nhật tích hợp sẵn, và kiểm tra mã băm SHA-256 khi tải qua máy chủ phụ (mirror). Nhà phát triển không chịu trách nhiệm đối với rủi ro từ các bản APK trôi nổi bị chỉnh sửa chữ ký số.</div>
+            <div class="sub-item" data-i="s4_4">4.4. Tự chi trả cước phí dữ liệu di động (4G/5G) và internet: Luồng video đám mây tiêu thụ từ khoảng 0,9 GB/giờ (ở mức 2 Mbps) đến 6,7–9 GB/giờ (ở mức 15–20 Mbps), chưa kể dữ liệu khi bạn bật cho phép tải cơ sở dữ liệu DB-IP Lite qua mạng di động. Người dùng tự chịu toàn bộ cước phí viễn thông phát sinh với nhà mạng trong mọi trường hợp.</div>
+            <div class="sub-item" data-i="s4_5">4.5. Quản lý nhiệt độ phần cứng, quyền Android và sức khỏe: Việc giải mã video 60fps liên tục kết hợp giữ sáng màn hình (WAKE_LOCK) và tần số quét 90Hz/120Hz làm tăng nhiệt độ và hao pin; người dùng tự chịu trách nhiệm theo dõi nhiệt độ máy, quản lý các quyền đã cấp (RECORD_AUDIO cho đàm thoại, POST_NOTIFICATIONS, REQUEST_INSTALL_PACKAGES) và sử dụng mức khuếch đại âm lượng (Volume Boost) an toàn. Khi bạn xóa dữ liệu ứng dụng hoặc gỡ cài đặt, mọi đánh dấu game và lịch sử phiên chơi trong SharedPreferences sẽ bị xóa vĩnh viễn (trừ dữ liệu lưu game trên đám mây do Microsoft quản lý).</div>
+          </div>
+          <div class="example-box" data-i="s4_ex">Ví dụ thực tế: Nếu bạn quên tắt dữ liệu di động 5G và chơi game ở mức 20 Mbps trong 2 giờ (tiêu thụ khoảng 15 GB dữ liệu), hoặc tự ý nhập thẻ tín dụng khi đang bật một ứng dụng VPN công cộng bên ngoài, bạn là người duy nhất chịu trách nhiệm về cước phí nhà mạng và rủi ro bảo mật phát sinh.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s5_t">5. Hành vi bị cấm</summary>
+      <!-- SECTION 5 (~310 words VI) -->
+      <details id="sec-5">
+        <summary><span class="sum-title" data-i="s5_t">5. Hành vi bị cấm</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s5_p1">Khi sử dụng Ứng dụng, bạn không được thực hiện các hành vi sau:</p>
-          <ul>
-            <li data-i="s5_l1">Sử dụng Ứng dụng để thực hiện hành vi vi phạm pháp luật hiện hành, phát tán mã độc, tấn công mạng hoặc gây quá tải hạ tầng của bên thứ ba.</li>
-            <li data-i="s5_l2">Sử dụng phần mềm gian lận (cheat, hack), kịch bản tự động hóa trái phép hoặc khai thác lỗ hổng dịch vụ trò chơi đám mây.</li>
-            <li data-i="s5_l3">Đóng gói lại (repackage) Ứng dụng kèm mã độc, phần mềm quảng cáo hoặc giả mạo danh tính nhà phát triển để lừa đảo người dùng khác.</li>
-          </ul>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s5_1">5.1. Cấm đóng gói lại kèm mã độc và giả mạo thương mại: Nghiêm cấm dịch ngược, chỉnh sửa tệp APK của CloudPlay để chèn mã độc, công cụ đánh cắp Cookie/mật khẩu, quảng cáo ẩn hoặc mạo danh nhà phát triển để lừa đảo hay thu tiền trái phép từ người dùng. Ngoại lệ: việc nghiên cứu, tạo bản nhánh (fork) hợp lệ theo giấy phép mã nguồn mở trên GitHub được phép thực hiện với điều kiện giữ nguyên thông tin bản quyền và không xóa bỏ các cơ chế bảo vệ an toàn.</div>
+            <div class="sub-item" data-i="s5_2">5.2. Cấm gian lận trong trò chơi và phá hoại dịch vụ đám mây: Người dùng không được lợi dụng WebView hoặc công cụ điều khiển của Ứng dụng để tiêm kịch bản gian lận (cheat, hack, aimbot), tự động hóa trái phép hoặc khai thác lỗ hổng của Xbox Cloud Gaming. Mọi vi phạm sẽ do chính người dùng chịu trách nhiệm trước Microsoft và nhà phát hành trò chơi.</div>
+            <div class="sub-item" data-i="s5_3">5.3. Cấm làm quá tải API tích hợp và lạm dụng máy chủ công cộng: Nghiêm cấm vượt qua cơ chế giới hạn tần suất trong mã nguồn (như giới hạn cứng 200 lượt đo/giờ của Globalping và thời gian chờ kiểm tra cập nhật) để gửi yêu cầu dồn dập làm quá tải GitHub API, VPNGate, ProxyScrape, Globalping, DB-IP, hoặc dùng máy chủ proxy công cộng để tấn công mạng và vi phạm pháp luật.</div>
+          </div>
+          <div class="example-box" data-i="s5_ex">Ví dụ thực tế: Hành vi tải APK CloudPlay, chèn mã đọc trộm phiên đăng nhập login.live.com rồi phát tán dưới tên “CloudPlay Bản Mở Khóa VIP” là hành vi bị cấm tuyệt đối và người thực hiện phải tự chịu trách nhiệm trước pháp luật.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s6_t">6. VPN, proxy và rủi ro với tài khoản</summary>
+      <!-- SECTION 6 (~460 words VI - Priority Deep Section) -->
+      <details id="sec-6">
+        <summary><span class="sum-title" data-i="s6_t">6. VPN, proxy và rủi ro với tài khoản</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s6_p1">Một số tính năng trong Ứng dụng (như kết nối qua máy chủ proxy/VPN hoặc thay đổi mã vùng ngôn ngữ truy cập) có thể bị coi là hành vi vượt giới hạn địa lý hoặc không tuân thủ điều khoản dịch vụ của Microsoft, Xbox, Epic Games hoặc các nhà phát hành trò chơi.</p>
-          <p data-i="s6_p2">Việc sử dụng các tính năng này có thể dẫn đến rủi ro bị từ chối kết nối, giới hạn tính năng, tạm khóa hoặc chấm dứt vĩnh viễn tài khoản của bạn bởi nhà cung cấp dịch vụ bên thứ ba. Tính năng VPN/proxy hoàn toàn là tùy chọn do bạn chủ động bật, và bạn tự chịu trách nhiệm đối với mọi hệ quả phát sinh trên tài khoản của mình.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s6_1">6.1. Quyết định chủ động của người dùng: Tính năng kết nối qua máy chủ proxy/VPN (“VPN thông minh” qua ProxyController, chế độ VPN ngoài EXTERNAL_VPN) và tùy chọn thay đổi mã vùng thị trường (Market Locale) trong Ứng dụng đều là công cụ tùy chọn. Việc bật hoặc tắt VPN/proxy hoàn toàn là quyết định tự nguyện của người dùng; Ứng dụng không tự động ép buộc đổi vùng nếu bạn sử dụng chế độ kết nối trực tiếp tại quốc gia được Xbox hỗ trợ.</div>
+            <div class="sub-item" data-i="s6_2">6.2. Rủi ro vi phạm điều khoản bên thứ ba và khóa tài khoản: Người dùng hiểu và chấp nhận rằng việc sử dụng VPN, proxy hoặc giả lập mã vùng để truy cập dịch vụ từ quốc gia chưa được hỗ trợ chính thức có thể bị Microsoft, Xbox, Epic Games hoặc các nhà phát hành trò chơi coi là hành vi vượt rào cản địa lý (geo-restriction circumvention) và vi phạm điều khoản dịch vụ của họ. Hệ quả có thể bao gồm: từ chối kết nối, chặn quyền mua hàng, thu hồi gói thuê bao, tạm khóa hoặc chấm dứt vĩnh viễn tài khoản Microsoft/Xbox hoặc tài khoản trò chơi của bạn.</div>
+            <div class="sub-item" data-i="s6_3">6.3. Phân định trách nhiệm và điều KHÔNG được bảo đảm: Nhà phát triển hoàn toàn không kiểm soát hệ thống xét duyệt tài khoản hay chính sách chống gian lận vùng của Microsoft/Epic Games, và không bảo đảm bất kỳ phương thức định tuyến proxy/VPN nào là “an toàn tuyệt đối” trước hệ thống kiểm duyệt của bên thứ ba. Người dùng tự chịu toàn bộ rủi ro và trách nhiệm đối với tài khoản cũng như các khoản tiền đã nạp vào tài khoản đó.</div>
+            <div class="sub-item" data-i="s6_4">6.4. Cơ chế kỹ thuật tự động ngắt proxy (Auto-Bypass) và ngoại lệ: Trong mã nguồn (ProxyInjector và VpnManager), khi chế độ tự động ngắt (autoBypassEnabled) được bật, Ứng dụng chỉ áp dụng proxy cho WebView trong bước kiểm tra vùng ban đầu và tự động xóa cấu hình proxy (clearProxyOverride) ngay khi luồng video WebRTC bắt đầu (hoặc sau độ trễ 1–8 giây do bạn chọn) để luồng chơi đi trực tiếp qua mạng gốc. Ngoại lệ: nếu bạn sử dụng ứng dụng VPN bên thứ ba chạy ngầm ở cấp hệ điều hành (EXTERNAL_VPN) hoặc tắt tính năng tự động ngắt, toàn bộ lưu lượng vẫn sẽ đi qua VPN cho đến khi bạn tự tắt thủ công.</div>
+          </div>
+          <div class="example-box" data-i="s6_ex">Ví dụ thực tế: Bạn dùng máy chủ proxy Nhật Bản hoặc Hàn Quốc để vượt bước kiểm tra vùng vào chơi Fortnite hoặc một tựa game trong Game Pass. Nếu hệ thống bảo mật của Microsoft hoặc Epic Games phát hiện địa chỉ IP bất thường và áp dụng lệnh hạn chế vùng hoặc khóa tài khoản của bạn, bạn là người duy nhất chịu trách nhiệm về quyết định bật VPN đó.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s7_t">7. Máy chủ công cộng của bên thứ ba</summary>
+      <!-- SECTION 7 (~460 words VI - Priority Deep Section) -->
+      <details id="sec-7">
+        <summary><span class="sum-title" data-i="s7_t">7. Máy chủ công cộng của bên thứ ba</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s7_p1">Danh sách máy chủ proxy và VPN miễn phí hiển thị trong Ứng dụng được tổng hợp tự động từ các nguồn công cộng trên internet (như VPNGate và ProxyScrape) và do các cá nhân, tổ chức bên thứ ba độc lập vận hành.</p>
-          <p data-i="s7_p2">Nhà phát triển không sở hữu, không vận hành và không thể kiểm soát độ an toàn, tính ổn định hay chính sách ghi nhật ký lưu lượng của các máy chủ công cộng này. Mặc dù Ứng dụng được thiết kế để chỉ định tuyến các tên miền kiểm tra vùng của Xbox và tự động ngắt kết nối máy chủ trung gian khi bạn mở trang thanh toán hoặc ngay khi luồng chơi bắt đầu, bạn không nên sử dụng máy chủ công cộng cho các giao dịch nhạy cảm.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s7_1">7.1. Nguồn gốc máy chủ công cộng và chủ thể vận hành: Danh sách máy chủ proxy và VPN miễn phí hiển thị trong Ứng dụng được tổng hợp tự động từ các thư mục công cộng trên internet (bao gồm dự án học thuật VPNGate tại vpngate.net và danh sách ProxyScrape tại proxyscrape.com) hoặc do chính người dùng tự nhập thủ công. Toàn bộ các máy chủ này đều do các cá nhân, tình nguyện viên hoặc tổ chức bên thứ ba độc lập vận hành; nhà phát triển không sở hữu, không thuê và không quản trị bất kỳ máy chủ nào trong danh sách.</div>
+            <div class="sub-item" data-i="s7_2">7.2. Nhận thức của người dùng về rủi ro bảo mật và chất lượng mạng: Khi quyết định bật kết nối qua máy chủ công cộng, người dùng xác nhận đã biết rõ các rủi ro cố hữu của hạ tầng công cộng miễn phí: (a) lưu lượng đi qua máy chủ có thể bị bên vận hành máy chủ đó theo dõi, ghi nhật ký (logging) địa chỉ IP và siêu dữ liệu truy cập; (b) tốc độ phản hồi có thể rất chậm, độ trễ (ping) cao hoặc băng thông bị bóp nghẽn do nhiều người dùng chung; và (c) máy chủ có thể ngắt kết nối đột ngột hoặc ngừng hoạt động bất cứ lúc nào mà không báo trước.</div>
+            <div class="sub-item" data-i="s7_3">7.3. Giới hạn bảo vệ của giao thức HTTPS và danh sách loại trừ: Dù kết nối tới xbox.com và login.live.com sử dụng mã hóa HTTPS/TLS, máy chủ proxy trung gian vẫn biết được tên miền bạn đang kết nối (qua thông tin SNI/CONNECT) và có thể can thiệp nếu bạn chấp nhận chứng chỉ bảo mật không hợp lệ. Để giảm thiểu rủi ro, mã nguồn của Ứng dụng thiết lập quy tắc loại trừ (bypass rules) để chỉ định tuyến các tên miền kiểm tra vùng của Xbox và tự động ngắt proxy khi phát hiện URL quản lý tài khoản (account.microsoft.com) hoặc trang thanh toán.</div>
+            <div class="sub-item" data-i="s7_4">7.4. Ngoại lệ và khuyến cáo an toàn bắt buộc: Cơ chế tự động ngắt của Ứng dụng không thể bảo vệ bạn nếu trang web bên thứ ba đổi cấu trúc đường dẫn thanh toán mới hoặc khi bạn dùng VPN ngoài hệ thống. Người dùng chịu trách nhiệm tuyệt đối không thực hiện giao dịch ngân hàng, nhập thẻ tín dụng, nạp mã quà tặng hoặc đổi mật khẩu khi đang kết nối bất kỳ máy chủ công cộng nào.</div>
+          </div>
+          <div class="example-box" data-i="s7_ex">Ví dụ thực tế: Một máy chủ công cộng trong danh sách VPNGate đang hoạt động bình thường nhưng đột nhiên phản hồi chậm hoặc ngắt kết nối giữa lúc bạn đang xếp hàng vào game, khiến phiên kết nối bị lỗi. Đây là đặc tính khách quan của máy chủ miễn phí bên thứ ba và không thuộc phạm vi kiểm soát hay bảo đảm của nhà phát triển.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s8_t">8. Sở hữu trí tuệ và nhãn hiệu</summary>
+      <!-- SECTION 8 (~260 words VI) -->
+      <details id="sec-8">
+        <summary><span class="sum-title" data-i="s8_t">8. Sở hữu trí tuệ và nhãn hiệu</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s8_p1">CloudPlay là dự án độc lập và không liên kết, không được tài trợ, chứng nhận hay phê duyệt bởi Microsoft Corporation, Xbox hay Epic Games, Inc.</p>
-          <p data-i="s8_p2">Các nhãn hiệu “Microsoft”, “Xbox”, “Xbox Cloud Gaming”, “Xbox Game Pass” thuộc quyền sở hữu của Microsoft Corporation. “Fortnite” và “Epic Games” là nhãn hiệu của Epic Games, Inc. Mọi tên trò chơi, hình ảnh bìa và nhãn hiệu khác hiển thị thông qua trình duyệt hoặc danh mục đều thuộc quyền sở hữu của các chủ sở hữu tương ứng. Mã nguồn của Ứng dụng được phát hành theo giấy phép ghi trong kho mã nguồn chính thức.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s8_1">8.1. Tuyên bố không liên kết và quyền sở hữu nhãn hiệu bên thứ ba: CloudPlay là dự án phần mềm độc lập, không liên kết, không được tài trợ, ủy quyền hay phê duyệt bởi Microsoft Corporation, Xbox hay Epic Games, Inc. Các nhãn hiệu “Microsoft”, “Xbox”, “Xbox Cloud Gaming”, “Xbox Game Pass” thuộc sở hữu của Microsoft Corporation; “Fortnite” và “Epic Games” thuộc sở hữu của Epic Games, Inc. Mọi tên trò chơi, biểu tượng và ảnh bìa tải từ API danh mục đều thuộc bản quyền của chủ sở hữu tương ứng.</div>
+            <div class="sub-item" data-i="s8_2">8.2. Bản quyền mã nguồn mở của Ứng dụng và giới hạn cấp phép: Mã nguồn gốc của CloudPlay thuộc bản quyền của nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]) và được phát hành theo giấy phép mã nguồn mở công bố tại kho lưu trữ GitHub chính thức. Ngoại lệ: giấy phép mã nguồn mở của Ứng dụng chỉ áp dụng cho phần mã của CloudPlay, hoàn toàn không cấp cho người dùng bất kỳ quyền sử dụng thương mại nào đối với nhãn hiệu, hình ảnh hay dịch vụ của Microsoft, Epic Games hoặc các nhà phát hành trò chơi.</div>
+            <div class="sub-item" data-i="s8_3">8.3. Ghi nhận đóng góp cộng đồng: Một số kỹ thuật tối ưu hiển thị luồng phát, điều khiển cảm ứng và dữ liệu từ điển dịch giao diện được tham khảo và đồng bộ từ dự án mã nguồn mở better-xcloud của tác giả redphx theo giấy phép MIT.</div>
+          </div>
+          <div class="example-box" data-i="s8_ex">Ví dụ thực tế: Việc ảnh bìa các tựa game Xbox Game Pass hiển thị trong mục Danh mục của CloudPlay chỉ là kết quả hiển thị dữ liệu công khai từ máy chủ Microsoft giúp người dùng nhận diện trò chơi, không đồng nghĩa với việc CloudPlay sở hữu bản quyền các trò chơi đó.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s9_t">9. Quyền riêng tư và dữ liệu</summary>
+      <!-- SECTION 9 (~550 words VI - Priority Deep Section) -->
+      <details id="sec-9">
+        <summary><span class="sum-title" data-i="s9_t">9. Quyền riêng tư và dữ liệu</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s9_p1">Ứng dụng không có máy chủ thu thập dữ liệu riêng, không yêu cầu tạo tài khoản riêng và không thu thập mật khẩu hay thông tin thẻ thanh toán của bạn. Dữ liệu cấu hình, danh sách game đánh dấu và lịch sử thông số phiên chơi chỉ được lưu cục bộ trên thiết bị của bạn (SharedPreferences / bộ nhớ đệm ứng dụng) và có thể xóa bất cứ lúc nào.</p>
-          <p data-i="s9_p2">Dưới đây là danh sách chính xác các kết nối mạng thực tế có trong mã nguồn của Ứng dụng:</p>
-          <ul>
-            <li data-i="s9_l1"><b>Microsoft &amp; Xbox (do Microsoft vận hành):</b> Kết nối trực tiếp tới <code>www.xbox.com</code>, <code>xbox.com</code>, <code>login.live.com</code>, <code>login.microsoftonline.com</code> để bạn đăng nhập và phát luồng trò chơi; cùng <code>catalog.gamepass.com</code>, <code>displaycatalog.mp.microsoft.com</code> và <code>store-images.s-microsoft.com</code> để tải danh mục và ảnh bìa trò chơi.</li>
-            <li data-i="s9_l2"><b>GitHub API, GitHub Releases &amp; Mirror cập nhật:</b> Kết nối tới <code>api.github.com/repos/muitenvn/CloudPlay-App/releases/latest</code> và <code>github.com/muitenvn/CloudPlay-App/releases</code> để kiểm tra phiên bản mới, lấy mã SHA-256 và tải bản cập nhật APK (có thể tắt tự động kiểm tra trong Cài đặt). Khi người dùng chủ động chọn tải qua máy chủ phụ, liên kết tải sẽ đi qua <code>ghfast.top</code>. Ngoài ra, ứng dụng có thể tải gói từ điển dịch giao diện từ <code>raw.githubusercontent.com/redphx/better-xcloud</code>.</li>
-            <li data-i="s9_l3"><b>VPNGate &amp; ProxyScrape (khi đồng bộ danh sách máy chủ):</b> Kết nối tới <code>www.vpngate.net/api/iphone/</code> và <code>api.proxyscrape.com/v2/</code> khi làm mới danh sách máy chủ proxy/VPN công cộng.</li>
-            <li data-i="s9_l4"><b>Globalping (khi bật tùy chọn trạm đo):</b> Chỉ kết nối tới <code>api.globalping.io/v1/measurements</code> khi người dùng chủ động bật tùy chọn đo độ trễ qua trạm đo khu vực (mặc định tắt).</li>
-            <li data-i="s9_l5"><b>DB-IP &amp; dịch vụ tra cứu vị trí IP:</b> Tải cơ sở dữ liệu quốc gia IP rút gọn từ <code>download.db-ip.com/free/dbip-country-lite-*.csv.gz</code> về thiết bị để tra cứu ngoại tuyến (trên mạng di động chỉ tải khi người dùng bật cho phép). Khi địa chỉ IP chưa có trong cơ sở dữ liệu cục bộ và tùy chọn tra cứu HTTPS dự phòng đang bật, ứng dụng truy vấn <code>api.country.is</code>, <code>ipwho.is</code> hoặc <code>ipapi.co/json/</code> để xác định mã quốc gia của IP.</li>
-            <li data-i="s9_l6"><b>Google Translate (khi bật dịch giao diện):</b> Khi tính năng dịch menu Xbox đang bật và gặp cụm từ chưa có sẵn trong từ điển nội bộ, ứng dụng gửi đoạn văn bản giao diện ngắn tới <code>translate.googleapis.com/translate_a/single</code> để dịch sang ngôn ngữ bạn chọn.</li>
-          </ul>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s9_1">9.1. Không có máy chủ thu thập dữ liệu riêng và lưu trữ thuần cục bộ: Nhà phát triển không vận hành máy chủ thu thập dữ liệu người dùng, không tích hợp bộ công cụ phân tích hành vi hay quảng cáo và không thu thập tài khoản, mật khẩu hay thẻ thanh toán của bạn. Toàn bộ dữ liệu hoạt động chỉ lưu cục bộ trên thiết bị trong vùng nhớ riêng (Context.MODE_PRIVATE SharedPreferences), gồm 6 tệp cấu hình thực tế trong mã nguồn: cloudplay_settings_store (cài đặt), cloudplay_servers (danh sách máy chủ lưu tạm), cloudplay_bookmarks (game đánh dấu), cloudplay_recent_games (game mở gần đây), cloudplay_session_history (lịch sử FPS/ping/decode) và cloudplay_update_checker (trạng thái kiểm tra cập nhật), cùng bộ nhớ đệm (filesDir/cacheDir) chứa tệp cơ sở dữ liệu IP ngoại tuyến, Cookie WebView và tệp APK cập nhật.</div>
+            <div class="sub-item" data-i="s9_2">9.2. Các quyền hệ thống Android thực tế (AndroidManifest.xml): Ứng dụng chỉ khai báo các quyền cần thiết cho chức năng kỹ thuật, gồm: quyền mạng và giữ kết nối nền (INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE), quyền rung tay cầm ảo (VIBRATE), quyền điều chỉnh âm thanh (MODIFY_AUDIO_SETTINGS), quyền thông báo (POST_NOTIFICATIONS), quyền cài đặt bản cập nhật khi người dùng chủ động bấm cập nhật (REQUEST_INSTALL_PACKAGES) và quyền ghi âm tùy chọn (RECORD_AUDIO — chỉ yêu cầu khi bạn bật micro đàm thoại trong game). Ứng dụng tuyệt đối không yêu cầu quyền vị trí GPS, danh bạ, camera hay đọc bộ nhớ ngoài.</div>
+            <div class="sub-item" data-i="s9_3">9.3. Kết nối mạng trực tiếp tới Microsoft &amp; Xbox (do Microsoft vận hành): Khi bạn đăng nhập, duyệt danh mục và phát luồng trò chơi, thiết bị của bạn kết nối trực tiếp tới: <code>www.xbox.com</code>, <code>xbox.com</code>, <code>login.live.com</code>, <code>login.microsoftonline.com</code>, <code>catalog.gamepass.com</code>, <code>displaycatalog.mp.microsoft.com</code> và <code>store-images.s-microsoft.com</code>. Dữ liệu trao đổi trên các tên miền này chịu sự điều chỉnh trực tiếp bởi Tuyên bố về Quyền riêng tư của Microsoft.</div>
+            <div class="sub-item" data-i="s9_4">9.4. Kết nối mạng phụ trợ và tùy chọn trong mã nguồn: (a) <b>GitHub &amp; Mirror cập nhật:</b> kết nối <code>api.github.com/repos/muitenvn/CloudPlay-App/releases/latest</code> và <code>github.com/muitenvn/CloudPlay-App/releases</code> để kiểm tra phiên bản, đối chiếu mã SHA-256 và tải APK (có thể tắt tự động kiểm tra); chỉ đi qua <code>ghfast.top</code> khi bạn chủ động chọn tải qua mirror; tải từ điển dịch từ <code>raw.githubusercontent.com/redphx/better-xcloud</code>. (b) <b>Đồng bộ máy chủ công cộng:</b> kết nối <code>www.vpngate.net/api/iphone/</code> và <code>api.proxyscrape.com/v2/</code> khi làm mới danh sách proxy/VPN. (c) <b>Globalping (mặc định tắt):</b> chỉ kết nối <code>api.globalping.io/v1/measurements</code> khi bạn bật tùy chọn đo độ trễ trạm khu vực. (d) <b>DB-IP &amp; tra cứu vị trí IP:</b> tải tệp cơ sở dữ liệu quốc gia từ <code>download.db-ip.com/free/dbip-country-lite-*.csv.gz</code> để tra cứu ngoại tuyến (trên mạng di động chỉ tải khi bạn bật cho phép), và chỉ truy vấn <code>api.country.is</code>, <code>ipwho.is</code> hoặc <code>ipapi.co/json/</code> khi IP chưa có trong tệp cục bộ và bạn bật tra cứu HTTPS dự phòng. (e) <b>Google Translate:</b> khi bật dịch menu Xbox và gặp cụm từ chưa có trong từ điển nội bộ, gửi chuỗi văn bản giao diện ngắn tới <code>translate.googleapis.com/translate_a/single</code>.</div>
+            <div class="sub-item" data-i="s9_5">9.5. Quyền kiểm soát của người dùng và giới hạn trách nhiệm dữ liệu bên thứ ba: Bạn có thể tắt các tính năng mạng tùy chọn trong Cài đặt hoặc xóa sạch dữ liệu cục bộ bằng cách xóa dữ liệu ứng dụng trong cài đặt Android. Ngoại lệ: khi thiết bị của bạn gửi yêu cầu trực tiếp tới các dịch vụ bên thứ ba nêu tại Mục 9.3 và 9.4, máy chủ của các bên đó sẽ nhận được địa chỉ IP và tiêu đề kết nối chuẩn (HTTP headers) theo chính sách quyền riêng tư riêng của họ mà nhà phát triển không có quyền can thiệp.</div>
+          </div>
+          <div class="example-box" data-i="s9_ex">Ví dụ thực tế: Khi bạn tắt công tắc “Tự động kiểm tra cập nhật”, tắt “Trạm đo Globalping” và tắt “Dịch giao diện Xbox”, Ứng dụng hoàn toàn không gửi bất kỳ yêu cầu nào tới api.github.com, api.globalping.io hay translate.googleapis.com.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s10_t">10. Dịch vụ và thư viện bên thứ ba</summary>
+      <!-- SECTION 10 (~340 words VI) -->
+      <details id="sec-10">
+        <summary><span class="sum-title" data-i="s10_t">10. Dịch vụ và thư viện bên thứ ba</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s10_p1"><b>Ghi nguồn dữ liệu định vị IP:</b> Ứng dụng sử dụng cơ sở dữ liệu DB-IP Lite. Theo điều khoản giấy phép Creative Commons Attribution 4.0 International (CC BY 4.0), chúng tôi ghi nhận nguồn: <b>“IP geolocation by DB-IP.com”</b> (<a href="https://db-ip.com" rel="noopener">https://db-ip.com</a>).</p>
-          <p data-i="s10_p2"><b>Cảm hứng và dữ liệu cộng đồng:</b> Một số giải pháp tối ưu hiển thị luồng phát, điều khiển cảm ứng và từ điển dịch thuật được tham khảo từ dự án mã nguồn mở <code>better-xcloud</code> của tác giả redphx theo giấy phép MIT.</p>
-          <p data-i="s10_p3"><b>Danh sách thư viện chính (khai báo trong <code>gradle/libs.versions.toml</code>):</b></p>
-          <ul>
-            <li data-i="s10_l1"><b>Thư viện đang biên dịch trong ứng dụng:</b> AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM &amp; Material 3 / Material Icons, AndroidX WebKit, AndroidX Room (Runtime, KTX, Compiler), AndroidX Credentials &amp; Google Identity (<code>googleid</code>), Kotlinx Coroutines (Core, Android), Square OkHttp &amp; Logging Interceptor, Square Retrofit &amp; Moshi (<code>moshi-kotlin</code>, <code>converter-moshi</code>), Coil Compose.</li>
-            <li data-i="s10_l2"><b>Thư viện khai báo sẵn trong danh mục phiên bản (dùng cho kiểm thử hoặc đang tạm đóng trong cấu hình build):</b> AndroidX DataStore Preferences, AndroidX Navigation Compose, AndroidX CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), cùng các thư viện kiểm thử JUnit 4, AndroidX Test, Espresso và Robolectric.</li>
-          </ul>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s10_1">10.1. Ghi nguồn dữ liệu định vị IP (DB-IP.com) và dữ liệu cộng đồng: Ứng dụng tích hợp dữ liệu định vị quốc gia theo địa chỉ IP từ cơ sở dữ liệu DB-IP Lite. Tuân thủ điều khoản giấy phép Creative Commons Attribution 4.0 International (CC BY 4.0), Ứng dụng ghi nhận rõ nguồn: <b>“IP geolocation by DB-IP.com”</b> (<a href="https://db-ip.com" rel="noopener">https://db-ip.com</a>). Các tập lệnh tối ưu hiển thị và từ điển dịch giao diện tham khảo từ dự án mã nguồn mở <code>better-xcloud</code> của tác giả redphx theo giấy phép MIT.</div>
+            <div class="sub-item" data-i="s10_2">10.2. Danh sách thư viện chính đang biên dịch trong ứng dụng (lấy từ <code>gradle/libs.versions.toml</code>): Bao gồm AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM &amp; Material 3 / Material Icons, AndroidX WebKit (cung cấp <code>ProxyController</code>), AndroidX Room (Runtime, KTX, Compiler — khai báo trong cấu hình phụ thuộc nhưng ứng dụng thực tế không khởi tạo cơ sở dữ liệu SQLite Room lúc chạy mà chỉ dùng <code>SharedPreferences</code>), AndroidX Credentials &amp; Google Identity (<code>googleid</code>), Kotlinx Coroutines (Core, Android), Square OkHttp &amp; Logging Interceptor, Square Retrofit &amp; Moshi (<code>moshi-kotlin</code>, <code>converter-moshi</code>) và Coil Compose.</div>
+            <div class="sub-item" data-i="s10_3">10.3. Thư viện khai báo sẵn trong danh mục phiên bản và giới hạn trách nhiệm: Các thư viện khác có mặt trong <code>gradle/libs.versions.toml</code> (dùng cho kiểm thử hoặc đang tạm đóng trong cấu hình build) gồm AndroidX DataStore Preferences, Navigation Compose, CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), JUnit 4, AndroidX Test, Espresso và Robolectric. Nhà phát triển không bảo đảm và không chịu trách nhiệm về các lỗi nội tại phát sinh từ thư viện hoặc thành phần hệ thống (như Android System WebView) do bên thứ ba cung cấp.</div>
+          </div>
+          <div class="example-box" data-i="s10_ex">Ví dụ thực tế: Nếu một bản cập nhật Android System WebView của Google trên điện thoại của bạn gặp lỗi giải mã WebRTC gây giật hình trên mọi trình duyệt, sự cố đó thuộc về thành phần hệ thống của bên thứ ba và nằm ngoài khả năng sửa lỗi trực tiếp của CloudPlay.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s11_t">11. Miễn trừ bảo đảm</summary>
+      <!-- SECTION 11 (~420 words VI - Priority Deep Section) -->
+      <details id="sec-11">
+        <summary><span class="sum-title" data-i="s11_t">11. Miễn trừ bảo đảm</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s11_p1">Trong phạm vi pháp luật hiện hành cho phép, Ứng dụng được cung cấp miễn phí trên cơ sở “NGUYÊN TRẠNG” (AS IS) và “NHƯ HIỆN CÓ” (AS AVAILABLE), không kèm theo bất kỳ bảo đảm明示 (rõ ràng) hay ngầm định nào về tính liên tục, không có lỗi, độ trễ mạng thấp hay khả năng tương thích với mọi thiết bị hoặc mọi thay đổi từ phía máy chủ bên thứ ba.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s11_1">11.1. Cung cấp trên cơ sở “NHƯ HIỆN CÓ” và “THEO KHẢ NĂNG HIỆN CÓ”: Trong phạm vi tối đa mà pháp luật hiện hành cho phép, Ứng dụng được cung cấp hoàn toàn miễn phí trên cơ sở “NHƯ HIỆN CÓ” (AS IS) và “THEO KHẢ NĂNG HIỆN CÓ” (AS AVAILABLE). Nhà phát triển từ chối mọi bảo đảm dưới bất kỳ hình thức nào, dù rõ ràng hay ngầm định, bao gồm nhưng không giới hạn ở các bảo đảm ngầm định về khả năng thương mại, tính phù hợp cho một mục đích cụ thể và việc không có lỗi kỹ thuật.</div>
+            <div class="sub-item" data-i="s11_2">11.2. Không bảo đảm hoạt động liên tục và chất lượng luồng phát: Nhà phát triển không bảo đảm rằng Ứng dụng sẽ luôn hoạt động liên tục, không bị gián đoạn, không bị văng (crash), độ trễ mạng (ping/RTT) luôn thấp, tốc độ khung hình luôn đạt 60 FPS hay thời gian giải mã khung hình (decode time) luôn ở mức tối ưu. Chất lượng thực tế phụ thuộc vào phần cứng giải mã MediaCodec của từng thiết bị Android, đường truyền của nhà cung cấp dịch vụ internet (ISP) và tải trọng máy chủ từ xa.</div>
+            <div class="sub-item" data-i="s11_3">11.3. Không bảo đảm khả năng tương thích với dịch vụ của Microsoft/Xbox và bên thứ ba: Do Ứng dụng hoạt động dựa trên việc hiển thị giao diện web và giao thức WebRTC của bên thứ ba, nhà phát triển tuyệt đối không bảo đảm Ứng dụng sẽ luôn tương thích với dịch vụ của Microsoft/Xbox (hoặc VPNGate, ProxyScrape, Globalping, GitHub API). Dịch vụ của Microsoft/Xbox và các bên thứ ba này có thể thay đổi cấu trúc trang web, thay đổi giao thức mã hóa, siết chặt kiểm tra vùng hoặc chặn truy cập từ trình duyệt WebView bất cứ lúc nào mà không báo trước, làm cho một phần hoặc toàn bộ tính năng của Ứng dụng ngừng hoạt động.</div>
+            <div class="sub-item" data-i="s11_4">11.4. Ngoại lệ theo luật định: Nếu pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú không cho phép loại trừ một số bảo đảm bắt buộc theo luật định, các giới hạn tại Mục 11 này chỉ áp dụng trong phạm vi tối đa mà pháp luật đó cho phép.</div>
+          </div>
+          <div class="example-box" data-i="s11_ex">Ví dụ thực tế: Nếu Microsoft bất ngờ cập nhật cổng web xbox.com/play khiến tập lệnh dịch menu hoặc chế độ vượt kiểm tra vùng bằng proxy trong CloudPlay không còn tác dụng, nhà phát triển không có nghĩa vụ bảo đảm tính năng đó phải hoạt động trở lại ngay lập tức.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s12_t">12. Giới hạn trách nhiệm</summary>
+      <!-- SECTION 12 (~450 words VI - Priority Deep Section) -->
+      <details id="sec-12">
+        <summary><span class="sum-title" data-i="s12_t">12. Giới hạn trách nhiệm</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s12_p1">Trong phạm vi pháp luật hiện hành cho phép, nhà phát triển không chịu trách nhiệm đối với các thiệt hại gián tiếp, ngẫu nhiên, phát sinh do việc không thể truy cập dịch vụ bên thứ ba, việc tài khoản bên thứ ba bị hạn chế, hoặc do sự cố từ các máy chủ proxy/VPN công cộng của bên thứ ba.</p>
-          <p data-i="s12_p2">Không có nội dung nào trong điều khoản này nhằm loại trừ hoặc giới hạn các trách nhiệm pháp lý bắt buộc của nhà phát triển mà pháp luật hiện hành không cho phép miễn trừ, và điều khoản này không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp luật bắt buộc nào từ nhà phát triển sang người dùng.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s12_1">12.1. Loại trừ trách nhiệm đối với các thiệt hại gián tiếp và hệ quả: Trong phạm vi tối đa mà pháp luật hiện hành cho phép, nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]) và những người đóng góp mã nguồn không chịu trách nhiệm bồi thường đối với bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt hay thiệt hại mang tính hệ quả nào phát sinh từ việc bạn sử dụng hoặc không thể sử dụng Ứng dụng.</div>
+            <div class="sub-item" data-i="s12_2">12.2. Không chịu trách nhiệm về mất tài khoản, mất dữ liệu, mất tiến trình game và chi phí di động: Cụ thể, trong phạm vi pháp luật cho phép, nhà phát triển không chịu trách nhiệm đối với: (a) việc tài khoản Microsoft/Xbox, Epic Games hoặc tài khoản trò chơi của bạn bị hạn chế vùng, tạm khóa hay khóa vĩnh viễn cùng mọi thiệt hại về phí thuê bao Game Pass hoặc vật phẩm đã mua; (b) việc mất dữ liệu cục bộ (danh sách game đánh dấu, lịch sử phiên chơi, cài đặt) hoặc mất tiến trình lưu game (save game) do lỗi kết nối hay lỗi đồng bộ đám mây; (c) mọi khoản cước phí dữ liệu di động (4G/5G) hoặc internet phát sinh với nhà mạng viễn thông; và (d) hiện tượng nóng máy, chai pin hoặc sự cố rò rỉ dữ liệu từ các máy chủ proxy/VPN công cộng do bên thứ ba vận hành.</div>
+            <div class="sub-item" data-i="s12_3">12.3. Giới hạn mức trần trách nhiệm dân sự: Do CloudPlay được cung cấp hoàn toàn miễn phí (0 đồng), trong trường hợp pháp luật áp dụng vẫn yêu cầu xác định một mức giới hạn trách nhiệm dân sự, tổng mức trách nhiệm tối đa của nhà phát triển đối với bạn cho mọi khiếu nại sẽ không vượt quá số tiền bạn đã trả trực tiếp cho nhà phát triển để sử dụng Ứng dụng (bằng không), trừ khi pháp luật bắt buộc có quy định khác.</div>
+            <div class="sub-item" data-i="s12_4">12.4. Ngoại lệ bắt buộc — Không miễn trừ trách nhiệm pháp luật bắt buộc: Không có nội dung nào trong Điều khoản này nhằm loại trừ hoặc giới hạn các trách nhiệm pháp lý bắt buộc của nhà phát triển mà pháp luật hiện hành không cho phép miễn trừ, và Điều khoản này hoàn toàn không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp luật bắt buộc nào từ nhà phát triển sang người dùng.</div>
+          </div>
+          <div class="example-box" data-i="s12_ex">Ví dụ thực tế: Khi bạn đang đấu xếp hạng trong game hoặc chưa kịp lưu tiến trình thì máy chủ đám mây bị ngắt kết nối làm mất tiến trình chơi (hoặc bị trừ điểm xếp hạng), nhà phát triển hoàn toàn không chịu trách nhiệm bồi thường cho tổn thất tiến trình đó.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s13_t">13. Bồi thường</summary>
+      <!-- SECTION 13 (~350 words VI - Priority Deep Section) -->
+      <details id="sec-13">
+        <summary><span class="sum-title" data-i="s13_t">13. Bồi thường</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s13_p1">Trong phạm vi pháp luật hiện hành cho phép, bạn chịu trách nhiệm đối với các khiếu nại hoặc thiệt hại phát sinh trực tiếp từ hành vi của chính bạn khi cố ý vi phạm các điều khoản này, vi phạm pháp luật hoặc xâm phạm quyền hợp pháp của bên thứ ba trong quá trình sử dụng Ứng dụng.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s13_1">13.1. Trách nhiệm giải quyết khiếu nại phát sinh từ hành vi có lỗi của người dùng: Trong phạm vi pháp luật hiện hành cho phép, bạn đồng ý tự chịu trách nhiệm giải quyết và giữ cho nhà phát triển không bị thiệt hại trước các khiếu nại, yêu cầu bồi thường dân sự hoặc chi phí hợp lý phát sinh trực tiếp từ hành vi có lỗi của chính bạn khi: (a) cố ý vi phạm các quy định trong Điều khoản này; (b) sử dụng Ứng dụng hoặc máy chủ công cộng để thực hiện hành vi vi phạm pháp luật, tấn công mạng hoặc xâm phạm quyền hợp pháp của bên thứ ba; hoặc (c) tự ý sửa đổi, đóng gói lại (repackage) tệp APK của Ứng dụng kèm mã độc để phát tán cho người khác.</div>
+            <div class="sub-item" data-i="s13_2">13.2. Phạm vi giới hạn và ngoại lệ: Quy định tại Mục 13.1 chỉ áp dụng đối với thiệt hại do chính hành vi sai phạm của bạn gây ra. Điều khoản này không áp dụng đối với các khiếu nại phát sinh từ lỗi của chính nhà phát triển và tuyệt đối không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp lý bắt buộc nào từ nhà phát triển sang người dùng.</div>
+          </div>
+          <div class="example-box" data-i="s13_ex">Ví dụ thực tế: Nếu một người tự ý chỉnh sửa tệp APK của CloudPlay để chèn quảng cáo lừa đảo rồi đem phát tán khiến người dùng khác bị thiệt hại và khiếu nại, chính người đã chỉnh sửa và phát tán bản APK đó phải tự chịu toàn bộ trách nhiệm bồi thường dân sự trước những người bị hại.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s14_t">14. Cập nhật và chấm dứt</summary>
+      <!-- SECTION 14 (~300 words VI) -->
+      <details id="sec-14">
+        <summary><span class="sum-title" data-i="s14_t">14. Cập nhật và chấm dứt</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s14_p1">Nhà phát triển có thể cập nhật nội dung điều khoản này hoặc thay đổi, tạm ngừng phát triển Ứng dụng bất cứ lúc nào. Khi có thay đổi quan trọng, ngày cập nhật ở đầu trang sẽ được điều chỉnh. Bạn có thể chấm dứt việc sử dụng bất cứ lúc nào bằng cách gỡ cài đặt Ứng dụng khỏi thiết bị.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s14_1">14.1. Quyền thay đổi điều khoản bất cứ lúc nào và sự chấp nhận bản mới: Nhà phát triển có quyền sửa đổi, bổ sung hoặc cập nhật Điều khoản này bất cứ lúc nào để phù hợp với tính năng kỹ thuật mới hoặc quy định pháp luật. Khi có cập nhật, ngày “Cập nhật lần cuối” ở đầu trang sẽ được điều chỉnh. Việc bạn tiếp tục mở và sử dụng Ứng dụng sau khi bản điều khoản mới được công bố đồng nghĩa với việc bạn chấp nhận bản điều khoản đã sửa đổi. Ngoại lệ: nếu không đồng ý với bản cập nhật điều khoản mới, bạn phải ngừng sử dụng và gỡ cài đặt Ứng dụng.</div>
+            <div class="sub-item" data-i="s14_2">14.2. Quyền thay đổi hoặc chấm dứt phát triển Ứng dụng: Vì Ứng dụng là dự án cung cấp miễn phí, nhà phát triển có quyền thêm, bớt tính năng, tạm ngừng cập nhật hoặc ngừng duy trì dự án bất cứ lúc nào mà không cần báo trước và không phát sinh nghĩa vụ bồi thường đối với người dùng.</div>
+            <div class="sub-item" data-i="s14_3">14.3. Chấm dứt bởi người dùng và các điều khoản giữ nguyên hiệu lực: Bạn có quyền chấm dứt sử dụng bất cứ lúc nào bằng cách gỡ cài đặt Ứng dụng khỏi thiết bị. Sau khi gỡ cài đặt, các quy định về Sở hữu trí tuệ (Phần 8), Miễn trừ bảo đảm (Phần 11), Giới hạn trách nhiệm (Phần 12), Bồi thường (Phần 13) và Luật áp dụng (Phần 15) vẫn tiếp tục có hiệu lực đối với giai đoạn bạn đã sử dụng trước đó.</div>
+          </div>
+          <div class="example-box" data-i="s14_ex">Ví dụ thực tế: Khi một phiên bản mới của CloudPlay bổ sung thêm tùy chọn mạng mới và cập nhật lại Phần 9 của trang điều khoản này, việc bạn nâng cấp và tiếp tục dùng ứng dụng xác nhận rằng bạn đồng ý với nội dung cập nhật đó.</div>
         </div>
       </details>
 
-      <details>
-        <summary data-i="s15_t">15. Luật áp dụng [ĐIỀN] và liên hệ [ĐIỀN]</summary>
+      <!-- SECTION 15 (~340 words VI) -->
+      <details id="sec-15">
+        <summary><span class="sum-title" data-i="s15_t">15. Luật áp dụng [ĐIỀN] và liên hệ [ĐIỀN]</span><span class="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></span></summary>
         <div class="acc-body">
-          <p data-i="s15_p1"><b>Luật áp dụng và giải quyết tranh chấp:</b> Điều khoản này được điều chỉnh và giải thích theo pháp luật của [ĐIỀN: Quốc gia / vùng lãnh thổ có luật áp dụng], không xét đến các quy tắc xung đột pháp luật. Mọi tranh chấp phát sinh liên quan đến Điều khoản này sẽ được giải quyết tại cơ quan có thẩm quyền tại [ĐIỀN: Tòa án / cơ quan tài phán có thẩm quyền], trừ trường hợp pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú có quy định bắt buộc khác.</p>
-          <p data-i="s15_p2"><b>Thông tin liên hệ:</b> Mọi thắc mắc, phản hồi hoặc yêu cầu liên quan đến điều khoản sử dụng và quyền riêng tư, vui lòng liên hệ [ĐIỀN: Tên cá nhân / nhóm phát triển] qua email: [ĐIỀN: Địa chỉ email liên hệ chính thức] hoặc tại trang vấn đề GitHub: <a href="https://github.com/muitenvn/CloudPlay-App/issues">https://github.com/muitenvn/CloudPlay-App/issues</a>.</p>
+          <div class="sub-list">
+            <div class="sub-item" data-i="s15_1">15.1. Luật áp dụng và cơ quan giải quyết tranh chấp: Điều khoản này được điều chỉnh và giải thích theo pháp luật của [ĐIỀN: Quốc gia / vùng lãnh thổ có luật áp dụng], không xét đến các quy tắc xung đột pháp luật. Mọi tranh chấp phát sinh từ hoặc liên quan đến Điều khoản này sẽ được giải quyết tại cơ quan có thẩm quyền tại [ĐIỀN: Tòa án / cơ quan tài phán có thẩm quyền]. Ngoại lệ: nếu pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú có quy định bắt buộc không thể thỏa thuận khác về luật áp dụng hoặc cơ quan tài phán, quy định bắt buộc đó sẽ được áp dụng.</div>
+            <div class="sub-item" data-i="s15_2">15.2. Tính hiệu lực từng phần (Severability): Nếu bất kỳ điều khoản hoặc mục nhỏ nào trong văn bản này bị tòa án hoặc cơ quan có thẩm quyền xác định là vô hiệu, trái pháp luật hoặc không thể thi hành, thì điều khoản đó sẽ được giới hạn hoặc tách riêng trong phạm vi tối thiểu cần thiết, và tất cả các điều khoản còn lại vẫn giữ nguyên giá trị pháp lý và hiệu lực thi hành đầy đủ.</div>
+            <div class="sub-item" data-i="s15_3">15.3. Ngôn ngữ ưu tiên khi có sự khác biệt: Trang Điều khoản này được cung cấp bằng cả tiếng Việt và tiếng Anh để thuận tiện cho người dùng. Trong trường hợp có bất kỳ sự khác biệt, mâu thuẫn hoặc cách hiểu không thống nhất nào giữa phiên bản tiếng Việt và phiên bản tiếng Anh, phiên bản [ĐIỀN: chọn bản nào được ưu tiên, ví dụ: Tiếng Việt / Tiếng Anh] sẽ được ưu tiên áp dụng làm căn cứ giải thích chính thức.</div>
+            <div class="sub-item" data-i="s15_4">15.4. Thông tin liên hệ chính thức: Mọi câu hỏi, phản hồi hoặc thông báo liên quan đến Điều khoản sử dụng và Quyền riêng tư, vui lòng liên hệ [ĐIỀN: Tên cá nhân / nhóm phát triển] qua email: [ĐIỀN: Địa chỉ email liên hệ chính thức] hoặc tại trang vấn đề GitHub: <a href="https://github.com/muitenvn/CloudPlay-App/issues">https://github.com/muitenvn/CloudPlay-App/issues</a>.</div>
+          </div>
+          <div class="example-box" data-i="s15_ex">Ví dụ thực tế: Giả sử một mục con trong Phần 12 bị pháp luật tại quốc gia của bạn coi là quá rộng và không được áp dụng toàn bộ, thì chỉ riêng phần vượt quá đó được điều chỉnh theo luật định, còn toàn bộ các phần khác từ Phần 1 đến Phần 15 vẫn tiếp tục có hiệu lực đầy đủ.</div>
         </div>
       </details>
     </div>
@@ -268,6 +407,11 @@
 (function(){
   var D={
     vi:{
+      toc_btn:"Mục lục",
+      toc_title:"Mục lục (15 phần)",
+      toc_close:"Đóng mục lục",
+      exp_all:"Mở tất cả",
+      col_all:"Thu gọn tất cả",
       back:"← Quay lại trang chủ",
       title:"Điều khoản sử dụng & Quyền riêng tư",
       updated:"Cập nhật lần cuối: [ĐIỀN: Ngày/tháng/năm cập nhật] · Chủ thể vận hành: [ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]",
@@ -280,64 +424,97 @@
       sum_4:"Ứng dụng không thu thập, lưu trữ hay gửi đi tài khoản, mật khẩu hoặc thông tin thanh toán của người dùng.",
       sum_5:"Dữ liệu định vị địa lý IP được cung cấp bởi DB-IP.com (IP geolocation by DB-IP.com, giấy phép CC BY 4.0).",
       s1_t:"1. Chấp nhận điều khoản",
-      s1_p1:"Khi tải xuống, cài đặt hoặc sử dụng ứng dụng CloudPlay (“Ứng dụng”), bạn xác nhận đã đọc, hiểu và đồng ý với các điều khoản tại trang này. Nếu bạn không đồng ý với bất kỳ nội dung nào, vui lòng ngừng sử dụng và gỡ cài đặt Ứng dụng khỏi thiết bị của bạn.",
-      s1_p2:"Điều khoản này chỉ điều chỉnh mối quan hệ giữa bạn và nhà phát triển Ứng dụng ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]), không thay thế cho điều khoản dịch vụ của Microsoft, Xbox, Epic Games hay bất kỳ nhà cung cấp dịch vụ bên thứ ba nào khác.",
+      s1_1:"1.1. Hành vi xác lập sự chấp thuận: Khi tải tệp cài đặt (APK), cài đặt hoặc mở ứng dụng CloudPlay (“Ứng dụng”), bạn xác nhận đã đọc, hiểu và đồng ý bị ràng buộc bởi Điều khoản này. Người dùng tự chịu trách nhiệm tìm hiểu nội dung điều khoản trước khi bật các tính năng kết nối mạng. Ngoại lệ: nếu bạn không đồng ý với bất kỳ điều khoản nào, bạn không có quyền sử dụng và phải gỡ cài đặt Ứng dụng khỏi thiết bị ngay lập tức.",
+      s1_2:"1.2. Phạm vi chủ thể và tính độc lập với bên thứ ba: Điều khoản này chỉ điều chỉnh mối quan hệ giữa bạn và nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]). Điều khoản này không thay thế, sửa đổi hay miễn trừ Thỏa thuận dịch vụ của Microsoft (Microsoft Services Agreement), Tiêu chuẩn cộng đồng Xbox, Điều khoản dịch vụ của Epic Games hoặc quy định của nhà phát hành trò chơi. Việc bạn chấp nhận Điều khoản của CloudPlay không tạo ra bất kỳ quyền miễn trừ nào trước các quy định của bên thứ ba.",
+      s1_3:"1.3. Chấp thuận theo từng tính năng tùy chọn và bản cập nhật: Các tính năng tắt mặc định (như Smart VPN/Proxy, trạm đo Globalping, dịch giao diện hoặc tải APK qua mirror) chỉ phát sinh hiệu lực khi bạn chủ động bật. Việc tiếp tục cài đặt bản cập nhật mới qua GitHub Releases hoặc mục Cài đặt đồng nghĩa với việc bạn chấp nhận điều khoản áp dụng cho phiên bản đó.",
+      s1_ex:"Ví dụ thực tế: Khi bạn dùng CloudPlay để đăng nhập tài khoản Xbox cá nhân, giao diện ứng dụng chịu sự điều chỉnh của Điều khoản này, nhưng tài khoản và gói thuê bao Game Pass của bạn vẫn hoàn toàn chịu sự quản lý của Microsoft.",
       s2_t:"2. Chức năng của ứng dụng",
-      s2_p1:"CloudPlay là công cụ trình duyệt chuyên dụng hỗ trợ truy cập giao diện web Xbox Cloud Gaming trên thiết bị Android. Các chức năng chính bao gồm:",
-      s2_l1:"Hiển thị thông số kỹ thuật thực tế của luồng phát WebRTC (độ trễ mạng RTT, độ biến động Jitter, tốc độ khung hình FPS, thời gian giải mã khung hình và số khung hình bị rớt).",
-      s2_l2:"Điều chỉnh giới hạn băng thông và độ phân giải luồng phát theo cấu hình người dùng chọn, đồng thời cung cấp lớp phủ tay cầm ảo trên màn hình cảm ứng.",
-      s2_l3:"Hỗ trợ dịch văn bản menu giao diện Xbox trên trình duyệt và cung cấp công cụ tùy chọn kết nối máy chủ proxy/VPN công cộng chỉ trong giai đoạn kiểm tra vùng trước khi vào luồng chơi.",
-      s2_p2:"Ứng dụng không cung cấp trò chơi, không cung cấp gói thuê bao Game Pass và không can thiệp vào mã nguồn hay bộ nhớ máy chủ trò chơi.",
+      s2_1:"2.1. Trình duyệt WebView chuyên dụng: Ứng dụng sử dụng thành phần Android System WebView có sẵn trên hệ điều hành để tải cổng trò chơi đám mây chính thức tại www.xbox.com/play. Quá trình xác thực tài khoản qua login.live.com diễn ra trực tiếp với máy chủ Microsoft và phiên đăng nhập chỉ lưu tại bộ nhớ Cookie cục bộ trên thiết bị của người dùng.",
+      s2_2:"2.2. Giám sát thông số kỹ thuật và tối ưu luồng WebRTC: Thông qua giao diện RTCPeerConnection.getStats(), Ứng dụng đọc thống kê thời gian thực (FPS, RTT/Ping, Jitter, thời gian giải mã khung hình Decode ms, số khung hình bị rớt và Bitrate) để hiển thị trên màn hình. Tập lệnh cục bộ ưu tiên hồ sơ codec H.264 Constrained Baseline (42e01f) trong bản tin SDP để giảm độ trễ giải mã phần cứng MediaCodec và áp dụng mức trần băng thông (2–20 Mbps), độ phân giải (720p/1080p/1080p HQ), bộ lọc hình ảnh và khuếch đại âm thanh do người dùng tự chọn.",
+      s2_3:"2.3. Điều khiển cảm ứng và định tuyến vùng cấp trình duyệt: Ứng dụng cung cấp lớp phủ tay cầm ảo (Virtual Touch Controller), hỗ trợ rung (VIBRATE), cảm biến con quay hồi chuyển và tay cầm vật lý Bluetooth/USB. Khi người dùng chủ động bật VPN thông minh, thư viện AndroidX WebKit ProxyController chỉ định tuyến lưu lượng của riêng WebView bên trong Ứng dụng qua máy chủ proxy công cộng trong bước kiểm tra vùng, và tự động xóa cấu hình proxy (clearProxyOverride) khi luồng phát bắt đầu.",
+      s2_4:"2.4. Giới hạn chức năng và những điều KHÔNG được bảo đảm: CloudPlay không sở hữu trò chơi, không cung cấp tài khoản hay gói thuê bao Xbox Game Pass, không tạo đường hầm VPN toàn hệ thống Android (dịch vụ nền XboxCloudVpnService chỉ là Foreground Service giữ tiến trình không bị hệ điều hành đóng khi đang phát luồng) và không can thiệp vào máy chủ trò chơi.",
+      s2_ex:"Ví dụ thực tế: Khi bạn bật “VPN thông minh” trong CloudPlay, chỉ có khung trình duyệt Xbox bên trong ứng dụng đi qua proxy khi kiểm tra vùng; các ứng dụng khác trên điện thoại (như ngân hàng, YouTube) hoàn toàn không bị ảnh hưởng.",
       s3_t:"3. Điều kiện sử dụng và độ tuổi",
-      s3_p1:"Bạn phải đủ độ tuổi thành niên hợp pháp tại quốc gia hoặc vùng lãnh thổ nơi bạn cư trú (hoặc từ [ĐIỀN: Độ tuổi tối thiểu theo quy định pháp luật áp dụng, ví dụ: 13 hoặc 18 tuổi] trở lên và có sự đồng ý, giám sát của cha mẹ hoặc người giám hộ hợp pháp) để sử dụng Ứng dụng.",
-      s3_p2:"Ngoài ra, bạn phải đáp ứng đầy đủ yêu cầu về độ tuổi và điều kiện tài khoản của Microsoft/Xbox cũng như giới hạn độ tuổi (ESRB, PEGI hoặc hệ thống phân loại tương đương) của từng trò chơi mà bạn truy cập.",
+      s3_1:"3.1. Độ tuổi tối thiểu và trách nhiệm giám sát: Người dùng phải đạt độ tuổi thành niên hợp pháp tại nơi cư trú, hoặc tối thiểu từ [ĐIỀN: Độ tuổi tối thiểu theo quy định pháp luật áp dụng, ví dụ: 13 hoặc 18 tuổi] trở lên. Ngoại lệ: người chưa thành niên trong độ tuổi cho phép chỉ được sử dụng khi có sự đồng ý và giám sát trực tiếp của cha mẹ hoặc người giám hộ hợp pháp; cha mẹ/người giám hộ chịu hoàn toàn trách nhiệm thiết lập giới hạn thông qua Microsoft Family Safety.",
+      s3_2:"3.2. Điều kiện tài khoản bên thứ ba và phân loại độ tuổi trò chơi: Người dùng tự chịu trách nhiệm duy trì tài khoản Microsoft/Xbox hợp lệ và gói thuê bao phù hợp. Do danh mục Xbox Cloud Gaming chứa các trò chơi gắn nhãn 16+/18+ (theo chuẩn ESRB, PEGI, CERO), người dùng có nghĩa vụ kiểm tra nhãn độ tuổi trước khi mở từng trò chơi. Nhà phát triển không có quyền kiểm soát hay lọc danh mục tài khoản của Microsoft.",
+      s3_3:"3.3. Điều kiện thiết bị và pháp luật địa phương: Thiết bị phải có thành phần Android System WebView tương thích WebRTC và giải mã phần cứng H.264. Bạn không được sử dụng Ứng dụng nếu pháp luật tại nơi bạn cư trú cấm dịch vụ trò chơi đám mây hoặc công cụ định tuyến proxy.",
+      s3_ex:"Ví dụ thực tế: Khi một thiếu niên 15 tuổi dùng CloudPlay, phụ huynh chịu trách nhiệm bật tính năng giới hạn độ tuổi trên tài khoản Microsoft Family để ngăn truy cập các tựa game gắn nhãn PEGI 18 / ESRB Mature 17+.",
       s4_t:"4. Trách nhiệm của người dùng",
-      s4_p1:"Người dùng tự chịu trách nhiệm về hành vi sử dụng Ứng dụng và tài khoản cá nhân của chính mình. Nhà phát triển không khuyến khích việc sử dụng Ứng dụng trái pháp luật hoặc trái với điều khoản dịch vụ của bất kỳ bên thứ ba nào.",
-      s4_p2:"Bạn có trách nhiệm tự bảo mật thiết bị, thông tin đăng nhập tài khoản Microsoft/Xbox, kiểm tra mã băm SHA-256 khi tải file APK từ các nguồn lưu trữ và tự chi trả mọi cước phí dữ liệu di động (4G/5G) hoặc internet phát sinh trong quá trình sử dụng.",
+      s4_1:"4.1. Tự chịu trách nhiệm về hành vi và cấu hình: Người dùng tự đưa ra quyết định bật hoặc tắt các tùy chọn trong Ứng dụng và hoàn toàn chịu trách nhiệm về hành vi sử dụng của chính mình. Nhà phát triển không khuyến khích hành vi sử dụng trái pháp luật hoặc vi phạm điều khoản dịch vụ của bên thứ ba.",
+      s4_2:"4.2. Bảo mật phiên đăng nhập và an toàn khi thanh toán: Phiên đăng nhập Microsoft được lưu trong bộ nhớ Cookie cục bộ của WebView; người dùng chịu trách nhiệm đặt khóa màn hình thiết bị, bật xác thực hai yếu tố (2FA) và đăng xuất khi dùng chung thiết bị. Ngoại lệ an toàn kỹ thuật: dù mã nguồn (ProxyInjector) tự động ngắt proxy khi phát hiện URL thanh toán hoặc account.microsoft.com, cơ chế này không thay thế nghĩa vụ cẩn trọng của bạn — bạn bắt buộc phải tự kiểm tra và tắt hoàn toàn proxy/VPN công cộng trước khi nhập thông tin thẻ ngân hàng, mã quà tặng hoặc mật khẩu.",
+      s4_3:"4.3. Xác minh nguồn tải chính thức và mã băm SHA-256: Người dùng có trách nhiệm chỉ tải Ứng dụng từ GitHub Releases chính thức (github.com/muitenvn/CloudPlay-App/releases) hoặc trình cập nhật tích hợp sẵn, và kiểm tra mã băm SHA-256 khi tải qua máy chủ phụ (mirror). Nhà phát triển không chịu trách nhiệm đối với rủi ro từ các bản APK trôi nổi bị chỉnh sửa chữ ký số.",
+      s4_4:"4.4. Tự chi trả cước phí dữ liệu di động (4G/5G) và internet: Luồng video đám mây tiêu thụ từ khoảng 0,9 GB/giờ (ở mức 2 Mbps) đến 6,7–9 GB/giờ (ở mức 15–20 Mbps), chưa kể dữ liệu khi bạn bật cho phép tải cơ sở dữ liệu DB-IP Lite qua mạng di động. Người dùng tự chịu toàn bộ cước phí viễn thông phát sinh với nhà mạng trong mọi trường hợp.",
+      s4_5:"4.5. Quản lý nhiệt độ phần cứng, quyền Android và sức khỏe: Việc giải mã video 60fps liên tục kết hợp giữ sáng màn hình (WAKE_LOCK) và tần số quét 90Hz/120Hz làm tăng nhiệt độ và hao pin; người dùng tự chịu trách nhiệm theo dõi nhiệt độ máy, quản lý các quyền đã cấp (RECORD_AUDIO cho đàm thoại, POST_NOTIFICATIONS, REQUEST_INSTALL_PACKAGES) và sử dụng mức khuếch đại âm lượng (Volume Boost) an toàn. Khi bạn xóa dữ liệu ứng dụng hoặc gỡ cài đặt, mọi đánh dấu game và lịch sử phiên chơi trong SharedPreferences sẽ bị xóa vĩnh viễn (trừ dữ liệu lưu game trên đám mây do Microsoft quản lý).",
+      s4_ex:"Ví dụ thực tế: Nếu bạn quên tắt dữ liệu di động 5G và chơi game ở mức 20 Mbps trong 2 giờ (tiêu thụ khoảng 15 GB dữ liệu), hoặc tự ý nhập thẻ tín dụng khi đang bật một ứng dụng VPN công cộng bên ngoài, bạn là người duy nhất chịu trách nhiệm về cước phí nhà mạng và rủi ro bảo mật phát sinh.",
       s5_t:"5. Hành vi bị cấm",
-      s5_p1:"Khi sử dụng Ứng dụng, bạn không được thực hiện các hành vi sau:",
-      s5_l1:"Sử dụng Ứng dụng để thực hiện hành vi vi phạm pháp luật hiện hành, phát tán mã độc, tấn công mạng hoặc gây quá tải hạ tầng của bên thứ ba.",
-      s5_l2:"Sử dụng phần mềm gian lận (cheat, hack), kịch bản tự động hóa trái phép hoặc khai thác lỗ hổng dịch vụ trò chơi đám mây.",
-      s5_l3:"Đóng gói lại (repackage) Ứng dụng kèm mã độc, phần mềm quảng cáo hoặc giả mạo danh tính nhà phát triển để lừa đảo người dùng khác.",
+      s5_1:"5.1. Cấm đóng gói lại kèm mã độc và giả mạo thương mại: Nghiêm cấm dịch ngược, chỉnh sửa tệp APK của CloudPlay để chèn mã độc, công cụ đánh cắp Cookie/mật khẩu, quảng cáo ẩn hoặc mạo danh nhà phát triển để lừa đảo hay thu tiền trái phép từ người dùng. Ngoại lệ: việc nghiên cứu, tạo bản nhánh (fork) hợp lệ theo giấy phép mã nguồn mở trên GitHub được phép thực hiện với điều kiện giữ nguyên thông tin bản quyền và không xóa bỏ các cơ chế bảo vệ an toàn.",
+      s5_2:"5.2. Cấm gian lận trong trò chơi và phá hoại dịch vụ đám mây: Người dùng không được lợi dụng WebView hoặc công cụ điều khiển của Ứng dụng để tiêm kịch bản gian lận (cheat, hack, aimbot), tự động hóa trái phép hoặc khai thác lỗ hổng của Xbox Cloud Gaming. Mọi vi phạm sẽ do chính người dùng chịu trách nhiệm trước Microsoft và nhà phát hành trò chơi.",
+      s5_3:"5.3. Cấm làm quá tải API tích hợp và lạm dụng máy chủ công cộng: Nghiêm cấm vượt qua cơ chế giới hạn tần suất trong mã nguồn (như giới hạn cứng 200 lượt đo/giờ của Globalping và thời gian chờ kiểm tra cập nhật) để gửi yêu cầu dồn dập làm quá tải GitHub API, VPNGate, ProxyScrape, Globalping, DB-IP, hoặc dùng máy chủ proxy công cộng để tấn công mạng và vi phạm pháp luật.",
+      s5_ex:"Ví dụ thực tế: Hành vi tải APK CloudPlay, chèn mã đọc trộm phiên đăng nhập login.live.com rồi phát tán dưới tên “CloudPlay Bản Mở Khóa VIP” là hành vi bị cấm tuyệt đối và người thực hiện phải tự chịu trách nhiệm trước pháp luật.",
       s6_t:"6. VPN, proxy và rủi ro với tài khoản",
-      s6_p1:"Một số tính năng trong Ứng dụng (như kết nối qua máy chủ proxy/VPN hoặc thay đổi mã vùng ngôn ngữ truy cập) có thể bị coi là hành vi vượt giới hạn địa lý hoặc không tuân thủ điều khoản dịch vụ của Microsoft, Xbox, Epic Games hoặc các nhà phát hành trò chơi.",
-      s6_p2:"Việc sử dụng các tính năng này có thể dẫn đến rủi ro bị từ chối kết nối, giới hạn tính năng, tạm khóa hoặc chấm dứt vĩnh viễn tài khoản của bạn bởi nhà cung cấp dịch vụ bên thứ ba. Tính năng VPN/proxy hoàn toàn là tùy chọn do bạn chủ động bật, và bạn tự chịu trách nhiệm đối với mọi hệ quả phát sinh trên tài khoản của mình.",
+      s6_1:"6.1. Quyết định chủ động của người dùng: Tính năng kết nối qua máy chủ proxy/VPN (“VPN thông minh” qua ProxyController, chế độ VPN ngoài EXTERNAL_VPN) và tùy chọn thay đổi mã vùng thị trường (Market Locale) trong Ứng dụng đều là công cụ tùy chọn. Việc bật hoặc tắt VPN/proxy hoàn toàn là quyết định tự nguyện của người dùng; Ứng dụng không tự động ép buộc đổi vùng nếu bạn sử dụng chế độ kết nối trực tiếp tại quốc gia được Xbox hỗ trợ.",
+      s6_2:"6.2. Rủi ro vi phạm điều khoản bên thứ ba và khóa tài khoản: Người dùng hiểu và chấp nhận rằng việc sử dụng VPN, proxy hoặc giả lập mã vùng để truy cập dịch vụ từ quốc gia chưa được hỗ trợ chính thức có thể bị Microsoft, Xbox, Epic Games hoặc các nhà phát hành trò chơi coi là hành vi vượt rào cản địa lý (geo-restriction circumvention) và vi phạm điều khoản dịch vụ của họ. Hệ quả có thể bao gồm: từ chối kết nối, chặn quyền mua hàng, thu hồi gói thuê bao, tạm khóa hoặc chấm dứt vĩnh viễn tài khoản Microsoft/Xbox hoặc tài khoản trò chơi của bạn.",
+      s6_3:"6.3. Phân định trách nhiệm và điều KHÔNG được bảo đảm: Nhà phát triển hoàn toàn không kiểm soát hệ thống xét duyệt tài khoản hay chính sách chống gian lận vùng của Microsoft/Epic Games, và không bảo đảm bất kỳ phương thức định tuyến proxy/VPN nào là “an toàn tuyệt đối” trước hệ thống kiểm duyệt của bên thứ ba. Người dùng tự chịu toàn bộ rủi ro và trách nhiệm đối với tài khoản cũng như các khoản tiền đã nạp vào tài khoản đó.",
+      s6_4:"6.4. Cơ chế kỹ thuật tự động ngắt proxy (Auto-Bypass) và ngoại lệ: Trong mã nguồn (ProxyInjector và VpnManager), khi chế độ tự động ngắt (autoBypassEnabled) được bật, Ứng dụng chỉ áp dụng proxy cho WebView trong bước kiểm tra vùng ban đầu và tự động xóa cấu hình proxy (clearProxyOverride) ngay khi luồng video WebRTC bắt đầu (hoặc sau độ trễ 1–8 giây do bạn chọn) để luồng chơi đi trực tiếp qua mạng gốc. Ngoại lệ: nếu bạn sử dụng ứng dụng VPN bên thứ ba chạy ngầm ở cấp hệ điều hành (EXTERNAL_VPN) hoặc tắt tính năng tự động ngắt, toàn bộ lưu lượng vẫn sẽ đi qua VPN cho đến khi bạn tự tắt thủ công.",
+      s6_ex:"Ví dụ thực tế: Bạn dùng máy chủ proxy Nhật Bản hoặc Hàn Quốc để vượt bước kiểm tra vùng vào chơi Fortnite hoặc một tựa game trong Game Pass. Nếu hệ thống bảo mật của Microsoft hoặc Epic Games phát hiện địa chỉ IP bất thường và áp dụng lệnh hạn chế vùng hoặc khóa tài khoản của bạn, bạn là người duy nhất chịu trách nhiệm về quyết định bật VPN đó.",
       s7_t:"7. Máy chủ công cộng của bên thứ ba",
-      s7_p1:"Danh sách máy chủ proxy và VPN miễn phí hiển thị trong Ứng dụng được tổng hợp tự động từ các nguồn công cộng trên internet (như VPNGate và ProxyScrape) và do các cá nhân, tổ chức bên thứ ba độc lập vận hành.",
-      s7_p2:"Nhà phát triển không sở hữu, không vận hành và không thể kiểm soát độ an toàn, tính ổn định hay chính sách ghi nhật ký lưu lượng của các máy chủ công cộng này. Mặc dù Ứng dụng được thiết kế để chỉ định tuyến các tên miền kiểm tra vùng của Xbox và tự động ngắt kết nối máy chủ trung gian khi bạn mở trang thanh toán hoặc ngay khi luồng chơi bắt đầu, bạn không nên sử dụng máy chủ công cộng cho các giao dịch nhạy cảm.",
+      s7_1:"7.1. Nguồn gốc máy chủ công cộng và chủ thể vận hành: Danh sách máy chủ proxy và VPN miễn phí hiển thị trong Ứng dụng được tổng hợp tự động từ các thư mục công cộng trên internet (bao gồm dự án học thuật VPNGate tại vpngate.net và danh sách ProxyScrape tại proxyscrape.com) hoặc do chính người dùng tự nhập thủ công. Toàn bộ các máy chủ này đều do các cá nhân, tình nguyện viên hoặc tổ chức bên thứ ba độc lập vận hành; nhà phát triển không sở hữu, không thuê và không quản trị bất kỳ máy chủ nào trong danh sách.",
+      s7_2:"7.2. Nhận thức của người dùng về rủi ro bảo mật và chất lượng mạng: Khi quyết định bật kết nối qua máy chủ công cộng, người dùng xác nhận đã biết rõ các rủi ro cố hữu của hạ tầng công cộng miễn phí: (a) lưu lượng đi qua máy chủ có thể bị bên vận hành máy chủ đó theo dõi, ghi nhật ký (logging) địa chỉ IP và siêu dữ liệu truy cập; (b) tốc độ phản hồi có thể rất chậm, độ trễ (ping) cao hoặc băng thông bị bóp nghẽn do nhiều người dùng chung; và (c) máy chủ có thể ngắt kết nối đột ngột hoặc ngừng hoạt động bất cứ lúc nào mà không báo trước.",
+      s7_3:"7.3. Giới hạn bảo vệ của giao thức HTTPS và danh sách loại trừ: Dù kết nối tới xbox.com và login.live.com sử dụng mã hóa HTTPS/TLS, máy chủ proxy trung gian vẫn biết được tên miền bạn đang kết nối (qua thông tin SNI/CONNECT) và có thể can thiệp nếu bạn chấp nhận chứng chỉ bảo mật không hợp lệ. Để giảm thiểu rủi ro, mã nguồn của Ứng dụng thiết lập quy tắc loại trừ (bypass rules) để chỉ định tuyến các tên miền kiểm tra vùng của Xbox và tự động ngắt proxy khi phát hiện URL quản lý tài khoản (account.microsoft.com) hoặc trang thanh toán.",
+      s7_4:"7.4. Ngoại lệ và khuyến cáo an toàn bắt buộc: Cơ chế tự động ngắt của Ứng dụng không thể bảo vệ bạn nếu trang web bên thứ ba đổi cấu trúc đường dẫn thanh toán mới hoặc khi bạn dùng VPN ngoài hệ thống. Người dùng chịu trách nhiệm tuyệt đối không thực hiện giao dịch ngân hàng, nhập thẻ tín dụng, nạp mã quà tặng hoặc đổi mật khẩu khi đang kết nối bất kỳ máy chủ công cộng nào.",
+      s7_ex:"Ví dụ thực tế: Một máy chủ công cộng trong danh sách VPNGate đang hoạt động bình thường nhưng đột nhiên phản hồi chậm hoặc ngắt kết nối giữa lúc bạn đang xếp hàng vào game, khiến phiên kết nối bị lỗi. Đây là đặc tính khách quan của máy chủ miễn phí bên thứ ba và không thuộc phạm vi kiểm soát hay bảo đảm của nhà phát triển.",
       s8_t:"8. Sở hữu trí tuệ và nhãn hiệu",
-      s8_p1:"CloudPlay là dự án độc lập và không liên kết, không được tài trợ, chứng nhận hay phê duyệt bởi Microsoft Corporation, Xbox hay Epic Games, Inc.",
-      s8_p2:"Các nhãn hiệu “Microsoft”, “Xbox”, “Xbox Cloud Gaming”, “Xbox Game Pass” thuộc quyền sở hữu của Microsoft Corporation. “Fortnite” và “Epic Games” là nhãn hiệu của Epic Games, Inc. Mọi tên trò chơi, hình ảnh bìa và nhãn hiệu khác hiển thị thông qua trình duyệt hoặc danh mục đều thuộc quyền sở hữu của các chủ sở hữu tương ứng. Mã nguồn của Ứng dụng được phát hành theo giấy phép ghi trong kho mã nguồn chính thức.",
+      s8_1:"8.1. Tuyên bố không liên kết và quyền sở hữu nhãn hiệu bên thứ ba: CloudPlay là dự án phần mềm độc lập, không liên kết, không được tài trợ, ủy quyền hay phê duyệt bởi Microsoft Corporation, Xbox hay Epic Games, Inc. Các nhãn hiệu “Microsoft”, “Xbox”, “Xbox Cloud Gaming”, “Xbox Game Pass” thuộc sở hữu của Microsoft Corporation; “Fortnite” và “Epic Games” thuộc sở hữu của Epic Games, Inc. Mọi tên trò chơi, biểu tượng và ảnh bìa tải từ API danh mục đều thuộc bản quyền của chủ sở hữu tương ứng.",
+      s8_2:"8.2. Bản quyền mã nguồn mở của Ứng dụng và giới hạn cấp phép: Mã nguồn gốc của CloudPlay thuộc bản quyền của nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]) và được phát hành theo giấy phép mã nguồn mở công bố tại kho lưu trữ GitHub chính thức. Ngoại lệ: giấy phép mã nguồn mở của Ứng dụng chỉ áp dụng cho phần mã của CloudPlay, hoàn toàn không cấp cho người dùng bất kỳ quyền sử dụng thương mại nào đối với nhãn hiệu, hình ảnh hay dịch vụ của Microsoft, Epic Games hoặc các nhà phát hành trò chơi.",
+      s8_3:"8.3. Ghi nhận đóng góp cộng đồng: Một số kỹ thuật tối ưu hiển thị luồng phát, điều khiển cảm ứng và dữ liệu từ điển dịch giao diện được tham khảo và đồng bộ từ dự án mã nguồn mở better-xcloud của tác giả redphx theo giấy phép MIT.",
+      s8_ex:"Ví dụ thực tế: Việc ảnh bìa các tựa game Xbox Game Pass hiển thị trong mục Danh mục của CloudPlay chỉ là kết quả hiển thị dữ liệu công khai từ máy chủ Microsoft giúp người dùng nhận diện trò chơi, không đồng nghĩa với việc CloudPlay sở hữu bản quyền các trò chơi đó.",
       s9_t:"9. Quyền riêng tư và dữ liệu",
-      s9_p1:"Ứng dụng không có máy chủ thu thập dữ liệu riêng, không yêu cầu tạo tài khoản riêng và không thu thập mật khẩu hay thông tin thẻ thanh toán của bạn. Dữ liệu cấu hình, danh sách game đánh dấu và lịch sử thông số phiên chơi chỉ được lưu cục bộ trên thiết bị của bạn (SharedPreferences / bộ nhớ đệm ứng dụng) và có thể xóa bất cứ lúc nào.",
-      s9_p2:"Dưới đây là danh sách chính xác các kết nối mạng thực tế có trong mã nguồn của Ứng dụng:",
-      s9_l1:"Microsoft & Xbox (do Microsoft vận hành): Kết nối trực tiếp tới www.xbox.com, xbox.com, login.live.com, login.microsoftonline.com để bạn đăng nhập và phát luồng trò chơi; cùng catalog.gamepass.com, displaycatalog.mp.microsoft.com và store-images.s-microsoft.com để tải danh mục và ảnh bìa trò chơi.",
-      s9_l2:"GitHub API, GitHub Releases & Mirror cập nhật: Kết nối tới api.github.com/repos/muitenvn/CloudPlay-App/releases/latest và github.com/muitenvn/CloudPlay-App/releases để kiểm tra phiên bản mới, lấy mã SHA-256 và tải bản cập nhật APK (có thể tắt tự động kiểm tra trong Cài đặt). Khi người dùng chủ động chọn tải qua máy chủ phụ, liên kết tải sẽ đi qua ghfast.top. Ngoài ra, ứng dụng có thể tải gói từ điển dịch giao diện từ raw.githubusercontent.com/redphx/better-xcloud.",
-      s9_l3:"VPNGate & ProxyScrape (khi đồng bộ danh sách máy chủ): Kết nối tới www.vpngate.net/api/iphone/ và api.proxyscrape.com/v2/ khi làm mới danh sách máy chủ proxy/VPN công cộng.",
-      s9_l4:"Globalping (khi bật tùy chọn trạm đo): Chỉ kết nối tới api.globalping.io/v1/measurements khi người dùng chủ động bật tùy chọn đo độ trễ qua trạm đo khu vực (mặc định tắt).",
-      s9_l5:"DB-IP & dịch vụ tra cứu vị trí IP: Tải cơ sở dữ liệu quốc gia IP rút gọn từ download.db-ip.com/free/dbip-country-lite-*.csv.gz về thiết bị để tra cứu ngoại tuyến (trên mạng di động chỉ tải khi người dùng bật cho phép). Khi địa chỉ IP chưa có trong cơ sở dữ liệu cục bộ và tùy chọn tra cứu HTTPS dự phòng đang bật, ứng dụng truy vấn api.country.is, ipwho.is hoặc ipapi.co/json/ để xác định mã quốc gia của IP.",
-      s9_l6:"Google Translate (khi bật dịch giao diện): Khi tính năng dịch menu Xbox đang bật và gặp cụm từ chưa có sẵn trong từ điển nội bộ, ứng dụng gửi đoạn văn bản giao diện ngắn tới translate.googleapis.com/translate_a/single để dịch sang ngôn ngữ bạn chọn.",
+      s9_1:"9.1. Không có máy chủ thu thập dữ liệu riêng và lưu trữ thuần cục bộ: Nhà phát triển không vận hành máy chủ thu thập dữ liệu người dùng, không tích hợp bộ công cụ phân tích hành vi hay quảng cáo và không thu thập tài khoản, mật khẩu hay thẻ thanh toán của bạn. Toàn bộ dữ liệu hoạt động chỉ lưu cục bộ trên thiết bị trong vùng nhớ riêng (Context.MODE_PRIVATE SharedPreferences), gồm 6 tệp cấu hình thực tế trong mã nguồn: cloudplay_settings_store (cài đặt), cloudplay_servers (danh sách máy chủ lưu tạm), cloudplay_bookmarks (game đánh dấu), cloudplay_recent_games (game mở gần đây), cloudplay_session_history (lịch sử FPS/ping/decode) và cloudplay_update_checker (trạng thái kiểm tra cập nhật), cùng bộ nhớ đệm (filesDir/cacheDir) chứa tệp cơ sở dữ liệu IP ngoại tuyến, Cookie WebView và tệp APK cập nhật.",
+      s9_2:"9.2. Các quyền hệ thống Android thực tế (AndroidManifest.xml): Ứng dụng chỉ khai báo các quyền cần thiết cho chức năng kỹ thuật, gồm: quyền mạng và giữ kết nối nền (INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE), quyền rung tay cầm ảo (VIBRATE), quyền điều chỉnh âm thanh (MODIFY_AUDIO_SETTINGS), quyền thông báo (POST_NOTIFICATIONS), quyền cài đặt bản cập nhật khi người dùng chủ động bấm cập nhật (REQUEST_INSTALL_PACKAGES) và quyền ghi âm tùy chọn (RECORD_AUDIO — chỉ yêu cầu khi bạn bật micro đàm thoại trong game). Ứng dụng tuyệt đối không yêu cầu quyền vị trí GPS, danh bạ, camera hay đọc bộ nhớ ngoài.",
+      s9_3:"9.3. Kết nối mạng trực tiếp tới Microsoft & Xbox (do Microsoft vận hành): Khi bạn đăng nhập, duyệt danh mục và phát luồng trò chơi, thiết bị của bạn kết nối trực tiếp tới: www.xbox.com, xbox.com, login.live.com, login.microsoftonline.com, catalog.gamepass.com, displaycatalog.mp.microsoft.com và store-images.s-microsoft.com. Dữ liệu trao đổi trên các tên miền này chịu sự điều chỉnh trực tiếp bởi Tuyên bố về Quyền riêng tư của Microsoft.",
+      s9_4:"9.4. Kết nối mạng phụ trợ và tùy chọn trong mã nguồn: (a) GitHub & Mirror cập nhật: kết nối api.github.com/repos/muitenvn/CloudPlay-App/releases/latest và github.com/muitenvn/CloudPlay-App/releases để kiểm tra phiên bản, đối chiếu mã SHA-256 và tải APK (có thể tắt tự động kiểm tra); chỉ đi qua ghfast.top khi bạn chủ động chọn tải qua mirror; tải từ điển dịch từ raw.githubusercontent.com/redphx/better-xcloud. (b) Đồng bộ máy chủ công cộng: kết nối www.vpngate.net/api/iphone/ và api.proxyscrape.com/v2/ khi làm mới danh sách proxy/VPN. (c) Globalping (mặc định tắt): chỉ kết nối api.globalping.io/v1/measurements khi bạn bật tùy chọn đo độ trễ trạm khu vực. (d) DB-IP & tra cứu vị trí IP: tải tệp cơ sở dữ liệu quốc gia từ download.db-ip.com/free/dbip-country-lite-*.csv.gz để tra cứu ngoại tuyến (trên mạng di động chỉ tải khi bạn bật cho phép), và chỉ truy vấn api.country.is, ipwho.is hoặc ipapi.co/json/ khi IP chưa có trong tệp cục bộ và bạn bật tra cứu HTTPS dự phòng. (e) Google Translate: khi bật dịch menu Xbox và gặp cụm từ chưa có trong từ điển nội bộ, gửi chuỗi văn bản giao diện ngắn tới translate.googleapis.com/translate_a/single.",
+      s9_5:"9.5. Quyền kiểm soát của người dùng và giới hạn trách nhiệm dữ liệu bên thứ ba: Bạn có thể tắt các tính năng mạng tùy chọn trong Cài đặt hoặc xóa sạch dữ liệu cục bộ bằng cách xóa dữ liệu ứng dụng trong cài đặt Android. Ngoại lệ: khi thiết bị của bạn gửi yêu cầu trực tiếp tới các dịch vụ bên thứ ba nêu tại Mục 9.3 và 9.4, máy chủ của các bên đó sẽ nhận được địa chỉ IP và tiêu đề kết nối chuẩn (HTTP headers) theo chính sách quyền riêng tư riêng của họ mà nhà phát triển không có quyền can thiệp.",
+      s9_ex:"Ví dụ thực tế: Khi bạn tắt công tắc “Tự động kiểm tra cập nhật”, tắt “Trạm đo Globalping” và tắt “Dịch giao diện Xbox”, Ứng dụng hoàn toàn không gửi bất kỳ yêu cầu nào tới api.github.com, api.globalping.io hay translate.googleapis.com.",
       s10_t:"10. Dịch vụ và thư viện bên thứ ba",
-      s10_p1:"Ghi nguồn dữ liệu định vị IP: Ứng dụng sử dụng cơ sở dữ liệu DB-IP Lite. Theo điều khoản giấy phép Creative Commons Attribution 4.0 International (CC BY 4.0), chúng tôi ghi nhận nguồn: “IP geolocation by DB-IP.com” (https://db-ip.com).",
-      s10_p2:"Cảm hứng và dữ liệu cộng đồng: Một số giải pháp tối ưu hiển thị luồng phát, điều khiển cảm ứng và từ điển dịch thuật được tham khảo từ dự án mã nguồn mở better-xcloud của tác giả redphx theo giấy phép MIT.",
-      s10_p3:"Danh sách thư viện chính (khai báo trong gradle/libs.versions.toml):",
-      s10_l1:"Thư viện đang biên dịch trong ứng dụng: AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM & Material 3 / Material Icons, AndroidX WebKit, AndroidX Room (Runtime, KTX, Compiler), AndroidX Credentials & Google Identity (googleid), Kotlinx Coroutines (Core, Android), Square OkHttp & Logging Interceptor, Square Retrofit & Moshi (moshi-kotlin, converter-moshi), Coil Compose.",
-      s10_l2:"Thư viện khai báo sẵn trong danh mục phiên bản (dùng cho kiểm thử hoặc đang tạm đóng trong cấu hình build): AndroidX DataStore Preferences, AndroidX Navigation Compose, AndroidX CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), cùng các thư viện kiểm thử JUnit 4, AndroidX Test, Espresso và Robolectric.",
+      s10_1:"10.1. Ghi nguồn dữ liệu định vị IP (DB-IP.com) và dữ liệu cộng đồng: Ứng dụng tích hợp dữ liệu định vị quốc gia theo địa chỉ IP từ cơ sở dữ liệu DB-IP Lite. Tuân thủ điều khoản giấy phép Creative Commons Attribution 4.0 International (CC BY 4.0), Ứng dụng ghi nhận rõ nguồn: “IP geolocation by DB-IP.com” (https://db-ip.com). Các tập lệnh tối ưu hiển thị và từ điển dịch giao diện tham khảo từ dự án mã nguồn mở better-xcloud của tác giả redphx theo giấy phép MIT.",
+      s10_2:"10.2. Danh sách thư viện chính đang biên dịch trong ứng dụng (lấy từ gradle/libs.versions.toml): Bao gồm AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM & Material 3 / Material Icons, AndroidX WebKit (cung cấp ProxyController), AndroidX Room (Runtime, KTX, Compiler — khai báo trong cấu hình phụ thuộc nhưng ứng dụng thực tế không khởi tạo cơ sở dữ liệu SQLite Room lúc chạy mà chỉ dùng SharedPreferences), AndroidX Credentials & Google Identity (googleid), Kotlinx Coroutines (Core, Android), Square OkHttp & Logging Interceptor, Square Retrofit & Moshi (moshi-kotlin, converter-moshi) và Coil Compose.",
+      s10_3:"10.3. Thư viện khai báo sẵn trong danh mục phiên bản và giới hạn trách nhiệm: Các thư viện khác có mặt trong gradle/libs.versions.toml (dùng cho kiểm thử hoặc đang tạm đóng trong cấu hình build) gồm AndroidX DataStore Preferences, Navigation Compose, CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), JUnit 4, AndroidX Test, Espresso và Robolectric. Nhà phát triển không bảo đảm và không chịu trách nhiệm về các lỗi nội tại phát sinh từ thư viện hoặc thành phần hệ thống (như Android System WebView) do bên thứ ba cung cấp.",
+      s10_ex:"Ví dụ thực tế: Nếu một bản cập nhật Android System WebView của Google trên điện thoại của bạn gặp lỗi giải mã WebRTC gây giật hình trên mọi trình duyệt, sự cố đó thuộc về thành phần hệ thống của bên thứ ba và nằm ngoài khả năng sửa lỗi trực tiếp của CloudPlay.",
       s11_t:"11. Miễn trừ bảo đảm",
-      s11_p1:"Trong phạm vi pháp luật hiện hành cho phép, Ứng dụng được cung cấp miễn phí trên cơ sở “NGUYÊN TRẠNG” (AS IS) và “NHƯ HIỆN CÓ” (AS AVAILABLE), không kèm theo bất kỳ bảo đảm rõ ràng hay ngầm định nào về tính liên tục, không có lỗi, độ trễ mạng thấp hay khả năng tương thích với mọi thiết bị hoặc mọi thay đổi từ phía máy chủ bên thứ ba.",
+      s11_1:"11.1. Cung cấp trên cơ sở “NHƯ HIỆN CÓ” và “THEO KHẢ NĂNG HIỆN CÓ”: Trong phạm vi tối đa mà pháp luật hiện hành cho phép, Ứng dụng được cung cấp hoàn toàn miễn phí trên cơ sở “NHƯ HIỆN CÓ” (AS IS) và “THEO KHẢ NĂNG HIỆN CÓ” (AS AVAILABLE). Nhà phát triển từ chối mọi bảo đảm dưới bất kỳ hình thức nào, dù rõ ràng hay ngầm định, bao gồm nhưng không giới hạn ở các bảo đảm ngầm định về khả năng thương mại, tính phù hợp cho một mục đích cụ thể và việc không có lỗi kỹ thuật.",
+      s11_2:"11.2. Không bảo đảm hoạt động liên tục và chất lượng luồng phát: Nhà phát triển không bảo đảm rằng Ứng dụng sẽ luôn hoạt động liên tục, không bị gián đoạn, không bị văng (crash), độ trễ mạng (ping/RTT) luôn thấp, tốc độ khung hình luôn đạt 60 FPS hay thời gian giải mã khung hình (decode time) luôn ở mức tối ưu. Chất lượng thực tế phụ thuộc vào phần cứng giải mã MediaCodec của từng thiết bị Android, đường truyền của nhà cung cấp dịch vụ internet (ISP) và tải trọng máy chủ từ xa.",
+      s11_3:"11.3. Không bảo đảm khả năng tương thích với dịch vụ của Microsoft/Xbox và bên thứ ba: Do Ứng dụng hoạt động dựa trên việc hiển thị giao diện web và giao thức WebRTC của bên thứ ba, nhà phát triển tuyệt đối không bảo đảm Ứng dụng sẽ luôn tương thích với dịch vụ của Microsoft/Xbox (hoặc VPNGate, ProxyScrape, Globalping, GitHub API). Dịch vụ của Microsoft/Xbox và các bên thứ ba này có thể thay đổi cấu trúc trang web, thay đổi giao thức mã hóa, siết chặt kiểm tra vùng hoặc chặn truy cập từ trình duyệt WebView bất cứ lúc nào mà không báo trước, làm cho một phần hoặc toàn bộ tính năng của Ứng dụng ngừng hoạt động.",
+      s11_4:"11.4. Ngoại lệ theo luật định: Nếu pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú không cho phép loại trừ một số bảo đảm bắt buộc theo luật định, các giới hạn tại Mục 11 này chỉ áp dụng trong phạm vi tối đa mà pháp luật đó cho phép.",
+      s11_ex:"Ví dụ thực tế: Nếu Microsoft bất ngờ cập nhật cổng web xbox.com/play khiến tập lệnh dịch menu hoặc chế độ vượt kiểm tra vùng bằng proxy trong CloudPlay không còn tác dụng, nhà phát triển không có nghĩa vụ bảo đảm tính năng đó phải hoạt động trở lại ngay lập tức.",
       s12_t:"12. Giới hạn trách nhiệm",
-      s12_p1:"Trong phạm vi pháp luật hiện hành cho phép, nhà phát triển không chịu trách nhiệm đối với các thiệt hại gián tiếp, ngẫu nhiên, phát sinh do việc không thể truy cập dịch vụ bên thứ ba, việc tài khoản bên thứ ba bị hạn chế, hoặc do sự cố từ các máy chủ proxy/VPN công cộng của bên thứ ba.",
-      s12_p2:"Không có nội dung nào trong điều khoản này nhằm loại trừ hoặc giới hạn các trách nhiệm pháp lý bắt buộc của nhà phát triển mà pháp luật hiện hành không cho phép miễn trừ, và điều khoản này không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp luật bắt buộc nào từ nhà phát triển sang người dùng.",
+      s12_1:"12.1. Loại trừ trách nhiệm đối với các thiệt hại gián tiếp và hệ quả: Trong phạm vi tối đa mà pháp luật hiện hành cho phép, nhà phát triển ([ĐIỀN: Tên cá nhân hoặc tổ chức phát triển]) và những người đóng góp mã nguồn không chịu trách nhiệm bồi thường đối với bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt hay thiệt hại mang tính hệ quả nào phát sinh từ việc bạn sử dụng hoặc không thể sử dụng Ứng dụng.",
+      s12_2:"12.2. Không chịu trách nhiệm về mất tài khoản, mất dữ liệu, mất tiến trình game và chi phí di động: Cụ thể, trong phạm vi pháp luật cho phép, nhà phát triển không chịu trách nhiệm đối với: (a) việc tài khoản Microsoft/Xbox, Epic Games hoặc tài khoản trò chơi của bạn bị hạn chế vùng, tạm khóa hay khóa vĩnh viễn cùng mọi thiệt hại về phí thuê bao Game Pass hoặc vật phẩm đã mua; (b) việc mất dữ liệu cục bộ (danh sách game đánh dấu, lịch sử phiên chơi, cài đặt) hoặc mất tiến trình lưu game (save game) do lỗi kết nối hay lỗi đồng bộ đám mây; (c) mọi khoản cước phí dữ liệu di động (4G/5G) hoặc internet phát sinh với nhà mạng viễn thông; và (d) hiện tượng nóng máy, chai pin hoặc sự cố rò rỉ dữ liệu từ các máy chủ proxy/VPN công cộng do bên thứ ba vận hành.",
+      s12_3:"12.3. Giới hạn mức trần trách nhiệm dân sự: Do CloudPlay được cung cấp hoàn toàn miễn phí (0 đồng), trong trường hợp pháp luật áp dụng vẫn yêu cầu xác định một mức giới hạn trách nhiệm dân sự, tổng mức trách nhiệm tối đa của nhà phát triển đối với bạn cho mọi khiếu nại sẽ không vượt quá số tiền bạn đã trả trực tiếp cho nhà phát triển để sử dụng Ứng dụng (bằng không), trừ khi pháp luật bắt buộc có quy định khác.",
+      s12_4:"12.4. Ngoại lệ bắt buộc — Không miễn trừ trách nhiệm pháp luật bắt buộc: Không có nội dung nào trong Điều khoản này nhằm loại trừ hoặc giới hạn các trách nhiệm pháp lý bắt buộc của nhà phát triển mà pháp luật hiện hành không cho phép miễn trừ, và Điều khoản này hoàn toàn không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp luật bắt buộc nào từ nhà phát triển sang người dùng.",
+      s12_ex:"Ví dụ thực tế: Khi bạn đang đấu xếp hạng trong game hoặc chưa kịp lưu tiến trình thì máy chủ đám mây bị ngắt kết nối làm mất tiến trình chơi (hoặc bị trừ điểm xếp hạng), nhà phát triển hoàn toàn không chịu trách nhiệm bồi thường cho tổn thất tiến trình đó.",
       s13_t:"13. Bồi thường",
-      s13_p1:"Trong phạm vi pháp luật hiện hành cho phép, bạn chịu trách nhiệm đối với các khiếu nại hoặc thiệt hại phát sinh trực tiếp từ hành vi của chính bạn khi cố ý vi phạm các điều khoản này, vi phạm pháp luật hoặc xâm phạm quyền hợp pháp của bên thứ ba trong quá trình sử dụng Ứng dụng.",
+      s13_1:"13.1. Trách nhiệm giải quyết khiếu nại phát sinh từ hành vi có lỗi của người dùng: Trong phạm vi pháp luật hiện hành cho phép, bạn đồng ý tự chịu trách nhiệm giải quyết và giữ cho nhà phát triển không bị thiệt hại trước các khiếu nại, yêu cầu bồi thường dân sự hoặc chi phí hợp lý phát sinh trực tiếp từ hành vi có lỗi của chính bạn khi: (a) cố ý vi phạm các quy định trong Điều khoản này; (b) sử dụng Ứng dụng hoặc máy chủ công cộng để thực hiện hành vi vi phạm pháp luật, tấn công mạng hoặc xâm phạm quyền hợp pháp của bên thứ ba; hoặc (c) tự ý sửa đổi, đóng gói lại (repackage) tệp APK của Ứng dụng kèm mã độc để phát tán cho người khác.",
+      s13_2:"13.2. Phạm vi giới hạn và ngoại lệ: Quy định tại Mục 13.1 chỉ áp dụng đối với thiệt hại do chính hành vi sai phạm của bạn gây ra. Điều khoản này không áp dụng đối với các khiếu nại phát sinh từ lỗi của chính nhà phát triển và tuyệt đối không chuyển giao bất kỳ trách nhiệm hình sự hay nghĩa vụ pháp lý bắt buộc nào từ nhà phát triển sang người dùng.",
+      s13_ex:"Ví dụ thực tế: Nếu một người tự ý chỉnh sửa tệp APK của CloudPlay để chèn quảng cáo lừa đảo rồi đem phát tán khiến người dùng khác bị thiệt hại và khiếu nại, chính người đã chỉnh sửa và phát tán bản APK đó phải tự chịu toàn bộ trách nhiệm bồi thường dân sự trước những người bị hại.",
       s14_t:"14. Cập nhật và chấm dứt",
-      s14_p1:"Nhà phát triển có thể cập nhật nội dung điều khoản này hoặc thay đổi, tạm ngừng phát triển Ứng dụng bất cứ lúc nào. Khi có thay đổi quan trọng, ngày cập nhật ở đầu trang sẽ được điều chỉnh. Bạn có thể chấm dứt việc sử dụng bất cứ lúc nào bằng cách gỡ cài đặt Ứng dụng khỏi thiết bị.",
+      s14_1:"14.1. Quyền thay đổi điều khoản bất cứ lúc nào và sự chấp nhận bản mới: Nhà phát triển có quyền sửa đổi, bổ sung hoặc cập nhật Điều khoản này bất cứ lúc nào để phù hợp với tính năng kỹ thuật mới hoặc quy định pháp luật. Khi có cập nhật, ngày “Cập nhật lần cuối” ở đầu trang sẽ được điều chỉnh. Việc bạn tiếp tục mở và sử dụng Ứng dụng sau khi bản điều khoản mới được công bố đồng nghĩa với việc bạn chấp nhận bản điều khoản đã sửa đổi. Ngoại lệ: nếu không đồng ý với bản cập nhật điều khoản mới, bạn phải ngừng sử dụng và gỡ cài đặt Ứng dụng.",
+      s14_2:"14.2. Quyền thay đổi hoặc chấm dứt phát triển Ứng dụng: Vì Ứng dụng là dự án cung cấp miễn phí, nhà phát triển có quyền thêm, bớt tính năng, tạm ngừng cập nhật hoặc ngừng duy trì dự án bất cứ lúc nào mà không cần báo trước và không phát sinh nghĩa vụ bồi thường đối với người dùng.",
+      s14_3:"14.3. Chấm dứt bởi người dùng và các điều khoản giữ nguyên hiệu lực: Bạn có quyền chấm dứt sử dụng bất cứ lúc nào bằng cách gỡ cài đặt Ứng dụng khỏi thiết bị. Sau khi gỡ cài đặt, các quy định về Sở hữu trí tuệ (Phần 8), Miễn trừ bảo đảm (Phần 11), Giới hạn trách nhiệm (Phần 12), Bồi thường (Phần 13) và Luật áp dụng (Phần 15) vẫn tiếp tục có hiệu lực đối với giai đoạn bạn đã sử dụng trước đó.",
+      s14_ex:"Ví dụ thực tế: Khi một phiên bản mới của CloudPlay bổ sung thêm tùy chọn mạng mới và cập nhật lại Phần 9 của trang điều khoản này, việc bạn nâng cấp và tiếp tục dùng ứng dụng xác nhận rằng bạn đồng ý với nội dung cập nhật đó.",
       s15_t:"15. Luật áp dụng [ĐIỀN] và liên hệ [ĐIỀN]",
-      s15_p1:"Luật áp dụng và giải quyết tranh chấp: Điều khoản này được điều chỉnh và giải thích theo pháp luật của [ĐIỀN: Quốc gia / vùng lãnh thổ có luật áp dụng], không xét đến các quy tắc xung đột pháp luật. Mọi tranh chấp phát sinh liên quan đến Điều khoản này sẽ được giải quyết tại cơ quan có thẩm quyền tại [ĐIỀN: Tòa án / cơ quan tài phán có thẩm quyền], trừ trường hợp pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú có quy định bắt buộc khác.",
-      s15_p2:"Thông tin liên hệ: Mọi thắc mắc, phản hồi hoặc yêu cầu liên quan đến điều khoản sử dụng và quyền riêng tư, vui lòng liên hệ [ĐIỀN: Tên cá nhân / nhóm phát triển] qua email: [ĐIỀN: Địa chỉ email liên hệ chính thức] hoặc tại trang vấn đề GitHub: https://github.com/muitenvn/CloudPlay-App/issues.",
+      s15_1:"15.1. Luật áp dụng và cơ quan giải quyết tranh chấp: Điều khoản này được điều chỉnh và giải thích theo pháp luật của [ĐIỀN: Quốc gia / vùng lãnh thổ có luật áp dụng], không xét đến các quy tắc xung đột pháp luật. Mọi tranh chấp phát sinh từ hoặc liên quan đến Điều khoản này sẽ được giải quyết tại cơ quan có thẩm quyền tại [ĐIỀN: Tòa án / cơ quan tài phán có thẩm quyền]. Ngoại lệ: nếu pháp luật bảo vệ người tiêu dùng tại nơi bạn cư trú có quy định bắt buộc không thể thỏa thuận khác về luật áp dụng hoặc cơ quan tài phán, quy định bắt buộc đó sẽ được áp dụng.",
+      s15_2:"15.2. Tính hiệu lực từng phần (Severability): Nếu bất kỳ điều khoản hoặc mục nhỏ nào trong văn bản này bị tòa án hoặc cơ quan có thẩm quyền xác định là vô hiệu, trái pháp luật hoặc không thể thi hành, thì điều khoản đó sẽ được giới hạn hoặc tách riêng trong phạm vi tối thiểu cần thiết, và tất cả các điều khoản còn lại vẫn giữ nguyên giá trị pháp lý và hiệu lực thi hành đầy đủ.",
+      s15_3:"15.3. Ngôn ngữ ưu tiên khi có sự khác biệt: Trang Điều khoản này được cung cấp bằng cả tiếng Việt và tiếng Anh để thuận tiện cho người dùng. Trong trường hợp có bất kỳ sự khác biệt, mâu thuẫn hoặc cách hiểu không thống nhất nào giữa phiên bản tiếng Việt và phiên bản tiếng Anh, phiên bản [ĐIỀN: chọn bản nào được ưu tiên, ví dụ: Tiếng Việt / Tiếng Anh] sẽ được ưu tiên áp dụng làm căn cứ giải thích chính thức.",
+      s15_4:"15.4. Thông tin liên hệ chính thức: Mọi câu hỏi, phản hồi hoặc thông báo liên quan đến Điều khoản sử dụng và Quyền riêng tư, vui lòng liên hệ [ĐIỀN: Tên cá nhân / nhóm phát triển] qua email: [ĐIỀN: Địa chỉ email liên hệ chính thức] hoặc tại trang vấn đề GitHub: https://github.com/muitenvn/CloudPlay-App/issues.",
+      s15_ex:"Ví dụ thực tế: Giả sử một mục con trong Phần 12 bị pháp luật tại quốc gia của bạn coi là quá rộng và không được áp dụng toàn bộ, thì chỉ riêng phần vượt quá đó được điều chỉnh theo luật định, còn toàn bộ các phần khác từ Phần 1 đến Phần 15 vẫn tiếp tục có hiệu lực đầy đủ.",
       foot:"CloudPlay cho Android",home:"Trang chủ",rel:"Các bản phát hành",src:"Mã nguồn"
     },
     en:{
+      toc_btn:"Contents",
+      toc_title:"Table of Contents (15 sections)",
+      toc_close:"Close table of contents",
+      exp_all:"Expand all",
+      col_all:"Collapse all",
       back:"← Back to home",
       title:"Terms of Use & Privacy",
       updated:"Last updated: [ĐIỀN: Date of update] · Operator: [ĐIỀN: Developer or entity name]",
@@ -350,61 +527,89 @@
       sum_4:"The app does not collect, store, or transmit your account credentials, passwords, or payment details.",
       sum_5:"IP geolocation data is provided by DB-IP.com (IP geolocation by DB-IP.com, CC BY 4.0 license).",
       s1_t:"1. Acceptance of Terms",
-      s1_p1:"By downloading, installing, or using the CloudPlay application (“the App”), you acknowledge that you have read, understood, and agreed to these terms. If you do not agree to any part of these terms, please stop using and uninstall the App from your device.",
-      s1_p2:"These terms govern only the relationship between you and the App developer ([ĐIỀN: Developer or entity name]) and do not replace the terms of service of Microsoft, Xbox, Epic Games, or any other third-party service provider.",
+      s1_1:"1.1. Act of Acceptance: By downloading the installation package (APK), installing, or opening the CloudPlay application (“the App”), you confirm that you have read, understood, and agreed to be bound by these Terms. Users are responsible for reviewing these terms before enabling network-related features. Exception: if you do not agree to any provision herein, you have no right to use the App and must uninstall it from your device immediately.",
+      s1_2:"1.2. Scope of Parties & Independence from Third Parties: These Terms govern only the relationship between you and the developer ([ĐIỀN: Developer or entity name]). They do not replace, modify, or waive the Microsoft Services Agreement, Xbox Community Standards, Epic Games Terms of Service, or any game publisher's rules. Accepting CloudPlay's Terms grants you no exemption from third-party rules.",
+      s1_3:"1.3. Consent to Optional Features & Updates: Features disabled by default (such as Smart VPN/Proxy, Globalping probes, UI translation, or mirror APK downloads) take effect only when you actively enable them. Continuing to install new updates via GitHub Releases or Settings constitutes acceptance of the terms applicable to that version.",
+      s1_ex:"Practical Example: When you use CloudPlay to sign in to your personal Xbox account, the App interface is governed by these Terms, while your Microsoft account and Game Pass subscription remain governed solely by Microsoft.",
       s2_t:"2. App Functionality",
-      s2_p1:"CloudPlay is a specialized browser utility that assists in accessing the Xbox Cloud Gaming web interface on Android devices. Key functions include:",
-      s2_l1:"Displaying real-time WebRTC stream telemetry (network round-trip time RTT, jitter, frame rate FPS, frame decode time, and dropped frames).",
-      s2_l2:"Adjusting stream bitrate and resolution caps according to user-selected presets, and providing an on-screen virtual touch controller overlay.",
-      s2_l3:"Translating Xbox web menu text and providing an optional public proxy/VPN connection tool used only during the regional check prior to stream startup.",
-      s2_p2:"The App does not provide games, does not include Game Pass subscriptions, and never modifies game server code or memory.",
+      s2_1:"2.1. Specialized WebView Browser: The App uses the built-in Android System WebView component to load the official cloud gaming portal at www.xbox.com/play. Account authentication via login.live.com occurs directly with Microsoft servers, and your session is stored strictly in the local WebView cookie store on your device.",
+      s2_2:"2.2. WebRTC Stream Telemetry & Optimization: Using RTCPeerConnection.getStats(), the App reads real-time metrics (FPS, RTT/Ping, Jitter, hardware frame Decode time in ms, dropped frames, and Bitrate) for the on-screen HUD. Local scripts prioritize the H.264 Constrained Baseline profile (42e01f) in SDP negotiation to reduce MediaCodec hardware decode latency and apply user-selected bitrate caps (2–20 Mbps), target resolutions (720p/1080p/1080p HQ), visual filters, and audio boost.",
+      s2_3:"2.3. Touch Controls & WebView-Scoped Regional Routing: The App provides a Virtual Touch Controller overlay with haptic vibration (VIBRATE), gyroscope aiming, and Bluetooth/USB gamepad support. When Smart VPN is enabled by the user, AndroidX WebKit ProxyController routes only the App's internal WebView traffic through a public proxy server during the regional check and automatically clears the proxy override (clearProxyOverride) once streaming begins.",
+      s2_4:"2.4. Functional Boundaries & What Is NOT Guaranteed: CloudPlay does not own games, does not provide Xbox Game Pass accounts or subscriptions, does not create a system-wide Android TUN VPN tunnel (XboxCloudVpnService is solely a Foreground Service keeping the process alive while streaming), and never modifies game servers.",
+      s2_ex:"Practical Example: When you enable “Smart VPN” in CloudPlay, only the Xbox browser view inside the App uses the proxy during the region check; other apps on your phone (banking, YouTube) are completely unaffected.",
       s3_t:"3. Eligibility and Age Requirements",
-      s3_p1:"You must be of legal age of majority in your country or territory of residence (or at least [ĐIỀN: Minimum age under applicable law, e.g., 13 or 18 years old] with the consent and supervision of a parent or legal guardian) to use the App.",
-      s3_p2:"You must also comply with Microsoft/Xbox account eligibility rules and the age ratings (ESRB, PEGI, or equivalent) of any game you access.",
+      s3_1:"3.1. Minimum Age & Supervision Responsibility: Users must be of legal age of majority in their jurisdiction of residence, or at least [ĐIỀN: Minimum age under applicable law, e.g., 13 or 18 years old] years old. Exception: eligible minors may use the App only with the direct consent and supervision of a parent or legal guardian, who bears full responsibility for configuring restrictions via Microsoft Family Safety.",
+      s3_2:"3.2. Third-Party Account Eligibility & Game Age Ratings: Users are solely responsible for maintaining a valid Microsoft/Xbox account and eligible subscription. Because the Xbox Cloud Gaming catalog includes 16+/18+ titles (under ESRB, PEGI, CERO), users must verify age ratings before launching any title. The developer has no control over Microsoft's catalog filtering.",
+      s3_3:"3.3. Device & Local Law Compliance: Your device must include an updated Android System WebView supporting WebRTC and hardware H.264 decoding. You may not use the App where cloud gaming or proxy routing utilities are prohibited by local law.",
+      s3_ex:"Practical Example: When a 15-year-old uses CloudPlay, their parent or guardian is responsible for enabling age restrictions in Microsoft Family Settings to block access to PEGI 18 / ESRB Mature 17+ games.",
       s4_t:"4. User Responsibilities",
-      s4_p1:"Users are responsible for their own actions and use of the App and their personal accounts. The developer does not encourage unlawful use or any use that violates third-party terms of service.",
-      s4_p2:"You are responsible for securing your device and Microsoft/Xbox login credentials, verifying the SHA-256 checksum when downloading APK files, and paying any mobile data (4G/5G) or internet charges incurred.",
+      s4_1:"4.1. Personal Responsibility for Actions & Configuration: Users independently decide whether to enable optional features and bear full responsibility for their own usage conduct. The developer does not encourage unlawful use or violations of third-party terms of service.",
+      s4_2:"4.2. Session Security & Payment Safety: Microsoft login sessions are stored in local WebView cookies; users are responsible for setting a device screen lock, enabling two-factor authentication (2FA), and signing out on shared devices. Technical Safety Exception: although internal code (ProxyInjector) automatically disconnects the proxy when detecting payment URLs or account.microsoft.com, this safeguard does not replace user due diligence — you must manually verify and disable any public proxy/VPN before entering payment card numbers, gift cards, or passwords.",
+      s4_3:"4.3. Verifying Official Sources & SHA-256 Hashes: Users are responsible for downloading the App exclusively from official GitHub Releases (github.com/muitenvn/CloudPlay-App/releases) or the built-in updater, and verifying SHA-256 checksums when using mirror links. The developer is not responsible for risks caused by unofficial tampered APKs.",
+      s4_4:"4.4. Mobile Data (4G/5G) & Internet Costs: Cloud video streaming consumes roughly 0.9 GB/hour (at 2 Mbps) up to 6.7–9 GB/hour (at 15–20 Mbps), plus any data used if you permit DB-IP Lite database downloads over cellular networks. Users are solely responsible for all carrier data charges under all circumstances.",
+      s4_5:"4.5. Hardware Thermals, Android Permissions & Health: Continuous 60fps hardware decoding with screen wake locks (WAKE_LOCK) and 90Hz/120Hz refresh rates generates heat and battery drain; users are responsible for monitoring device temperature, managing granted permissions (RECORD_AUDIO for voice chat, POST_NOTIFICATIONS, REQUEST_INSTALL_PACKAGES), and using Volume Boost safely. Clearing app data or uninstalling permanently deletes local bookmarks and session history in SharedPreferences (except Xbox Cloud Saves managed by Microsoft).",
+      s4_ex:"Practical Example: If you forget to turn off 5G mobile data and stream at 20 Mbps for 2 hours (consuming ~15 GB), or enter a credit card while an external public VPN is active, you alone bear responsibility for the resulting carrier charges and security risks.",
       s5_t:"5. Prohibited Conduct",
-      s5_p1:"When using the App, you must not:",
-      s5_l1:"Use the App for any unlawful purpose, distribute malware, conduct network attacks, or overload third-party infrastructure.",
-      s5_l2:"Use cheats, hacks, unauthorized automation scripts, or exploit vulnerabilities in cloud gaming services.",
-      s5_l3:"Repackage the App with malware, adware, or impersonate the developer to deceive other users.",
+      s5_1:"5.1. Prohibition on Malicious Repackaging & Commercial Impersonation: Decompiling or modifying the CloudPlay APK to inject malware, cookie/password stealers, or hidden adware, or impersonating the developer to defraud or charge users, is strictly prohibited. Exception: studying the code or creating compliant open-source forks on GitHub is permitted provided copyright notices and built-in safety mechanisms remain intact.",
+      s5_2:"5.2. Prohibition on In-Game Cheating & Service Abuse: Users must not use the App's WebView or controller tools to inject cheats, hacks, aimbots, unauthorized automation macros, or exploit vulnerabilities in Xbox Cloud Gaming. Users bear sole responsibility toward Microsoft and game publishers for any violation.",
+      s5_3:"5.3. Prohibition on API Flooding & Public Server Abuse: Bypassing built-in rate limits (such as the hard cap of 200 Globalping probes/hour and update check cooldowns) to flood the GitHub API, VPNGate, ProxyScrape, Globalping, or DB-IP, or using public proxy servers for network attacks or unlawful acts, is strictly prohibited.",
+      s5_ex:"Practical Example: Downloading the CloudPlay APK, injecting script code to steal login.live.com cookies, and distributing it as a “CloudPlay VIP Unlock” is strictly prohibited and the perpetrator bears sole legal liability.",
       s6_t:"6. VPN, Proxy and Account Risks",
-      s6_p1:"Certain features in the App (such as connecting via proxy/VPN servers or changing market locale codes) may be considered geo-restriction circumvention or a violation of the terms of service of Microsoft, Xbox, Epic Games, or game publishers.",
-      s6_p2:"Using these features carries a risk of connection refusal, feature restriction, temporary suspension, or permanent ban of your account by third-party service providers. VPN/proxy features are strictly optional, initiated by you, and you assume responsibility for any resulting consequences to your account.",
+      s6_1:"6.1. User's Independent Decision: Connecting via proxy/VPN servers (“Smart VPN” via ProxyController, or external VPN mode EXTERNAL_VPN) and changing Market Locale codes in the App are strictly optional tools. Enabling or disabling VPN/proxy is solely the user's voluntary decision; the App never forces region switching if you use direct connection mode in an Xbox-supported country.",
+      s6_2:"6.2. Risk of Third-Party Terms Violation & Account Suspension: Users understand and accept that using a VPN, proxy, or market locale override to access services from an unsupported region may be treated by Microsoft, Xbox, Epic Games, or game publishers as geo-restriction circumvention in violation of their terms of service. Consequences may include connection refusal, purchase blocks, subscription revocation, temporary suspension, or permanent termination of your Microsoft/Xbox or game accounts.",
+      s6_3:"6.3. Allocation of Responsibility & What Is NOT Guaranteed: The developer has zero control over Microsoft's or Epic Games' account enforcement or regional anti-abuse systems, and makes no guarantee that any proxy/VPN routing method is “ban-proof” or safe from third-party enforcement. Users assume full risk and responsibility for their accounts and any funds or subscriptions tied to those accounts.",
+      s6_4:"6.4. Technical Auto-Bypass Mechanism & Exceptions: In the source code (ProxyInjector and VpnManager), when autoBypassEnabled is active, the App applies the proxy to the WebView only during the initial regional check and automatically clears the proxy override (clearProxyOverride) once the WebRTC video stream starts (or after a user-selected 1–8s delay) so gameplay traffic flows directly over your native connection. Exception: if you use an OS-level third-party VPN app (EXTERNAL_VPN) or disable auto-bypass, all traffic continues routing through the VPN until you manually disconnect it.",
+      s6_ex:"Practical Example: You use a Japanese or Korean proxy server to pass the regional check to play Fortnite or a Game Pass title. If Microsoft's or Epic Games' security systems detect anomalous IP routing and restrict or ban your account, you alone bear responsibility for your decision to enable the VPN.",
       s7_t:"7. Third-Party Public Servers",
-      s7_p1:"The free proxy and VPN server lists displayed in the App are aggregated automatically from public internet directories (such as VPNGate and ProxyScrape) and are operated by independent third parties.",
-      s7_p2:"The developer does not own, operate, or control the security, uptime, or traffic-logging policies of these public servers. Although the App is designed to route only Xbox regional check domains and automatically disconnect intermediate servers when opening payment pages or once gameplay starts, you should never use public servers for sensitive transactions.",
+      s7_1:"7.1. Public Server Sources & Independent Operators: The free proxy and VPN server lists displayed in the App are automatically aggregated from public internet directories (including the academic VPNGate project at vpngate.net and ProxyScrape lists at proxyscrape.com) or manually entered by the user. All such servers are operated by independent individuals, volunteers, or third-party entities; the developer does not own, lease, or administer any server in the list.",
+      s7_2:"7.2. User Awareness of Security & Network Quality Risks: By enabling a connection through a public server, the user acknowledges the inherent risks of free public infrastructure: (a) traffic passing through the server may be monitored or logged (including your IP address and access metadata) by the server's operator; (b) response times may be slow, latency (ping) high, or bandwidth throttled due to shared congestion; and (c) servers may drop connections abruptly or go offline at any time without notice.",
+      s7_3:"7.3. Limits of HTTPS Protection & Bypass Rules: Although connections to xbox.com and login.live.com use HTTPS/TLS encryption, an intermediate proxy server can still see the target domain name (via SNI/CONNECT headers) and could intercept traffic if you accept invalid security certificates. To mitigate risk, the App's source code configures bypass rules to route only Xbox regional check domains and automatically disconnects the proxy when detecting account management (account.microsoft.com) or payment URLs.",
+      s7_4:"7.4. Exceptions & Mandatory Safety Precautions: The App's automatic bypass cannot protect you if a third-party website changes its payment URL structure or if you use a system-wide external VPN. Users are strictly responsible for never performing banking transactions, entering credit card details, redeeming gift cards, or changing passwords while connected to any public server.",
+      s7_ex:"Practical Example: A public server from the VPNGate list works initially but suddenly becomes slow or disconnects while you are queued for a game, causing the session to fail. This is an inherent characteristic of free third-party public servers and is outside the developer's control or warranty.",
       s8_t:"8. Intellectual Property and Trademarks",
-      s8_p1:"CloudPlay is an independent project and is not affiliated with, sponsored, endorsed, or approved by Microsoft Corporation, Xbox, or Epic Games, Inc.",
-      s8_p2:"“Microsoft”, “Xbox”, “Xbox Cloud Gaming”, and “Xbox Game Pass” are trademarks of Microsoft Corporation. “Fortnite” and “Epic Games” are trademarks of Epic Games, Inc. All other game titles, cover art, and trademarks displayed belong to their respective owners. The App's source code is licensed as specified in the official repository.",
+      s8_1:"8.1. Non-Affiliation & Third-Party Trademarks: CloudPlay is an independent software project and is not affiliated with, sponsored, authorized, or endorsed by Microsoft Corporation, Xbox, or Epic Games, Inc. “Microsoft”, “Xbox”, “Xbox Cloud Gaming”, and “Xbox Game Pass” are trademarks of Microsoft Corporation; “Fortnite” and “Epic Games” are trademarks of Epic Games, Inc. All game titles, icons, and cover art loaded from catalog APIs belong to their respective copyright owners.",
+      s8_2:"8.2. Open-Source Copyright & License Boundaries: CloudPlay's original source code is copyrighted by the developer ([ĐIỀN: Developer or entity name]) and released under the open-source license published in the official GitHub repository. Exception: the App's open-source license applies exclusively to CloudPlay's own code and grants users no commercial rights to the trademarks, imagery, or services of Microsoft, Epic Games, or game publishers.",
+      s8_3:"8.3. Community Attribution: Certain stream display optimizations, touch control techniques, and UI translation dictionary data are adapted and synced from the open-source better-xcloud project by redphx under the MIT License.",
+      s8_ex:"Practical Example: Displaying Xbox Game Pass cover art inside CloudPlay's Catalog tab merely renders public metadata from Microsoft's servers to help users identify games and does not mean CloudPlay owns any rights to those games.",
       s9_t:"9. Privacy and Data",
-      s9_p1:"The App operates no proprietary analytics or data collection servers, requires no separate user account, and never collects your passwords or payment card details. Settings, bookmarked games, and session history are stored strictly locally on your device (SharedPreferences / app cache) and can be cleared at any time.",
-      s9_p2:"Below is the exact list of network connections present in the App's source code:",
-      s9_l1:"Microsoft & Xbox (operated by Microsoft): Direct connections to www.xbox.com, xbox.com, login.live.com, and login.microsoftonline.com for account sign-in and game streaming; plus catalog.gamepass.com, displaycatalog.mp.microsoft.com, and store-images.s-microsoft.com to fetch the game catalog and cover art.",
-      s9_l2:"GitHub API, GitHub Releases & Update Mirror: Connections to api.github.com/repos/muitenvn/CloudPlay-App/releases/latest and github.com/muitenvn/CloudPlay-App/releases to check for updates, fetch SHA-256 checksums, and download APK updates (auto-check can be disabled in Settings). When the user manually selects the mirror option, downloads route via ghfast.top. The App may also sync UI translation dictionaries from raw.githubusercontent.com/redphx/better-xcloud.",
-      s9_l3:"VPNGate & ProxyScrape (when syncing server lists): Connections to www.vpngate.net/api/iphone/ and api.proxyscrape.com/v2/ when refreshing the public proxy/VPN server list.",
-      s9_l4:"Globalping (when optional regional probe is enabled): Connects to api.globalping.io/v1/measurements only when the user enables the regional probe latency test option (off by default).",
-      s9_l5:"DB-IP & IP Geolocation Services: Downloads the compact IP country database from download.db-ip.com/free/dbip-country-lite-*.csv.gz for offline lookup (mobile data downloads require explicit user permission in Settings). When an IP is not found locally and HTTPS fallback lookup is enabled, the App queries api.country.is, ipwho.is, or ipapi.co/json/ to resolve the country code.",
-      s9_l6:"Google Translate (when UI translation is enabled): When Xbox menu translation is enabled and a phrase is not in the built-in dictionary, short UI text strings are sent to translate.googleapis.com/translate_a/single for translation into your selected language.",
+      s9_1:"9.1. No Proprietary Data Collection Servers & Strictly Local Storage: The developer operates no user-data collection servers, embeds no behavioral analytics or ad SDKs, and never collects your accounts, passwords, or payment cards. All operational data is stored strictly locally on your device in private storage (Context.MODE_PRIVATE SharedPreferences) across 6 actual files in the codebase: cloudplay_settings_store (settings), cloudplay_servers (cached server list), cloudplay_bookmarks (bookmarked games), cloudplay_recent_games (recent games), cloudplay_session_history (FPS/ping/decode history), and cloudplay_update_checker (update check state), plus local cache (filesDir/cacheDir) holding the offline IP database, WebView cookies, and downloaded APK updates.",
+      s9_2:"9.2. Actual Android System Permissions (AndroidManifest.xml): The App declares only permissions required for technical functionality: network and foreground keep-alive permissions (INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, WAKE_LOCK, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE), virtual gamepad haptics (VIBRATE), audio routing/boost (MODIFY_AUDIO_SETTINGS), notifications (POST_NOTIFICATIONS), package installation when you manually trigger an APK update (REQUEST_INSTALL_PACKAGES), and optional microphone access (RECORD_AUDIO — requested only when you enable in-game voice chat). The App never requests GPS location, contacts, camera, or external storage read permissions.",
+      s9_3:"9.3. Direct Network Connections to Microsoft & Xbox (Operated by Microsoft): When you sign in, browse the catalog, and stream games, your device connects directly to: www.xbox.com, xbox.com, login.live.com, login.microsoftonline.com, catalog.gamepass.com, displaycatalog.mp.microsoft.com, and store-images.s-microsoft.com. Data exchanged with these domains is governed directly by the Microsoft Privacy Statement.",
+      s9_4:"9.4. Auxiliary & Optional Network Connections in Source Code: (a) GitHub & Update Mirror: connects to api.github.com/repos/muitenvn/CloudPlay-App/releases/latest and github.com/muitenvn/CloudPlay-App/releases to check versions, verify SHA-256 hashes, and download APKs (auto-check can be disabled); routes via ghfast.top only when you manually select the mirror option; fetches translation dictionaries from raw.githubusercontent.com/redphx/better-xcloud. (b) Public Server Sync: connects to www.vpngate.net/api/iphone/ and api.proxyscrape.com/v2/ when refreshing proxy/VPN lists. (c) Globalping (off by default): connects to api.globalping.io/v1/measurements only when you enable regional probe latency tests. (d) DB-IP & IP Geolocation: downloads the country database from download.db-ip.com/free/dbip-country-lite-*.csv.gz for offline lookup (mobile data downloads require explicit permission in Settings), and queries api.country.is, ipwho.is, or ipapi.co/json/ only when an IP is missing locally and HTTPS fallback lookup is enabled. (e) Google Translate: when Xbox menu translation is enabled and a phrase is not in the local dictionary, sends short UI strings to translate.googleapis.com/translate_a/single.",
+      s9_5:"9.5. User Control & Third-Party Data Boundaries: You can disable optional network features in Settings or wipe all local data by clearing app storage in Android settings. Exception: when your device sends direct requests to the third-party endpoints listed in Sections 9.3 and 9.4, those third-party servers receive your IP address and standard HTTP headers under their own respective privacy policies, over which the developer has no control.",
+      s9_ex:"Practical Example: When you turn off “Auto-check for updates”, “Globalping Probes”, and “Xbox UI Translation”, the App sends zero requests to api.github.com, api.globalping.io, or translate.googleapis.com.",
       s10_t:"10. Third-Party Services and Libraries",
-      s10_p1:"IP Geolocation Attribution: This App uses the DB-IP Lite database. Pursuant to the Creative Commons Attribution 4.0 International (CC BY 4.0) license, attribution is given as: “IP geolocation by DB-IP.com” (https://db-ip.com).",
-      s10_p2:"Community Inspiration & Data: Stream display optimizations, touch control techniques, and translation dictionary entries draw from the open-source better-xcloud project by redphx under the MIT License.",
-      s10_p3:"Main Libraries (declared in gradle/libs.versions.toml):",
-      s10_l1:"Active compiled libraries: AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM & Material 3 / Material Icons, AndroidX WebKit, AndroidX Room (Runtime, KTX, Compiler), AndroidX Credentials & Google Identity (googleid), Kotlinx Coroutines (Core, Android), Square OkHttp & Logging Interceptor, Square Retrofit & Moshi (moshi-kotlin, converter-moshi), Coil Compose.",
-      s10_l2:"Additional catalog entries in libs.versions.toml (used for testing or currently commented out in build config): AndroidX DataStore Preferences, AndroidX Navigation Compose, AndroidX CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), plus test libraries JUnit 4, AndroidX Test, Espresso, and Robolectric.",
+      s10_1:"10.1. IP Geolocation Attribution (DB-IP.com) & Community Data: The App integrates IP-to-country lookup data from the DB-IP Lite database. In compliance with the Creative Commons Attribution 4.0 International (CC BY 4.0) license, attribution is explicitly provided as: “IP geolocation by DB-IP.com” (https://db-ip.com). Stream display scripts and UI translation dictionaries reference the open-source better-xcloud project by redphx under the MIT License.",
+      s10_2:"10.2. Active Compiled Libraries (from gradle/libs.versions.toml): Includes AndroidX Core KTX, AndroidX Lifecycle (Runtime KTX, Runtime Compose, ViewModel Compose), AndroidX Activity Compose, Jetpack Compose BOM & Material 3 / Material Icons, AndroidX WebKit (providing ProxyController), AndroidX Room (Runtime, KTX, Compiler — declared in build dependencies though the App does not instantiate a runtime Room SQLite database and uses SharedPreferences instead), AndroidX Credentials & Google Identity (googleid), Kotlinx Coroutines (Core, Android), Square OkHttp & Logging Interceptor, Square Retrofit & Moshi (moshi-kotlin, converter-moshi), and Coil Compose.",
+      s10_3:"10.3. Additional Catalog Entries & Liability Boundaries: Other libraries declared in gradle/libs.versions.toml (for testing or currently commented out in build config) include AndroidX DataStore Preferences, Navigation Compose, CameraX, Google Play Services Location, Accompanist Permissions, Firebase BOM (Firebase AI, App Check), JUnit 4, AndroidX Test, Espresso, and Robolectric. The developer makes no warranty and assumes no liability for internal defects in third-party libraries or system components (such as Android System WebView).",
+      s10_ex:"Practical Example: If a Google update to Android System WebView on your phone introduces a WebRTC decoding bug across browsers, that defect originates from a third-party system component outside CloudPlay's direct control.",
       s11_t:"11. Disclaimer of Warranties",
-      s11_p1:"To the maximum extent permitted by applicable law, the App is provided free of charge on an “AS IS” and “AS AVAILABLE” basis, without warranties of any kind, express or implied, regarding uninterrupted operation, error-free performance, low network latency, or compatibility with every device or third-party server change.",
+      s11_1:"11.1. Provided “AS IS” and “AS AVAILABLE”: To the maximum extent permitted by applicable law, the App is provided free of charge on an “AS IS” and “AS AVAILABLE” basis. The developer disclaims all warranties of any kind, whether express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, and absence of technical defects.",
+      s11_2:"11.2. No Warranty of Uninterrupted Operation or Stream Quality: The developer does not warrant that the App will operate without interruption or crashes, that network latency (ping/RTT) will remain low, that frame rates will consistently reach 60 FPS, or that hardware frame decode times will always stay optimal. Actual performance depends on your Android device's MediaCodec hardware decoder, your ISP connection, and remote server load.",
+      s11_3:"11.3. No Warranty of Compatibility with Microsoft/Xbox or Third-Party Services: Because the App relies on rendering third-party web interfaces and WebRTC protocols, the developer makes zero warranty that the App will remain compatible with Microsoft/Xbox services (or VPNGate, ProxyScrape, Globalping, and the GitHub API). Microsoft/Xbox and these third parties may alter web structures, update encryption protocols, tighten regional checks, or block WebView access at any time without notice, rendering part or all of the App non-functional.",
+      s11_4:"11.4. Statutory Exceptions: Where consumer protection laws in your jurisdiction do not allow the exclusion of certain mandatory statutory warranties, the disclaimers in this Section 11 apply to the fullest extent permitted by such laws.",
+      s11_ex:"Practical Example: If Microsoft updates the xbox.com/play web portal and causes CloudPlay's menu translation script or proxy regional bypass to stop working, the developer has no obligation to guarantee that those features will be restored.",
       s12_t:"12. Limitation of Liability",
-      s12_p1:"To the maximum extent permitted by applicable law, the developer shall not be liable for indirect, incidental, or consequential damages arising from inability to access third-party services, restrictions placed on third-party accounts, or failures of third-party public proxy/VPN servers.",
-      s12_p2:"Nothing in these terms excludes or limits any mandatory statutory liability of the developer that cannot be waived under applicable law, nor do these terms transfer any criminal liability or mandatory legal obligation from the developer to the user.",
+      s12_1:"12.1. Exclusion of Indirect & Consequential Damages: To the maximum extent permitted by applicable law, the developer ([ĐIỀN: Developer or entity name]) and code contributors shall not be liable for any indirect, incidental, special, or consequential damages arising out of or related to your use of or inability to use the App.",
+      s12_2:"12.2. No Liability for Account Loss, Data Loss, Game Progress Loss, or Mobile Data Costs: Specifically, to the extent permitted by law, the developer is not liable for: (a) regional restrictions, temporary suspensions, or permanent bans placed on your Microsoft/Xbox, Epic Games, or game accounts, or any loss of Game Pass subscriptions or in-game purchases; (b) loss of local data (bookmarks, session history, settings) or loss of in-game save progress due to connection drops or cloud sync errors; (c) any mobile data (4G/5G) or internet charges billed by your telecom carrier; or (d) device overheating, battery wear, or data exposure on third-party public proxy/VPN servers.",
+      s12_3:"12.3. Liability Cap: Because CloudPlay is provided free of charge (at zero cost), where applicable law requires a civil liability cap, the developer's total aggregate liability to you for all claims shall not exceed the amount you actually paid directly to the developer to use the App (zero), unless mandatory law requires otherwise.",
+      s12_4:"12.4. Mandatory Statutory Exceptions — No Transfer of Criminal or Mandatory Liability: Nothing in these Terms excludes or limits any mandatory statutory liability of the developer that cannot be waived under applicable law, nor do these Terms transfer any criminal liability or mandatory legal obligation from the developer to the user.",
+      s12_ex:"Practical Example: If a cloud server disconnects during a ranked match or before a checkpoint is saved, causing you to lose in-game progress or ranking points, the developer bears no liability to compensate for that loss.",
       s13_t:"13. Indemnification",
-      s13_p1:"To the extent permitted by applicable law, you are responsible for claims or damages arising directly from your own willful breach of these terms, violation of applicable law, or infringement of third-party rights while using the App.",
+      s13_1:"13.1. Responsibility for Claims Arising from User Fault: To the extent permitted by applicable law, you agree to be responsible for and hold the developer harmless from civil third-party claims, demands, or reasonable expenses arising directly from your own culpable conduct when you: (a) willfully breach these Terms; (b) use the App or public servers to violate applicable law, conduct network attacks, or infringe third-party rights; or (c) modify and repackage the App's APK with malware for distribution to others.",
+      s13_2:"13.2. Scope Boundaries & Exceptions: Section 13.1 applies strictly to damages caused by your own wrongful acts. It does not apply to claims caused by the developer's own fault and never transfers any criminal liability or mandatory statutory obligation from the developer to the user.",
+      s13_ex:"Practical Example: If an individual modifies the CloudPlay APK to inject fraudulent ads and distributes it, causing harm to other users, that individual alone is responsible for resolving resulting civil claims.",
       s14_t:"14. Changes and Termination",
-      s14_p1:"The developer may update these terms or modify, suspend, or discontinue the App at any time. When material changes are made, the update date at the top of this page will be revised. You may stop using the App at any time by uninstalling it from your device.",
+      s14_1:"14.1. Right to Modify Terms at Any Time & Acceptance by Continued Use: The developer reserves the right to revise, supplement, or update these Terms at any time to reflect technical changes or legal requirements. When updated, the “Last updated” date at the top of this page will be revised. Your continued opening and use of the App after revised Terms are published constitutes your acceptance of the updated Terms. Exception: if you do not agree to the updated Terms, you must stop using and uninstall the App.",
+      s14_2:"14.2. Right to Modify or Discontinue the App: Because the App is provided free of charge, the developer may add or remove features, pause updates, or discontinue maintaining the project at any time without prior notice and without liability for compensation.",
+      s14_3:"14.3. Termination by User & Survival of Provisions: You may terminate these Terms at any time by uninstalling the App from your device. Upon uninstallation, the sections governing Intellectual Property (Section 8), Disclaimer of Warranties (Section 11), Limitation of Liability (Section 12), Indemnification (Section 13), and Governing Law (Section 15) shall survive with respect to your prior use.",
+      s14_ex:"Practical Example: When a new CloudPlay release adds a networking option and updates Section 9 of this page, upgrading and continuing to use the App confirms your acceptance of that update.",
       s15_t:"15. Governing Law [ĐIỀN] and Contact [ĐIỀN]",
-      s15_p1:"Governing Law & Disputes: These terms are governed by and construed in accordance with the laws of [ĐIỀN: Applicable country / jurisdiction], without regard to conflict of law principles. Any dispute arising out of these terms shall be submitted to the competent courts/authorities in [ĐIỀN: Competent court / jurisdiction], unless mandatory consumer protection laws in your place of residence require otherwise.",
-      s15_p2:"Contact Information: For questions, feedback, or inquiries regarding these terms and privacy practices, please contact [ĐIỀN: Developer / team name] via email at [ĐIỀN: Official contact email address] or via GitHub Issues: https://github.com/muitenvn/CloudPlay-App/issues.",
+      s15_1:"15.1. Governing Law & Dispute Resolution: These Terms are governed by and construed in accordance with the laws of [ĐIỀN: Applicable country / jurisdiction], without regard to conflict of law principles. Any dispute arising out of or relating to these Terms shall be submitted to the competent courts/authorities in [ĐIỀN: Competent court / jurisdiction]. Exception: where mandatory consumer protection laws in your place of residence grant non-waivable rights regarding governing law or venue, those mandatory rules apply.",
+      s15_2:"15.2. Severability: If any provision or sub-clause of these Terms is held by a court or competent authority to be invalid, unlawful, or unenforceable, that provision shall be limited or severed to the minimum extent necessary, and all remaining provisions shall remain in full force and effect.",
+      s15_3:"15.3. Prevailing Language: These Terms are provided in both Vietnamese and English for user convenience. In the event of any discrepancy, inconsistency, or ambiguity between the Vietnamese and English versions, the [ĐIỀN: Select prevailing version, e.g., Vietnamese / English] version shall prevail for official interpretation.",
+      s15_4:"15.4. Official Contact Information: For any questions, feedback, or notices regarding these Terms of Use and Privacy practices, please contact [ĐIỀN: Developer / team name] via email at [ĐIỀN: Official contact email address] or via GitHub Issues: https://github.com/muitenvn/CloudPlay-App/issues.",
+      s15_ex:"Practical Example: If a sub-clause in Section 12 is deemed overly broad under your country's mandatory consumer laws, only the excess portion is adjusted to match statutory limits while Sections 1 through 15 otherwise remain fully valid.",
       foot:"CloudPlay for Android",home:"Home",rel:"Releases",src:"Source code"
     }
   };
@@ -414,9 +619,62 @@
   function apply(l){
     lang=l;var t=D[l];document.documentElement.lang=l;
     [].forEach.call(document.querySelectorAll("[data-i]"),function(el){var k=el.getAttribute("data-i");if(t[k]!==undefined)el.textContent=t[k];});
+    [].forEach.call(document.querySelectorAll("[data-i-aria]"),function(el){var k=el.getAttribute("data-i-aria");if(t[k]!==undefined)el.setAttribute("aria-label",t[k]);});
     [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.setAttribute("aria-pressed",b.getAttribute("data-lang")===l?"true":"false");});
   }
   [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.addEventListener("click",function(){var l=b.getAttribute("data-lang");try{localStorage.setItem("cp_lang",l);}catch(e){}apply(l);});});
+
+  /* Expand / Collapse all */
+  var allDetails=document.querySelectorAll(".acc-list details");
+  var btnExp=document.getElementById("btn-exp-all");
+  var btnCol=document.getElementById("btn-col-all");
+  if(btnExp)btnExp.addEventListener("click",function(){[].forEach.call(allDetails,function(d){d.open=true;});});
+  if(btnCol)btnCol.addEventListener("click",function(){[].forEach.call(allDetails,function(d){d.open=false;});});
+
+  /* Table of Contents drawer */
+  var tocBtn=document.getElementById("toc-btn");
+  var tocPanel=document.getElementById("toc-panel");
+  var tocBackdrop=document.getElementById("toc-backdrop");
+  var tocClose=document.getElementById("toc-close");
+  function setToc(open){
+    if(!tocBtn||!tocPanel||!tocBackdrop)return;
+    tocBtn.setAttribute("aria-expanded",open?"true":"false");
+    tocPanel.setAttribute("aria-hidden",open?"false":"true");
+    if(open){
+      tocPanel.classList.add("open");
+      tocBackdrop.classList.add("open");
+    }else{
+      tocPanel.classList.remove("open");
+      tocBackdrop.classList.remove("open");
+    }
+  }
+  if(tocBtn)tocBtn.addEventListener("click",function(){
+    var isOpen=tocBtn.getAttribute("aria-expanded")==="true";
+    setToc(!isOpen);
+  });
+  if(tocClose)tocClose.addEventListener("click",function(){setToc(false);if(tocBtn)tocBtn.focus();});
+  if(tocBackdrop)tocBackdrop.addEventListener("click",function(){setToc(false);});
+  document.addEventListener("keydown",function(e){
+    if((e.key==="Escape"||e.key==="Esc")&&tocBtn&&tocBtn.getAttribute("aria-expanded")==="true"){
+      setToc(false);
+      tocBtn.focus();
+    }
+  });
+  [].forEach.call(document.querySelectorAll(".toc-list a"),function(a){
+    a.addEventListener("click",function(e){
+      e.preventDefault();
+      var id=a.getAttribute("data-sec");
+      var target=id?document.getElementById(id):null;
+      setToc(false);
+      if(target){
+        target.open=true;
+        target.scrollIntoView({behavior:"smooth",block:"start"});
+        var sum=target.querySelector("summary");
+        if(sum)sum.focus({preventScroll:true});
+      }
+    });
+  });
+
   apply(lang);
 })();
 </script>

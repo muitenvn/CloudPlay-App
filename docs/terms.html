@@ -66,7 +66,7 @@
   .toc-list{list-style:none;overflow-y:auto;padding:8px}
   .toc-list li+li{margin-top:2px}
   .toc-list a{display:block;padding:10px 12px;border-radius:10px;color:var(--text);text-decoration:none;font-size:14.5px;font-weight:600;line-height:1.35;transition:background .15s,color .15s}
-  .toc-list a:hover,.toc-list a:active{background:var(--accent-soft);color:var(--accent)}
+  .toc-list a:hover,.toc-list a:active,.toc-list a.active{background:var(--accent-soft);color:var(--accent)}
   /* page header */
   .page-head{padding:22px 0 12px}
   .back-link{display:inline-flex;align-items:center;gap:6px;font-size:14.5px;font-weight:600;text-decoration:none;margin-bottom:10px}
@@ -81,11 +81,45 @@
   .summary-list{list-style:none;display:grid;gap:8px}
   .summary-list li{position:relative;padding-left:18px;font-size:15.5px;line-height:1.6;color:var(--text)}
   .summary-list li::before{content:"•";position:absolute;left:2px;top:0;color:var(--accent);font-weight:700}
-  /* accordion controls & sections */
+  /* directory hub cards (multi-page in single file) */
   .terms-sec{margin-top:24px}
-  .acc-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:12px}
-  .ctrl-btn{font:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 12px;min-height:38px;cursor:pointer;transition:background .15s,border-color .15s}
+  .acc-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .toolbar-label{font-size:15px;font-weight:700;color:var(--text)}
+  .toolbar-btns{display:flex;flex-wrap:wrap;gap:8px}
+  .ctrl-btn{font:inherit;font-size:13.5px;font-weight:600;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 12px;min-height:40px;cursor:pointer;transition:background .15s,border-color .15s}
   .ctrl-btn:hover{background:var(--sum-hover);border-color:var(--accent)}
+  .ctrl-btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  /* directory grid */
+  .dir-grid{display:grid;gap:10px;margin-bottom:18px}
+  .dir-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;min-height:56px;border-radius:var(--r);background:var(--sum-bg);border:1.5px solid var(--line);color:var(--text);text-decoration:none;font-weight:700;font-size:16.5px;line-height:1.35;transition:background .15s,border-color .15s,transform .12s}
+  .dir-card:hover,.dir-card:active{background:var(--sum-hover);border-color:var(--accent)}
+  .dir-arrow{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:999px;background:var(--bg);border:1px solid var(--line);color:var(--accent);font-size:16px;flex:none}
+  /* single-section sub-page view */
+  .subpage-bar{display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:12px 14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+  .subpage-back{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:14.5px;font-weight:700;color:var(--accent);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-height:42px;cursor:pointer;text-decoration:none}
+  .subpage-back:hover{background:var(--accent-soft);border-color:var(--accent)}
+  .subpage-badge{font-size:13.5px;font-weight:700;color:var(--muted);padding:4px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+  .subpage-nav{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .pnav-btn{display:flex;flex-direction:column;gap:4px;padding:12px 14px;min-height:54px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--line);color:var(--text);text-decoration:none;transition:background .15s,border-color .15s}
+  .pnav-btn:hover{background:var(--sum-hover);border-color:var(--accent)}
+  .pnav-btn.next{text-align:right;align-items:flex-end}
+  .pnav-dir{font-size:12.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.03em}
+  .pnav-title{font-size:14.5px;font-weight:700;color:var(--text);line-height:1.3}
+  /* View modes: 1) hub mode (default), 2) subpage mode (#sec-X), 3) all-accordion mode */
+  body[data-mode="hub"] .acc-list,
+  body[data-mode="hub"] #acc-exp-btns{display:none}
+  body[data-mode="subpage"] .dir-grid,
+  body[data-mode="subpage"] .summary-box,
+  body[data-mode="subpage"] .notice,
+  body[data-mode="subpage"] .acc-toolbar{display:none}
+  body[data-mode="subpage"] .subpage-bar{display:flex}
+  body[data-mode="subpage"] .subpage-nav{display:grid}
+  body[data-mode="subpage"] .acc-list details{display:none}
+  body[data-mode="subpage"] .acc-list details.active-sec{display:block}
+  body[data-mode="subpage"] .acc-list details.active-sec summary{cursor:default;pointer-events:none}
+  body[data-mode="subpage"] .acc-list details.active-sec .chev{display:none}
+  body[data-mode="all"] .dir-grid{display:none}
+  /* accordion details styling */
   .acc-list{display:grid;gap:12px}
   details{border:1.5px solid var(--line);border-radius:var(--r);background:var(--surface);overflow:hidden;scroll-margin-top:70px;transition:border-color .2s,box-shadow .2s}
   details[open]{border-color:var(--accent);box-shadow:var(--shadow)}
@@ -105,12 +139,14 @@
   .example-box{padding:12px 14px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--line);color:var(--text)}
   .acc-body code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;background:var(--surface);padding:1px 5px;border-radius:5px;border:1px solid var(--line);color:var(--text)}
   footer{margin-top:34px;padding:22px 0 10px;border-top:1px solid var(--line);color:var(--muted);font-size:14.5px;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
-  @media (max-width:380px){
+  @media (max-width:420px){
     .wrap{padding:0 12px}
     .toc-trigger{padding:6px 10px;font-size:13px}
     .lang button{padding:6px 8px;font-size:12.5px}
-    summary{padding:12px 14px;font-size:16px}
+    summary,.dir-card{padding:12px 14px;font-size:16px}
     .acc-body{padding:14px;font-size:15px}
+    .subpage-nav{grid-template-columns:1fr}
+    .pnav-btn.next{text-align:left;align-items:flex-start}
   }
   @media (min-width:640px){
     .wrap{max-width:840px;padding:0 28px}
@@ -119,7 +155,7 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
-<body>
+<body data-mode="hub">
 <header class="top">
   <div class="wrap">
     <a class="brand" href="https://muitenvn.github.io/CloudPlay-App/"><img src="img/icon.png" alt="" width="28" height="28"><span>CloudPlay</span></a>
@@ -143,6 +179,7 @@
     <button type="button" id="toc-close" class="toc-close" aria-label="Đóng" data-i-aria="toc_close">✕</button>
   </div>
   <ol class="toc-list">
+    <li><a href="#overview" data-sec="overview" data-i="toc_home">🏠 Trang danh mục tổng quan</a></li>
     <li><a href="#sec-1" data-sec="sec-1" data-i="s1_t">1. Chấp nhận điều khoản</a></li>
     <li><a href="#sec-2" data-sec="sec-2" data-i="s2_t">2. Chức năng của ứng dụng</a></li>
     <li><a href="#sec-3" data-sec="sec-3" data-i="s3_t">3. Điều kiện sử dụng và độ tuổi</a></li>
@@ -185,9 +222,41 @@
   </section>
 
   <section class="terms-sec" aria-label="Terms sections">
+    <!-- Top bar when viewing an individual section sub-page -->
+    <div id="subpage-bar" class="subpage-bar">
+      <a href="#overview" id="subpage-back" class="subpage-back" data-i="back_dir">← Danh mục 15 điều khoản</a>
+      <span id="subpage-badge" class="subpage-badge">1 / 15</span>
+    </div>
+
+    <!-- Mode switcher & accordion controls -->
     <div class="acc-toolbar">
-      <button type="button" id="btn-exp-all" class="ctrl-btn" data-i="exp_all">Mở tất cả</button>
-      <button type="button" id="btn-col-all" class="ctrl-btn" data-i="col_all">Thu gọn tất cả</button>
+      <span class="toolbar-label" data-i="dir_heading">Chọn chuyên mục để xem trang chi tiết:</span>
+      <div class="toolbar-btns">
+        <button type="button" id="btn-mode-toggle" class="ctrl-btn" aria-pressed="false" data-i="mode_all">Xem gộp trên 1 trang</button>
+        <span id="acc-exp-btns" class="toolbar-btns">
+          <button type="button" id="btn-exp-all" class="ctrl-btn" data-i="exp_all">Mở tất cả</button>
+          <button type="button" id="btn-col-all" class="ctrl-btn" data-i="col_all">Thu gọn tất cả</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- Directory cards (each opens its dedicated virtual page inside this file) -->
+    <div id="dir-grid" class="dir-grid" role="navigation" aria-label="Terms directory">
+      <a class="dir-card" href="#sec-1" data-sec="sec-1"><span data-i="s1_t">1. Chấp nhận điều khoản</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-2" data-sec="sec-2"><span data-i="s2_t">2. Chức năng của ứng dụng</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-3" data-sec="sec-3"><span data-i="s3_t">3. Điều kiện sử dụng và độ tuổi</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-4" data-sec="sec-4"><span data-i="s4_t">4. Trách nhiệm của người dùng</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-5" data-sec="sec-5"><span data-i="s5_t">5. Hành vi bị cấm</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-6" data-sec="sec-6"><span data-i="s6_t">6. VPN, proxy và rủi ro với tài khoản</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-7" data-sec="sec-7"><span data-i="s7_t">7. Máy chủ công cộng của bên thứ ba</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-8" data-sec="sec-8"><span data-i="s8_t">8. Sở hữu trí tuệ và nhãn hiệu</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-9" data-sec="sec-9"><span data-i="s9_t">9. Quyền riêng tư và dữ liệu</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-10" data-sec="sec-10"><span data-i="s10_t">10. Dịch vụ và thư viện bên thứ ba</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-11" data-sec="sec-11"><span data-i="s11_t">11. Miễn trừ bảo đảm</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-12" data-sec="sec-12"><span data-i="s12_t">12. Giới hạn trách nhiệm</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-13" data-sec="sec-13"><span data-i="s13_t">13. Bồi thường</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-14" data-sec="sec-14"><span data-i="s14_t">14. Cập nhật và chấm dứt</span><span class="dir-arrow" aria-hidden="true">→</span></a>
+      <a class="dir-card" href="#sec-15" data-sec="sec-15"><span data-i="s15_t">15. Luật áp dụng [ĐIỀN] và liên hệ [ĐIỀN]</span><span class="dir-arrow" aria-hidden="true">→</span></a>
     </div>
 
     <div class="acc-list">
@@ -395,6 +464,18 @@
         </div>
       </details>
     </div>
+
+    <!-- Bottom Prev / Next page navigation when inside a section sub-page -->
+    <nav id="subpage-nav" class="subpage-nav" aria-label="Section page navigation">
+      <a href="#overview" id="pnav-prev" class="pnav-btn prev">
+        <span class="pnav-dir" id="pnav-prev-dir" data-i="prev_sec">← Phần trước</span>
+        <span class="pnav-title" id="pnav-prev-title"></span>
+      </a>
+      <a href="#overview" id="pnav-next" class="pnav-btn next">
+        <span class="pnav-dir" id="pnav-next-dir" data-i="next_sec">Phần tiếp theo →</span>
+        <span class="pnav-title" id="pnav-next-title"></span>
+      </a>
+    </nav>
   </section>
 
   <footer>
@@ -410,6 +491,13 @@
       toc_btn:"Mục lục",
       toc_title:"Mục lục (15 phần)",
       toc_close:"Đóng mục lục",
+      toc_home:"🏠 Trang danh mục tổng quan",
+      dir_heading:"Chọn chuyên mục để mở trang chi tiết:",
+      back_dir:"← Danh mục 15 điều khoản",
+      mode_all:"Xem gộp trên 1 trang",
+      mode_hub:"Chế độ từng trang gọn",
+      prev_sec:"← Phần trước",
+      next_sec:"Phần tiếp theo →",
       exp_all:"Mở tất cả",
       col_all:"Thu gọn tất cả",
       back:"← Quay lại trang chủ",
@@ -513,6 +601,13 @@
       toc_btn:"Contents",
       toc_title:"Table of Contents (15 sections)",
       toc_close:"Close table of contents",
+      toc_home:"🏠 Terms Directory Overview",
+      dir_heading:"Select a topic to open its dedicated page:",
+      back_dir:"← All 15 Terms Sections",
+      mode_all:"View all on 1 page",
+      mode_hub:"Multi-page directory mode",
+      prev_sec:"← Previous section",
+      next_sec:"Next section →",
       exp_all:"Expand all",
       col_all:"Collapse all",
       back:"← Back to home",
@@ -614,22 +709,113 @@
     }
   };
   var lang="en";
+  var currentSecNum=0;
+  var preferAllMode=false;
   try{var sv=localStorage.getItem("cp_lang");if(sv==="vi"||sv==="en")lang=sv;else lang=guess();}catch(e){lang=guess();}
   function guess(){var tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch(e){}return((navigator.language||"").toLowerCase().indexOf("vi")===0||/Ho_Chi_Minh|Saigon/.test(tz))?"vi":"en";}
+
+  var allDetails=document.querySelectorAll(".acc-list details");
+  var btnMode=document.getElementById("btn-mode-toggle");
+  var badgeEl=document.getElementById("subpage-badge");
+  var prevBtn=document.getElementById("pnav-prev");
+  var nextBtn=document.getElementById("pnav-next");
+  var prevTitle=document.getElementById("pnav-prev-title");
+  var nextTitle=document.getElementById("pnav-next-title");
+  var prevDir=document.getElementById("pnav-prev-dir");
+  var nextDir=document.getElementById("pnav-next-dir");
+
+  function syncNavLabels(){
+    var t=D[lang];
+    if(btnMode){
+      btnMode.textContent=preferAllMode?t.mode_hub:t.mode_all;
+      btnMode.setAttribute("aria-pressed",preferAllMode?"true":"false");
+    }
+    if(currentSecNum>=1&&currentSecNum<=15){
+      if(badgeEl)badgeEl.textContent=currentSecNum+" / 15";
+      if(prevBtn&&prevTitle&&prevDir){
+        if(currentSecNum>1){
+          var pIdx=currentSecNum-1;
+          prevBtn.href="#sec-"+pIdx;
+          prevDir.textContent=t.prev_sec;
+          prevTitle.textContent=t["s"+pIdx+"_t"]||"";
+        }else{
+          prevBtn.href="#overview";
+          prevDir.textContent="←";
+          prevTitle.textContent=t.back_dir;
+        }
+      }
+      if(nextBtn&&nextTitle&&nextDir){
+        if(currentSecNum<15){
+          var nIdx=currentSecNum+1;
+          nextBtn.href="#sec-"+nIdx;
+          nextDir.textContent=t.next_sec;
+          nextTitle.textContent=t["s"+nIdx+"_t"]||"";
+        }else{
+          nextBtn.href="#overview";
+          nextDir.textContent="→";
+          nextTitle.textContent=t.back_dir;
+        }
+      }
+    }
+  }
+
   function apply(l){
     lang=l;var t=D[l];document.documentElement.lang=l;
     [].forEach.call(document.querySelectorAll("[data-i]"),function(el){var k=el.getAttribute("data-i");if(t[k]!==undefined)el.textContent=t[k];});
     [].forEach.call(document.querySelectorAll("[data-i-aria]"),function(el){var k=el.getAttribute("data-i-aria");if(t[k]!==undefined)el.setAttribute("aria-label",t[k]);});
     [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.setAttribute("aria-pressed",b.getAttribute("data-lang")===l?"true":"false");});
+    syncNavLabels();
   }
+
+  function routeFromHash(scrollTop){
+    var h=(window.location.hash||"").replace(/^#/,"");
+    var m=/^sec-([1-9]|1[0-5])$/.exec(h);
+    [].forEach.call(document.querySelectorAll(".toc-list a"),function(a){
+      a.classList.toggle("active",a.getAttribute("data-sec")===h||(h===""&&a.getAttribute("data-sec")==="overview"));
+    });
+    if(m&&!preferAllMode){
+      currentSecNum=parseInt(m[1],10);
+      document.body.setAttribute("data-mode","subpage");
+      [].forEach.call(allDetails,function(d){
+        var isTarget=d.id==="sec-"+currentSecNum;
+        d.classList.toggle("active-sec",isTarget);
+        d.open=isTarget;
+      });
+      syncNavLabels();
+      if(scrollTop)window.scrollTo({top:0,behavior:"smooth"});
+    }else if(m&&preferAllMode){
+      currentSecNum=0;
+      document.body.setAttribute("data-mode","all");
+      var target=document.getElementById("sec-"+m[1]);
+      if(target){
+        target.open=true;
+        target.scrollIntoView({behavior:"smooth",block:"start"});
+      }
+      syncNavLabels();
+    }else{
+      currentSecNum=0;
+      document.body.setAttribute("data-mode",preferAllMode?"all":"hub");
+      [].forEach.call(allDetails,function(d){d.classList.remove("active-sec");});
+      syncNavLabels();
+      if(scrollTop&&h==="overview")window.scrollTo({top:0,behavior:"smooth"});
+    }
+  }
+
   [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.addEventListener("click",function(){var l=b.getAttribute("data-lang");try{localStorage.setItem("cp_lang",l);}catch(e){}apply(l);});});
 
-  /* Expand / Collapse all */
-  var allDetails=document.querySelectorAll(".acc-list details");
+  if(btnMode)btnMode.addEventListener("click",function(){
+    preferAllMode=!preferAllMode;
+    if(preferAllMode&&window.location.hash&&window.location.hash!=="#overview"){
+      history.replaceState(null,"","#overview");
+    }
+    routeFromHash(false);
+  });
+
+  /* Expand / Collapse all (in all-on-one-page mode) */
   var btnExp=document.getElementById("btn-exp-all");
   var btnCol=document.getElementById("btn-col-all");
-  if(btnExp)btnExp.addEventListener("click",function(){[].forEach.call(allDetails,function(d){d.open=true;});});
-  if(btnCol)btnCol.addEventListener("click",function(){[].forEach.call(allDetails,function(d){d.open=false;});});
+  if(btnExp)btnExp.addEventListener("click",function(){preferAllMode=true;document.body.setAttribute("data-mode","all");syncNavLabels();[].forEach.call(allDetails,function(d){d.open=true;});});
+  if(btnCol)btnCol.addEventListener("click",function(){preferAllMode=true;document.body.setAttribute("data-mode","all");syncNavLabels();[].forEach.call(allDetails,function(d){d.open=false;});});
 
   /* Table of Contents drawer */
   var tocBtn=document.getElementById("toc-btn");
@@ -664,18 +850,21 @@
     a.addEventListener("click",function(e){
       e.preventDefault();
       var id=a.getAttribute("data-sec");
-      var target=id?document.getElementById(id):null;
       setToc(false);
-      if(target){
-        target.open=true;
-        target.scrollIntoView({behavior:"smooth",block:"start"});
-        var sum=target.querySelector("summary");
-        if(sum)sum.focus({preventScroll:true});
+      if(id==="overview"){
+        preferAllMode=false;
+        window.location.hash="#overview";
+        routeFromHash(true);
+      }else if(id){
+        window.location.hash="#"+id;
+        routeFromHash(true);
       }
     });
   });
 
+  window.addEventListener("hashchange",function(){routeFromHash(true);});
   apply(lang);
+  routeFromHash(false);
 })();
 </script>
 </body>

@@ -151,9 +151,9 @@ object UpdateChecker {
 
     fun getCurrentVersionName(context: Context): String = try {
         val pkgInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-        normalizeVersionString(pkgInfo.versionName ?: "1.2.1")
+        normalizeVersionString(pkgInfo.versionName ?: "1.3.0")
     } catch (_: Exception) {
-        "1.2.1"
+        "1.3.0"
     }
 
     fun normalizeVersionString(raw: String): String = raw.trim().removePrefix("v").removePrefix("V").trim()

@@ -1077,6 +1077,13 @@ fun FloatingHud(
                                     }
                                 )
 
+                                if (virtualControllerEnabled) {
+                                    DenseQuickGamepadSection(
+                                        virtualControllerEnabled = true,
+                                        onInteraction = { markUserInteraction() }
+                                    )
+                                }
+
                                 // ========================================================
                                 // NHÓM 3: MÀU SẮC (Độ nét, FPS & Màu sắc hình ảnh)
                                 // ========================================================
@@ -2325,6 +2332,103 @@ private fun DenseQuickTogglePill(
                 fontWeight = FontWeight.Bold,
                 maxLines = 1
             )
+        }
+    }
+}
+
+/**
+ * Nhóm Tùy chỉnh nhanh tay cầm ảo (Độ mờ, Kích thước nút) ngay trên HUD khi đang chơi.
+ */
+@Composable
+private fun DenseQuickGamepadSection(
+    virtualControllerEnabled: Boolean,
+    onInteraction: () -> Unit = {}
+) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val isEn = config.isEnglishUI()
+    if (!virtualControllerEnabled) return
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF101C16),
+        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isEn) "🎮 Virtual Gamepad Quick Adjust" else "🎮 Tùy chỉnh nhanh tay cầm ảo",
+                    color = XboxNeonGreen,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    text = "${(config.gamepadOpacity * 100).toInt()}% • ${String.format("%.2f", config.gamepadScale)}x",
+                    color = DirectCyan,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Opacity quick presets: 40%, 65%, 85%
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isEn) "Opacity" else "Độ mờ",
+                    color = TextSecondary,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.width(44.dp)
+                )
+                listOf(0.40f to "40%", 0.65f to "65%", 0.85f to "85%").forEach { (opVal, opLabel) ->
+                    val isSel = kotlin.math.abs(config.gamepadOpacity - opVal) < 0.10f
+                    DenseQualityPresetChip(
+                        label = opLabel,
+                        isSelected = isSel,
+                        onClick = {
+                            onInteraction()
+                            com.example.data.SettingsRepository.updateGamepadOpacity(opVal)
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Scale quick presets: 0.85x, 1.0x, 1.20x
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isEn) "Scale" else "Cỡ nút",
+                    color = TextSecondary,
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.width(44.dp)
+                )
+                listOf(0.85f to "0.85x", 1.0f to "1.0x", 1.20f to "1.2x").forEach { (scVal, scLabel) ->
+                    val isSel = kotlin.math.abs(config.gamepadScale - scVal) < 0.08f
+                    DenseQualityPresetChip(
+                        label = scLabel,
+                        isSelected = isSel,
+                        onClick = {
+                            onInteraction()
+                            com.example.data.SettingsRepository.updateGamepadScale(scVal)
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
     }
 }

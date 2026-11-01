@@ -311,19 +311,42 @@ fun VirtualGamepadOverlay(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 val vib = vm?.defaultVibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && amp > 0) {
-                    vib?.vibrate(VibrationEffect.createOneShot(dur, amp))
-                } else {
-                    vib?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                if (vib != null && vib.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val effect = when {
+                            stronger -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+                            level == GamepadHapticLevel.LIGHT -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                            else -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                        }
+                        vib.vibrate(effect)
+                    } else if (amp > 0) {
+                        vib.vibrate(VibrationEffect.createOneShot(dur, amp))
+                    }
                 }
             } else {
                 @Suppress("DEPRECATION")
                 val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && amp > 0) {
-                    v?.vibrate(VibrationEffect.createOneShot(dur, amp))
+                if (v != null && v.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val effect = when {
+                            stronger -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+                            level == GamepadHapticLevel.LIGHT -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                            else -> VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                        }
+                        v.vibrate(effect)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && amp > 0) {
+                        v.vibrate(VibrationEffect.createOneShot(dur, amp))
+                    } else {
+                        v.vibrate(dur)
+                    }
                 }
             }
         } catch (_: Exception) {
+            try {
+                @Suppress("DEPRECATION")
+                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                v?.vibrate(level.durationMs.coerceAtLeast(10L))
+            } catch (_: Exception) {}
         }
     }
 

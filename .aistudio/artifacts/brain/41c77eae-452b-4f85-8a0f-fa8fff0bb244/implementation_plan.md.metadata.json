@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch thiết kế chi tiết theo từng bước nhằm khắc phục triệt để lỗi cảnh báo Decode khi chơi Xbox Cloud Gaming: sửa thời điểm thương lượng H.264 Constrained Baseline trước khi tạo SDP, sửa thứ tự dòng băng thông chuẩn RFC 4566, cô lập việc vẽ lại giao diện HUD khỏi màn hình WebView, tối ưu vòng lặp đo thông số và khôi phục công tắc ẩn cảnh báo trên màn hình.",
-  "updatedAt":  "2026-10-31T12:38:12.096637652Z",
+  "summary":  "Kế hoạch cập nhật từng bước cho CloudPlay v1.3.0 gồm: (1) Hoàn thiện các trường pháp lý [ĐIỀN] trong Điều khoản sử dụng; (2) Nâng cấp tay cầm ảo (độ nhạy, độ trong suốt, rung haptic và độ phản hồi cảm ứng); (3) Tối ưu chất lượng luồng phát Xbox (SDP negotiation H.264 profile, giảm jitter, bộ lọc sắc nét hình ảnh); (4) Chuẩn bị quy trình phát hành bản phát hành v1.3.0 lên GitHub Releases (tag, APK release, SHA-256 checksum, release notes).",
+  "updatedAt":  "2026-11-01T01:50:12.590668317Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

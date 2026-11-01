@@ -714,6 +714,25 @@ class XboxBridge(
                                 return line;
                             });
 
+                            // Ưu tiên hồ sơ codec H.264 Constrained Baseline (profile-level-id=42e01f) lên đầu danh sách m=video
+                            // để WebRTC thương lượng cấu hình tối ưu độ trễ giải mã phần cứng MediaCodec
+                            try {
+                                const fmtpMatches = sdp.match(/a=fmtp:(\d+)[^\r\n]*profile-level-id=42[eE]01[fF]/i);
+                                if (fmtpMatches && fmtpMatches[1]) {
+                                    const preferredPt = fmtpMatches[1];
+                                    sdp = sdp.replace(/(m=video \d+ [A-Z\/]+)( [0-9 ]+)/, function(match, mPrefix, ptList) {
+                                        const pts = ptList.trim().split(/\s+/).filter(function(p){ return p.length > 0; });
+                                        const idx = pts.indexOf(preferredPt);
+                                        if (idx > 0) {
+                                            pts.splice(idx, 1);
+                                            pts.unshift(preferredPt);
+                                            return mPrefix + ' ' + pts.join(' ');
+                                        }
+                                        return match;
+                                    });
+                                }
+                            } catch(_) {}
+
                             if (isLowEndMode && window.__pauseTranslator) {
                                 window.__pauseTranslator();
                             }
@@ -995,7 +1014,7 @@ class XboxBridge(
                                     const hasRealDropOrLowFps = (fps > 0 && fps < 52) || (prevSnap && framesDropped > prevSnap.framesDropped + 2);
                                     if (decodeTimeMs > 18.0 && hasRealDropOrLowFps) {
                                         window.__highDecodeStreakForClarity = (window.__highDecodeStreakForClarity || 0) + 1;
-                                        if (window.__highDecodeStreakForClarity >= 5 && window.__clarityBoostActive && window.__setClarityPreset) {
+                                        if (window.__highDecodeStreakForClarity >= 3 && window.__clarityBoostActive && window.__setClarityPreset) {
                                             window.__highDecodeStreakForClarity = 0;
                                             window.__clarityBoostActive = false;
                                             window.__setClarityPreset('OFF');

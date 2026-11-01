@@ -1071,5 +1071,54 @@ class ExampleRobolectricTest {
         assertTrue(com.example.data.UpdateChecker.hasValidApkZipMagicHeader(validZipHeader, validZipHeader.size))
         org.junit.Assert.assertFalse(com.example.data.UpdateChecker.hasValidApkZipMagicHeader(htmlErrorHeader, htmlErrorHeader.size))
     }
+
+    @Test
+    fun testAutoSelectDistanceLimitBlocksDistantUsServersForAsianUsers() {
+        val vnGeo = com.example.vpn.GeoIpResult(
+            ip = "14.225.204.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Ho Chi Minh City",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 10.8231,
+            longitude = 106.6297
+        )
+        VpnManager.updateSmartDecision(vnGeo)
+
+        val allServers = VpnManager.getAllServers()
+        val jpServer = allServers.first { it.countryCode == "JP" }
+        val krServer = allServers.first { it.countryCode == "KR" }
+        val usServer = allServers.first { it.countryCode == "US" }
+
+        // 1. JP (~4,300km) and KR (~3,600km) are within the 5,500km limit; US (~12,600km) exceeds it
+        assertTrue(com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(jpServer, allServers, vnGeo))
+        assertTrue(com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(krServer, allServers, vnGeo))
+        org.junit.Assert.assertFalse(com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(usServer, allServers, vnGeo))
+
+        val usDistKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(usServer, vnGeo)
+        assertNotNull(usDistKm)
+        assertTrue("US server must be > 10,000 km from Vietnam", usDistKm!! > 10000)
+
+        // 2. Even if a US server has a lower fake edge TCP ping (30ms) than JP (65ms), JP must rank above US
+        val pingMap = mapOf(
+            usServer.id to 30,
+            jpServer.id to 65
+        )
+        val sorted = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(usServer, jpServer),
+            pingMap = pingMap,
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL
+        )
+        assertEquals(jpServer.id, sorted[0].id)
+        assertEquals(usServer.id, sorted[1].id)
+
+        // 3. filterServersWithinDistanceLimit excludes US servers when JP/KR servers are available
+        val filteredPool = VpnManager.filterServersWithinDistanceLimit(allServers, vnGeo)
+        assertTrue(filteredPool.none { it.countryCode == "US" })
+        assertTrue(filteredPool.any { it.countryCode == "JP" })
+        assertTrue(filteredPool.any { it.countryCode == "KR" })
+    }
 }
 

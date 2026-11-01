@@ -166,20 +166,26 @@ fun ServersScreen(
             context = context,
             forceRefresh = forceRefresh,
             onPickedBest = { best, bestPing ->
+                val distKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(
+                    server = best,
+                    geo = vpnState.detectedGeoIp,
+                    allowTimezoneFallback = true
+                )
+                val distSuffix = if (distKm != null) " • ~${distKm}km" else ""
                 if (bestPing > 0) {
                     onSelectServer(best)
                     val msg = if (isEn) {
-                        "Selected best server: ${best.flag} ${best.name} (${bestPing}ms)"
+                        "Selected best server: ${best.flag} ${best.name} (${bestPing}ms$distSuffix)"
                     } else {
-                        "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name} (${bestPing}ms)"
+                        "Đã chọn máy chủ tốt nhất: ${best.flag} ${best.name} (${bestPing}ms$distSuffix)"
                     }
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else if (isSmartBypassEngine) {
                     onSelectServer(best)
                     val msg = if (isEn) {
-                        "Selected optimal server: ${best.flag} ${best.name}"
+                        "Selected optimal server: ${best.flag} ${best.name}$distSuffix"
                     } else {
-                        "Đã chọn máy chủ tối ưu: ${best.flag} ${best.name}"
+                        "Đã chọn máy chủ tối ưu: ${best.flag} ${best.name}$distSuffix"
                     }
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else {
@@ -244,35 +250,55 @@ fun ServersScreen(
             }
     }
 
-    // Gợi ý máy chủ nhanh hơn:
+    // Gợi ý máy chủ nhanh hơn (kèm giới hạn khoảng cách <= 5.500 km):
     // - Chỉ hiện sau khi đợt đo ping kết thúc (!isTestingAll) để tránh nhấp nháy.
-    // - Cả máy chủ đang chọn và máy chủ gợi ý đều phải có ping thật đo được trên cổng chính (MEASURED_PRIMARY) và chênh >= 30ms.
-    // - Không coi máy chủ chỉ phản hồi cổng phụ (:443/:80) là ứng viên gợi ý thay thế cổng chính.
+    // - Ứng viên gợi ý bắt buộc phải nằm trong giới hạn khoảng cách cho phép (<= 5.500 km, không gợi ý máy chủ Mỹ quá xa khi người dùng ở Châu Á).
+    // - Nếu máy chủ đang chọn vượt giới hạn khoảng cách (> 5.500 km), gợi ý ngay máy chủ gần có cổng chính sống.
     val fasterServerSuggestion: Pair<ServerLocation, Int>? = remember(
         currentServer,
         allServersSnapshot,
         serverPings,
         serverMeasurements,
         vpnState.unlockRecords,
+        vpnState.detectedGeoIp,
         isTestingAll,
         userNeedsVpn
     ) {
         if (!userNeedsVpn || isTestingAll) {
             null
         } else {
+            val isCurrentTooFar = !com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                server = currentServer,
+                servers = allServersSnapshot,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
             val currentMeasuredPing = serverPings[currentServer.id] ?: -1
-            if (currentMeasuredPing <= 0) {
+            if (currentMeasuredPing <= 0 && !isCurrentTooFar) {
                 null
             } else {
                 val currentStatus = VpnManager.getServerUnlockStatus(currentServer, vpnState.unlockRecords)
-                val hasAnyUnlockedServer = allServersSnapshot.any {
-                    VpnManager.getServerUnlockStatus(it, vpnState.unlockRecords) == RegionUnlockStatus.UNLOCKED
+                val hasAnyUnlockedNearbyServer = allServersSnapshot.any {
+                    com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                        server = it,
+                        servers = allServersSnapshot,
+                        geo = vpnState.detectedGeoIp,
+                        allowTimezoneFallback = true
+                    ) && VpnManager.getServerUnlockStatus(it, vpnState.unlockRecords) == RegionUnlockStatus.UNLOCKED
                 }
-                val allowUntestedFallback = currentStatus != RegionUnlockStatus.UNLOCKED && !hasAnyUnlockedServer
+                val allowUntestedFallback = isCurrentTooFar || (currentStatus != RegionUnlockStatus.UNLOCKED && !hasAnyUnlockedNearbyServer)
 
                 allServersSnapshot
                     .asSequence()
                     .filter { it.id != currentServer.id }
+                    .filter { candidate ->
+                        com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                            server = candidate,
+                            servers = allServersSnapshot,
+                            geo = vpnState.detectedGeoIp,
+                            allowTimezoneFallback = true
+                        )
+                    }
                     .filter { candidate ->
                         val m = serverMeasurements[candidate.id]
                         m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
@@ -282,7 +308,9 @@ fun ServersScreen(
                         st == RegionUnlockStatus.UNLOCKED || (allowUntestedFallback && st == RegionUnlockStatus.UNTESTED)
                     }
                     .map { candidate -> candidate to (serverPings[candidate.id] ?: -1) }
-                    .filter { (_, ping) -> ping > 0 && (currentMeasuredPing - ping) >= 30 }
+                    .filter { (_, ping) ->
+                        ping > 0 && (isCurrentTooFar || (currentMeasuredPing - ping) >= 30)
+                    }
                     .minWithOrNull(
                         Comparator { a, b ->
                             val stA = VpnManager.getServerUnlockStatus(a.first, vpnState.unlockRecords)
@@ -928,13 +956,19 @@ fun ServersScreen(
             }
         }
 
-        // Servers list: Huy hiệu "★ ĐỀ XUẤT" chỉ dành riêng cho máy chủ đã mở khóa thành công (UNLOCKED) và có ping thật trên cổng chính (MEASURED_PRIMARY)
+        // Servers list: Huy hiệu "★ ĐỀ XUẤT" chỉ dành riêng cho máy chủ nằm trong giới hạn khoảng cách (<= 5.500 km), đã mở khóa thành công (UNLOCKED) và có ping thật trên cổng chính (MEASURED_PRIMARY)
         val recommendedServerId = filteredServers.firstOrNull { server ->
             val measuredPing = serverPings[server.id] ?: -1
             val m = serverMeasurements[server.id]
             val isPrimaryOk = m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
             val st = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
-            measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED
+            val withinDistLimit = selectedCategory != "ALL" || com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                server = server,
+                servers = allServersSnapshot,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
+            measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED && withinDistLimit
         }?.id
 
         items(
@@ -959,6 +993,17 @@ fun ServersScreen(
             }
             val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
             val isRecommended = server.id == recommendedServerId
+            val distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(
+                server = server,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
+            val isTooFarForAutoSelect = !com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                server = server,
+                servers = allServersSnapshot,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
 
             ServerCard(
                 server = server,
@@ -971,6 +1016,8 @@ fun ServersScreen(
                 isGameActiveNow = isGameActiveOnThisServer,
                 isTestingPings = isTestingAll,
                 unlockStatus = unlockStatus,
+                distanceKm = distanceKm,
+                isTooFarForAutoSelect = isTooFarForAutoSelect,
                 isEn = isEn,
                 onClick = { onSelectServer(server) },
                 onDelete = if (server.isCustom) {
@@ -1025,6 +1072,8 @@ private fun ServerCard(
     isGameActiveNow: Boolean = false,
     isTestingPings: Boolean = false,
     unlockStatus: RegionUnlockStatus,
+    distanceKm: Int? = null,
+    isTooFarForAutoSelect: Boolean = false,
     isEn: Boolean = false,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
@@ -1205,10 +1254,29 @@ private fun ServerCard(
                                 )
                             }
                         }
+                        if (isTooFarForAutoSelect) {
+                            Surface(
+                                shape = RoundedCornerShape(5.dp),
+                                color = WarningAmber.copy(alpha = 0.16f),
+                                border = androidx.compose.foundation.BorderStroke(0.7.dp, WarningAmber.copy(alpha = 0.65f))
+                            ) {
+                                Text(
+                                    text = config.tr("Quá xa", "Too far"),
+                                    color = WarningAmber,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    softWrap = false,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                                )
+                            }
+                        }
                     }
 
+                    val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
                     Text(
-                        text = "${server.localizedDescription(isEn)} • ${server.ip}",
+                        text = "${server.localizedDescription(isEn)}$distLabel • ${server.ip}",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,

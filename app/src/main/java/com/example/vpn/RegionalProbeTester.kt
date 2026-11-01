@@ -292,6 +292,121 @@ object RegionalProbeTester {
         }
     }
 
+    /** Giới hạn khoảng cách địa lý tối đa (km) khi tự động chọn máy chủ để tránh chọn máy chủ quá xa (như Mỹ ~12.000km từ VN) */
+    const val MAX_AUTO_SELECT_DISTANCE_KM = 5500.0
+
+    /** Giới hạn chênh lệch khoảng cách tối đa (km) so với vùng hỗ trợ Xbox gần người dùng nhất */
+    const val MAX_AUTO_SELECT_DELTA_KM = 2500.0
+
+    /**
+     * Lấy tọa độ người dùng từ GeoIP thực tế, hoặc suy luận sơ bộ từ múi giờ hệ thống khi dùng cho bộ lọc giới hạn khoảng cách tự chọn máy chủ.
+     */
+    fun resolveUserCoordinatesWithTimezoneFallback(
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+    ): Pair<Double, Double>? {
+        resolveUserCoordinatesOrNull(geo)?.let { return it }
+        // Nếu caller truyền trực tiếp một đối tượng GeoIpResult rỗng (ví dụ trong unit test), tôn trọng kết quả null
+        if (geo != null && geo.countryCode.isBlank()) return null
+
+        val tzId = try {
+            java.util.TimeZone.getDefault().id ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+        return when {
+            tzId.equals("Asia/Ho_Chi_Minh", ignoreCase = true) ||
+                tzId.equals("Asia/Saigon", ignoreCase = true) ||
+                tzId.equals("Asia/Bangkok", ignoreCase = true) ||
+                tzId.equals("Asia/Phnom_Penh", ignoreCase = true) ||
+                tzId.equals("Asia/Vientiane", ignoreCase = true) -> Pair(16.0544, 108.2022)
+            tzId.startsWith("Asia/", ignoreCase = true) -> Pair(21.0285, 105.8542)
+            else -> null
+        }
+    }
+
+    /**
+     * Tính khoảng cách địa lý (km) từ vị trí người dùng tới máy chủ.
+     */
+    fun getServerDistanceKm(
+        server: ServerLocation,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        allowTimezoneFallback: Boolean = false
+    ): Int? {
+        val userCoords = if (allowTimezoneFallback) {
+            resolveUserCoordinatesWithTimezoneFallback(geo)
+        } else {
+            resolveUserCoordinatesOrNull(geo)
+        } ?: return null
+        val (uLat, uLon) = userCoords
+        val (sLat, sLon) = resolveServerCoordinates(server)
+        return haversineDistanceKm(uLat, uLon, sLat, sLon).toInt()
+    }
+
+    /**
+     * Kiểm tra máy chủ có nằm trong giới hạn khoảng cách cho phép khi Tự động chọn (Auto-Select) hay không:
+     * - Máy chủ do người dùng tự thêm (isCustom = true) luôn được phép.
+     * - Khi có vùng hỗ trợ Xbox trong bán kính <= 5.500 km (ví dụ người dùng ở Việt Nam có Hàn Quốc ~2.700-3.600km và Nhật Bản ~3.700-4.350km),
+     *   chặn hoàn toàn các máy chủ vượt quá 5.500 km hoặc xa hơn vùng gần nhất quá 2.500 km (như máy chủ Mỹ ~11.500-14.200km).
+     */
+    fun isWithinAutoSelectDistanceLimit(
+        server: ServerLocation,
+        servers: List<ServerLocation> = DEFAULT_SERVERS,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        allowTimezoneFallback: Boolean = false
+    ): Boolean {
+        if (server.isCustom) return true
+        val code = server.countryCode.trim().uppercase()
+        if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) return false
+
+        val userCoords = if (allowTimezoneFallback) {
+            resolveUserCoordinatesWithTimezoneFallback(geo)
+        } else {
+            resolveUserCoordinatesOrNull(geo)
+        } ?: return true
+
+        val (userLat, userLon) = userCoords
+        val referencePool = if (servers.size >= 2) (servers + DEFAULT_SERVERS) else DEFAULT_SERVERS
+        val supportedCodes = referencePool
+            .map { it.countryCode.trim().uppercase() }
+            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
+            .distinct()
+            .ifEmpty { listOf("JP", "KR", "US") }
+
+        val minCountryDistKm = supportedCodes.minOfOrNull { c ->
+            val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+            haversineDistanceKm(userLat, userLon, lat, lon)
+        } ?: 0.0
+
+        val (srvLat, srvLon) = resolveServerCoordinates(server)
+        val srvDistKm = haversineDistanceKm(userLat, userLon, srvLat, srvLon)
+        val (countryLat, countryLon) = COUNTRY_REFERENCE_COORDS[code] ?: Pair(srvLat, srvLon)
+        val countryDistKm = haversineDistanceKm(userLat, userLon, countryLat, countryLon)
+        val effectiveDistKm = minOf(srvDistKm, countryDistKm)
+        val deltaKm = (effectiveDistKm - minCountryDistKm).coerceAtLeast(0.0)
+
+        return if (minCountryDistKm <= MAX_AUTO_SELECT_DISTANCE_KM) {
+            effectiveDistKm <= MAX_AUTO_SELECT_DISTANCE_KM && deltaKm <= MAX_AUTO_SELECT_DELTA_KM
+        } else {
+            deltaKm <= MAX_AUTO_SELECT_DELTA_KM
+        }
+    }
+
+    /**
+     * Kiểm tra mã quốc gia có nằm trong giới hạn khoảng cách tự chọn hay không.
+     */
+    fun isCountryWithinAutoSelectDistanceLimit(
+        countryCode: String,
+        servers: List<ServerLocation> = DEFAULT_SERVERS,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        allowTimezoneFallback: Boolean = false
+    ): Boolean {
+        val code = countryCode.trim().uppercase()
+        val sampleServer = servers.firstOrNull { it.countryCode.equals(code, ignoreCase = true) }
+            ?: DEFAULT_SERVERS.firstOrNull { it.countryCode.equals(code, ignoreCase = true) }
+            ?: return false
+        return isWithinAutoSelectDistanceLimit(sampleServer, servers, geo, allowTimezoneFallback)
+    }
+
     /**
      * Phân tầng khoảng cách Quốc gia hỗ trợ Xbox so với người dùng (chỉ dùng làm tiêu chí sơ bộ khi chưa đo được ping thật).
      * Khi thiếu GeoIP thực tế -> trả về 0 cho mọi quốc gia được hỗ trợ (không giả định vị trí người dùng).

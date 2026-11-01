@@ -28,7 +28,9 @@ data class StreamUiState(
     val currentUrl: String = "https://www.xbox.com/en-US/play",
     val showBanner: Boolean = false,
     val bannerMessage: String = "",
-    val bannerType: BannerType = BannerType.INFO
+    val bannerType: BannerType = BannerType.INFO,
+    val shortcutToggleRecordingTick: Long = 0L,
+    val shortcutVirtualPadOverrideTick: Long = 0L
 )
 
 enum class BannerType {
@@ -585,6 +587,94 @@ class StreamController(private val context: Context) {
             delay(durationMs)
             if (_uiState.value.bannerType == type) {
                 _uiState.value = _uiState.value.copy(showBanner = false)
+            }
+        }
+    }
+
+    @Volatile
+    private var lastGameRumbleAtMs: Long = 0L
+
+    fun onGameRumbleRequested(durationMs: Int, strongMag: Float, weakMag: Float) {
+        val level = SettingsRepository.config.value.gameRumbleLevel
+        if (level == com.example.data.GamepadHapticLevel.OFF) return
+        try {
+            val vib: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (vib == null || !vib.hasVibrator()) return
+            if (durationMs <= 0) {
+                vib.cancel()
+                return
+            }
+            val nowMs = System.currentTimeMillis()
+            if (nowMs - lastGameRumbleAtMs < 60L) return
+            if (checkDeviceThermalModerateOrHigher()) return
+            val combinedMag = maxOf(strongMag.coerceIn(0f, 1f), weakMag.coerceIn(0f, 1f) * 0.7f)
+            if (combinedMag < 0.04f) return
+            lastGameRumbleAtMs = nowMs
+
+            val levelMult = when (level) {
+                com.example.data.GamepadHapticLevel.OFF -> 0f
+                com.example.data.GamepadHapticLevel.LIGHT -> 0.45f
+                com.example.data.GamepadHapticLevel.MEDIUM -> 0.75f
+                com.example.data.GamepadHapticLevel.STRONG -> 1.0f
+            }
+            val dur = durationMs.toLong().coerceIn(15L, 500L)
+            val amp = (combinedMag * levelMult * 255f).toInt().coerceIn(1, 255)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vib.vibrate(VibrationEffect.createOneShot(dur, amp))
+            } else {
+                @Suppress("DEPRECATION")
+                vib.vibrate(dur)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun onControllerShortcutTriggered(actionId: String) {
+        val cfg = SettingsRepository.config.value
+        if (!cfg.controllerShortcutsEnabled) return
+        scope.launch {
+            val isEn = cfg.isEnglishUI()
+            vibrateFeedback()
+            when (actionId) {
+                "TOGGLE_STATS" -> {
+                    val nextHide = !cfg.hideStreamStatsOverlay
+                    SettingsRepository.updateHideStreamStatsOverlay(nextHide)
+                    showTemporaryBanner(
+                        if (nextHide) {
+                            if (isEn) "📊 Stream stats hidden (Combo Shortcut)" else "📊 Đã ẩn thanh thông số (Phím tắt tay cầm)"
+                        } else {
+                            if (isEn) "📊 Stream stats shown (Combo Shortcut)" else "📊 Đã hiện thanh thông số (Phím tắt tay cầm)"
+                        },
+                        BannerType.INFO,
+                        2200
+                    )
+                }
+                "TOGGLE_VPAD" -> {
+                    val nextShow = !cfg.showVirtualController
+                    SettingsRepository.updateShowVirtualController(nextShow)
+                    _uiState.value = _uiState.value.copy(
+                        shortcutVirtualPadOverrideTick = System.currentTimeMillis()
+                    )
+                    showTemporaryBanner(
+                        if (nextShow) {
+                            if (isEn) "🎮 Virtual Gamepad ON (Combo Shortcut)" else "🎮 Đã bật Tay cầm ảo (Phím tắt tay cầm)"
+                        } else {
+                            if (isEn) "🎮 Virtual Gamepad OFF (Combo Shortcut)" else "🎮 Đã tắt Tay cầm ảo (Phím tắt tay cầm)"
+                        },
+                        BannerType.INFO,
+                        2200
+                    )
+                }
+                "TOGGLE_REC" -> {
+                    _uiState.value = _uiState.value.copy(
+                        shortcutToggleRecordingTick = System.currentTimeMillis()
+                    )
+                }
             }
         }
     }

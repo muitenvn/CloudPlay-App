@@ -1086,7 +1086,7 @@ class ExampleRobolectricTest {
         )
         VpnManager.updateSmartDecision(vnGeo)
 
-        val allServers = VpnManager.getAllServers()
+        val allServers = com.example.vpn.DEFAULT_SERVERS
         val jpServer = allServers.first { it.countryCode == "JP" }
         val krServer = allServers.first { it.countryCode == "KR" }
         val usServer = allServers.first { it.countryCode == "US" }
@@ -1119,6 +1119,44 @@ class ExampleRobolectricTest {
         assertTrue(filteredPool.none { it.countryCode == "US" })
         assertTrue(filteredPool.any { it.countryCode == "JP" })
         assertTrue(filteredPool.any { it.countryCode == "KR" })
+
+        // 4. Dual-Mode v1.3.0 Algorithm:
+        // Suppose JP has 58ms proxy ping and KR has 68ms proxy ping:
+        val jpVsKrPings = mapOf(
+            jpServer.id to 58,
+            krServer.id to 68
+        )
+        // Mode A: Auto-Off VPN in game (prioritizeDistanceForAutoBypass = true) -> prioritizes Korea (KR ~70ms direct in-game, closer to VN) over Japan (JP ~80ms)
+        val sortedAutoBypassOn = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(jpServer, krServer),
+            pingMap = jpVsKrPings,
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            prioritizeDistanceForAutoBypass = true
+        )
+        assertEquals("Auto-Off VPN must prioritize closer geographic country (KR)", krServer.id, sortedAutoBypassOn[0].id)
+        assertEquals(jpServer.id, sortedAutoBypassOn[1].id)
+
+        // Mode B: Keep VPN On in game (prioritizeDistanceForAutoBypass = false) -> prioritizes lowest measured ping (JP 58ms) first, with distance second
+        val sortedKeepVpnOn = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(jpServer, krServer),
+            pingMap = jpVsKrPings,
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            prioritizeDistanceForAutoBypass = false
+        )
+        assertEquals("Keep VPN On must prioritize lowest ping (JP 58ms) before distance", jpServer.id, sortedKeepVpnOn[0].id)
+        assertEquals(krServer.id, sortedKeepVpnOn[1].id)
+
+        // 5. v1.3.0 Upgrade Step automatically selects KR when Auto-Off VPN is enabled
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        SettingsRepository.updateAutoBypass(true)
+        val upgradedBest = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+        assertNotNull(upgradedBest)
+        assertEquals("KR", upgradedBest!!.countryCode)
+        assertEquals(70, com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs("KR", vnGeo))
+        assertEquals(80, com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs("JP", vnGeo))
+        VpnManager.selectServer(com.example.vpn.DEFAULT_SERVERS[0], context)
     }
 }
 

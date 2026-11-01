@@ -1,104 +1,86 @@
-# Kế hoạch Cập nhật CloudPlay v1.3.0 (Từng bước)
+# Kế hoạch nâng cấp Hệ thống Điều khiển CloudPlay (v1.3.0 — Bản hiệu chỉnh)
 
-Kế hoạch chi tiết từng bước cho đợt cập nhật tính năng mới **v1.3.0**, tập trung vào 3 trọng tâm chính: hoàn thiện văn bản Điều khoản sử dụng, cải thiện trải nghiệm điều khiển tay cầm ảo & luồng phát Xbox, và chuẩn bị quy trình phát hành chính thức lên GitHub Releases.
-
----
-
-## Ý kiến người dùng & Quyết định cốt lõi
-
-> [!IMPORTANT]
-> Dưới đây là các quyết định đã xác nhận cùng các mục cần thông tin thực tế từ bạn trước khi thực hiện chỉnh sửa:
-
-- **Phiên bản mục tiêu:** Nâng cấp từ `v1.2.x` lên `v1.3.0` (Bản cập nhật tính năng mới).
-- **Trọng tâm 1 - Điều khoản sử dụng:** Thay thế toàn bộ các placeholder `[ĐIỀN: ...]` bằng thông tin thực tế:
-  - *Tên nhà phát triển/nhóm:* Mặc định đề xuất: `muitenvn (CloudPlay Project Contributors)`.
-  - *Email liên hệ:* Mặc định đề xuất: `https://github.com/muitenvn/CloudPlay-App/issues` hoặc email do bạn cung cấp.
-  - *Độ tuổi tối thiểu:* Mặc định: `13 tuổi` (phù hợp chính sách tài khoản Microsoft & ESRB).
-  - *Luật áp dụng & Tòa án:* Mặc định: `Pháp luật Việt Nam` / Tòa án có thẩm quyền tại Việt Nam.
-  - *Ngôn ngữ ưu tiên:* `Tiếng Việt` (bản gốc giải thích).
-- **Trọng tâm 2 - Tay cầm ảo & Luồng phát Xbox:**
-  - Bổ sung thanh trượt tùy chỉnh **Độ mờ / Độ trong suốt (Opacity 10% - 100%)** và **Kích thước nút bấm (Scale 80% - 130%)** cho tay cầm ảo ngay trên HUD điều khiển nhanh.
-  - Tối ưu rung phản hồi haptic khi chạm nút ảo (giảm delay rung 15ms xuống mức tức thì).
-  - Cải tiến thông số đàm phán luồng WebRTC H.264 constrained baseline giúp giảm thời gian giải mã khung hình (decode time) và chống giật hình khi chuyển cảnh nhanh.
-- **Trọng tâm 3 - Quy trình phát hành GitHub Releases:**
-  - Cập nhật số phiên bản `1.3.0` trong `build.gradle.kts`.
-  - Tự động đồng bộ tạo tệp chữ ký băm `CloudPlay-v1.3.0.apk.sha256`.
-  - Cập nhật mẫu ghi chú phát hành (Release Notes) song ngữ tóm tắt các tính năng mới cho GitHub Releases.
+Dựa trên yêu cầu hiệu chỉnh kế hoạch và đối chiếu trực tiếp với mã nguồn thực tế (`XboxBridge.kt`, `VirtualGamepad.kt`, `CloudBrowserScreen.kt`, `FloatingHud.kt`, `InGameLoadingOverlay.kt`, `XboxTranslator.kt`, `AppSettings.kt`, `SettingsScreen.kt`), dưới đây là kế hoạch triển khai đã cập nhật:
 
 ---
 
-## 1. Tổng quan & Mục tiêu
-
-- **Mục đích:** Cung cấp bản phát hành `v1.3.0` ổn định, hoàn thiện đầy đủ tính pháp lý minh bạch, đem lại trải nghiệm vuốt chạm tay cầm ảo mượt mà không che khuất màn hình game và tối ưu đường truyền hình ảnh Cloud Gaming.
-- **Đối tượng sử dụng:** Game thủ Android chơi Xbox Cloud Gaming (Fortnite, Game Pass Ultimate) bằng màn hình cảm ứng điện thoại hoặc máy tính bảng.
-
----
-
-## 2. Trải nghiệm người dùng & Giao diện (UX/UI)
-
-### 2.1. Tùy biến tay cầm ảo (Virtual Gamepad Overlay)
-- **Menu cài đặt nhanh (HUD Trong Game):** Khi mở HUD góc màn hình, người chơi có thể:
-  - Điều chỉnh thanh trượt **Độ trong suốt nút bấm (Opacity)** từ 20% (mờ nhẹ không che tầm nhìn) đến 100% (nét rõ).
-  - Điều chỉnh **Kích thước nút bấm (Scale)** nhỏ/vừa/lớn phù hợp cho cả màn hình nhỏ 5.5 inch và máy tính bảng 11 inch.
-  - Bật/tắt chế độ **Haptic Feedback** (rung nhẹ khi chạm nút ảo A/B/X/Y, D-Pad và Triggers L2/R2).
-
-### 2.2. Tối ưu chất lượng hiển thị luồng phát
-- Giữ vững thiết kế tối giản Neon Green (`#107C10`, `#00FF5A`) đồng bộ Material 3.
-- Bổ sung nút chuyển nhanh bộ lọc hình ảnh: **Sắc nét (Clarity boost)** / **Mặc định** / **Mượt mà (Smooth)** trực tiếp trên thanh điều khiển nhanh.
+## 1. Rung của game (Game Rumble qua Gamepad API)
+- **Hiện trạng trong code**:
+  - `XboxBridge.kt` (dòng 1600) đang gán `vibrationActuator: null` trên `virtualGamepadState`.
+  - Khi gộp tay cầm thật và tay cầm ảo trong `navigator.getGamepads()` (`XboxBridge.kt` dòng 1753–1761), mã hiện tại tạo một object mới chỉ gồm `{ id, index, connected, timestamp, mapping, axes, buttons }` nên **làm mất thuộc tính `physPad.vibrationActuator` (và `hapticActuators`) gốc của tay cầm thật**.
+- **Phương án triển khai**:
+  - **Với tay cầm thật (`physPad` có kết nối)**: Giữ nguyên và chuyển tiếp trực tiếp `vibrationActuator: physPad.vibrationActuator || null` (cùng `hapticActuators` nếu có) của tay cầm thật sang đối tượng trả về trong `navigator.getGamepads()`. **Tuyệt đối không thay thế actuator của tay cầm thật bằng rung điện thoại.**
+  - **Chỉ khi chơi bằng tay cầm ảo (`!physPad` và `shouldExposeVirtual`)**: Cung cấp đối tượng `virtualVibrationActuator` (`type: "dual-rumble"`, `playEffect(type, params)`, `reset()`) trên `virtualGamepadState` để chuyển tiếp lệnh rung của game về `Vibrator` của điện thoại qua `@JavascriptInterface fun onGameRumble(durationMs: Int, strongMag: Float, weakMag: Float)` (giữ nguyên tên mọi hàm `@JavascriptInterface` hiện có).
+  - Thêm tùy chọn **Độ rung của game trên tay cầm ảo (`gameRumbleLevel`: Tắt / Nhẹ / Vừa / Mạnh)** trong `AppSettings.kt` và `SettingsScreen.kt`, kèm giới hạn tần suất (throttle `65ms`, thời lượng tối đa `500ms`/lần, ngắt khi máy quá nhiệt `window.__deviceThermalThrottled` hoặc xuống nền).
 
 ---
 
-## 3. Quy trình thực hiện từng bước (Step-by-Step Execution Plan)
-
-### Bước 1: Hoàn thiện các mục `[ĐIỀN]` trong Điều khoản sử dụng
-1. Điền chính xác thông tin vận hành vào `docs/terms.html`:
-   - Ngày cập nhật mới nhất.
-   - Chủ thể: `muitenvn (CloudPlay Project)`.
-   - Độ tuổi tối thiểu: `13 tuổi` (có sự giám sát của phụ huynh đối với game 16+/18+).
-   - Luật áp dụng: Pháp luật Việt Nam, ngôn ngữ ưu tiên là Tiếng Việt.
-   - Kênh liên hệ: GitHub Issues chính thức và email tiếp nhận phản hồi.
-2. Cập nhật đồng bộ cả bản Tiếng Việt và Tiếng Anh trong tệp `terms.html`.
-
-### Bước 2: Nâng cấp Tay cầm ảo & Trải nghiệm luồng phát (Web Script & Compose)
-1. Trong `AppSettings.kt`: Bổ sung cấu hình lưu trữ `virtualControllerOpacity` (mặc định 65%) và `virtualControllerScale` (mặc định 100%).
-2. Trong script ảo hóa tay cầm (`virtual gamepad script` trong `CloudBrowserScreen.kt`):
-   - Nhận thông số opacity & scale động từ Compose để render layout CSS linh hoạt.
-   - Thêm bộ đệm xử lý đa điểm cảm ứng (multi-touch handling) mượt mà cho cần analog và phím ngắm bắn đồng thời.
-3. Trong `StreamController.kt` / SDP Filter: Tinh chỉnh ưu tiên codec video H.264 profile `42e01f` giúp tối ưu bộ giải mã phần cứng MediaCodec trên thiết bị Android, giảm hiện tượng tụt FPS.
-
-### Bước 3: Nâng số phiên bản lên v1.3.0
-1. Cập nhật `app/build.gradle.kts`:
-   - Nâng `versionName = "1.3.0"`.
-   - Đảm bảo `versionCode` tăng tự động không xung đột khi cài đè.
-2. Cập nhật số phiên bản hiển thị trong `SettingsScreen.kt` và trang tải web `docs/index.html`.
-
-### Bước 4: Chuẩn bị quy trình phát hành GitHub Releases v1.3.0
-1. Biên dịch và kiểm thử toàn diện bằng lệnh `compile_applet` và kiểm thử tự động JVM Robolectric (`gradle testDebugUnitTest`).
-2. Tạo mẫu tệp `RELEASE_NOTES_v1.3.0.md` chuẩn bị sẵn nội dung:
-   - Tóm tắt tính năng mới (Tay cầm ảo chỉnh mờ/phóng to, luồng phát mượt hơn).
-   - Khắc phục lỗi và hoàn thiện trang điều khoản minh bạch.
-   - Hướng dẫn kiểm tra mã SHA-256 sau khi tải file APK.
+## 2. Con quay hồi chuyển (Gyroscope) — Gỡ bỏ toàn bộ trên `app/src`
+- **Kết quả `grep -ri "gyro" app/src/`**:
+  1. `VirtualGamepad.kt` (dòng 363–432, 838, 845–846, 1350, 1513, 1725–1735): Mã đăng ký cảm biến `Sensor.TYPE_GYROSCOPE`, biến `gyroRightX`/`gyroRightY`, nhãn `"R•🎯"`, và nút bật nhanh `🎯 Ngắm Gyro`.
+  2. `SettingsScreen.kt` (dòng 714–730): Công tắc `🎯 Nghiêng máy để ngắm` và thanh trượt `Độ nhạy nghiêng máy`.
+  3. `AppSettings.kt` (dòng 624–625, 848–849, 971–972, 1411–1418): Trường `gamepadGyroEnabled`, `gamepadGyroSensitivity` và các hàm cập nhật.
+  4. `app/src/main/assets/web/terms.html` (dòng 632): Cụm từ `"gyroscope aiming"` trong mô tả điều khoản mục 2.3.
+  5. `XboxTranslator.kt` (dòng 285): `"Gyroscope" to "Cảm biến con quay hồi chuyển (Gyro)"` — đây là từ điển dịch giao diện web Xbox Cloud (dùng để dịch chữ "Gyroscope" trên trang web Xbox nếu xuất hiện, không phải mã cảm biến của app).
+- **Phương án triển khai**:
+  - Gỡ bỏ toàn bộ mã cảm biến, giao diện và tham chiếu gyro tại `VirtualGamepad.kt`, `SettingsScreen.kt`, `AppSettings.kt`, `XboxTranslator.kt` (dòng 285) và `terms.html` (dòng 632).
+  - Trong `AppSettings.kt`, bỏ hoàn toàn các thuộc tính gyro khỏi `AppConfig` và không ghi xuống `SharedPreferences` nữa (dữ liệu `SharedPreferences` cũ có sẵn khóa `gamepad_gyro_enabled` trên máy người dùng cũ sẽ tự động được bỏ qua an toàn khi đọc mà không gây lỗi).
 
 ---
 
-## 4. Kiến trúc kỹ thuật & Sơ đồ luồng (Architecture Diagram)
+## 3. Đổi nút (Remap) linh hoạt cho tay cầm thật
+- **Phương án triển khai**:
+  - Lưu bảng ánh xạ nút tay cầm thật `physicalGamepadButtonMap: String` trong `AppSettings.kt` (ánh xạ từng nút bất kỳ trong 17 nút chuẩn W3C Gamepad).
+  - Trong `navigator.getGamepads()` (`XboxBridge.kt`), áp dụng bảng ánh xạ `window.__physGamepadRemap` riêng trên mảng `physPad.buttons` của tay cầm thật trước khi trả về hoặc gộp. Không tác động đến `virtualGamepadState.buttons`.
+  - Trong `SettingsScreen.kt`, thêm giao diện cho phép đổi từng nút bất kỳ của tay cầm thật kèm nút **Đặt lại (Reset)** có `contentDescription` và chuỗi song ngữ VI/EN.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     CloudPlay v1.3.0                        │
-└─────────────────────────────────────────────────────────────┘
-                               │
-       ┌───────────────────────┼────────────────────────┐
-       ▼                       ▼                        ▼
-┌──────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│   Bước 1:    │      │     Bước 2:     │      │   Bước 3 & 4:   │
-│ docs/terms   │      │ Virtual Gamepad │      │ Version Bump &  │
-│  Hoàn thiện  │      │ & Stream Engine │      │ Release Engine  │
-└──────────────┘      └─────────────────┘      └─────────────────┘
-       │                       │                        │
-       ▼                       ▼                        ▼
-• Xóa [ĐIỀN]           • Opacity (20-100%)      • versionName 1.3.0
-• Tên & liên hệ        • Scale (80-130%)        • SHA-256 Checksum
-• Luật áp dụng VN      • Haptic touch low-delay • GitHub Releases
-• Song ngữ VI / EN     • H.264 WebRTC decode    • Multi-mirror APK
-```
+---
+
+## 4. Vùng chết (Deadzone) Trong & Ngoài cho từng cần Analog (Trái / Phải)
+- **Phương án triển khai**:
+  - **Với tay cầm ảo**: Bổ sung vùng chết trong và ngoài cho Cần Trái (`leftStickInnerDeadzone` mặc định `0.08f`, `leftStickOuterDeadzone` mặc định `0.95f`) và Cần Phải (`rightStickInnerDeadzone` mặc định `0.08f`, `rightStickOuterDeadzone` mặc định `0.95f`), áp dụng trong `VirtualAnalogStick` (`VirtualGamepad.kt`).
+  - **Với tay cầm thật**: Bổ sung vùng chết trong và ngoài riêng cho Cần Trái và Cần Phải của tay cầm thật với **giá trị mặc định `inner = 0.0f` và `outer = 1.0f`** (giữ nguyên giá trị trục gốc của tay cầm thật, không chồng lên vùng chết của game trừ khi người dùng chủ động chỉnh trong Cài đặt).
+  - Trong `navigator.getGamepads()` (`XboxBridge.kt`), bước tính vùng chết của tay cầm thật chỉ chạy khi khác mặc định (`inner > 0` hoặc `outer < 1.0`) và được **áp dụng trên `physPad.axes` TRƯỚC bước gộp `mergedAxes`**.
+
+---
+
+## 5. Bố cục tay cầm ảo lưu riêng theo từng game
+- **Hiện trạng nhận diện game**:
+  - App đã nhận diện được game qua URL `/play/launch/<slug>/<productId>` và `streamUiState.gameTitle` (`StreamController.kt`).
+- **Phương án triển khai**:
+  - Lưu hồ sơ bố cục theo khóa game (`perGameLayoutsJson`) kèm cờ `usePerGameGamepadLayout: Boolean` trong `AppSettings.kt`.
+  - Thêm nút **Dùng bố cục chung (Use Global Layout)** và **Đặt lại (Reset)** trong bảng chỉnh tay cầm ảo (`VirtualGamepad.kt`) và trong `SettingsScreen.kt`.
+
+---
+
+## 6. Tổ hợp nút tay cầm làm phím tắt (3 hành động, không làm trễ nút View)
+- **Phương án triển khai**:
+  - Chỉ hỗ trợ đúng **3 hành động có sẵn**:
+    1. Ẩn / hiện bảng thông số luồng phát (`hideStreamStatsOverlay`).
+    2. Bật / tắt tay cầm ảo trên màn hình (`showVirtualController`).
+    3. Bật / tắt quay video màn hình (`ZeroLagScreenRecorder.toggleRecording`).
+  - **Cơ chế xử lý nút View (Back) không trễ, không nuốt nút**:
+    - Khi người chơi nhấn nút `View` (nút số 8), sự kiện nhấn `View` **vẫn được chuyển ngay lập tức vào game** (không giữ chờ hay làm trễ nút `View`).
+    - Hệ thống chỉ ghi nhận thời điểm bắt đầu giữ nút `View` (`viewButtonDownAt`). Khi nút `View` đang được giữ đủ lâu (`>= 400ms`) và người chơi nhấn nút thứ hai trùng khớp với một trong 3 phím tắt đã gán, hệ thống mới chặn riêng xung của **nút thứ hai** đó để thực thi hành động phím tắt.
+  - Cho phép bật/tắt tính năng tổ hợp phím tắt và đổi nút kích hoạt thứ hai cho từng hành động trong `SettingsScreen.kt`.
+
+---
+
+## 7. Tự ẩn tay cầm ảo khi cắm tay cầm thật
+- **Kết quả kiểm tra `CloudBrowserScreen.kt` (dòng 688, 881, 920)**:
+  - Tại dòng 688 (`hasGamepad = gamepadStatus.hasPhysicalController` truyền vào `InGameLoadingOverlay`) và dòng 920 (`physicalControllerConnected = gamepadStatus.hasPhysicalController` truyền vào `IsolatedFloatingHud`), hai tham số này hiện **chỉ dùng để đổi nhãn chữ và màu biểu tượng trạng thái tay cầm** trên màn hình chờ (`InGameLoadingOverlay.kt` dòng 194) và trên viên thuốc HUD (`FloatingHud.kt` dòng 772, 1681).
+  - Tại dòng 881 của `CloudBrowserScreen.kt`:
+    ```kotlin
+    if (config.showVirtualController) {
+        VirtualGamepadOverlay(...)
+    }
+    ```
+    **Chưa có logic tự ẩn `VirtualGamepadOverlay` khi cắm tay cầm thật.**
+- **Phương án triển khai**:
+  - Thêm công tắc `autoHideVirtualOnPhysicalController: Boolean = true` trong `AppSettings.kt` và `SettingsScreen.kt`.
+  - Cập nhật điều kiện hiển thị tại dòng 881 (và `LaunchedEffect` đồng bộ `__setVirtualGamepadEnabled` tại dòng 396) của `CloudBrowserScreen.kt` để tự động ẩn tay cầm ảo khi `gamepadStatus.hasPhysicalController && config.autoHideVirtualOnPhysicalController` (trừ khi người dùng chủ động bấm nút bật tay cầm ảo trên HUD trong lúc đang cắm tay cầm thật).
+
+---
+
+## 8. Nghiên cứu Bàn phím & Chuột Bluetooth/USB (Chỉ báo cáo nghiên cứu, KHÔNG viết code)
+- Trình bày báo cáo nghiên cứu kỹ thuật trong phần tổng kết cuối cùng (cơ chế `KeyEvent`/`MotionEvent` trên WebView Android, rào cản `requestPointerLock` của Xbox Cloud Gaming trên WebView di động, và các điều kiện cần thiết nếu muốn hỗ trợ).

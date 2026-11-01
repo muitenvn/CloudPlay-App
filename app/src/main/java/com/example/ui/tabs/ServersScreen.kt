@@ -146,8 +146,12 @@ fun ServersScreen(
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // Tự động đo ping sơ bộ (bước 1 + 2) và tự động quét, lọc lỗi & kiểm tra kết nối máy chủ công cộng trong nền
+    // Bước nâng cấp v1.3.0 + tự động đo ping sơ bộ (bước 1 + 2) và quét máy chủ công cộng trong nền
     LaunchedEffect(Unit) {
+        val upgradedSrv = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = false)
+        if (upgradedSrv != null) {
+            onSelectServer(upgradedSrv)
+        }
         if (serverPings.isEmpty() && !isTestingAll) {
             VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
@@ -210,6 +214,7 @@ fun ServersScreen(
         vpnState.engine,
         recentSessions,
         config.hideUnreachableDynamicServers,
+        config.autoBypassEnabled,
         currentServer.id
     ) {
         val rawFiltered = when (selectedCategory) {
@@ -231,7 +236,8 @@ fun ServersScreen(
             records = vpnState.unlockRecords,
             engine = vpnState.engine,
             sessions = recentSessions,
-            measurementsMap = serverMeasurements
+            measurementsMap = serverMeasurements,
+            prioritizeDistanceForAutoBypass = config.autoBypassEnabled
         )
     }
 
@@ -737,6 +743,142 @@ fun ServersScreen(
                                         fontWeight = FontWeight.ExtraBold,
                                         maxLines = 1
                                     )
+                                }
+                            }
+                        }
+                    }
+
+                    // Bước nâng cấp v1.3.0: Thuật toán chọn máy chủ theo chế độ chơi (Tự tắt VPN vs Giữ VPN luôn)
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("v130_smart_routing_algorithm_card"),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF07120D),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 11.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (isEn) {
+                                        "⚡ v1.3.0 Upgrade • Smart Selection Algorithm"
+                                    } else {
+                                        "⚡ Cải tiến v1.3 • Thuật toán chọn máy chủ thông minh"
+                                    },
+                                    color = DirectCyan,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(
+                                    text = if (config.autoBypassEnabled) {
+                                        if (isEn) "Distance ➔ Ping" else "Vị trí gần ➔ Ping"
+                                    } else {
+                                        if (isEn) "Ping ➔ Distance" else "Ping thấp ➔ Vị trí"
+                                    },
+                                    color = XboxNeonGreen,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val isAutoOff = config.autoBypassEnabled
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            if (!isAutoOff) {
+                                                SettingsRepository.updateAutoBypass(true)
+                                                val best = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+                                                if (best != null) onSelectServer(best)
+                                            }
+                                        }
+                                        .testTag("mode_auto_off_distance_first_chip"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isAutoOff) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.65f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.9.dp,
+                                        if (isAutoOff) XboxNeonGreen else XboxCardBorder
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Auto-Off VPN in game" else "Tự tắt VPN khi vào game",
+                                            color = if (isAutoOff) XboxNeonGreen else TextPrimary,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (isEn) "1st: Geo Distance (KR ~70ms)" else "Ưu tiên: Vị trí gần (KR ~70ms)",
+                                            color = if (isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            if (isAutoOff) {
+                                                SettingsRepository.updateAutoBypass(false)
+                                                val best = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+                                                if (best != null) onSelectServer(best)
+                                            }
+                                        }
+                                        .testTag("mode_keep_vpn_ping_first_chip"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (!isAutoOff) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.65f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.9.dp,
+                                        if (!isAutoOff) XboxNeonGreen else XboxCardBorder
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "Keep VPN on in game" else "Bật VPN luôn khi chơi",
+                                            color = if (!isAutoOff) XboxNeonGreen else TextPrimary,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (isEn) "1st: Lowest Ping ➔ Distance" else "Ưu tiên: Ping thấp ➔ Vị trí",
+                                            color = if (!isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
+                                            fontSize = 9.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1275,8 +1417,16 @@ private fun ServerCard(
                     }
 
                     val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
+                    val estDirectPing = remember(server.countryCode, config.autoBypassEnabled) {
+                        if (config.autoBypassEnabled && (server.countryCode == "KR" || server.countryCode == "JP")) {
+                            com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs(server.countryCode)
+                        } else null
+                    }
+                    val directPingNote = if (estDirectPing != null) {
+                        if (isEn) " • ~${estDirectPing}ms in-game" else " • ~${estDirectPing}ms khi tắt VPN"
+                    } else ""
                     Text(
-                        text = "${server.localizedDescription(isEn)}$distLabel • ${server.ip}",
+                        text = "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,

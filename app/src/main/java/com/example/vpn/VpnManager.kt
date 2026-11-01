@@ -523,13 +523,21 @@ object VpnManager {
         return if (withinLimit.isNotEmpty()) withinLimit else servers
     }
 
+    /**
+     * Thuật toán chọn & sắp xếp máy chủ Kép (Cải tiến v1.3.0):
+     * - Khi `prioritizeDistanceForAutoBypass == true` (Chế độ Tự động tắt VPN khi vào game):
+     *   Ưu tiên KHOẢNG CÁCH ĐỊA LÝ gần nhất trước (ví dụ từ VN: Hàn Quốc ~70ms khi tắt VPN > Nhật Bản ~80ms), sau đó mới xét Ping của máy chủ trong vùng đó.
+     * - Khi `prioritizeDistanceForAutoBypass == false` (Chế độ Bật VPN luôn khi chơi):
+     *   Ưu tiên ĐỘ TRỄ PING thực tế thấp nhất trước (trong giới hạn khoảng cách <= 5.500 km), còn khoảng cách địa lý xếp ở phía sau làm tiêu chí phụ.
+     */
     fun sortServersByUnlockAndPing(
         servers: List<ServerLocation>,
         pingMap: Map<String, Int> = _state.value.serverPings,
         records: Map<String, ServerUnlockRecord> = _state.value.unlockRecords,
         engine: VpnEngine = _state.value.engine,
         sessions: List<com.example.data.PlaySessionRecord> = com.example.data.SessionHistoryRepository.sessions.value,
-        measurementsMap: Map<String, EndpointPingMeasurement> = _state.value.serverMeasurements
+        measurementsMap: Map<String, EndpointPingMeasurement> = if (pingMap === _state.value.serverPings) _state.value.serverMeasurements else emptyMap(),
+        prioritizeDistanceForAutoBypass: Boolean = false
     ): List<ServerLocation> {
         val currentGeo = _state.value.detectedGeoIp
         return servers.sortedWith(
@@ -549,11 +557,17 @@ object VpnManager {
                     return@Comparator if (withinDistA) -1 else 1
                 }
 
+                val exactDistRankA = RegionalProbeTester.getExactCountryDistanceRank(a.countryCode, servers, currentGeo, allowTimezoneFallback = false)
+                val exactDistRankB = RegionalProbeTester.getExactCountryDistanceRank(b.countryCode, servers, currentGeo, allowTimezoneFallback = false)
+
                 if (engine == VpnEngine.SMART_BYPASS && pingMap.isEmpty() && measurementsMap.isEmpty()) {
                     val rankA = unlockSortRank(statusA)
                     val rankB = unlockSortRank(statusB)
                     if (rankA != rankB) {
                         return@Comparator rankA.compareTo(rankB)
+                    }
+                    if (prioritizeDistanceForAutoBypass && exactDistRankA != exactDistRankB) {
+                        return@Comparator exactDistRankA.compareTo(exactDistRankB)
                     }
                     val lastPlayA = getLastSessionPingForServer(a, sessions)
                     val lastPlayB = getLastSessionPingForServer(b, sessions)
@@ -565,12 +579,12 @@ object VpnManager {
                     if (hasPlayA && hasPlayB && lastPlayA != lastPlayB) {
                         return@Comparator lastPlayA.compareTo(lastPlayB)
                     }
+                    if (prioritizeDistanceForAutoBypass && exactDistRankA != exactDistRankB) {
+                        return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                    }
                     val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
                     val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
-                    if (countryTierA != countryTierB) {
-                        return@Comparator countryTierA.compareTo(countryTierB)
-                    }
-                    return@Comparator 0
+                    return@Comparator countryTierA.compareTo(countryTierB)
                 }
 
                 val measA = measurementsMap[a.id]
@@ -591,35 +605,54 @@ object VpnManager {
                     return@Comparator rankA.compareTo(rankB)
                 }
 
-                // Tầng 0 (Cổng chính sống): xếp trực tiếp theo độ ổn định và số ping đo thật (KHÔNG để địa lý ghi đè ping thật)
+                // Tầng 0 (Cổng chính sống):
+                // - Nếu bật Tự động tắt VPN khi vào game (`prioritizeDistanceForAutoBypass = true`):
+                //   Ưu tiên Khoảng cách địa lý gần nhất trước (Hàn Quốc KR ~70ms > Nhật Bản JP ~80ms), sau đó xét Ping trong vùng.
+                // - Nếu chọn Bật VPN luôn khi chơi (`prioritizeDistanceForAutoBypass = false`):
+                //   Ưu tiên Ping thấp nhất trước, còn Khoảng cách địa lý xếp ở phía sau!
                 if (reachTierA == 0) {
                     val unstableA = measA?.isUnstable == true
                     val unstableB = measB?.isUnstable == true
                     if (unstableA != unstableB) {
                         return@Comparator if (!unstableA) -1 else 1
                     }
-                    if (pingA != pingB) {
-                        return@Comparator pingA.compareTo(pingB)
+                    if (prioritizeDistanceForAutoBypass) {
+                        if (exactDistRankA != exactDistRankB) {
+                            return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                        }
+                        if (pingA != pingB) {
+                            return@Comparator pingA.compareTo(pingB)
+                        }
+                    } else {
+                        if (pingA != pingB) {
+                            return@Comparator pingA.compareTo(pingB)
+                        }
+                        if (exactDistRankA != exactDistRankB) {
+                            return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                        }
                     }
-                    val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
-                    val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
-                    if (countryTierA != countryTierB) {
-                        return@Comparator countryTierA.compareTo(countryTierB)
-                    }
-                    return@Comparator 0
                 }
 
-                // Tầng 1 (Chỉ cổng phụ :443/:80 sống): xếp theo RTT cổng phụ
+                // Tầng 1 (Chỉ cổng phụ :443/:80 sống):
                 if (reachTierA == 1) {
+                    if (prioritizeDistanceForAutoBypass && exactDistRankA != exactDistRankB) {
+                        return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                    }
                     val fbPingA = measA?.rttMs ?: Int.MAX_VALUE
                     val fbPingB = measB?.rttMs ?: Int.MAX_VALUE
                     if (fbPingA != fbPingB) {
                         return@Comparator fbPingA.compareTo(fbPingB)
                     }
+                    if (exactDistRankA != exactDistRankB) {
+                        return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                    }
                 }
 
-                // Tầng 2 (Chưa đo): dùng khoảng cách địa lý sơ bộ nếu có GeoIP hợp lệ, ưu tiên máy chủ tĩnh trước máy chủ động
+                // Tầng 2 (Chưa đo): khi bật Tự tắt VPN thì ưu tiên quốc gia gần nhất (KR -> JP); mặc định dùng phân tầng vùng và ưu tiên máy chủ tĩnh
                 if (reachTierA == 2) {
+                    if (prioritizeDistanceForAutoBypass && exactDistRankA != exactDistRankB) {
+                        return@Comparator exactDistRankA.compareTo(exactDistRankB)
+                    }
                     val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
                     val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
                     if (countryTierA != countryTierB) {
@@ -942,12 +975,19 @@ object VpnManager {
                     isTestingPings = false
                 )
 
+                val autoBypassMode = com.example.data.SettingsRepository.config.value.autoBypassEnabled
                 val currentSrvStatus = getServerUnlockStatus(currentSrv, records)
                 val currentSrvPing = finalPings[currentSrv.id] ?: -1
                 val currentSrvCountryTier = RegionalProbeTester.getNearestSupportedCountryTier(
                     currentSrv.countryCode,
                     allServers,
                     _state.value.detectedGeoIp
+                )
+                val currentSrvExactDistRank = RegionalProbeTester.getExactCountryDistanceRank(
+                    currentSrv.countryCode,
+                    allServers,
+                    _state.value.detectedGeoIp,
+                    allowTimezoneFallback = true
                 )
                 val isCurrentSrvTooFar = !currentSrv.isCustom &&
                     !RegionalProbeTester.isWithinAutoSelectDistanceLimit(
@@ -956,11 +996,17 @@ object VpnManager {
                         geo = _state.value.detectedGeoIp,
                         allowTimezoneFallback = true
                     )
+                val shouldSwitchForAutoBypassNearestCountry = autoBypassMode &&
+                    !currentSrv.isCustom &&
+                    currentSrvStatus != RegionUnlockStatus.UNLOCKED &&
+                    currentSrvExactDistRank > 0
 
                 // Tự động đổi máy chủ khi người dùng bấm "Chọn tối ưu", hoặc khi máy chủ hiện tại vượt quá giới hạn khoảng cách (>5.500km như Mỹ từ VN),
+                // hoặc khi bật Tự động tắt VPN mà máy chủ chưa ở quốc gia gần nhất (ví dụ đang ở JP thay vì KR gần hơn),
                 // hoặc khi máy chủ hiện tại bị lỗi/chưa mở khóa và chết cổng chính.
                 val shouldAutoSwitchToOptimal = autoPickBest ||
                     isCurrentSrvTooFar ||
+                    shouldSwitchForAutoBypassNearestCountry ||
                     (!currentSrv.isCustom && (
                         currentSrvStatus == RegionUnlockStatus.FAILED ||
                             currentSrvStatus == RegionUnlockStatus.WRONG_REGION ||
@@ -983,7 +1029,8 @@ object VpnManager {
                         pingMap = finalPings,
                         records = records,
                         engine = currentEngine,
-                        measurementsMap = finalMeas
+                        measurementsMap = finalMeas,
+                        prioritizeDistanceForAutoBypass = autoBypassMode
                     )
                     val hasAnyUnlockedInDistancePool = candidates.any { cand ->
                         val candMeas = finalMeas[cand.id]
@@ -992,7 +1039,12 @@ object VpnManager {
                         } else {
                             finalPings[cand.id] ?: -1
                         }
-                        candPrimaryPing > 0 && getServerUnlockStatus(cand, records) == RegionUnlockStatus.UNLOCKED
+                        val matchesMode = if (autoBypassMode) {
+                            RegionalProbeTester.getExactCountryDistanceRank(cand.countryCode, allServers, _state.value.detectedGeoIp, allowTimezoneFallback = true) == 0
+                        } else {
+                            true
+                        }
+                        candPrimaryPing > 0 && getServerUnlockStatus(cand, records) == RegionUnlockStatus.UNLOCKED && matchesMode
                     }
                     val best = candidates.firstOrNull { cand ->
                         val candMeas = finalMeas[cand.id]
@@ -1003,6 +1055,7 @@ object VpnManager {
                         }
                         val candStatus = getServerUnlockStatus(cand, records)
                         val allowedByUnlockRule = if (!isCurrentSrvTooFar &&
+                            !shouldSwitchForAutoBypassNearestCountry &&
                             currentSrvStatus == RegionUnlockStatus.UNLOCKED &&
                             currentSrvPing > 0 &&
                             hasAnyUnlockedInDistancePool
@@ -1012,10 +1065,10 @@ object VpnManager {
                             true
                         }
                         candPrimaryPing > 0 && allowedByUnlockRule
-                    } ?: if (currentEngine == VpnEngine.SMART_BYPASS && (isCurrentSrvTooFar || currentSrvStatus != RegionUnlockStatus.UNLOCKED)) {
+                    } ?: if (currentEngine == VpnEngine.SMART_BYPASS && (isCurrentSrvTooFar || shouldSwitchForAutoBypassNearestCountry || currentSrvStatus != RegionUnlockStatus.UNLOCKED)) {
                         candidates.firstOrNull { getLastSessionPingForServer(it) > 0 }
                             ?: candidates.firstOrNull()
-                    } else if (isCurrentSrvTooFar) {
+                    } else if (isCurrentSrvTooFar || shouldSwitchForAutoBypassNearestCountry) {
                         candidates.firstOrNull()
                     } else {
                         null
@@ -1033,9 +1086,10 @@ object VpnManager {
                         if (best.id != currentSrv.id || autoPickBest) {
                             val distKm = RegionalProbeTester.getServerDistanceKm(best, _state.value.detectedGeoIp, allowTimezoneFallback = true)
                             val distNote = if (distKm != null) " • ~${distKm}km" else ""
+                            val algoLabel = if (autoBypassMode) "Tự tắt VPN: Ưu tiên Vị trí gần" else "Giữ VPN: Ưu tiên Ping thấp"
                             com.example.data.AppLogger.success(
                                 "VPN",
-                                "Chọn tối ưu (${best.countryCode}$distNote • ${getServerUnlockStatus(best, records)}): ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Sẵn sàng"})"
+                                "Chọn tối ưu v1.3 [$algoLabel] (${best.countryCode}$distNote • ${getServerUnlockStatus(best, records)}): ${best.name} (${if (bestPing > 0) "${bestPing}ms" else "Sẵn sàng"})"
                             )
                             withContext(Dispatchers.Main) {
                                 selectServer(best, context ?: appContext)
@@ -1157,6 +1211,81 @@ object VpnManager {
         )
         selectServer(bestNext, context ?: appContext)
         return bestNext
+    }
+
+    private const val PREF_V130_SMART_ROUTING_UPGRADED = "upgraded_v1_3_0_smart_routing_step"
+
+    fun isV130SmartRoutingUpgraded(context: Context? = appContext): Boolean {
+        val ctx = context ?: appContext ?: return false
+        return try {
+            val sp = ctx.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+            sp.getBoolean(PREF_V130_SMART_ROUTING_UPGRADED, false)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Bước nâng cấp cải tiến phiên bản 1.3.0:
+     * Tự động áp dụng thuật toán chọn máy chủ kép (Khoảng cách địa lý vs Ping) khi người dùng nâng cấp lên v1.3.0
+     * hoặc khi đổi chế độ Tự tắt VPN / Giữ VPN khi chơi.
+     */
+    fun runV130SmartRoutingUpgradeStep(
+        context: Context? = appContext,
+        force: Boolean = false
+    ): ServerLocation? {
+        val ctx = context ?: appContext
+        if (!force && ctx != null && isV130SmartRoutingUpgraded(ctx)) {
+            return null
+        }
+        val currentSrv = _state.value.currentServer
+        if (currentSrv.isCustom && !force) return null
+
+        val autoBypass = com.example.data.SettingsRepository.config.value.autoBypassEnabled
+        val allServers = getAllServers()
+        val records = _state.value.unlockRecords
+        val validPool = allServers.filter {
+            val st = getServerUnlockStatus(it, records)
+            st != RegionUnlockStatus.FAILED && st != RegionUnlockStatus.WRONG_REGION
+        }
+        val distanceLimitedPool = filterServersWithinDistanceLimit(
+            servers = validPool,
+            geo = _state.value.detectedGeoIp,
+            allowTimezoneFallback = true
+        )
+        val sorted = sortServersByUnlockAndPing(
+            servers = distanceLimitedPool,
+            pingMap = _state.value.serverPings,
+            records = records,
+            engine = _state.value.engine,
+            measurementsMap = _state.value.serverMeasurements,
+            prioritizeDistanceForAutoBypass = autoBypass
+        )
+        val targetBest = sorted.firstOrNull() ?: return null
+
+        if (ctx != null) {
+            try {
+                ctx.getSharedPreferences("cloudplay_servers", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(PREF_V130_SMART_ROUTING_UPGRADED, true)
+                    .apply()
+            } catch (_: Exception) {
+            }
+        }
+
+        if (targetBest.id != currentSrv.id) {
+            selectServer(targetBest, ctx)
+            val modeDesc = if (autoBypass) {
+                "Tự động tắt VPN -> Ưu tiên Vị trí gần nhất (${targetBest.countryCode} ~70ms)"
+            } else {
+                "Giữ VPN khi chơi -> Ưu tiên Ping thấp nhất (${targetBest.countryCode})"
+            }
+            com.example.data.AppLogger.success(
+                "UPGRADE_1.3",
+                "Hoàn tất bước nâng cấp thuật toán v1.3.0 [$modeDesc]: Chuyển sang ${targetBest.flag} ${targetBest.name}"
+            )
+        }
+        return targetBest
     }
 
     private fun loadPersistedServers(context: Context) {

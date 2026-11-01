@@ -26,6 +26,11 @@
 - Giao diện nút tải được tinh chỉnh ngắn gọn: **“Tải nhanh qua máy chủ phụ”**, loại bỏ hoàn toàn các từ ngữ kỹ thuật phức tạp.
 - Tự động kiểm tra độ sống và chuyển hướng mượt mà giữa các mirror uy tín (`gh-proxy.com`, `ghproxy.net`, `ghfast.top`, `mirror.ghproxy.com`, `kkgithub.com`).
 
+#### 5. Bước nâng cấp Thuật toán Chọn Máy Chủ Kép v1.3.0 (Khoảng cách địa lý vs Ping)
+- **Giới hạn khoảng cách tự động chọn (`≤ 5.500 km`)**: Ngăn chặn hoàn toàn việc chọn nhầm máy chủ Mỹ (`US`, ~12.600 km) quá xa người dùng Việt Nam / Đông Nam Á.
+- **Chế độ Tự động tắt VPN khi vào game (`Vị trí gần ➔ Ping`)**: Vì khi vào game sẽ ngắt VPN để đi mạng trực tiếp, hệ thống ưu tiên **Khoảng cách địa lý gần nhất trước** — chọn **🇰🇷 Hàn Quốc (~70ms khi tắt VPN)** trước **🇯🇵 Nhật Bản (~80ms khi tắt VPN)**, sau đó mới xét đến ping của máy chủ trong vùng đó.
+- **Chế độ Bật VPN luôn khi chơi (`Ping thấp ➔ Vị trí`)**: Khi giữ VPN xuyên suốt lúc chơi, hệ thống ưu tiên **Độ trễ Ping đo thực tế thấp nhất trước**, còn khoảng cách địa lý xếp ở phía sau làm tiêu chí phụ.
+
 ---
 
 ### 📦 Quy trình phát hành lên GitHub Releases

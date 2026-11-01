@@ -254,6 +254,22 @@ class XboxBridge(
                 hideStreamStats = hideStreamStats,
                 targetLanguage = targetTranslateLang
             )
+            val physMapJson = org.json.JSONObject().apply {
+                com.example.data.SettingsRepository.parsePhysicalButtonMap(currentConfig.physicalGamepadButtonMap).forEach { (k, v) ->
+                    put(k.toString(), v)
+                }
+            }.toString()
+            val initPhysConfJson = org.json.JSONObject().apply {
+                put("buttonMap", org.json.JSONObject(physMapJson))
+                put("leftInner", currentConfig.physLeftStickInnerDeadzone.toDouble())
+                put("leftOuter", currentConfig.physLeftStickOuterDeadzone.toDouble())
+                put("rightInner", currentConfig.physRightStickInnerDeadzone.toDouble())
+                put("rightOuter", currentConfig.physRightStickOuterDeadzone.toDouble())
+                put("shortcutsEnabled", currentConfig.controllerShortcutsEnabled)
+                put("shortcutStatsBtn", currentConfig.shortcutToggleStatsButton)
+                put("shortcutVpadBtn", currentConfig.shortcutToggleVirtualPadButton)
+                put("shortcutRecBtn", currentConfig.shortcutToggleRecordingButton)
+            }.toString()
             return """
                 (function() {
                     window.__cloudPlayIsEnglishUi = $isEnglishUi;
@@ -267,12 +283,18 @@ class XboxBridge(
                         if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: "$cellularMode", networkTuningMode: "$networkTuningMode", speedFirst: $speedFirstPriority, targetBitrate: $effectiveBitrateMbps, lowEndDeviceMode: $lowEndDeviceMode, isCellular: $isCellular });
                         if (window.__updateGraphicsTuning) window.__updateGraphicsTuning({ renderScale: $renderScaleFactor, fpsCap: $fpsCap, gpuLoadReduction: $gpuLoadReduction, lowEndDeviceMode: $lowEndDeviceMode });
                         if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($virtualGamepadEnabled);
+                        if (window.__updatePhysicalControllerConfig) window.__updatePhysicalControllerConfig($initPhysConfJson);
                         if ($lowEndDeviceMode && window.__pauseTranslator) window.__pauseTranslator();
                         return;
                     }
                     window.__cloudPlayInjected = true;
                     window.__virtualGamepadEnabled = $virtualGamepadEnabled;
                     window.__isRecordingPerformanceMode = false;
+                    window.__physControllerConfig = $initPhysConfJson;
+                    window.__updatePhysicalControllerConfig = function(conf) {
+                        if (!conf) return;
+                        window.__physControllerConfig = Object.assign(window.__physControllerConfig || {}, conf);
+                    };
 
                     function isFortniteSession() {
                         const h = (location.href || '').toLowerCase();
@@ -1589,6 +1611,43 @@ class XboxBridge(
                     const nowTs = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
                     let virtualGamepadActive = !!window.__virtualGamepadEnabled;
                     let gamepadConnectedDispatched = false;
+                    let lastRumbleBridgeAt = 0;
+                    window.__hasPhysicalGamepadConnected = false;
+
+                    const virtualVibrationActuator = {
+                        type: "dual-rumble",
+                        playEffect: function(type, params) {
+                            try {
+                                if (window.__deviceThermalThrottled || window.__appInBackground || window.__hasPhysicalGamepadConnected) {
+                                    return Promise.resolve("complete");
+                                }
+                                const p = params || {};
+                                const dur = Math.max(0, Math.min(500, Math.round(Number(p.duration) || 0)));
+                                const strong = Math.max(0, Math.min(1, Number(p.strongMagnitude) || 0));
+                                const weak = Math.max(0, Math.min(1, Number(p.weakMagnitude) || 0));
+                                if (dur <= 10 || (strong < 0.04 && weak < 0.04)) {
+                                    return Promise.resolve("complete");
+                                }
+                                const nowMs = Date.now();
+                                if (nowMs - lastRumbleBridgeAt >= 65) {
+                                    lastRumbleBridgeAt = nowMs;
+                                    if (window.CloudPlayBridge && typeof window.CloudPlayBridge.onGameRumble === 'function') {
+                                        window.CloudPlayBridge.onGameRumble(dur, strong, weak);
+                                    }
+                                }
+                            } catch (e) {}
+                            return Promise.resolve("complete");
+                        },
+                        reset: function() {
+                            try {
+                                if (!window.__hasPhysicalGamepadConnected && window.CloudPlayBridge && typeof window.CloudPlayBridge.onGameRumble === 'function') {
+                                    window.CloudPlayBridge.onGameRumble(0, 0, 0);
+                                }
+                            } catch (e) {}
+                            return Promise.resolve("complete");
+                        }
+                    };
+
                     const virtualGamepadState = {
                         id: "Xbox 360 Controller (XInput STANDARD GAMEPAD)",
                         index: 0,
@@ -1597,7 +1656,7 @@ class XboxBridge(
                         mapping: "standard",
                         axes: [0, 0, 0, 0],
                         buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
-                        vibrationActuator: null
+                        vibrationActuator: virtualVibrationActuator
                     };
 
                     function ensureGamepadConnectedEvent() {
@@ -1640,11 +1699,50 @@ class XboxBridge(
                         }
                     };
 
+                    let virtViewDownAt = 0;
+                    let virtShortcutLatched = {};
+
+                    function checkComboShortcutMatch(btnIdx) {
+                        const cfg = window.__physControllerConfig;
+                        if (!cfg || !cfg.shortcutsEnabled || btnIdx === 8 || btnIdx < 0) return null;
+                        if (btnIdx === cfg.shortcutStatsBtn) return "TOGGLE_STATS";
+                        if (btnIdx === cfg.shortcutVpadBtn) return "TOGGLE_VPAD";
+                        if (btnIdx === cfg.shortcutRecBtn) return "TOGGLE_REC";
+                        return null;
+                    }
+
                     window.__cpBtn = function(idx, pressed, analogVal) {
                         if (idx >= 0 && idx < 17) {
                             ensureGamepadConnectedEvent();
                             const v = (typeof analogVal === 'number') ? Math.max(0, Math.min(1, analogVal)) : (pressed ? 1.0 : 0.0);
                             const isPressed = pressed || v > 0.12;
+                            if (idx === 8) {
+                                if (isPressed && virtViewDownAt === 0) {
+                                    virtViewDownAt = Date.now();
+                                } else if (!isPressed) {
+                                    virtViewDownAt = 0;
+                                    virtShortcutLatched = {};
+                                }
+                            } else if (virtViewDownAt > 0 && (Date.now() - virtViewDownAt >= 400)) {
+                                const act = checkComboShortcutMatch(idx);
+                                if (act) {
+                                    if (isPressed) {
+                                        if (!virtShortcutLatched[idx]) {
+                                            virtShortcutLatched[idx] = true;
+                                            if (window.CloudPlayBridge && typeof window.CloudPlayBridge.onControllerShortcut === 'function') {
+                                                window.CloudPlayBridge.onControllerShortcut(act);
+                                            }
+                                        }
+                                        virtualGamepadState.buttons[idx].pressed = false;
+                                        virtualGamepadState.buttons[idx].touched = false;
+                                        virtualGamepadState.buttons[idx].value = 0;
+                                        virtualGamepadState.timestamp = nowTs();
+                                        return;
+                                    } else {
+                                        virtShortcutLatched[idx] = false;
+                                    }
+                                }
+                            }
                             virtualGamepadState.buttons[idx].pressed = isPressed;
                             virtualGamepadState.buttons[idx].touched = isPressed || v > 0.01;
                             virtualGamepadState.buttons[idx].value = v;
@@ -1716,6 +1814,28 @@ class XboxBridge(
                     }
 
                     try {
+                        let physViewDownAt = 0;
+                        let physShortcutLatched = {};
+
+                        function applyPhysStickDeadzone(x, y, innerDz, outerDz) {
+                            const inn = (typeof innerDz === 'number') ? innerDz : 0.0;
+                            const out = (typeof outerDz === 'number') ? outerDz : 1.0;
+                            if (inn <= 0.001 && out >= 0.999) {
+                                return [x, y];
+                            }
+                            const mag = Math.hypot(x, y);
+                            if (mag <= inn || mag < 0.0001) {
+                                return [0, 0];
+                            }
+                            const effOuter = Math.max(inn + 0.05, out);
+                            const norm = Math.min(1, Math.max(0, (mag - inn) / (effOuter - inn)));
+                            const scale = norm / mag;
+                            return [
+                                Math.max(-1, Math.min(1, x * scale)),
+                                Math.max(-1, Math.min(1, y * scale))
+                            ];
+                        }
+
                         const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null;
                         navigator.getGamepads = function() {
                             const real = origGetGamepads ? origGetGamepads() : [];
@@ -1727,38 +1847,112 @@ class XboxBridge(
                                     break;
                                 }
                             }
+                            window.__hasPhysicalGamepadConnected = !!physPad;
                             const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
                             if (!physPad) {
+                                physViewDownAt = 0;
+                                physShortcutLatched = {};
                                 if (shouldExposeVirtual) {
                                     list[0] = virtualGamepadState;
                                 }
-                            } else if (shouldExposeVirtual) {
-                                // Hybrid merge: allow on-screen virtual buttons/sticks to work even while a physical pad is connected
-                                const mergedButtons = [];
-                                for (let b = 0; b < 17; b++) {
-                                    const vb = virtualGamepadState.buttons[b] || { pressed: false, touched: false, value: 0 };
-                                    const pb = (physPad.buttons && physPad.buttons[b]) ? physPad.buttons[b] : { pressed: false, touched: false, value: 0 };
-                                    mergedButtons.push({
-                                        pressed: !!(vb.pressed || pb.pressed),
-                                        touched: !!(vb.touched || pb.touched),
-                                        value: Math.max(vb.value || 0, pb.value || 0)
-                                    });
+                            } else {
+                                const pCfg = window.__physControllerConfig || {};
+                                const bMap = pCfg.buttonMap || {};
+                                const remappedPhysButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+                                const rawBtns = physPad.buttons || [];
+                                for (let s = 0; s < 17; s++) {
+                                    const sb = rawBtns[s] || { pressed: false, touched: false, value: 0 };
+                                    const mappedKey = String(s);
+                                    const dst = (typeof bMap[mappedKey] === 'number' && bMap[mappedKey] >= 0 && bMap[mappedKey] < 17) ? bMap[mappedKey] : s;
+                                    const prev = remappedPhysButtons[dst];
+                                    remappedPhysButtons[dst] = {
+                                        pressed: !!(prev.pressed || sb.pressed),
+                                        touched: !!(prev.touched || sb.touched),
+                                        value: Math.max(prev.value || 0, sb.value || 0)
+                                    };
                                 }
-                                const mergedAxes = [0, 0, 0, 0];
-                                for (let a = 0; a < 4; a++) {
-                                    const va = virtualGamepadState.axes[a] || 0;
-                                    const pa = (physPad.axes && physPad.axes[a]) ? physPad.axes[a] : 0;
-                                    mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
+
+                                // Non-blocking View (button 8) combo shortcut detection:
+                                // View button itself goes to game immediately without delay; only the matched 2nd button is intercepted when View is held >= 400ms.
+                                const viewPressed = !!(remappedPhysButtons[8] && remappedPhysButtons[8].pressed);
+                                if (viewPressed) {
+                                    if (physViewDownAt === 0) {
+                                        physViewDownAt = Date.now();
+                                    } else if (pCfg.shortcutsEnabled && (Date.now() - physViewDownAt >= 400)) {
+                                        for (let b = 0; b < 17; b++) {
+                                            if (b === 8) continue;
+                                            const act = checkComboShortcutMatch(b);
+                                            if (act) {
+                                                if (remappedPhysButtons[b].pressed) {
+                                                    if (!physShortcutLatched[b]) {
+                                                        physShortcutLatched[b] = true;
+                                                        if (window.CloudPlayBridge && typeof window.CloudPlayBridge.onControllerShortcut === 'function') {
+                                                            window.CloudPlayBridge.onControllerShortcut(act);
+                                                        }
+                                                    }
+                                                    remappedPhysButtons[b] = { pressed: false, touched: false, value: 0 };
+                                                } else {
+                                                    physShortcutLatched[b] = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    physViewDownAt = 0;
+                                    physShortcutLatched = {};
                                 }
-                                list[physPad.index || 0] = {
-                                    id: physPad.id || virtualGamepadState.id,
-                                    index: physPad.index || 0,
-                                    connected: true,
-                                    timestamp: Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp),
-                                    mapping: "standard",
-                                    axes: mergedAxes,
-                                    buttons: mergedButtons
-                                };
+
+                                // Apply physical stick inner/outer deadzone BEFORE mergedAxes (defaults inner=0, outer=1.0 leave sticks unchanged)
+                                const rawAx0 = (physPad.axes && typeof physPad.axes[0] === 'number') ? physPad.axes[0] : 0;
+                                const rawAx1 = (physPad.axes && typeof physPad.axes[1] === 'number') ? physPad.axes[1] : 0;
+                                const rawAx2 = (physPad.axes && typeof physPad.axes[2] === 'number') ? physPad.axes[2] : 0;
+                                const rawAx3 = (physPad.axes && typeof physPad.axes[3] === 'number') ? physPad.axes[3] : 0;
+                                const leftPair = applyPhysStickDeadzone(rawAx0, rawAx1, pCfg.leftInner, pCfg.leftOuter);
+                                const rightPair = applyPhysStickDeadzone(rawAx2, rawAx3, pCfg.rightInner, pCfg.rightOuter);
+                                const physProcessedAxes = [leftPair[0], leftPair[1], rightPair[0], rightPair[1]];
+
+                                if (shouldExposeVirtual) {
+                                    // Hybrid merge: allow on-screen virtual buttons/sticks to work alongside physical pad while preserving physPad.vibrationActuator
+                                    const mergedButtons = [];
+                                    for (let b = 0; b < 17; b++) {
+                                        const vb = virtualGamepadState.buttons[b] || { pressed: false, touched: false, value: 0 };
+                                        const pb = remappedPhysButtons[b] || { pressed: false, touched: false, value: 0 };
+                                        mergedButtons.push({
+                                            pressed: !!(vb.pressed || pb.pressed),
+                                            touched: !!(vb.touched || pb.touched),
+                                            value: Math.max(vb.value || 0, pb.value || 0)
+                                        });
+                                    }
+                                    const mergedAxes = [0, 0, 0, 0];
+                                    for (let a = 0; a < 4; a++) {
+                                        const va = virtualGamepadState.axes[a] || 0;
+                                        const pa = physProcessedAxes[a] || 0;
+                                        mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
+                                    }
+                                    list[physPad.index || 0] = {
+                                        id: physPad.id || virtualGamepadState.id,
+                                        index: physPad.index || 0,
+                                        connected: true,
+                                        timestamp: Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp),
+                                        mapping: physPad.mapping || "standard",
+                                        axes: mergedAxes,
+                                        buttons: mergedButtons,
+                                        vibrationActuator: physPad.vibrationActuator || null,
+                                        hapticActuators: physPad.hapticActuators
+                                    };
+                                } else {
+                                    list[physPad.index || 0] = {
+                                        id: physPad.id,
+                                        index: physPad.index || 0,
+                                        connected: true,
+                                        timestamp: physPad.timestamp || nowTs(),
+                                        mapping: physPad.mapping || "standard",
+                                        axes: physProcessedAxes,
+                                        buttons: remappedPhysButtons,
+                                        vibrationActuator: physPad.vibrationActuator || null,
+                                        hapticActuators: physPad.hapticActuators
+                                    };
+                                }
                             }
                             return list;
                         };
@@ -2670,6 +2864,18 @@ class XboxBridge(
                 Log.w(TAG, "Error in requestBatchTranslate", e)
             }
         }
+    }
+
+    @JavascriptInterface
+    fun onGameRumble(durationMs: Int, strongMag: Float, weakMag: Float) {
+        if (!isCallerTrusted()) return
+        controller.onGameRumbleRequested(durationMs, strongMag, weakMag)
+    }
+
+    @JavascriptInterface
+    fun onControllerShortcut(actionId: String?) {
+        if (!isCallerTrusted() || actionId.isNullOrBlank()) return
+        controller.onControllerShortcutTriggered(actionId.trim())
     }
 
     @JavascriptInterface

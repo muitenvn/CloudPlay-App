@@ -601,6 +601,15 @@ enum class RecordingCaptureEngine(
 }
 
 @androidx.compose.runtime.Immutable
+data class PerGameGamepadLayout(
+    val offsets: String = "",
+    val scales: String = "",
+    val hiddenButtons: String = "",
+    val abxySplit: Boolean = false,
+    val dpadSplit: Boolean = false
+)
+
+@androidx.compose.runtime.Immutable
 data class AppConfig(
     val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val smartVpnEnabled: Boolean = true,
@@ -615,20 +624,35 @@ data class AppConfig(
     val inputPollingBoost: Boolean = true,
     val showFloatingHud: Boolean = true,
     val showVirtualController: Boolean = false,
+    val autoHideVirtualOnPhysicalController: Boolean = true,
     val gamepadScale: Float = 1.0f, // 0.75f .. 1.35f
     val gamepadOpacity: Float = 0.70f, // 0.25f .. 0.95f
     val gamepadDeadzone: Float = 0.08f, // 0.02f .. 0.25f
+    val leftStickInnerDeadzone: Float = 0.08f, // 0.00f .. 0.30f
+    val leftStickOuterDeadzone: Float = 0.95f, // 0.70f .. 1.00f
+    val rightStickInnerDeadzone: Float = 0.08f, // 0.00f .. 0.30f
+    val rightStickOuterDeadzone: Float = 0.95f, // 0.70f .. 1.00f
+    val physLeftStickInnerDeadzone: Float = 0.0f, // 0.00f .. 0.30f (default 0.0 = untouched)
+    val physLeftStickOuterDeadzone: Float = 1.0f, // 0.70f .. 1.00f (default 1.0 = untouched)
+    val physRightStickInnerDeadzone: Float = 0.0f, // 0.00f .. 0.30f (default 0.0 = untouched)
+    val physRightStickOuterDeadzone: Float = 1.0f, // 0.70f .. 1.00f (default 1.0 = untouched)
     val gamepadSensitivity: Float = 1.0f, // 0.60f .. 1.60f
     val gamepadLayoutPreset: GamepadLayoutPreset = GamepadLayoutPreset.STANDARD,
     val gamepadHapticLevel: GamepadHapticLevel = GamepadHapticLevel.MEDIUM,
-    val gamepadGyroEnabled: Boolean = false,
-    val gamepadGyroSensitivity: Float = 1.0f,
+    val gameRumbleLevel: GamepadHapticLevel = GamepadHapticLevel.MEDIUM,
     val gamepadSprintLockEnabled: Boolean = true,
     val gamepadCustomOffsets: String = "",
     val gamepadButtonScales: String = "",
     val gamepadHiddenButtons: String = "",
     val gamepadAbxySplitMode: Boolean = false,
     val gamepadDpadSplitMode: Boolean = false,
+    val usePerGameGamepadLayout: Boolean = true,
+    val perGameLayoutsJson: String = "{}",
+    val physicalGamepadButtonMap: String = "",
+    val controllerShortcutsEnabled: Boolean = true,
+    val shortcutToggleStatsButton: Int = 3, // Y
+    val shortcutToggleVirtualPadButton: Int = 1, // B
+    val shortcutToggleRecordingButton: Int = 0, // A
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
@@ -835,9 +859,18 @@ object SettingsRepository {
             antiAfkKeepAlive = sp.getBoolean("anti_afk", true),
             inputPollingBoost = sp.getBoolean("input_polling_boost", true),
             showVirtualController = sp.getBoolean("show_virtual_controller", false),
+            autoHideVirtualOnPhysicalController = sp.getBoolean("auto_hide_virtual_on_phys", true),
             gamepadScale = sp.getFloat("gamepad_scale", 1.0f).coerceIn(0.75f, 1.35f),
             gamepadOpacity = sp.getFloat("gamepad_opacity", 0.70f).coerceIn(0.25f, 0.95f),
             gamepadDeadzone = sp.getFloat("gamepad_deadzone", 0.08f).coerceIn(0.02f, 0.25f),
+            leftStickInnerDeadzone = sp.getFloat("left_stick_inner_deadzone", sp.getFloat("gamepad_deadzone", 0.08f)).coerceIn(0.00f, 0.30f),
+            leftStickOuterDeadzone = sp.getFloat("left_stick_outer_deadzone", 0.95f).coerceIn(0.70f, 1.00f),
+            rightStickInnerDeadzone = sp.getFloat("right_stick_inner_deadzone", sp.getFloat("gamepad_deadzone", 0.08f)).coerceIn(0.00f, 0.30f),
+            rightStickOuterDeadzone = sp.getFloat("right_stick_outer_deadzone", 0.95f).coerceIn(0.70f, 1.00f),
+            physLeftStickInnerDeadzone = sp.getFloat("phys_left_stick_inner_deadzone", 0.0f).coerceIn(0.00f, 0.30f),
+            physLeftStickOuterDeadzone = sp.getFloat("phys_left_stick_outer_deadzone", 1.0f).coerceIn(0.70f, 1.00f),
+            physRightStickInnerDeadzone = sp.getFloat("phys_right_stick_inner_deadzone", 0.0f).coerceIn(0.00f, 0.30f),
+            physRightStickOuterDeadzone = sp.getFloat("phys_right_stick_outer_deadzone", 1.0f).coerceIn(0.70f, 1.00f),
             gamepadSensitivity = sp.getFloat("gamepad_sensitivity", 1.0f).coerceIn(0.60f, 1.60f),
             gamepadLayoutPreset = try {
                 GamepadLayoutPreset.valueOf(sp.getString("gamepad_layout_preset", GamepadLayoutPreset.STANDARD.name) ?: GamepadLayoutPreset.STANDARD.name)
@@ -845,14 +878,22 @@ object SettingsRepository {
             gamepadHapticLevel = try {
                 GamepadHapticLevel.valueOf(sp.getString("gamepad_haptic_level", GamepadHapticLevel.MEDIUM.name) ?: GamepadHapticLevel.MEDIUM.name)
             } catch (_: Exception) { GamepadHapticLevel.MEDIUM },
-            gamepadGyroEnabled = sp.getBoolean("gamepad_gyro_enabled", false),
-            gamepadGyroSensitivity = sp.getFloat("gamepad_gyro_sensitivity", 1.0f).coerceIn(0.40f, 2.50f),
+            gameRumbleLevel = try {
+                GamepadHapticLevel.valueOf(sp.getString("game_rumble_level", GamepadHapticLevel.MEDIUM.name) ?: GamepadHapticLevel.MEDIUM.name)
+            } catch (_: Exception) { GamepadHapticLevel.MEDIUM },
             gamepadSprintLockEnabled = sp.getBoolean("gamepad_sprint_lock", true),
             gamepadCustomOffsets = sp.getString("gamepad_custom_offsets", "") ?: "",
             gamepadButtonScales = sp.getString("gamepad_button_scales", "") ?: "",
             gamepadHiddenButtons = sp.getString("gamepad_hidden_buttons", "") ?: "",
             gamepadAbxySplitMode = sp.getBoolean("gamepad_abxy_split_mode", false),
             gamepadDpadSplitMode = sp.getBoolean("gamepad_dpad_split_mode", false),
+            usePerGameGamepadLayout = sp.getBoolean("use_per_game_gamepad_layout", true),
+            perGameLayoutsJson = sp.getString("per_game_layouts_json", "{}") ?: "{}",
+            physicalGamepadButtonMap = sp.getString("physical_gamepad_button_map", "") ?: "",
+            controllerShortcutsEnabled = sp.getBoolean("controller_shortcuts_enabled", true),
+            shortcutToggleStatsButton = sp.getInt("shortcut_toggle_stats_btn", 3).coerceIn(-1, 16),
+            shortcutToggleVirtualPadButton = sp.getInt("shortcut_toggle_vpad_btn", 1).coerceIn(-1, 16),
+            shortcutToggleRecordingButton = sp.getInt("shortcut_toggle_rec_btn", 0).coerceIn(-1, 16),
             systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
             stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
             autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),
@@ -962,20 +1003,35 @@ object SettingsRepository {
             putBoolean("anti_afk", c.antiAfkKeepAlive)
             putBoolean("input_polling_boost", c.inputPollingBoost)
             putBoolean("show_virtual_controller", c.showVirtualController)
+            putBoolean("auto_hide_virtual_on_phys", c.autoHideVirtualOnPhysicalController)
             putFloat("gamepad_scale", c.gamepadScale)
             putFloat("gamepad_opacity", c.gamepadOpacity)
             putFloat("gamepad_deadzone", c.gamepadDeadzone)
+            putFloat("left_stick_inner_deadzone", c.leftStickInnerDeadzone)
+            putFloat("left_stick_outer_deadzone", c.leftStickOuterDeadzone)
+            putFloat("right_stick_inner_deadzone", c.rightStickInnerDeadzone)
+            putFloat("right_stick_outer_deadzone", c.rightStickOuterDeadzone)
+            putFloat("phys_left_stick_inner_deadzone", c.physLeftStickInnerDeadzone)
+            putFloat("phys_left_stick_outer_deadzone", c.physLeftStickOuterDeadzone)
+            putFloat("phys_right_stick_inner_deadzone", c.physRightStickInnerDeadzone)
+            putFloat("phys_right_stick_outer_deadzone", c.physRightStickOuterDeadzone)
             putFloat("gamepad_sensitivity", c.gamepadSensitivity)
             putString("gamepad_layout_preset", c.gamepadLayoutPreset.name)
             putString("gamepad_haptic_level", c.gamepadHapticLevel.name)
-            putBoolean("gamepad_gyro_enabled", c.gamepadGyroEnabled)
-            putFloat("gamepad_gyro_sensitivity", c.gamepadGyroSensitivity)
+            putString("game_rumble_level", c.gameRumbleLevel.name)
             putBoolean("gamepad_sprint_lock", c.gamepadSprintLockEnabled)
             putString("gamepad_custom_offsets", c.gamepadCustomOffsets)
             putString("gamepad_button_scales", c.gamepadButtonScales)
             putString("gamepad_hidden_buttons", c.gamepadHiddenButtons)
             putBoolean("gamepad_abxy_split_mode", c.gamepadAbxySplitMode)
             putBoolean("gamepad_dpad_split_mode", c.gamepadDpadSplitMode)
+            putBoolean("use_per_game_gamepad_layout", c.usePerGameGamepadLayout)
+            putString("per_game_layouts_json", c.perGameLayoutsJson)
+            putString("physical_gamepad_button_map", c.physicalGamepadButtonMap)
+            putBoolean("controller_shortcuts_enabled", c.controllerShortcutsEnabled)
+            putInt("shortcut_toggle_stats_btn", c.shortcutToggleStatsButton)
+            putInt("shortcut_toggle_vpad_btn", c.shortcutToggleVirtualPadButton)
+            putInt("shortcut_toggle_rec_btn", c.shortcutToggleRecordingButton)
             putBoolean("system_revolution", c.systemRevolutionEnabled)
             putBoolean("stealth_headers", c.stealthHeadersEnabled)
             putBoolean("auto_healing_mesh", c.autoHealingProxyMesh)
@@ -1378,6 +1434,11 @@ object SettingsRepository {
         persist(_config.value)
     }
 
+    fun updateAutoHideVirtualOnPhysicalController(enabled: Boolean) {
+        _config.update { it.copy(autoHideVirtualOnPhysicalController = enabled) }
+        persist(_config.value)
+    }
+
     fun updateGamepadScale(scale: Float) {
         _config.update { it.copy(gamepadScale = scale.coerceIn(0.75f, 1.35f)) }
         persist(_config.value)
@@ -1389,8 +1450,58 @@ object SettingsRepository {
     }
 
     fun updateGamepadDeadzone(deadzone: Float) {
-        _config.update { it.copy(gamepadDeadzone = deadzone.coerceIn(0.02f, 0.25f)) }
+        val clamped = deadzone.coerceIn(0.02f, 0.25f)
+        _config.update {
+            it.copy(
+                gamepadDeadzone = clamped,
+                leftStickInnerDeadzone = clamped,
+                rightStickInnerDeadzone = clamped
+            )
+        }
         persist(_config.value)
+    }
+
+    fun updateVirtualStickDeadzones(
+        leftInner: Float = _config.value.leftStickInnerDeadzone,
+        leftOuter: Float = _config.value.leftStickOuterDeadzone,
+        rightInner: Float = _config.value.rightStickInnerDeadzone,
+        rightOuter: Float = _config.value.rightStickOuterDeadzone
+    ) {
+        val li = leftInner.coerceIn(0.00f, 0.30f)
+        val lo = leftOuter.coerceIn(0.70f, 1.00f)
+        val ri = rightInner.coerceIn(0.00f, 0.30f)
+        val ro = rightOuter.coerceIn(0.70f, 1.00f)
+        _config.update {
+            it.copy(
+                gamepadDeadzone = li.coerceIn(0.02f, 0.25f),
+                leftStickInnerDeadzone = li,
+                leftStickOuterDeadzone = lo,
+                rightStickInnerDeadzone = ri,
+                rightStickOuterDeadzone = ro
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun updatePhysicalStickDeadzones(
+        leftInner: Float = _config.value.physLeftStickInnerDeadzone,
+        leftOuter: Float = _config.value.physLeftStickOuterDeadzone,
+        rightInner: Float = _config.value.physRightStickInnerDeadzone,
+        rightOuter: Float = _config.value.physRightStickOuterDeadzone
+    ) {
+        _config.update {
+            it.copy(
+                physLeftStickInnerDeadzone = leftInner.coerceIn(0.00f, 0.30f),
+                physLeftStickOuterDeadzone = leftOuter.coerceIn(0.70f, 1.00f),
+                physRightStickInnerDeadzone = rightInner.coerceIn(0.00f, 0.30f),
+                physRightStickOuterDeadzone = rightOuter.coerceIn(0.70f, 1.00f)
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun resetPhysicalStickDeadzones() {
+        updatePhysicalStickDeadzones(0.0f, 1.0f, 0.0f, 1.0f)
     }
 
     fun updateGamepadSensitivity(sensitivity: Float) {
@@ -1408,13 +1519,8 @@ object SettingsRepository {
         persist(_config.value)
     }
 
-    fun updateGamepadGyroEnabled(enabled: Boolean) {
-        _config.update { it.copy(gamepadGyroEnabled = enabled) }
-        persist(_config.value)
-    }
-
-    fun updateGamepadGyroSensitivity(sensitivity: Float) {
-        _config.update { it.copy(gamepadGyroSensitivity = sensitivity.coerceIn(0.40f, 2.50f)) }
+    fun updateGameRumbleLevel(level: GamepadHapticLevel) {
+        _config.update { it.copy(gameRumbleLevel = level) }
         persist(_config.value)
     }
 
@@ -1423,32 +1529,97 @@ object SettingsRepository {
         persist(_config.value)
     }
 
-    fun updateGamepadCustomOffsets(offsets: String) {
+    fun updateGamepadCustomOffsets(offsets: String, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
+                offsets = _config.value.gamepadCustomOffsets,
+                scales = _config.value.gamepadButtonScales,
+                hiddenButtons = _config.value.gamepadHiddenButtons,
+                abxySplit = _config.value.gamepadAbxySplitMode,
+                dpadSplit = _config.value.gamepadDpadSplitMode
+            )
+            savePerGameLayout(normKey, current.copy(offsets = offsets))
+            return
+        }
         _config.update { it.copy(gamepadCustomOffsets = offsets) }
         persist(_config.value)
     }
 
-    fun updateGamepadButtonScales(scales: String) {
+    fun updateGamepadButtonScales(scales: String, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
+                offsets = _config.value.gamepadCustomOffsets,
+                scales = _config.value.gamepadButtonScales,
+                hiddenButtons = _config.value.gamepadHiddenButtons,
+                abxySplit = _config.value.gamepadAbxySplitMode,
+                dpadSplit = _config.value.gamepadDpadSplitMode
+            )
+            savePerGameLayout(normKey, current.copy(scales = scales))
+            return
+        }
         _config.update { it.copy(gamepadButtonScales = scales) }
         persist(_config.value)
     }
 
-    fun updateGamepadHiddenButtons(hidden: String) {
+    fun updateGamepadHiddenButtons(hidden: String, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
+                offsets = _config.value.gamepadCustomOffsets,
+                scales = _config.value.gamepadButtonScales,
+                hiddenButtons = _config.value.gamepadHiddenButtons,
+                abxySplit = _config.value.gamepadAbxySplitMode,
+                dpadSplit = _config.value.gamepadDpadSplitMode
+            )
+            savePerGameLayout(normKey, current.copy(hiddenButtons = hidden))
+            return
+        }
         _config.update { it.copy(gamepadHiddenButtons = hidden) }
         persist(_config.value)
     }
 
-    fun updateGamepadAbxySplitMode(split: Boolean) {
+    fun updateGamepadAbxySplitMode(split: Boolean, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
+                offsets = _config.value.gamepadCustomOffsets,
+                scales = _config.value.gamepadButtonScales,
+                hiddenButtons = _config.value.gamepadHiddenButtons,
+                abxySplit = _config.value.gamepadAbxySplitMode,
+                dpadSplit = _config.value.gamepadDpadSplitMode
+            )
+            savePerGameLayout(normKey, current.copy(abxySplit = split))
+            return
+        }
         _config.update { it.copy(gamepadAbxySplitMode = split) }
         persist(_config.value)
     }
 
-    fun updateGamepadDpadSplitMode(split: Boolean) {
+    fun updateGamepadDpadSplitMode(split: Boolean, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
+                offsets = _config.value.gamepadCustomOffsets,
+                scales = _config.value.gamepadButtonScales,
+                hiddenButtons = _config.value.gamepadHiddenButtons,
+                abxySplit = _config.value.gamepadAbxySplitMode,
+                dpadSplit = _config.value.gamepadDpadSplitMode
+            )
+            savePerGameLayout(normKey, current.copy(dpadSplit = split))
+            return
+        }
         _config.update { it.copy(gamepadDpadSplitMode = split) }
         persist(_config.value)
     }
 
-    fun resetGamepadCustomOffsets() {
+    fun resetGamepadCustomOffsets(gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            savePerGameLayout(normKey, PerGameGamepadLayout())
+            return
+        }
         _config.update {
             it.copy(
                 gamepadCustomOffsets = "",
@@ -1456,6 +1627,260 @@ object SettingsRepository {
                 gamepadHiddenButtons = "",
                 gamepadAbxySplitMode = false,
                 gamepadDpadSplitMode = false
+            )
+        }
+        persist(_config.value)
+    }
+
+    fun updateUsePerGameGamepadLayout(enabled: Boolean) {
+        _config.update { it.copy(usePerGameGamepadLayout = enabled) }
+        persist(_config.value)
+    }
+
+    fun normalizeGameLayoutKey(rawKey: String?): String {
+        if (rawKey.isNullOrBlank()) return ""
+        val trimmed = rawKey.trim().lowercase(Locale.ROOT)
+        if (trimmed == "generic" || trimmed == "xbox cloud game" || trimmed == "xbox game") return ""
+        return trimmed.replace(Regex("[^a-z0-9_-]"), "_").trim('_').take(64)
+    }
+
+    fun getPerGameLayout(gameKey: String?, cfg: AppConfig = _config.value): PerGameGamepadLayout? {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (normKey.isEmpty() || cfg.perGameLayoutsJson.isBlank()) return null
+        return try {
+            val root = org.json.JSONObject(cfg.perGameLayoutsJson)
+            val obj = root.optJSONObject(normKey) ?: return null
+            PerGameGamepadLayout(
+                offsets = obj.optString("offsets", ""),
+                scales = obj.optString("scales", ""),
+                hiddenButtons = obj.optString("hidden", ""),
+                abxySplit = obj.optBoolean("abxySplit", false),
+                dpadSplit = obj.optBoolean("dpadSplit", false)
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun savePerGameLayout(gameKey: String, layout: PerGameGamepadLayout) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (normKey.isEmpty()) return
+        try {
+            val root = try {
+                org.json.JSONObject(_config.value.perGameLayoutsJson)
+            } catch (_: Exception) {
+                org.json.JSONObject()
+            }
+            val obj = org.json.JSONObject().apply {
+                put("offsets", layout.offsets)
+                put("scales", layout.scales)
+                put("hidden", layout.hiddenButtons)
+                put("abxySplit", layout.abxySplit)
+                put("dpadSplit", layout.dpadSplit)
+            }
+            root.put(normKey, obj)
+            val nextJson = root.toString()
+            _config.update { it.copy(perGameLayoutsJson = nextJson) }
+            persist(_config.value)
+        } catch (_: Exception) {}
+    }
+
+    fun useGlobalLayoutForGame(gameKey: String?) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (normKey.isEmpty()) return
+        try {
+            val root = org.json.JSONObject(_config.value.perGameLayoutsJson)
+            if (root.has(normKey)) {
+                root.remove(normKey)
+                val nextJson = root.toString()
+                _config.update { it.copy(perGameLayoutsJson = nextJson) }
+                persist(_config.value)
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun resetAllPerGameLayouts() {
+        _config.update { it.copy(perGameLayoutsJson = "{}") }
+        persist(_config.value)
+    }
+
+    fun parsePhysicalButtonMap(raw: String = _config.value.physicalGamepadButtonMap): Map<Int, Int> {
+        if (raw.isBlank()) return emptyMap()
+        val map = mutableMapOf<Int, Int>()
+        raw.split(",").forEach { pair ->
+            val parts = pair.trim().split(":")
+            if (parts.size == 2) {
+                val src = parts[0].toIntOrNull()
+                val dst = parts[1].toIntOrNull()
+                if (src != null && dst != null && src in 0..16 && dst in 0..16 && src != dst) {
+                    map[src] = dst
+                }
+            }
+        }
+        return map
+    }
+
+    fun serializePhysicalButtonMap(map: Map<Int, Int>): String {
+        return map.entries
+            .filter { it.key in 0..16 && it.value in 0..16 && it.key != it.value }
+            .sortedBy { it.key }
+            .joinToString(",") { "${it.key}:${it.value}" }
+    }
+
+    fun updatePhysicalButtonMapping(sourceButton: Int, targetButton: Int) {
+        if (sourceButton !in 0..16 || targetButton !in 0..16) return
+        val current = parsePhysicalButtonMap().toMutableMap()
+        if (sourceButton == targetButton) {
+            current.remove(sourceButton)
+        } else {
+            current[sourceButton] = targetButton
+        }
+        val serialized = serializePhysicalButtonMap(current)
+        _config.update { it.copy(physicalGamepadButtonMap = serialized) }
+        persist(_config.value)
+    }
+
+    fun resetPhysicalButtonMap() {
+        _config.update { it.copy(physicalGamepadButtonMap = "") }
+        persist(_config.value)
+    }
+
+    fun updateControllerShortcutsEnabled(enabled: Boolean) {
+        _config.update { it.copy(controllerShortcutsEnabled = enabled) }
+        persist(_config.value)
+    }
+
+    fun updateControllerShortcutButtons(
+        toggleStatsBtn: Int = _config.value.shortcutToggleStatsButton,
+        toggleVirtualPadBtn: Int = _config.value.shortcutToggleVirtualPadButton,
+        toggleRecordingBtn: Int = _config.value.shortcutToggleRecordingButton
+    ) {
+        _config.update {
+            it.copy(
+                shortcutToggleStatsButton = toggleStatsBtn.coerceIn(-1, 16),
+                shortcutToggleVirtualPadButton = toggleVirtualPadBtn.coerceIn(-1, 16),
+                shortcutToggleRecordingButton = toggleRecordingBtn.coerceIn(-1, 16)
+            )
+        }
+        persist(_config.value)
+    }
+
+    val STANDARD_GAMEPAD_BUTTONS: List<Triple<Int, String, String>> = listOf(
+        Triple(0, "A", "A (Cross)"),
+        Triple(1, "B", "B (Circle)"),
+        Triple(2, "X", "X (Square)"),
+        Triple(3, "Y", "Y (Triangle)"),
+        Triple(4, "LB", "LB (L1)"),
+        Triple(5, "RB", "RB (R1)"),
+        Triple(6, "LT", "LT (L2)"),
+        Triple(7, "RT", "RT (R2)"),
+        Triple(8, "View", "View (Back)"),
+        Triple(9, "Menu", "Menu (Start)"),
+        Triple(10, "L3", "L3 (Left Stick)"),
+        Triple(11, "R3", "R3 (Right Stick)"),
+        Triple(12, "D-Up", "D-Pad Up"),
+        Triple(13, "D-Down", "D-Pad Down"),
+        Triple(14, "D-Left", "D-Pad Left"),
+        Triple(15, "D-Right", "D-Pad Right"),
+        Triple(16, "Nexus", "Xbox Guide")
+    )
+
+    fun getGamepadButtonShortLabel(btnIndex: Int): String {
+        return STANDARD_GAMEPAD_BUTTONS.firstOrNull { it.first == btnIndex }?.second ?: "Btn $btnIndex"
+    }
+
+    fun getGamepadButtonLabel(btnIndex: Int, isEn: Boolean): String {
+        return STANDARD_GAMEPAD_BUTTONS.firstOrNull { it.first == btnIndex }?.third ?: if (isEn) "Button $btnIndex" else "Nút $btnIndex"
+    }
+
+    fun updateLeftStickInnerDeadzone(value: Float) {
+        updateVirtualStickDeadzones(leftInner = value)
+    }
+
+    fun updateLeftStickOuterDeadzone(value: Float) {
+        updateVirtualStickDeadzones(leftOuter = value)
+    }
+
+    fun updateRightStickInnerDeadzone(value: Float) {
+        updateVirtualStickDeadzones(rightInner = value)
+    }
+
+    fun updateRightStickOuterDeadzone(value: Float) {
+        updateVirtualStickDeadzones(rightOuter = value)
+    }
+
+    fun resetVirtualStickDeadzones() {
+        updateVirtualStickDeadzones(0.08f, 0.95f, 0.08f, 0.95f)
+    }
+
+    fun updatePhysLeftStickInnerDeadzone(value: Float) {
+        updatePhysicalStickDeadzones(leftInner = value)
+    }
+
+    fun updatePhysLeftStickOuterDeadzone(value: Float) {
+        updatePhysicalStickDeadzones(leftOuter = value)
+    }
+
+    fun updatePhysRightStickInnerDeadzone(value: Float) {
+        updatePhysicalStickDeadzones(rightInner = value)
+    }
+
+    fun updatePhysRightStickOuterDeadzone(value: Float) {
+        updatePhysicalStickDeadzones(rightOuter = value)
+    }
+
+    fun parseAllPerGameLayouts(rawJson: String = _config.value.perGameLayoutsJson): Map<String, PerGameGamepadLayout> {
+        if (rawJson.isBlank()) return emptyMap()
+        val result = mutableMapOf<String, PerGameGamepadLayout>()
+        try {
+            val root = org.json.JSONObject(rawJson)
+            val keys = root.keys()
+            while (keys.hasNext()) {
+                val k = keys.next()
+                val obj = root.optJSONObject(k) ?: continue
+                result[k] = PerGameGamepadLayout(
+                    offsets = obj.optString("offsets", ""),
+                    scales = obj.optString("scales", ""),
+                    hiddenButtons = obj.optString("hidden", ""),
+                    abxySplit = obj.optBoolean("abxySplit", false),
+                    dpadSplit = obj.optBoolean("dpadSplit", false)
+                )
+            }
+        } catch (_: Exception) {}
+        return result
+    }
+
+    fun clearAllPerGameLayouts() {
+        resetAllPerGameLayouts()
+    }
+
+    fun updatePhysicalGamepadSingleButtonMap(sourceButton: Int, targetButton: Int) {
+        updatePhysicalButtonMapping(sourceButton, targetButton)
+    }
+
+    fun resetPhysicalGamepadButtonMap() {
+        resetPhysicalButtonMap()
+    }
+
+    fun updateShortcutToggleStatsButton(btnIdx: Int) {
+        updateControllerShortcutButtons(toggleStatsBtn = btnIdx)
+    }
+
+    fun updateShortcutToggleVirtualPadButton(btnIdx: Int) {
+        updateControllerShortcutButtons(toggleVirtualPadBtn = btnIdx)
+    }
+
+    fun updateShortcutToggleRecordingButton(btnIdx: Int) {
+        updateControllerShortcutButtons(toggleRecordingBtn = btnIdx)
+    }
+
+    fun resetControllerShortcuts() {
+        _config.update {
+            it.copy(
+                controllerShortcutsEnabled = true,
+                shortcutToggleStatsButton = 3, // Y
+                shortcutToggleVirtualPadButton = 1, // B
+                shortcutToggleRecordingButton = 5 // RB
             )
         }
         persist(_config.value)

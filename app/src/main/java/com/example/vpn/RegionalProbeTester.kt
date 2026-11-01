@@ -445,6 +445,70 @@ object RegionalProbeTester {
     }
 
     /**
+     * Xếp hạng chính xác thứ tự khoảng cách quốc gia hỗ trợ Xbox tính từ vị trí người dùng (0 = quốc gia gần nhất, 1 = gần nhì, ...).
+     * Ví dụ từ Việt Nam: Hàn Quốc (KR ~2.740 - 3.590 km) có hạng 0 (gần nhất, khi tắt VPN vào game ping ~70ms),
+     * Nhật Bản (JP ~3.670 - 4.350 km) có hạng 1 (khi tắt VPN vào game ping ~80ms), Mỹ (US ~12.600 km) có hạng 2.
+     */
+    fun getExactCountryDistanceRank(
+        serverCountryCode: String,
+        servers: List<ServerLocation> = DEFAULT_SERVERS,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        allowTimezoneFallback: Boolean = false
+    ): Int {
+        val code = serverCountryCode.trim().uppercase()
+        if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) return 99
+
+        val userCoords = if (allowTimezoneFallback) {
+            resolveUserCoordinatesWithTimezoneFallback(geo)
+        } else {
+            resolveUserCoordinatesOrNull(geo)
+        } ?: return 0
+
+        val (userLat, userLon) = userCoords
+        val referencePool = if (servers.size >= 2) (servers + DEFAULT_SERVERS) else DEFAULT_SERVERS
+        val orderedCodes = referencePool
+            .map { it.countryCode.trim().uppercase() }
+            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
+            .distinct()
+            .ifEmpty { listOf("KR", "JP", "US") }
+            .sortedBy { c ->
+                val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+                haversineDistanceKm(userLat, userLon, lat, lon)
+            }
+
+        val idx = orderedCodes.indexOf(code)
+        return if (idx >= 0) idx else 99
+    }
+
+    /**
+     * Ước tính độ trễ trực tiếp trong game (ms) sau khi Tự động tắt VPN dựa trên khoảng cách địa lý tới cụm máy chủ Xbox của vùng.
+     * Từ Việt Nam / Đông Nam Á: Hàn Quốc (KR) đạt ~70ms, Nhật Bản (JP) đạt ~80ms.
+     */
+    fun estimateDirectInGamePingMs(
+        countryCode: String,
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        allowTimezoneFallback: Boolean = true
+    ): Int? {
+        val code = countryCode.trim().uppercase()
+        val userCoords = if (allowTimezoneFallback) {
+            resolveUserCoordinatesWithTimezoneFallback(geo)
+        } else {
+            resolveUserCoordinatesOrNull(geo)
+        } ?: return null
+        val (uLat, uLon) = userCoords
+        val (cLat, cLon) = COUNTRY_REFERENCE_COORDS[code] ?: return null
+        val distKm = haversineDistanceKm(uLat, uLon, cLat, cLon)
+        return when {
+            code == "KR" && distKm in 1500.0..4200.0 -> 70
+            code == "JP" && distKm in 2500.0..5200.0 -> 80
+            distKm <= 1200.0 -> 35
+            distKm <= 3600.0 -> 70
+            distKm <= 5000.0 -> 80
+            else -> (35 + (distKm * 0.014)).toInt()
+        }
+    }
+
+    /**
      * Xác định danh sách Trạm Test được sắp xếp từ gần người dùng nhất tới xa hơn.
      * Nếu chưa có GeoIP thực tế -> trả về danh sách rỗng (bỏ qua trạm đo và đo TCP trực tiếp).
      */

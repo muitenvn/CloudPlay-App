@@ -294,6 +294,24 @@ fun CloudBrowserScreen(
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
 
+    var manualVirtualPadOverrideWithPhys by remember { mutableStateOf(false) }
+    LaunchedEffect(gamepadStatus.hasPhysicalController) {
+        manualVirtualPadOverrideWithPhys = false
+    }
+    LaunchedEffect(streamUiState.shortcutVirtualPadOverrideTick) {
+        if (streamUiState.shortcutVirtualPadOverrideTick > 0L && gamepadStatus.hasPhysicalController) {
+            manualVirtualPadOverrideWithPhys = !manualVirtualPadOverrideWithPhys
+        }
+    }
+    LaunchedEffect(streamUiState.shortcutToggleRecordingTick) {
+        if (streamUiState.shortcutToggleRecordingTick > 0L) {
+            com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
+        }
+    }
+
+    val effectiveShowVirtualController = config.showVirtualController &&
+        (!config.autoHideVirtualOnPhysicalController || !gamepadStatus.hasPhysicalController || manualVirtualPadOverrideWithPhys)
+
     // Dynamically recompute injectionScript only when structural settings change (bitrate updates go through __updateNetworkProfile)
     val injectionScript = remember(
         config.clarityBoostEnabled,
@@ -309,11 +327,20 @@ fun CloudBrowserScreen(
         config.networkTuningMode,
         config.wifiSpeedFirstPriority,
         config.lowEndDeviceMode,
-        config.showVirtualController,
+        effectiveShowVirtualController,
         config.streamRenderScale,
         config.streamFpsCap,
         config.gpuLoadReductionEnabled,
-        networkStatus.isCellular
+        networkStatus.isCellular,
+        config.physicalGamepadButtonMap,
+        config.physLeftStickInnerDeadzone,
+        config.physLeftStickOuterDeadzone,
+        config.physRightStickInnerDeadzone,
+        config.physRightStickOuterDeadzone,
+        config.controllerShortcutsEnabled,
+        config.shortcutToggleStatsButton,
+        config.shortcutToggleVirtualPadButton,
+        config.shortcutToggleRecordingButton
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -330,7 +357,7 @@ fun CloudBrowserScreen(
             speedFirstPriority = config.wifiSpeedFirstPriority,
             effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps,
             lowEndDeviceMode = config.lowEndDeviceMode,
-            virtualGamepadEnabled = config.showVirtualController,
+            virtualGamepadEnabled = effectiveShowVirtualController,
             renderScaleFactor = config.streamRenderScale.scaleFactor,
             fpsCap = config.streamFpsCap.fps,
             gpuLoadReduction = config.gpuLoadReductionEnabled,
@@ -393,9 +420,32 @@ fun CloudBrowserScreen(
     }
 
     // Đồng bộ tức thì trạng thái Tay cầm ảo với WebView (Tắt tay cầm ảo -> ngắt kết nối Gamepad giả lập để Fortnite hiện HUD Cảm ứng Epic gốc)
-    LaunchedEffect(config.showVirtualController, webViewInstance) {
+    LaunchedEffect(effectiveShowVirtualController, webViewInstance) {
         webViewInstance?.evaluateJavascript(
-            "if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled(${config.showVirtualController});",
+            "if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($effectiveShowVirtualController);",
+            null
+        )
+    }
+
+    // Đồng bộ tức thì cấu hình Tay cầm thật (đổi nút, vùng chết trong/ngoài từng cần, tổ hợp phím tắt View + nút)
+    LaunchedEffect(
+        config.physicalGamepadButtonMap,
+        config.physLeftStickInnerDeadzone,
+        config.physLeftStickOuterDeadzone,
+        config.physRightStickInnerDeadzone,
+        config.physRightStickOuterDeadzone,
+        config.controllerShortcutsEnabled,
+        config.shortcutToggleStatsButton,
+        config.shortcutToggleVirtualPadButton,
+        config.shortcutToggleRecordingButton,
+        webViewInstance
+    ) {
+        val remapObj = org.json.JSONObject()
+        SettingsRepository.parsePhysicalButtonMap(config.physicalGamepadButtonMap).forEach { (src, dst) ->
+            remapObj.put(src.toString(), dst)
+        }
+        webViewInstance?.evaluateJavascript(
+            "if (window.__updatePhysicalControllerConfig) window.__updatePhysicalControllerConfig({ remap: ${remapObj}, lInner: ${config.physLeftStickInnerDeadzone}, lOuter: ${config.physLeftStickOuterDeadzone}, rInner: ${config.physRightStickInnerDeadzone}, rOuter: ${config.physRightStickOuterDeadzone}, shortcutsEnabled: ${config.controllerShortcutsEnabled}, shortcutStats: ${config.shortcutToggleStatsButton}, shortcutVirtualPad: ${config.shortcutToggleVirtualPadButton}, shortcutRecord: ${config.shortcutToggleRecordingButton} });",
             null
         )
     }
@@ -877,10 +927,37 @@ fun CloudBrowserScreen(
             }
         }
 
-        // Virtual Gamepad Overlay (if toggled on)
-        if (config.showVirtualController) {
+        val activeGameKey = remember(currentMainFrameUrl, initialUrl, gameProfile.gameId, streamUiState.gameTitle) {
+            when {
+                gameProfile.gameId.isNotBlank() && gameProfile.gameId != "generic" -> gameProfile.gameId.lowercase()
+                else -> {
+                    val urlSlug = Regex("/play/(?:launch|games)/([^/?#]+)", RegexOption.IGNORE_CASE)
+                        .find(currentMainFrameUrl.ifBlank { initialUrl })
+                        ?.groupValues?.getOrNull(1)
+                        ?.lowercase()
+                        ?.replace(Regex("[^a-z0-9_-]+"), "_")
+                        ?.trim('_')
+                        ?.takeIf { it.isNotBlank() }
+                    urlSlug ?: streamUiState.gameTitle
+                        ?.lowercase()
+                        ?.replace(Regex("[^a-z0-9]+"), "_")
+                        ?.trim('_')
+                        ?.takeIf { it.isNotBlank() }
+                }
+            }
+        }
+        val activeGameDisplayName = remember(streamUiState.gameTitle, gameProfile.title, gameProfile.gameId, activeGameKey) {
+            streamUiState.gameTitle?.takeIf { it.isNotBlank() }
+                ?: gameProfile.title.takeIf { gameProfile.gameId != "generic" && it.isNotBlank() }
+                ?: activeGameKey
+        }
+
+        // Virtual Gamepad Overlay (if toggled on and not auto-hidden by physical controller)
+        if (effectiveShowVirtualController) {
             VirtualGamepadOverlay(
                 webView = webViewInstance,
+                gameKey = activeGameKey,
+                gameDisplayName = activeGameDisplayName,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -916,7 +993,7 @@ fun CloudBrowserScreen(
         IsolatedFloatingHud(
             vpnState = vpnState,
             isGameActive = streamUiState.isGameActive,
-            virtualControllerEnabled = config.showVirtualController,
+            virtualControllerEnabled = effectiveShowVirtualController,
             physicalControllerConnected = gamepadStatus.hasPhysicalController,
             controllerName = gamepadStatus.controllerName,
             onToggleNetwork = {
@@ -927,7 +1004,18 @@ fun CloudBrowserScreen(
                 }
             },
             onToggleVirtualController = {
-                SettingsRepository.updateShowVirtualController(!config.showVirtualController)
+                if (gamepadStatus.hasPhysicalController && config.autoHideVirtualOnPhysicalController) {
+                    if (!effectiveShowVirtualController) {
+                        manualVirtualPadOverrideWithPhys = true
+                        if (!config.showVirtualController) {
+                            SettingsRepository.updateShowVirtualController(true)
+                        }
+                    } else {
+                        manualVirtualPadOverrideWithPhys = false
+                    }
+                } else {
+                    SettingsRepository.updateShowVirtualController(!config.showVirtualController)
+                }
             },
             onOpenSettings = {
                 showQuickSettingsDialog = true

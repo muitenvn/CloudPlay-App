@@ -282,7 +282,6 @@ object XboxTranslator {
         "Default layout" to "Bố cục mặc định",
         "Shooter layout" to "Bố cục bắn súng (Shooter)",
         "Racing layout" to "Bố cục đua xe (Racing)",
-        "Gyroscope" to "Cảm biến con quay hồi chuyển (Gyro)",
         "Sensitivity" to "Độ nhạy",
 
         // === Network Telemetry & Diagnostics ===

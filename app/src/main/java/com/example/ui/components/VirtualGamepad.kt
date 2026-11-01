@@ -1,10 +1,6 @@
 package com.example.ui.components
 
 import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -63,6 +59,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -185,6 +183,8 @@ private fun serializeHiddenButtons(set: Set<String>): String {
 fun VirtualGamepadOverlay(
     webView: WebView?,
     opacity: Float? = null,
+    gameKey: String? = null,
+    gameDisplayName: String? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -212,13 +212,23 @@ fun VirtualGamepadOverlay(
     var showEditGrid by remember { mutableStateOf(true) }
     var isToolbarCollapsed by remember { mutableStateOf(false) }
 
-    val abxySplitMode = config.gamepadAbxySplitMode
-    val dpadSplitMode = config.gamepadDpadSplitMode
+    val normGameKey = remember(gameKey) { SettingsRepository.normalizeGameLayoutKey(gameKey) }
+    val perGameLayout = remember(normGameKey, config.usePerGameGamepadLayout, config.perGameLayoutsJson) {
+        if (config.usePerGameGamepadLayout && normGameKey.isNotEmpty()) {
+            SettingsRepository.getPerGameLayout(normGameKey, config)
+        } else null
+    }
+
+    val effectiveOffsetsRaw = perGameLayout?.offsets ?: config.gamepadCustomOffsets
+    val effectiveScalesRaw = perGameLayout?.scales ?: config.gamepadButtonScales
+    val effectiveHiddenRaw = perGameLayout?.hiddenButtons ?: config.gamepadHiddenButtons
+    val abxySplitMode = perGameLayout?.abxySplit ?: config.gamepadAbxySplitMode
+    val dpadSplitMode = perGameLayout?.dpadSplit ?: config.gamepadDpadSplitMode
 
     // Custom draggable per-button offsets (in pixels), backward-compatible with legacy cluster keys
-    val customOffsets = remember(config.gamepadCustomOffsets) {
+    val customOffsets = remember(effectiveOffsetsRaw, normGameKey, config.usePerGameGamepadLayout) {
         mutableStateMapOf<String, Pair<Float, Float>>().apply {
-            val parsed = parseControlOffsets(config.gamepadCustomOffsets)
+            val parsed = parseControlOffsets(effectiveOffsetsRaw)
             putAll(parsed)
             // Backward compatibility: if user had legacy cluster offsets, seed individual button offsets if unset
             parsed["left_shoulder"]?.let { (cx, cy) ->
@@ -246,23 +256,23 @@ fun VirtualGamepadOverlay(
     }
 
     // Per-button individual scale multiplier (0.50f .. 2.00f)
-    val customButtonScales = remember(config.gamepadButtonScales) {
+    val customButtonScales = remember(effectiveScalesRaw, normGameKey, config.usePerGameGamepadLayout) {
         mutableStateMapOf<String, Float>().apply {
-            putAll(parseButtonScales(config.gamepadButtonScales))
+            putAll(parseButtonScales(effectiveScalesRaw))
         }
     }
 
     // Hidden (deleted) buttons set
-    val hiddenButtons = remember(config.gamepadHiddenButtons) {
-        parseHiddenButtons(config.gamepadHiddenButtons)
+    val hiddenButtons = remember(effectiveHiddenRaw, normGameKey, config.usePerGameGamepadLayout) {
+        parseHiddenButtons(effectiveHiddenRaw)
     }
 
     fun saveCustomOffsets() {
-        SettingsRepository.updateGamepadCustomOffsets(serializeControlOffsets(customOffsets))
+        SettingsRepository.updateGamepadCustomOffsets(serializeControlOffsets(customOffsets), normGameKey)
     }
 
     fun saveButtonScales() {
-        SettingsRepository.updateGamepadButtonScales(serializeButtonScales(customButtonScales))
+        SettingsRepository.updateGamepadButtonScales(serializeButtonScales(customButtonScales), normGameKey)
     }
 
     fun setButtonScale(nodeId: String, newMultiplier: Float) {
@@ -274,13 +284,13 @@ fun VirtualGamepadOverlay(
     fun deleteButton(nodeId: String) {
         val updated = hiddenButtons.toMutableSet()
         updated.add(nodeId)
-        SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated))
+        SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated), normGameKey)
     }
 
     fun restoreButton(nodeId: String) {
         val updated = hiddenButtons.toMutableSet()
         updated.remove(nodeId)
-        SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated))
+        SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated), normGameKey)
         selectedButtonId = nodeId
     }
 
@@ -294,7 +304,11 @@ fun VirtualGamepadOverlay(
     fun resetAllCustomizations() {
         customOffsets.clear()
         customButtonScales.clear()
-        SettingsRepository.resetGamepadCustomOffsets()
+        SettingsRepository.resetGamepadCustomOffsets(normGameKey)
+    }
+
+    fun switchCurrentGameToGlobalLayout() {
+        SettingsRepository.useGlobalLayoutForGame(normGameKey)
     }
 
     fun nodeScale(nodeId: String, baseScale: Float = effectiveScale): Float {
@@ -360,12 +374,6 @@ fun VirtualGamepadOverlay(
         )
     }
 
-    // Track right stick touch vs gyro offset so they combine smoothly
-    var touchRightX by remember { mutableFloatStateOf(0f) }
-    var touchRightY by remember { mutableFloatStateOf(0f) }
-    var gyroRightX by remember { mutableFloatStateOf(0f) }
-    var gyroRightY by remember { mutableFloatStateOf(0f) }
-
     fun sendStickAxesPair(xAxisIndex: Int, xVal: Float, yAxisIndex: Int, yVal: Float) {
         val rx = (xVal.coerceIn(-1f, 1f) * 100f).roundToInt() / 100f
         val ry = (yVal.coerceIn(-1f, 1f) * 100f).roundToInt() / 100f
@@ -373,62 +381,6 @@ fun VirtualGamepadOverlay(
             "if(window.__cpStick){window.__cpStick($xAxisIndex,$rx,$yAxisIndex,$ry);}else if(window.dispatchEvent){window.dispatchEvent(new CustomEvent('virtual_gamepad_axes_pair',{detail:{xAxis:$xAxisIndex,xVal:$rx,yAxis:$yAxisIndex,yVal:$ry}}));}",
             null
         )
-    }
-
-    val currentGyroSens by rememberUpdatedState(config.gamepadGyroSensitivity)
-    val currentWebView by rememberUpdatedState(webView)
-
-    // Real Hardware Gyroscope Aiming for Right Stick (Axes 2 & 3)
-    DisposableEffect(config.gamepadGyroEnabled) {
-        if (!config.gamepadGyroEnabled) {
-            gyroRightX = 0f
-            gyroRightY = 0f
-            return@DisposableEffect onDispose {}
-        }
-        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        val gyroSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
-        if (sensorManager == null || gyroSensor == null) {
-            return@DisposableEffect onDispose {}
-        }
-
-        val listener = object : SensorEventListener {
-            private var filteredX = 0f
-            private var filteredY = 0f
-
-            override fun onSensorChanged(event: SensorEvent?) {
-                val ev = event ?: return
-                val rawYaw = -ev.values[0] * 0.38f * currentGyroSens
-                val rawPitch = ev.values[1] * 0.38f * currentGyroSens
-
-                filteredX = filteredX * 0.65f + (if (abs(rawYaw) < 0.018f) 0f else rawYaw) * 0.35f
-                filteredY = filteredY * 0.65f + (if (abs(rawPitch) < 0.018f) 0f else rawPitch) * 0.35f
-
-                val clampedX = filteredX.coerceIn(-0.85f, 0.85f)
-                val clampedY = filteredY.coerceIn(-0.85f, 0.85f)
-
-                if (abs(clampedX - gyroRightX) >= 0.015f || abs(clampedY - gyroRightY) >= 0.015f) {
-                    gyroRightX = clampedX
-                    gyroRightY = clampedY
-                    val combinedX = (touchRightX + gyroRightX).coerceIn(-1f, 1f)
-                    val combinedY = (touchRightY + gyroRightY).coerceIn(-1f, 1f)
-                    val rx = (combinedX * 100f).roundToInt() / 100f
-                    val ry = (combinedY * 100f).roundToInt() / 100f
-                    currentWebView?.evaluateJavascript(
-                        "if(window.__cpStick){window.__cpStick(2,$rx,3,$ry);}",
-                        null
-                    )
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-
-        sensorManager.registerListener(listener, gyroSensor, SensorManager.SENSOR_DELAY_GAME)
-        onDispose {
-            sensorManager.unregisterListener(listener)
-            gyroRightX = 0f
-            gyroRightY = 0f
-        }
     }
 
     fun Modifier.draggableGamepadNode(key: String): Modifier {
@@ -722,7 +674,8 @@ fun VirtualGamepadOverlay(
                     VirtualAnalogStick(
                         opacity = effectiveOpacity,
                         scale = nodeScale("left_stick"),
-                        deadzone = config.gamepadDeadzone,
+                        innerDeadzone = config.leftStickInnerDeadzone,
+                        outerDeadzone = config.leftStickOuterDeadzone,
                         sensitivity = config.gamepadSensitivity,
                         label = "L",
                         enableAutoSprintL3 = config.gamepadSprintLockEnabled,
@@ -833,18 +786,15 @@ fun VirtualGamepadOverlay(
                     VirtualAnalogStick(
                         opacity = effectiveOpacity * 0.92f,
                         scale = nodeScale("right_stick", rightStickBaseScale),
-                        deadzone = config.gamepadDeadzone,
+                        innerDeadzone = config.rightStickInnerDeadzone,
+                        outerDeadzone = config.rightStickOuterDeadzone,
                         sensitivity = config.gamepadSensitivity,
-                        label = if (config.gamepadGyroEnabled) "R•🎯" else "R",
+                        label = "R",
                         enableAutoSprintL3 = false,
                         isEditMode = isEditPositionMode,
                         onSprintStateChange = {},
                         onMove = { x, y ->
-                            touchRightX = x
-                            touchRightY = y
-                            val combinedX = (x + gyroRightX).coerceIn(-1f, 1f)
-                            val combinedY = (y + gyroRightY).coerceIn(-1f, 1f)
-                            sendStickAxesPair(2, combinedX, 3, combinedY)
+                            sendStickAxesPair(2, x, 3, y)
                         }
                     )
                 }
@@ -1193,7 +1143,7 @@ fun VirtualGamepadOverlay(
                                     .clickable {
                                         vibrate()
                                         val nextSplit = !abxySplitMode
-                                        SettingsRepository.updateGamepadAbxySplitMode(nextSplit)
+                                        SettingsRepository.updateGamepadAbxySplitMode(nextSplit, normGameKey)
                                         selectedButtonId = if (nextSplit) "btn_a" else "abxy"
                                     }
                                     .testTag("virtual_gamepad_split_abxy_toggle")
@@ -1223,7 +1173,7 @@ fun VirtualGamepadOverlay(
                                     .clickable {
                                         vibrate()
                                         val nextSplit = !dpadSplitMode
-                                        SettingsRepository.updateGamepadDpadSplitMode(nextSplit)
+                                        SettingsRepository.updateGamepadDpadSplitMode(nextSplit, normGameKey)
                                         selectedButtonId = if (nextSplit) "dpad_up" else "dpad"
                                     }
                                     .testTag("virtual_gamepad_split_dpad_toggle")
@@ -1328,7 +1278,7 @@ fun VirtualGamepadOverlay(
                 },
                 onRestoreAll = {
                     vibrate()
-                    SettingsRepository.updateGamepadHiddenButtons("")
+                    SettingsRepository.updateGamepadHiddenButtons("", normGameKey)
                 },
                 onClose = { showAddButtonModal = false },
                 modifier = Modifier
@@ -1343,24 +1293,31 @@ fun VirtualGamepadOverlay(
                 isEn = isEn,
                 scale = config.gamepadScale,
                 opacity = config.gamepadOpacity,
-                deadzone = config.gamepadDeadzone,
+                deadzone = config.leftStickInnerDeadzone,
                 sensitivity = config.gamepadSensitivity,
                 preset = config.gamepadLayoutPreset,
                 hapticLevel = config.gamepadHapticLevel,
-                gyroEnabled = config.gamepadGyroEnabled,
+                gameRumbleLevel = config.gameRumbleLevel,
                 sprintLockEnabled = config.gamepadSprintLockEnabled,
                 abxySplitMode = abxySplitMode,
                 dpadSplitMode = dpadSplitMode,
                 isEditPositionMode = isEditPositionMode,
+                hasActiveGameKey = normGameKey.isNotEmpty(),
+                hasPerGameCustomLayout = perGameLayout != null,
+                gameDisplayName = gameDisplayName,
+                onUseGlobalLayout = {
+                    vibrate()
+                    switchCurrentGameToGlobalLayout()
+                },
                 onToggleEditPosition = {
                     isEditPositionMode = !isEditPositionMode
                     if (isEditPositionMode) showControlTuner = false
                 },
                 onToggleAbxySplit = {
-                    SettingsRepository.updateGamepadAbxySplitMode(!abxySplitMode)
+                    SettingsRepository.updateGamepadAbxySplitMode(!abxySplitMode, normGameKey)
                 },
                 onToggleDpadSplit = {
-                    SettingsRepository.updateGamepadDpadSplitMode(!dpadSplitMode)
+                    SettingsRepository.updateGamepadDpadSplitMode(!dpadSplitMode, normGameKey)
                 },
                 onOpenAddButtons = {
                     showControlTuner = false
@@ -1510,11 +1467,15 @@ private fun ControlQuickTunerPanel(
     sensitivity: Float,
     preset: GamepadLayoutPreset,
     hapticLevel: GamepadHapticLevel,
-    gyroEnabled: Boolean,
+    gameRumbleLevel: GamepadHapticLevel,
     sprintLockEnabled: Boolean,
     abxySplitMode: Boolean,
     dpadSplitMode: Boolean,
     isEditPositionMode: Boolean,
+    hasActiveGameKey: Boolean,
+    hasPerGameCustomLayout: Boolean,
+    gameDisplayName: String?,
+    onUseGlobalLayout: () -> Unit,
     onToggleEditPosition: () -> Unit,
     onToggleAbxySplit: () -> Unit,
     onToggleDpadSplit: () -> Unit,
@@ -1722,16 +1683,87 @@ private fun ControlQuickTunerPanel(
                 }
             }
 
-            // Quick Feature Toggles: Gyro, Auto-Sprint L3, Haptics
+            // Per-Game Layout Bar (Use Global Layout + Reset)
+            if (hasActiveGameKey) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (hasPerGameCustomLayout) {
+                            if (isEn) "📌 Layout: ${gameDisplayName ?: "This Game"}" else "📌 Bố cục riêng: ${gameDisplayName ?: "Game này"}"
+                        } else {
+                            if (isEn) "🌐 Using Global Layout" else "🌐 Đang dùng bố cục chung"
+                        },
+                        color = if (hasPerGameCustomLayout) XboxNeonGreen else TextSecondary,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF16241C),
+                        border = androidx.compose.foundation.BorderStroke(
+                            0.8.dp,
+                            if (hasPerGameCustomLayout) DirectCyan else XboxCardBorder
+                        ),
+                        modifier = Modifier
+                            .semantics {
+                                contentDescription = if (isEn) "Use Global Layout" else "Dùng bố cục chung"
+                            }
+                            .clickable { onUseGlobalLayout() }
+                            .testTag("tuner_use_global_layout_btn")
+                    ) {
+                        Text(
+                            text = if (isEn) "Use Global Layout" else "Dùng bố cục chung",
+                            color = if (hasPerGameCustomLayout) DirectCyan else TextSecondary,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF1A2820),
+                        border = androidx.compose.foundation.BorderStroke(0.8.dp, WarningAmber.copy(alpha = 0.7f)),
+                        modifier = Modifier
+                            .semantics {
+                                contentDescription = if (isEn) "Reset Layout" else "Đặt lại"
+                            }
+                            .clickable { showResetConfirmDialog = true }
+                            .testTag("tuner_per_game_reset_btn")
+                    ) {
+                        Text(
+                            text = if (isEn) "Reset" else "Đặt lại",
+                            color = WarningAmber,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // Quick Feature Toggles: Game Rumble, Auto-Sprint L3, Touch Haptics
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 QuickFeatureChip(
                     modifier = Modifier.weight(1f),
-                    label = if (isEn) "🎯 Gyro Aim" else "🎯 Ngắm Gyro",
-                    active = gyroEnabled,
-                    onClick = { SettingsRepository.updateGamepadGyroEnabled(!gyroEnabled) }
+                    label = if (isEn) "🎮 Rumble: ${gameRumbleLevel.localizedTitle(true)}" else "🎮 Rung game: ${gameRumbleLevel.localizedTitle(false)}",
+                    active = gameRumbleLevel != GamepadHapticLevel.OFF,
+                    onClick = {
+                        val next = when (gameRumbleLevel) {
+                            GamepadHapticLevel.OFF -> GamepadHapticLevel.LIGHT
+                            GamepadHapticLevel.LIGHT -> GamepadHapticLevel.MEDIUM
+                            GamepadHapticLevel.MEDIUM -> GamepadHapticLevel.STRONG
+                            GamepadHapticLevel.STRONG -> GamepadHapticLevel.OFF
+                        }
+                        SettingsRepository.updateGameRumbleLevel(next)
+                    }
                 )
                 QuickFeatureChip(
                     modifier = Modifier.weight(1f),
@@ -1741,7 +1773,7 @@ private fun ControlQuickTunerPanel(
                 )
                 QuickFeatureChip(
                     modifier = Modifier.weight(1f),
-                    label = if (isEn) "📳 Haptic: ${hapticLevel.localizedTitle(true)}" else "📳 Rung: ${hapticLevel.localizedTitle(false)}",
+                    label = if (isEn) "📳 Touch: ${hapticLevel.localizedTitle(true)}" else "📳 Rung nút: ${hapticLevel.localizedTitle(false)}",
                     active = hapticLevel != GamepadHapticLevel.OFF,
                     onClick = {
                         val next = when (hapticLevel) {
@@ -1898,7 +1930,8 @@ private fun QuickFeatureChip(
 private fun VirtualAnalogStick(
     opacity: Float,
     scale: Float,
-    deadzone: Float,
+    innerDeadzone: Float,
+    outerDeadzone: Float = 0.95f,
     sensitivity: Float,
     label: String,
     enableAutoSprintL3: Boolean,
@@ -1920,14 +1953,17 @@ private fun VirtualAnalogStick(
     var isTouching by remember { mutableStateOf(false) }
     var isAutoSprinting by remember { mutableStateOf(false) }
 
-    val currentDeadzone by rememberUpdatedState(deadzone)
+    val currentInnerDeadzone by rememberUpdatedState(innerDeadzone)
+    val currentOuterDeadzone by rememberUpdatedState(outerDeadzone)
     val currentSensitivity by rememberUpdatedState(sensitivity)
     val currentAutoSprint by rememberUpdatedState(enableAutoSprintL3)
 
     fun applyDeadzoneAndCurve(rawNorm: Float): Float {
         val absVal = abs(rawNorm)
-        if (absVal <= currentDeadzone) return 0f
-        val rescaled = ((absVal - currentDeadzone) / (1f - currentDeadzone)).coerceIn(0f, 1f)
+        val effInner = currentInnerDeadzone.coerceIn(0f, 0.30f)
+        val effOuter = currentOuterDeadzone.coerceIn((effInner + 0.10f).coerceAtMost(1f), 1f)
+        if (absVal <= effInner) return 0f
+        val rescaled = ((absVal - effInner) / (effOuter - effInner)).coerceIn(0f, 1f)
         val exponent = (1f / currentSensitivity.coerceIn(0.6f, 1.6f)).coerceIn(0.55f, 1.75f)
         return sign(rawNorm) * rescaled.pow(exponent)
     }
@@ -2017,18 +2053,18 @@ private fun VirtualAnalogStick(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Custom Canvas: Deadzone Ring + Active Vector Line
+        // Custom Canvas: Outer & Inner Deadzone Rings + Active Vector Line
         Canvas(modifier = Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2f, size.height / 2f)
             drawCircle(
                 color = Color.White.copy(alpha = 0.12f),
-                radius = maxRadiusPx * 0.72f,
+                radius = maxRadiusPx * currentOuterDeadzone.coerceIn(0.50f, 1.0f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )
             drawCircle(
                 color = DirectCyan.copy(alpha = 0.18f),
-                radius = maxRadiusPx * currentDeadzone,
+                radius = maxRadiusPx * currentInnerDeadzone.coerceIn(0.0f, 0.35f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )

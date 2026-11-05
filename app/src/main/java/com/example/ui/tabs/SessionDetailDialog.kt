@@ -115,11 +115,10 @@ internal fun SessionDetailDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(9.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Header
+                // Sticky Header (always visible even when scrolling down the session report)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -145,18 +144,28 @@ internal fun SessionDetailDialog(
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .border(1.dp, XboxCardBorder, CircleShape)
+                            .testTag("session_detail_close_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = if (isEn) "Close" else "Đóng",
-                            tint = TextSecondary,
+                            tint = TextPrimary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
 
                 // Nhãn kết luận lớn ở đầu chi tiết phiên (Mượt / Hơi giật / Giật nhiều / Chưa đủ dữ liệu)
                 val verdict = remember(session) { evaluateSessionVerdict(session) }
@@ -585,6 +594,7 @@ internal fun SessionDetailDialog(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
                 }
             }
         }

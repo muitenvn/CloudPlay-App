@@ -71,7 +71,7 @@ internal fun CustomProxyDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                if (isEn) "Add Custom Proxy" else "Thêm Proxy Tùy Chỉnh",
+                config.tr("Thêm Proxy Tùy Chỉnh", "Add Custom Proxy"),
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold
@@ -304,13 +304,14 @@ internal fun ServerDetailDialog(
     isEn: Boolean,
     onDismiss: () -> Unit
 ) {
+    val config by com.example.data.SettingsRepository.config.collectAsState()
     val detailBadge = measurement?.formatDisplayBadge(isEn = isEn, showPort = true)
-        ?: if (pingMs > 0) "${pingMs}ms (:${server.port})" else if (isEn) "Not tested (:${server.port})" else "Chưa đo (:${server.port})"
+        ?: if (pingMs > 0) "${pingMs}ms (:${server.port})" else "${config.tr("Chưa đo", "Not tested")} (:${server.port})"
     val unlockText = when (unlockStatus) {
-        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
-        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
-        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested" else "Chưa thử mở khóa"
-        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
+        RegionUnlockStatus.UNLOCKED -> config.tr("Đã mở khóa", "Unlocked")
+        RegionUnlockStatus.FAILED -> config.tr("Không mở khóa", "Unlock Failed")
+        RegionUnlockStatus.UNTESTED -> config.tr("Chưa thử mở khóa", "Untested")
+        RegionUnlockStatus.WRONG_REGION -> config.tr("Sai vùng", "Wrong Region")
     }
 
     AlertDialog(
@@ -358,7 +359,7 @@ internal fun ServerDetailDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (isEn) "Close" else "Đóng", color = XboxNeonGreen)
+                Text(config.tr("Đóng", "Close"), color = XboxNeonGreen)
             }
         },
         containerColor = XboxSurface

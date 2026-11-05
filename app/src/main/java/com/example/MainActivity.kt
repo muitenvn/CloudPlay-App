@@ -97,9 +97,19 @@ class MainActivity : ComponentActivity() {
             val currentUiMode = baseContext.resources.configuration.uiMode
             val (localizedConfiguration, localizedWrapper) = remember(targetLocale, currentOrientation, currentUiMode) {
                 val conf = android.content.res.Configuration(baseContext.resources.configuration)
-                conf.setLocale(targetLocale)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    conf.setLocales(android.os.LocaleList(targetLocale))
+                } else {
+                    @Suppress("DEPRECATION")
+                    conf.setLocale(targetLocale)
+                }
                 conf.setLayoutDirection(targetLocale)
                 val localizedCtx = baseContext.createConfigurationContext(conf)
+                @Suppress("DEPRECATION")
+                this@MainActivity.resources.updateConfiguration(
+                    localizedCtx.resources.configuration,
+                    this@MainActivity.resources.displayMetrics
+                )
                 val wrapper = object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
                     override fun getResources(): android.content.res.Resources = localizedCtx.resources
                     override fun getAssets(): android.content.res.AssetManager = localizedCtx.assets

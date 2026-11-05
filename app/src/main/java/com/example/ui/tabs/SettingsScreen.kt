@@ -63,6 +63,7 @@ fun SettingsScreen(
 ) {
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showAppLogDialog by remember { mutableStateOf(false) }
+    var showFullTermsDialog by remember { mutableStateOf(false) }
     var showResetGamepadConfirmDialog by remember { mutableStateOf(false) }
 
     // 6 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
@@ -78,6 +79,10 @@ fun SettingsScreen(
     val termsWebUrl = "https://muitenvn.github.io/CloudPlay-App/terms.html"
 
     fun openExternalTermsPage() {
+        showFullTermsDialog = true
+    }
+
+    fun launchExternalBrowserTerms() {
         try {
             val intent = android.content.Intent(
                 android.content.Intent.ACTION_VIEW,
@@ -465,6 +470,14 @@ fun SettingsScreen(
         )
     }
 
+    if (showFullTermsDialog) {
+        FullTermsInAppDialog(
+            isEn = config.isEnglishUI(),
+            onOpenExternalBrowser = { launchExternalBrowserTerms() },
+            onDismiss = { showFullTermsDialog = false }
+        )
+    }
+
     if (showResetGamepadConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showResetGamepadConfirmDialog = false },
@@ -531,3 +544,131 @@ fun SettingsScreen(
         )
     }
 }
+
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun FullTermsInAppDialog(
+    isEn: Boolean,
+    onOpenExternalBrowser: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val syncTermsThemeAndLangJs = remember(isEn) {
+        val targetLang = if (isEn) "en" else "vi"
+        """
+        (function() {
+            try {
+                document.documentElement.style.setProperty('--bg', '#0b1210');
+                document.documentElement.style.setProperty('--surface', '#121b17');
+                document.documentElement.style.setProperty('--sum-bg', '#17231e');
+                document.documentElement.style.setProperty('--sum-hover', '#1d2c26');
+                document.documentElement.style.setProperty('--line', '#283931');
+                document.documentElement.style.setProperty('--text', '#eaf1ee');
+                document.documentElement.style.setProperty('--muted', '#b2c5bd');
+                document.documentElement.style.setProperty('--accent', '#3fb950');
+                document.documentElement.style.setProperty('--accent-d', '#2f9a40');
+                document.documentElement.style.setProperty('--accent-soft', '#132a1c');
+                document.documentElement.style.setProperty('--on-accent', '#06130a');
+                document.documentElement.style.setProperty('--warn-bg', '#241c0b');
+                document.documentElement.style.setProperty('--warn-line', '#524014');
+                document.documentElement.style.setProperty('--warn-text', '#f3dca2');
+                document.documentElement.style.setProperty('--bar', 'rgba(11,18,16,0.95)');
+                localStorage.setItem('cp_lang', '$targetLang');
+                var btn = document.querySelector('.lang button[data-lang="$targetLang"]');
+                if (btn) btn.click();
+            } catch (e) {}
+        })();
+        """.trimIndent()
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .height(580.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .testTag("full_terms_in_app_dialog"),
+            color = com.example.ui.theme.XboxDark,
+            border = androidx.compose.foundation.BorderStroke(1.2.dp, XboxNeonGreen.copy(alpha = 0.65f))
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(XboxSurface)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = XboxNeonGreen,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = if (isEn) "Terms of Use & Privacy" else "Điều khoản & Quyền riêng tư",
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp,
+                            maxLines = 1
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        TextButton(onClick = onOpenExternalBrowser) {
+                            Text(
+                                text = if (isEn) "↗ Browser" else "↗ Trình duyệt",
+                                color = DirectCyan,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text(
+                                text = if (isEn) "✕ Close" else "✕ Đóng",
+                                color = XboxNeonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+
+                androidx.compose.ui.viewinterop.AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    factory = { ctx ->
+                        android.webkit.WebView(ctx).apply {
+                            setBackgroundColor(android.graphics.Color.parseColor("#0B1210"))
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            webViewClient = object : android.webkit.WebViewClient() {
+                                override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    view?.evaluateJavascript(syncTermsThemeAndLangJs, null)
+                                }
+                            }
+                            loadUrl("file:///android_asset/web/terms.html")
+                        }
+                    },
+                    update = { webView ->
+                        webView.evaluateJavascript(syncTermsThemeAndLangJs, null)
+                    }
+                )
+            }
+        }
+    }
+}
+

@@ -301,6 +301,39 @@ internal fun SettingsLanguageMarketAccountSection(
         // 4.2 Ngôn ngữ ứng dụng
         SettingsCard(title = if (isEn) "App Language (Global)" else "Ngôn ngữ ứng dụng (Quốc tế)") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = DirectCyan.copy(alpha = 0.12f),
+                    border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "✓ Active: ${config.appLanguage.effectiveFlag()} ${config.appLanguage.titleEn} (${config.appLanguage.effectiveShortBadge()})"
+                            } else {
+                                "✓ Đang dùng: ${config.appLanguage.effectiveFlag()} ${config.appLanguage.title} (${config.appLanguage.effectiveShortBadge()})"
+                            },
+                            color = DirectCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (config.appLanguage != AppLanguage.VIETNAMESE &&
+                            config.appLanguage != AppLanguage.ENGLISH &&
+                            config.appLanguage != AppLanguage.SYSTEM
+                        ) {
+                            Text(
+                                text = "Trang chủ, Thư viện, Máy chủ & HUD đã chuyển sang ${config.appLanguage.title}. Mục Cài đặt giữ Tiếng Việt để bạn dễ điều chỉnh.",
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -320,7 +353,14 @@ internal fun SettingsLanguageMarketAccountSection(
                                     if (isSelected) XboxNeonGreen else XboxCardBorder,
                                     RoundedCornerShape(10.dp)
                                 )
-                                .clickable { SettingsRepository.updateAppLanguage(lang) }
+                                .clickable {
+                                    SettingsRepository.updateAppLanguage(lang)
+                                    Toast.makeText(
+                                        context,
+                                        "✓ ${lang.effectiveFlag()} ${lang.title}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                                 .testTag(tag),
                             color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.55f)
                         ) {
@@ -369,7 +409,14 @@ internal fun SettingsLanguageMarketAccountSection(
                                         if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.7f),
                                         RoundedCornerShape(10.dp)
                                     )
-                                    .clickable { SettingsRepository.updateAppLanguage(lang) }
+                                    .clickable {
+                                        SettingsRepository.updateAppLanguage(lang)
+                                        Toast.makeText(
+                                            context,
+                                            "✓ ${lang.flag} ${lang.title} (${lang.shortBadge})",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                     .testTag("app_lang_${lang.shortBadge.lowercase()}_button"),
                                 color = if (isSelected) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant.copy(alpha = 0.4f)
                             ) {

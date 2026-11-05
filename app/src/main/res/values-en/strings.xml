@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App & General -->
+    <string name="app_name">CloudPlay</string>
+    <string name="app_subtitle">Xbox Cloud Gaming</string>
+    <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
+
+    <!-- Navigation Tabs -->
+    <string name="tab_home">Home</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_servers">Servers</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Language Settings -->
+    <string name="section_app_language">APP LANGUAGE</string>
+    <string name="app_language_desc">Automatically select language based on system or set manually.</string>
+    <string name="lang_system_default">System Default (Auto)</string>
+    <string name="lang_vietnamese">Tiếng Việt (Vietnamese)</string>
+    <string name="lang_english">English (Tiếng Anh)</string>
+    <string name="current_language">Language</string>
+
+    <!-- Xbox Web Language -->
+    <string name="section_xbox_web_language">XBOX PAGE LANGUAGE</string>
+    <string name="xbox_web_language_desc">Choose display language for Xbox pages and prevent forced Japanese menus.</string>
+    <string name="xbox_lang_system_match">Follow Device Language (Default en-US)</string>
+    <string name="xbox_lang_custom">Custom Xbox Language</string>
+    <string name="anti_japanese_enforcer">Prevent Forced Japanese</string>
+    <string name="anti_japanese_enforcer_desc">Automatically keeps Xbox pages in English instead of Japanese.</string>
+
+    <!-- Hero / Quick Play -->
+    <string name="hero_tag">XBOX CLOUD</string>
+    <string name="hero_title">PLAY XBOX CLOUD</string>
+    <string name="hero_subtitle">Unlock region • Auto turn off VPN</string>
+    <string name="btn_launch_xcloud">Play Now</string>
+    <string name="btn_play_fortnite">Fortnite</string>
+    <string name="btn_continue_game">Continue</string>
+
+    <!-- Network & Hardware Cockpit -->
+    <string name="cockpit_title">Network &amp; Controller</string>
+    <string name="cockpit_subtitle">Unlock region • Auto turn off VPN</string>
+    <string name="net_mode_direct">Direct Network</string>
+    <string name="net_mode_vpn">VPN On</string>
+    <string name="net_desc_direct">Direct connection active for smooth gaming.</string>
+    <string name="net_desc_vpn">Region unlock active for launching games.</string>
+    <string name="btn_enable_vpn">Turn On VPN</string>
+    <string name="btn_switch_direct">Turn Off VPN</string>
+    <string name="vpn_status_connected">VPN On</string>
+    <string name="vpn_status_disconnected">Direct Network</string>
+    <string name="auto_bypass_enabled">Auto turn off VPN on launch</string>
+    <string name="auto_bypass_triggered">Game started! Switched to direct network.</string>
+    <string name="hardware_controller">Controller</string>
+    <string name="controller_connected">Connected</string>
+    <string name="controller_disconnected">Not connected</string>
+    <string name="controller_touch">Touch</string>
+    <string name="gamepad_none">None</string>
+    <string name="gamepad_default_name">Xbox Controller</string>
+    <string name="guide_button">Guide</string>
+
+    <!-- Featured Games -->
+    <string name="featured_games_title">Featured Games</string>
+    <string name="featured_games_subtitle">Quick game launch</string>
+    <string name="btn_view_all">View All</string>
+    <string name="btn_play_now">Play Now</string>
+    <string name="badge_free">Free</string>
+    <string name="badge_touch">Touch</string>
+    <string name="badge_pass">Game Pass</string>
+
+    <!-- Game Library Screen -->
+    <string name="search_games_placeholder">Search games in library...</string>
+    <string name="filter_all">All</string>
+    <string name="filter_free">Free to Play</string>
+    <string name="filter_touch">Touch Friendly</string>
+    <string name="filter_gamepass">Xbox Game Pass</string>
+    <string name="btn_add_game">Add Game</string>
+    <string name="dialog_add_game_title">Add Custom Bookmark</string>
+    <string name="input_game_title">Game Title</string>
+    <string name="input_game_url">Xbox Game URL</string>
+    <string name="input_game_category">Category</string>
+    <string name="input_game_cover">Cover Image URL (Optional)</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_delete">Delete</string>
+
+    <!-- Servers Screen -->
+    <string name="servers_title">Region Unlock Servers</string>
+    <string name="servers_subtitle">servers available to unlock game region</string>
+    <string name="cat_japan">Japan (Tokyo/Osaka)</string>
+    <string name="cat_korea">Korea (Seoul)</string>
+    <string name="cat_sea">SE Asia (Singapore)</string>
+    <string name="cat_usa">United States</string>
+    <string name="btn_ping_all">Check Ping</string>
+    <string name="btn_fetch_live">Update Servers</string>
+    <string name="btn_add_custom_server">Add Server</string>
+    <string name="server_active">Connected</string>
+    <string name="server_optimal">Optimal</string>
+    <string name="server_testing">Testing ping...</string>
+
+    <!-- Settings Screen -->
+    <string name="section_auto_bypass">AUTO VPN &amp; NETWORK</string>
+    <string name="smart_vpn_title">Auto VPN</string>
+    <string name="smart_vpn_desc">Turns on VPN to open the game, then switches to direct network.</string>
+    <string name="stealth_headers_title">Region Unlock</string>
+    <string name="stealth_headers_desc">Uses proxy headers when launching games.</string>
+    <string name="section_cellular_wifi">GRAPHICS &amp; PERFORMANCE</string>
+    <string name="section_graphics_quality">GRAPHICS &amp; PERFORMANCE</string>
+    <string name="graphics_quality_auto">Auto (Recommended)</string>
+    <string name="graphics_quality_auto_desc">Adjusts to network quality and helps keep your phone cool.</string>
+    <string name="graphics_quality_saver">Data Saver (Low)</string>
+    <string name="graphics_quality_saver_desc">Low data use, keeps phone cool and saves battery.</string>
+    <string name="graphics_quality_medium">Medium</string>
+    <string name="graphics_quality_medium_desc">Balanced image clarity and cool device temperature.</string>
+    <string name="graphics_quality_high">High</string>
+    <string name="graphics_quality_high_desc">Sharp 1080p image with clear details.</string>
+    <string name="graphics_quality_ultra">Ultra (Max)</string>
+    <string name="graphics_quality_ultra_desc">Highest visual quality for fast networks and strong phones.</string>
+    <string name="cellular_mode_saver">Data Saver (Low)</string>
+    <string name="cellular_mode_saver_desc">Saves mobile data and keeps phone cool.</string>
+    <string name="cellular_mode_max">Ultra (Max)</string>
+    <string name="cellular_mode_max_desc">Highest graphics quality for strong networks.</string>
+    <string name="wifi_speed_first">Smooth Response Priority</string>
+    <string name="wifi_speed_first_desc">Reduces input delay when network fluctuates.</string>
+    <string name="section_clarity">IMAGE QUALITY &amp; CONTROLS</string>
+    <string name="clarity_boost_title">Clarity Boost (Sharpening)</string>
+    <string name="clarity_boost_desc">Makes game images sharper and clearer.</string>
+    <string name="preset_off">Off</string>
+    <string name="preset_balanced">Balanced (Recommended)</string>
+    <string name="preset_sharp">Ultra Sharp</string>
+    <string name="preset_oled">Vivid Colors</string>
+    <string name="section_controls">CONTROLS &amp; UTILITIES</string>
+    <string name="anti_afk_title">Prevent Idle Disconnect</string>
+    <string name="anti_afk_desc">Keeps game session active when idle.</string>
+    <string name="polling_boost_title">Fast Controller Response</string>
+    <string name="polling_boost_desc">Improves button response speed.</string>
+    <string name="floating_hud_title">In-Game Quick Bar (HUD)</string>
+    <string name="floating_hud_desc">Shows live ping, FPS, and quick settings while playing.</string>
+    <string name="virtual_gamepad_title">Touch Controller</string>
+    <string name="virtual_gamepad_desc">Play with on-screen touch buttons when no controller is connected.</string>
+    <string name="section_storage">CACHE &amp; ACCOUNT</string>
+    <string name="clear_cookies_title">Clear Cache &amp; Cookies</string>
+    <string name="clear_cookies_desc">Clears saved login data to fix loading issues.</string>
+    <string name="btn_clear_cookies">Clear Data Now</string>
+    <string name="toast_cookies_cleared">Cache and cookies cleared!</string>
+
+    <!-- Cloud Browser & Floating HUD -->
+    <string name="hud_stream_latency">PING</string>
+    <string name="hud_controller">CONTROLLER</string>
+    <string name="hud_clarity_boost">SHARPENING</string>
+    <string name="hud_vietnamese_translator">TRANSLATOR</string>
+    <string name="hud_return_home">Return Home</string>
+    <string name="hud_reload">Reload Page</string>
+    <string name="hud_virtual_gamepad">Touch Gamepad</string>
+    <string name="hud_network_switch">Switch Network</string>
+    <string name="dialog_exit_title">Leave Game?</string>
+    <string name="dialog_exit_message">Do you want to exit the game and return to the home screen?</string>
+    <string name="btn_confirm_exit">Exit Game</string>
+    <string name="loading_stream">Connecting to Xbox Cloud...</string>
+    <string name="loading_tip">Tip: VPN turns off automatically once the game starts for smoother play.</string>
+</resources>

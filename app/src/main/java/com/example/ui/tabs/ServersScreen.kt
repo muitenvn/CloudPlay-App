@@ -547,6 +547,10 @@ fun ServersScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { detailServer = currentServer }
+                                .testTag("header_selected_server_pill"),
                             shape = RoundedCornerShape(10.dp),
                             color = XboxGreen.copy(alpha = 0.22f),
                             border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.55f))
@@ -606,30 +610,26 @@ fun ServersScreen(
                             }
                         }
                         currentMeasurement != null && currentMeasurement.status != ServerPingStatus.UNTESTED -> {
-                            val prefix = if (isEn) "Latency: " else "Độ trễ: "
-                            prefix + currentMeasurement.formatDisplayBadge(isEn, showPort = false)
+                            val badge = currentMeasurement.formatDisplayBadge(isEn, showPort = false)
+                            config.tr("Độ trễ: $badge", "Network latency: $badge")
                         }
-                        hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
-                            "Latency: ${currentPingMs}ms"
-                        } else {
-                            "Độ trễ: ${currentPingMs}ms"
-                        }
-                        isTestingAll -> if (isEn) "Testing network latency..." else "Đang đo độ trễ mạng..."
-                        hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
+                        hasTriedCurrentPing && currentPingMs > 0 -> config.tr(
+                            "Độ trễ: ${currentPingMs}ms",
+                            "Network latency: ${currentPingMs}ms"
+                        )
+                        isTestingAll -> config.tr("Đang đo độ trễ mạng...", "Testing network latency...")
+                        hasTriedCurrentPing && currentPingMs <= 0 -> config.tr(
+                            "Độ trễ mạng: Không đo được",
                             "Network latency: Unreachable"
-                        } else {
-                            "Độ trễ mạng: Không đo được"
-                        }
-                        isSmartBypassEngine && currentPingMs > 0 -> if (isEn) {
-                            "Last session latency: ${currentPingMs}ms"
-                        } else {
-                            "Độ trễ phiên gần nhất: ${currentPingMs}ms"
-                        }
-                        else -> if (isEn) {
+                        )
+                        isSmartBypassEngine && currentPingMs > 0 -> config.tr(
+                            "Độ trễ phiên gần nhất: ${currentPingMs}ms",
+                            "Last session ping: ${currentPingMs}ms"
+                        )
+                        else -> config.tr(
+                            "Độ trễ mạng: Chưa đo",
                             "Network latency: Not tested"
-                        } else {
-                            "Độ trễ mạng: Chưa đo"
-                        }
+                        )
                     }
 
                     Surface(
@@ -748,7 +748,14 @@ fun ServersScreen(
                                 modifier = Modifier
                                     .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable(enabled = !isTestingAll) { testAllServers(autoPickBest = true, forceRefresh = true) }
+                                    .clickable(enabled = !isTestingAll) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            config.tr("⚡ Đang đo ping và chọn máy chủ tối ưu...", "⚡ Measuring ping & selecting best server..."),
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                        testAllServers(autoPickBest = true, forceRefresh = true)
+                                    }
                                     .testTag("auto_pick_best_server_button")
                             ) {
                                 Row(
@@ -756,20 +763,36 @@ fun ServersScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Speed,
-                                        contentDescription = null,
-                                        tint = XboxNeonGreen,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Text(
-                                        text = config.tr("Chọn tối ưu", "Auto Best"),
-                                        color = XboxNeonGreen,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        maxLines = 1
-                                    )
+                                    if (isTestingAll) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(12.dp),
+                                            color = XboxNeonGreen,
+                                            strokeWidth = 1.8.dp
+                                        )
+                                        Text(
+                                            text = config.tr("Đang chọn...", "Selecting..."),
+                                            color = XboxNeonGreen,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = null,
+                                            tint = XboxNeonGreen,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = config.tr("Chọn tối ưu", "Auto Best"),
+                                            color = XboxNeonGreen,
+                                            fontFamily = SpaceGroteskFontFamily,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -796,11 +819,10 @@ fun ServersScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isEn) {
+                                    text = config.tr(
+                                        "⚡ Thuật toán chọn máy chủ thông minh",
                                         "⚡ Smart Server Selection"
-                                    } else {
-                                        "⚡ Thuật toán chọn máy chủ thông minh"
-                                    },
+                                    ),
                                     color = DirectCyan,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 10.5.sp,
@@ -813,9 +835,9 @@ fun ServersScreen(
                                 )
                                 Text(
                                     text = if (config.autoBypassEnabled) {
-                                        if (isEn) "Session ➔ Unlock" else "RTT phiên ➔ Mở khóa"
+                                        config.tr("RTT phiên ➔ Mở khóa", "Session ➔ Unlock")
                                     } else {
-                                        if (isEn) "VPN Ping ➔ Session" else "Ping VPN ➔ Phiên"
+                                        config.tr("Ping VPN ➔ Phiên", "VPN Ping ➔ Session")
                                     },
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
@@ -840,6 +862,11 @@ fun ServersScreen(
                                                 SettingsRepository.updateAutoBypass(true)
                                                 VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
                                             }
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                config.tr("✓ Chế độ: Tự tắt VPN khi vào game", "✓ Mode: Auto-Off VPN in game"),
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                         .testTag("mode_auto_off_distance_first_chip"),
                                     shape = RoundedCornerShape(8.dp),
@@ -854,7 +881,7 @@ fun ServersScreen(
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
                                         Text(
-                                            text = if (isEn) "Auto-Off VPN in game" else "Tự tắt VPN khi vào game",
+                                            text = config.tr("Tự tắt VPN khi vào game", "Auto-Off VPN in game"),
                                             color = if (isAutoOff) XboxNeonGreen else TextPrimary,
                                             fontFamily = SpaceGroteskFontFamily,
                                             fontSize = 10.sp,
@@ -863,7 +890,7 @@ fun ServersScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isEn) "75% Session • 25% Unlock" else "75% RTT phiên • 25% Mở khóa",
+                                            text = config.tr("75% RTT phiên • 25% Mở khóa", "75% Session • 25% Unlock"),
                                             color = if (isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
                                             fontSize = 8.8.sp,
                                             maxLines = 1,
@@ -881,6 +908,11 @@ fun ServersScreen(
                                                 SettingsRepository.updateAutoBypass(false)
                                                 VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
                                             }
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                config.tr("✓ Chế độ: Bật VPN luôn khi chơi", "✓ Mode: Keep VPN on in game"),
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
                                         }
                                         .testTag("mode_keep_vpn_ping_first_chip"),
                                     shape = RoundedCornerShape(8.dp),
@@ -895,7 +927,7 @@ fun ServersScreen(
                                         verticalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
                                         Text(
-                                            text = if (isEn) "Keep VPN on in game" else "Bật VPN luôn khi chơi",
+                                            text = config.tr("Bật VPN luôn khi chơi", "Keep VPN on in game"),
                                             color = if (!isAutoOff) XboxNeonGreen else TextPrimary,
                                             fontFamily = SpaceGroteskFontFamily,
                                             fontSize = 10.sp,
@@ -904,7 +936,7 @@ fun ServersScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isEn) "75% VPN Ping • 25% Session" else "75% Ping VPN • 25% RTT phiên",
+                                            text = config.tr("75% Ping VPN • 25% RTT phiên", "75% VPN Ping • 25% Session"),
                                             color = if (!isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
                                             fontSize = 8.8.sp,
                                             maxLines = 1,
@@ -1034,7 +1066,17 @@ fun ServersScreen(
                                 .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                 .clip(RoundedCornerShape(14.dp))
                                 .clickable {
-                                    SettingsRepository.updateHideUnreachableDynamicServers(!hideActive)
+                                    val nextHide = !hideActive
+                                    SettingsRepository.updateHideUnreachableDynamicServers(nextHide)
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        if (nextHide) {
+                                            config.tr("✓ Đã ẩn các proxy động không phản hồi", "✓ Hiding unreachable dynamic proxies")
+                                        } else {
+                                            config.tr("Đã hiện toàn bộ proxy động", "Showing all dynamic proxies")
+                                        },
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                                 .testTag("toggle_hide_dead_live_proxies_chip"),
                             color = if (hideActive) DirectCyan.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.88f),
@@ -1045,10 +1087,10 @@ fun ServersScreen(
                             shape = RoundedCornerShape(14.dp)
                         ) {
                             Text(
-                                text = if (isEn) {
-                                    if (hideActive) "Hiding dead dynamic" else "Hide dead dynamic"
+                                text = if (hideActive) {
+                                    config.tr("✓ Đang ẩn proxy chết", "✓ Hiding dead proxies")
                                 } else {
-                                    if (hideActive) "Đang ẩn proxy chết" else "Ẩn proxy động chết"
+                                    config.tr("Ẩn proxy động chết", "Hide dead proxies")
                                 },
                                 color = if (hideActive) DirectCyan else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -1066,6 +1108,11 @@ fun ServersScreen(
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                             .clip(RoundedCornerShape(14.dp))
                             .clickable(enabled = !vpnState.isAutoSyncingLiveProxies) {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    config.tr("Đang cập nhật danh sách proxy công cộng...", "Refreshing public proxy list..."),
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
                                 VpnManager.autoSyncPublicProxiesIfNeeded(
                                     context = context,
                                     countryFilter = "ALL",

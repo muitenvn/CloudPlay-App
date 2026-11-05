@@ -249,7 +249,7 @@ fun DashboardScreen(
                                         )
                                         Text(
                                             text = when (vpnState.mode) {
-                                                NetworkMode.DIRECT_NETWORK -> stringResource(R.string.net_mode_direct)
+                                                NetworkMode.DIRECT_NETWORK -> config.tr("Mạng trực tiếp", "Direct Network")
                                                 NetworkMode.VPN_JAPAN -> "${vpnState.currentServer.flag} ${vpnState.currentServer.name}"
                                                 NetworkMode.DISCONNECTED -> "Xbox Cloud Console"
                                             },
@@ -396,6 +396,11 @@ fun DashboardScreen(
                                                 onClick = {
                                                     showLanguageMenu = false
                                                     SettingsRepository.updateAppLanguage(langOption)
+                                                    android.widget.Toast.makeText(
+                                                        context,
+                                                        "✓ ${langOption.flag} ${langOption.title}",
+                                                        android.widget.Toast.LENGTH_SHORT
+                                                    ).show()
                                                 },
                                                 modifier = Modifier.testTag("topbar_lang_item_${langOption.code}")
                                             )
@@ -498,7 +503,7 @@ fun DashboardScreen(
                                         DropdownMenuItem(
                                             text = {
                                                 Text(
-                                                    text = stringResource(R.string.guide_button),
+                                                    text = config.tr("Hướng dẫn", "Guide"),
                                                     color = TextPrimary,
                                                     fontFamily = SpaceGroteskFontFamily,
                                                     fontSize = 13.sp,
@@ -536,7 +541,7 @@ fun DashboardScreen(
                 currentTab = currentTab,
                 gamesCount = allGames.size,
                 isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED,
-                settingsTabLabel = if (config.isSettingsEnglishUI()) "Settings" else "Cài đặt",
+                settingsTabLabel = config.tr("Cài đặt", "Settings"),
                 motionEnabled = motionEnabled,
                 onSelectTab = { currentTab = it }
             )
@@ -764,10 +769,11 @@ private fun ConsoleFloatingNavigationDock(
     motionEnabled: Boolean = true,
     onSelectTab: (DashboardTab) -> Unit
 ) {
+    val config by SettingsRepository.config.collectAsState()
     val navItems = listOf(
-        Triple(DashboardTab.HOME, Icons.Default.Home, stringResource(R.string.tab_home)),
-        Triple(DashboardTab.LIBRARY, Icons.Default.SportsEsports, stringResource(R.string.tab_library)),
-        Triple(DashboardTab.SERVERS, Icons.Default.Speed, stringResource(R.string.tab_servers)),
+        Triple(DashboardTab.HOME, Icons.Default.Home, config.tr("Trang chủ", "Home")),
+        Triple(DashboardTab.LIBRARY, Icons.Default.SportsEsports, config.tr("Thư viện", "Library")),
+        Triple(DashboardTab.SERVERS, Icons.Default.Speed, config.tr("Máy chủ", "Servers")),
         Triple(DashboardTab.SETTINGS, Icons.Default.Tune, settingsTabLabel)
     )
 

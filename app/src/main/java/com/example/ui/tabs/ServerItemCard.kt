@@ -358,23 +358,22 @@ internal fun ServerCard(
 
                     val metricLabelText = when {
                         isGameActiveNow -> "RTT WebRTC"
-                        isServerCurrentlyTesting -> if (isEn) "Testing..." else "Đang đo..."
+                        isServerCurrentlyTesting -> config.tr("Đang đo...", "Testing...")
                         isFallbackPortOnly -> {
-                            if (isEn) "Fallback port • Primary closed" else "Cổng phụ • Cổng chính đóng"
+                            config.tr("Cổng phụ • Cổng chính đóng", "Fallback port • Primary closed")
                         }
                         measurement?.status == ServerPingStatus.MEASURED_PRIMARY && pingMs > 0 -> {
-                            val qualityTag = when {
-                                isUnstablePing -> if (isEn) "Unstable" else "Mạng chập chờn"
-                                pingMs <= 80 -> if (isEn) "Good" else "Tốt"
-                                pingMs <= 120 -> if (isEn) "Fair" else "Trung bình"
-                                else -> if (isEn) "High" else "Cao"
+                            when {
+                                isUnstablePing -> config.tr("Độ trễ mạng (Mạng chập chờn)", "Latency (Unstable)")
+                                pingMs <= 80 -> config.tr("Độ trễ mạng (Tốt)", "Latency (Good)")
+                                pingMs <= 120 -> config.tr("Độ trễ mạng (Trung bình)", "Latency (Fair)")
+                                else -> config.tr("Độ trễ mạng (Cao)", "Latency (High)")
                             }
-                            if (isEn) "Latency ($qualityTag)" else "Độ trễ mạng ($qualityTag)"
                         }
-                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency" else "Độ trễ mạng"
-                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
-                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session latency" else "Độ trễ phiên gần nhất"
-                        else -> if (isEn) "Not tested" else "Chưa đo"
+                        hasTriedPing && pingMs > 0 -> config.tr("Độ trễ mạng", "Network latency")
+                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> config.tr("Không đo được", "Unreachable")
+                        isSmartBypass && pingMs > 0 -> config.tr("Độ trễ phiên gần nhất", "Last session latency")
+                        else -> config.tr("Chưa đo", "Not tested")
                     }
 
                     if (isSelected) {

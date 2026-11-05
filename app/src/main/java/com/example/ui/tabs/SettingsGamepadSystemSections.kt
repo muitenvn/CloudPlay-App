@@ -106,6 +106,7 @@ internal fun SettingsGamepadTouchSection(
             val savedPerGameCount = remember(config.perGameLayoutsJson) {
                 SettingsRepository.parseAllPerGameLayouts(config.perGameLayoutsJson).size
             }
+            val isGlobalLayoutActive = !config.usePerGameGamepadLayout
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -115,7 +116,11 @@ internal fun SettingsGamepadTouchSection(
                         SettingsRepository.updateUsePerGameGamepadLayout(false)
                         Toast.makeText(
                             context,
-                            if (isEn) "Switched to Global Layout for all games" else "Đã chuyển sang Dùng bố cục chung cho mọi game",
+                            if (isEn) {
+                                "✓ Active: Global Layout applied to all games"
+                            } else {
+                                "✓ Đang áp dụng bố cục chung cho tất cả game"
+                            },
                             Toast.LENGTH_SHORT
                         ).show()
                     },
@@ -125,10 +130,21 @@ internal fun SettingsGamepadTouchSection(
                             contentDescription = if (isEn) "Use Global Layout" else "Dùng bố cục chung"
                         }
                         .testTag("settings_use_global_gamepad_layout_btn"),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        if (isGlobalLayoutActive) 1.4.dp else 1.dp,
+                        if (isGlobalLayoutActive) DirectCyan else XboxCardBorder
+                    ),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (isGlobalLayoutActive) DirectCyan.copy(alpha = 0.16f) else Color.Transparent
+                    )
                 ) {
                     Text(
-                        text = if (isEn) "Use Global Layout" else "Dùng bố cục chung",
+                        text = if (isGlobalLayoutActive) {
+                            if (isEn) "✓ Using Global Layout" else "✓ Đang dùng bố cục chung"
+                        } else {
+                            if (isEn) "Use Global Layout" else "Dùng bố cục chung"
+                        },
                         color = DirectCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
@@ -142,7 +158,7 @@ internal fun SettingsGamepadTouchSection(
                         SettingsRepository.resetGamepadCustomOffsets()
                         Toast.makeText(
                             context,
-                            if (isEn) "Reset all gamepad layouts to default" else "Đã đặt lại bố cục tay cầm ảo về mặc định",
+                            if (isEn) "✓ Reset all gamepad layouts to default" else "✓ Đã đặt lại bố cục tay cầm ảo về mặc định",
                             Toast.LENGTH_SHORT
                         ).show()
                     },

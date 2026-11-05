@@ -346,6 +346,24 @@ fun WebDownloadPortalDialog(
                                         }
 
                                         Text(
+                                            text = if (qrUseDirectApk) {
+                                                config.tr(
+                                                    "✓ Mã QR đang trỏ tới: 📥 Link tải trực tiếp file APK",
+                                                    "✓ QR encodes: 📥 Direct APK File Link"
+                                                )
+                                            } else {
+                                                config.tr(
+                                                    "✓ Mã QR đang trỏ tới: 🌐 Trang web giới thiệu & tải ứng dụng",
+                                                    "✓ QR encodes: 🌐 Download Web Page"
+                                                )
+                                            },
+                                            color = if (qrUseDirectApk) XboxNeonGreen else DirectCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center
+                                        )
+
+                                        Text(
                                             text = config.tr(
                                                 "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải.",
                                                 "Open Camera or a QR scanner app on another phone to open the download link."
@@ -357,10 +375,16 @@ fun WebDownloadPortalDialog(
 
                                         // Web URL Box
                                         Surface(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { qrUseDirectApk = false },
                                             shape = RoundedCornerShape(10.dp),
-                                            color = XboxSurfaceVariant,
-                                            border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.4f))
+                                            color = if (!qrUseDirectApk) DirectCyan.copy(alpha = 0.14f) else XboxSurfaceVariant,
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                if (!qrUseDirectApk) 1.4.dp else 0.8.dp,
+                                                if (!qrUseDirectApk) DirectCyan else DirectCyan.copy(alpha = 0.35f)
+                                            )
                                         ) {
                                             Row(
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -369,7 +393,8 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = config.tr("🌐 Trang web giới thiệu & tải ứng dụng", "🌐 Download Web Page"),
+                                                        text = (if (!qrUseDirectApk) "✓ " else "") +
+                                                            config.tr("🌐 Trang web giới thiệu & tải ứng dụng", "🌐 Download Web Page"),
                                                         color = DirectCyan,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -398,10 +423,16 @@ fun WebDownloadPortalDialog(
 
                                         // Direct APK Download URL Box
                                         Surface(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable { qrUseDirectApk = true },
                                             shape = RoundedCornerShape(10.dp),
-                                            color = XboxSurfaceVariant,
-                                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.4f))
+                                            color = if (qrUseDirectApk) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant,
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                if (qrUseDirectApk) 1.4.dp else 0.8.dp,
+                                                if (qrUseDirectApk) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.35f)
+                                            )
                                         ) {
                                             Row(
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -410,7 +441,8 @@ fun WebDownloadPortalDialog(
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = config.tr("📥 Link tải trực tiếp file APK", "📥 Direct APK File Link"),
+                                                        text = (if (qrUseDirectApk) "✓ " else "") +
+                                                            config.tr("📥 Link tải trực tiếp file APK", "📥 Direct APK File Link"),
                                                         color = XboxNeonGreen,
                                                         fontSize = 10.sp,
                                                         fontWeight = FontWeight.Bold
@@ -506,10 +538,39 @@ fun WebDownloadPortalDialog(
                                         .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
                                     color = XboxSurface
                                 ) {
+                                    val portalSyncJs = remember(config.customApkDownloadUrl, config.githubRepoSlug, isEn) {
+                                        val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")
+                                        val escapedRepo = config.githubRepoSlug.replace("'", "\\'")
+                                        val targetLang = if (isEn) "en" else "vi"
+                                        """
+                                        (function() {
+                                            try {
+                                                document.documentElement.style.setProperty('--bg', '#0b1210');
+                                                document.documentElement.style.setProperty('--surface', '#121b17');
+                                                document.documentElement.style.setProperty('--line', '#223029');
+                                                document.documentElement.style.setProperty('--text', '#eaf1ee');
+                                                document.documentElement.style.setProperty('--muted', '#9db0a8');
+                                                document.documentElement.style.setProperty('--accent', '#3fb950');
+                                                document.documentElement.style.setProperty('--accent-d', '#2f9a40');
+                                                document.documentElement.style.setProperty('--accent-soft', '#12261a');
+                                                document.documentElement.style.setProperty('--on-accent', '#06130a');
+                                                document.documentElement.style.setProperty('--warn-bg', '#241c0b');
+                                                document.documentElement.style.setProperty('--warn-line', '#4a3a12');
+                                                document.documentElement.style.setProperty('--warn-text', '#f0d594');
+                                                document.documentElement.style.setProperty('--bar', 'rgba(11,18,16,0.94)');
+                                                localStorage.setItem('cp_lang', '$targetLang');
+                                                var btn = document.querySelector('.lang button[data-lang="$targetLang"]');
+                                                if (btn) btn.click();
+                                                if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');
+                                            } catch (e) {}
+                                        })();
+                                        """.trimIndent()
+                                    }
                                     AndroidView(
                                         modifier = Modifier.fillMaxSize(),
                                         factory = { ctx ->
                                             WebView(ctx).apply {
+                                                setBackgroundColor(android.graphics.Color.parseColor("#0B1210"))
                                                 settings.javaScriptEnabled = true
                                                 settings.domStorageEnabled = true
                                                 webViewClient = object : WebViewClient() {
@@ -539,24 +600,14 @@ fun WebDownloadPortalDialog(
 
                                                     override fun onPageFinished(view: WebView?, url: String?) {
                                                         super.onPageFinished(view, url)
-                                                        val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")
-                                                        val escapedRepo = config.githubRepoSlug.replace("'", "\\'")
-                                                        view?.evaluateJavascript(
-                                                            "if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');",
-                                                            null
-                                                        )
+                                                        view?.evaluateJavascript(portalSyncJs, null)
                                                     }
                                                 }
                                                 loadUrl("file:///android_asset/web/index.html")
                                             }
                                         },
                                         update = { webView ->
-                                            val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")
-                                            val escapedRepo = config.githubRepoSlug.replace("'", "\\'")
-                                            webView.evaluateJavascript(
-                                                "if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');",
-                                                null
-                                            )
+                                            webView.evaluateJavascript(portalSyncJs, null)
                                         }
                                     )
                                 }

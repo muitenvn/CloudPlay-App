@@ -909,6 +909,158 @@ object AppUiTranslator {
                 else -> en
             }
         }
+        when (en) {
+            "Home" -> return when (lang) {
+                "zh" -> "主页"; "ja" -> "ホーム"; "ko" -> "홈"; "es" -> "Inicio"; "pt" -> "Início"
+                "fr" -> "Accueil"; "de" -> "Start"; "ru" -> "Главная"; "th" -> "หน้าหลัก"; "id" -> "Beranda"
+                else -> en
+            }
+            "Library" -> return when (lang) {
+                "zh" -> "游戏库"; "ja" -> "ライブラリ"; "ko" -> "라이브러리"; "es" -> "Biblioteca"; "pt" -> "Biblioteca"
+                "fr" -> "Bibliothèque"; "de" -> "Bibliothek"; "ru" -> "Библиотека"; "th" -> "คลังเกม"; "id" -> "Pustaka"
+                else -> en
+            }
+            "Servers" -> return when (lang) {
+                "zh" -> "服务器"; "ja" -> "サーバー"; "ko" -> "서버"; "es" -> "Servidores"; "pt" -> "Servidores"
+                "fr" -> "Serveurs"; "de" -> "Server"; "ru" -> "Серверы"; "th" -> "เซิร์ฟเวอร์"; "id" -> "Server"
+                else -> en
+            }
+            "Settings" -> return when (lang) {
+                "zh" -> "设置"; "ja" -> "設定"; "ko" -> "설정"; "es" -> "Ajustes"; "pt" -> "Configurações"
+                "fr" -> "Paramètres"; "de" -> "Einstellungen"; "ru" -> "Настройки"; "th" -> "ตั้งค่า"; "id" -> "Pengaturan"
+                else -> en
+            }
+            "Guide", "How to Use" -> return when (lang) {
+                "zh" -> "使用指南"; "ja" -> "使い方"; "ko" -> "사용법"; "es" -> "Guía"; "pt" -> "Guia"
+                "fr" -> "Guide"; "de" -> "Anleitung"; "ru" -> "Инструкция"; "th" -> "คู่มือ"; "id" -> "Panduan"
+                else -> en
+            }
+            "Direct Network" -> return when (lang) {
+                "zh" -> "直连网络"; "ja" -> "ダイレクト接続"; "ko" -> "직접 연결"; "es" -> "Red directa"; "pt" -> "Rede direta"
+                "fr" -> "Réseau direct"; "de" -> "Direktnetz"; "ru" -> "Прямая сеть"; "th" -> "เครือข่ายตรง"; "id" -> "Jaringan Langsung"
+                else -> en
+            }
+            "Untested unlock", "Untested" -> return when (lang) {
+                "zh" -> "未测试解锁"; "ja" -> "未確認"; "ko" -> "미확인 서버"; "es" -> "Sin probar"; "pt" -> "Não testado"
+                "fr" -> "Non testé"; "de" -> "Ungetestet"; "ru" -> "Не проверен"; "th" -> "ยังไม่ทดสอบ"; "id" -> "Belum diuji"
+                else -> en
+            }
+            "★ BEST" -> return when (lang) {
+                "zh" -> "★ 推荐"; "ja" -> "★ 最適"; "ko" -> "★ 추천"; "es" -> "★ MEJOR"; "pt" -> "★ MELHOR"
+                "fr" -> "★ TOP"; "de" -> "★ BESTE"; "ru" -> "★ ЛУЧШИЙ"; "th" -> "★ แนะนำ"; "id" -> "★ TERBAIK"
+                else -> en
+            }
+            "Too far" -> return when (lang) {
+                "zh" -> "距离过远"; "ja" -> "遠距離"; "ko" -> "거리 멈"; "es" -> "Muy lejos"; "pt" -> "Muito longe"
+                "fr" -> "Trop loin"; "de" -> "Zu weit"; "ru" -> "Далеко"; "th" -> "ไกลเกินไป"; "id" -> "Terlalu jauh"
+                else -> en
+            }
+            "Unreachable" -> return when (lang) {
+                "zh" -> "无法连接"; "ja" -> "接続不可"; "ko" -> "연결 불가"; "es" -> "Inaccesible"; "pt" -> "Inacessível"
+                "fr" -> "Injoignable"; "de" -> "Nicht erreichbar"; "ru" -> "Недоступен"; "th" -> "เชื่อมต่อไม่ได้"; "id" -> "Tidak terjangkau"
+                else -> en
+            }
+            "Not tested" -> return when (lang) {
+                "zh" -> "未测速"; "ja" -> "未測定"; "ko" -> "미측정"; "es" -> "Sin medir"; "pt" -> "Não medido"
+                "fr" -> "Non mesuré"; "de" -> "Nicht gemessen"; "ru" -> "Не измерено"; "th" -> "ยังไม่วัด"; "id" -> "Belum diukur"
+                else -> en
+            }
+            "Testing..." -> return when (lang) {
+                "zh" -> "测速中..."; "ja" -> "測定中..."; "ko" -> "측정 중..."; "es" -> "Midiendo..."; "pt" -> "Testando..."
+                "fr" -> "Test..."; "de" -> "Teste..."; "ru" -> "Тест..."; "th" -> "กำลังวัด..."; "id" -> "Menguji..."
+                else -> en
+            }
+            "Selecting..." -> return when (lang) {
+                "zh" -> "择优中..."; "ja" -> "選択中..."; "ko" -> "선택 중..."; "es" -> "Eligiendo..."; "pt" -> "Selecionando..."
+                "fr" -> "Sélection..."; "de" -> "Wähle..."; "ru" -> "Выбор..."; "th" -> "กำลังเลือก..."; "id" -> "Memilih..."
+                else -> en
+            }
+            "Network latency" -> return when (lang) {
+                "zh" -> "网络延迟"; "ja" -> "ネットワーク遅延"; "ko" -> "네트워크 지연"; "es" -> "Latencia de red"; "pt" -> "Latência de rede"
+                "fr" -> "Latence réseau"; "de" -> "Netzwerklatenz"; "ru" -> "Задержка сети"; "th" -> "ความหน่วงเครือข่าย"; "id" -> "Latensi jaringan"
+                else -> en
+            }
+            "Last session latency" -> return when (lang) {
+                "zh" -> "上次游玩延迟"; "ja" -> "前回の遅延"; "ko" -> "최근 세션 지연"; "es" -> "Latencia última sesión"; "pt" -> "Latência última sessão"
+                "fr" -> "Latence dernière session"; "de" -> "Latenz letzte Sitzung"; "ru" -> "Задержка прошлой сессии"; "th" -> "ความหน่วงรอบล่าสุด"; "id" -> "Latensi sesi terakhir"
+                else -> en
+            }
+            "Latency (Good)" -> return when (lang) {
+                "zh" -> "网络延迟 (极佳)"; "ja" -> "ネットワーク遅延 (良好)"; "ko" -> "네트워크 지연 (양호)"; "es" -> "Latencia (Buena)"; "pt" -> "Latência (Boa)"
+                "fr" -> "Latence (Bonne)"; "de" -> "Latenz (Gut)"; "ru" -> "Задержка (Хорошо)"; "th" -> "ความหน่วง (ดี)"; "id" -> "Latensi (Baik)"
+                else -> en
+            }
+            "Latency (Fair)" -> return when (lang) {
+                "zh" -> "网络延迟 (一般)"; "ja" -> "ネットワーク遅延 (普通)"; "ko" -> "네트워크 지연 (보통)"; "es" -> "Latencia (Media)"; "pt" -> "Latência (Média)"
+                "fr" -> "Latence (Moyenne)"; "de" -> "Latenz (Mittel)"; "ru" -> "Задержка (Средне)"; "th" -> "ความหน่วง (ปานกลาง)"; "id" -> "Latensi (Sedang)"
+                else -> en
+            }
+            "Latency (High)" -> return when (lang) {
+                "zh" -> "网络延迟 (偏高)"; "ja" -> "ネットワーク遅延 (高め)"; "ko" -> "네트워크 지연 (높음)"; "es" -> "Latencia (Alta)"; "pt" -> "Latência (Alta)"
+                "fr" -> "Latence (Élevée)"; "de" -> "Latenz (Hoch)"; "ru" -> "Задержка (Высокая)"; "th" -> "ความหน่วง (สูง)"; "id" -> "Latensi (Tinggi)"
+                else -> en
+            }
+            "Latency (Unstable)", "Unstable" -> return when (lang) {
+                "zh" -> "网络波动"; "ja" -> "不安定"; "ko" -> "네트워크 불안정"; "es" -> "Inestable"; "pt" -> "Instável"
+                "fr" -> "Instable"; "de" -> "Instabil"; "ru" -> "Нестабильно"; "th" -> "ไม่เสถียร"; "id" -> "Tidak stabil"
+                else -> en
+            }
+            "⚡ Smart Server Selection" -> return when (lang) {
+                "zh" -> "⚡ 智能节点选择算法"; "ja" -> "⚡ スマートサーバー選択"; "ko" -> "⚡ 스마트 서버 자동 선택"; "es" -> "⚡ Selección inteligente"; "pt" -> "⚡ Seleção inteligente"
+                "fr" -> "⚡ Sélection intelligente"; "de" -> "⚡ Intelligente Serverwahl"; "ru" -> "⚡ Умный выбор сервера"; "th" -> "⚡ เลือกเซิร์ฟเวอร์อัจฉริยะ"; "id" -> "⚡ Pilihan Server Pintar"
+                else -> en
+            }
+            "Session ➔ Unlock" -> return when (lang) {
+                "zh" -> "游玩延迟 ➔ 解锁"; "ja" -> "プレイ遅延 ➔ 解除"; "ko" -> "세션 지연 ➔ 잠금 해제"; "es" -> "Sesión ➔ Desbloqueo"; "pt" -> "Sessão ➔ Desbloqueio"
+                "fr" -> "Session ➔ Déblocage"; "de" -> "Sitzung ➔ Freischaltung"; "ru" -> "Сессия ➔ Разблок."; "th" -> "ปิงในเกม ➔ ปลดล็อก"; "id" -> "Sesi ➔ Buka Kunci"
+                else -> en
+            }
+            "VPN Ping ➔ Session" -> return when (lang) {
+                "zh" -> "VPN 延迟 ➔ 游玩"; "ja" -> "VPN遅延 ➔ プレイ"; "ko" -> "VPN 핑 ➔ 세션 지연"; "es" -> "Ping VPN ➔ Sesión"; "pt" -> "Ping VPN ➔ Sessão"
+                "fr" -> "Ping VPN ➔ Session"; "de" -> "VPN-Ping ➔ Sitzung"; "ru" -> "Пинг VPN ➔ Сессия"; "th" -> "ปิง VPN ➔ ในเกม"; "id" -> "Ping VPN ➔ Sesi"
+                else -> en
+            }
+            "Auto-Off VPN in game" -> return when (lang) {
+                "zh" -> "进游戏自动关闭 VPN"; "ja" -> "ゲーム開始時にVPN自動オフ"; "ko" -> "게임 진입 시 VPN 자동 끄기"; "es" -> "Apagar VPN al entrar"; "pt" -> "Desligar VPN no jogo"
+                "fr" -> "Couper VPN en jeu"; "de" -> "VPN im Spiel auto-aus"; "ru" -> "Авто-откл. VPN в игре"; "th" -> "ปิด VPN อัตโนมัติเมื่อเข้าเกม"; "id" -> "Matikan VPN saat main"
+                else -> en
+            }
+            "75% Session • 25% Unlock" -> return when (lang) {
+                "zh" -> "75% 游玩延迟 • 25% 解锁"; "ja" -> "75% プレイ遅延 • 25% 解除"; "ko" -> "75% 세션 지연 • 25% 잠금 해제"; "es" -> "75% Sesión • 25% Desbloqueo"; "pt" -> "75% Sessão • 25% Desbloqueio"
+                "fr" -> "75% Session • 25% Déblocage"; "de" -> "75% Sitzung • 25% Freisch."; "ru" -> "75% Сессия • 25% Разблок."; "th" -> "75% ปิงในเกม • 25% ปลดล็อก"; "id" -> "75% Sesi • 25% Buka Kunci"
+                else -> en
+            }
+            "Keep VPN on in game" -> return when (lang) {
+                "zh" -> "游玩时保持开启 VPN"; "ja" -> "プレイ中もVPNを維持"; "ko" -> "게임 중 VPN 계속 유지"; "es" -> "Mantener VPN en juego"; "pt" -> "Manter VPN ligado"
+                "fr" -> "Garder VPN en jeu"; "de" -> "VPN im Spiel anlassen"; "ru" -> "Держать VPN включённым"; "th" -> "เปิด VPN ตลอดขณะเล่น"; "id" -> "Tetap nyalakan VPN"
+                else -> en
+            }
+            "75% VPN Ping • 25% Session" -> return when (lang) {
+                "zh" -> "75% VPN 延迟 • 25% 游玩"; "ja" -> "75% VPN遅延 • 25% プレイ"; "ko" -> "75% VPN 핑 • 25% 세션 지연"; "es" -> "75% Ping VPN • 25% Sesión"; "pt" -> "75% Ping VPN • 25% Sessão"
+                "fr" -> "75% Ping VPN • 25% Session"; "de" -> "75% VPN-Ping • 25% Sitzung"; "ru" -> "75% Пинг VPN • 25% Сессия"; "th" -> "75% ปิง VPN • 25% ในเกม"; "id" -> "75% Ping VPN • 25% Sesi"
+                else -> en
+            }
+            "✓ Hiding dead proxies", "Hiding dead dynamic" -> return when (lang) {
+                "zh" -> "✓ 已隐藏失效节点"; "ja" -> "✓ 応答なしを非表示中"; "ko" -> "✓ 응답 없는 프록시 숨김"; "es" -> "✓ Ocultando inactivos"; "pt" -> "✓ Ocultando inativos"
+                "fr" -> "✓ Inactifs masqués"; "de" -> "✓ Tote Proxys ausgeblendet"; "ru" -> "✓ Недоступные скрыты"; "th" -> "✓ ซ่อนพร็อกซีที่เสียแล้ว"; "id" -> "✓ Sembunyikan proxy mati"
+                else -> en
+            }
+            "Hide dead proxies", "Hide dead dynamic" -> return when (lang) {
+                "zh" -> "隐藏失效节点"; "ja" -> "応答なしを非表示"; "ko" -> "응답 없는 프록시 숨기기"; "es" -> "Ocultar inactivos"; "pt" -> "Ocultar inativos"
+                "fr" -> "Masquer inactifs"; "de" -> "Tote Proxys ausblenden"; "ru" -> "Скрыть недоступные"; "th" -> "ซ่อนพร็อกซีที่เสีย"; "id" -> "Sembunyikan proxy mati"
+                else -> en
+            }
+            "Refresh Public List" -> return when (lang) {
+                "zh" -> "刷新公共列表"; "ja" -> "公開リスト更新"; "ko" -> "공개 목록 새로고침"; "es" -> "Actualizar lista"; "pt" -> "Atualizar lista"
+                "fr" -> "Actualiser la liste"; "de" -> "Liste aktualisieren"; "ru" -> "Обновить список"; "th" -> "อัปเดตรายชื่อ"; "id" -> "Segarkan Daftar"
+                else -> en
+            }
+            "Add Custom Proxy" -> return when (lang) {
+                "zh" -> "添加自定义代理"; "ja" -> "カスタムプロキシ追加"; "ko" -> "사용자 지정 프록시 추가"; "es" -> "Añadir proxy"; "pt" -> "Adicionar proxy"
+                "fr" -> "Ajouter un proxy"; "de" -> "Eigenen Proxy hinzufügen"; "ru" -> "Добавить прокси"; "th" -> "เพิ่มพร็อกซีส่วนตัว"; "id" -> "Tambah Proxy Kustom"
+                else -> en
+            }
+        }
         return en
     }
 

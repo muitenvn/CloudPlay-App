@@ -334,9 +334,27 @@ enum class AppLanguage(
 
     fun effectiveLanguageCode(): String {
         if (this != SYSTEM) return code
-        val rawSys = Locale.getDefault().language.lowercase(Locale.ROOT)
+        val rawSys = resolveOsSystemLanguage()
         val normalized = if (rawSys == "in") "id" else rawSys
         return entries.firstOrNull { it != SYSTEM && normalized.startsWith(it.code) }?.code ?: "en"
+    }
+
+    companion object {
+        fun resolveOsSystemLanguage(): String {
+            return try {
+                val sysConf = android.content.res.Resources.getSystem().configuration
+                val sysLoc = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && !sysConf.locales.isEmpty) {
+                    sysConf.locales[0]
+                } else {
+                    @Suppress("DEPRECATION")
+                    sysConf.locale
+                }
+                val lang = sysLoc?.language?.lowercase(Locale.ROOT).orEmpty()
+                if (lang.isNotBlank()) lang else Locale.getDefault().language.lowercase(Locale.ROOT)
+            } catch (_: Exception) {
+                Locale.getDefault().language.lowercase(Locale.ROOT)
+            }
+        }
     }
 
     fun effectiveShortBadge(): String {
@@ -719,7 +737,7 @@ data class AppConfig(
     fun isSettingsEnglishUI(): Boolean {
         return when (appLanguage) {
             AppLanguage.ENGLISH -> true
-            AppLanguage.SYSTEM -> !Locale.getDefault().language.lowercase(Locale.ROOT).startsWith("vi")
+            AppLanguage.SYSTEM -> !AppLanguage.resolveOsSystemLanguage().startsWith("vi")
             else -> false
         }
     }

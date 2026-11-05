@@ -65,6 +65,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -146,12 +148,9 @@ fun ServersScreen(
     val isSmartBypassEngine = vpnState.engine == com.example.vpn.VpnEngine.SMART_BYPASS
     val userNeedsVpn = VpnManager.needsVpnToPlay()
 
-    // Bước nâng cấp v1.3.0 + tự động đo ping sơ bộ (bước 1 + 2) và quét máy chủ công cộng trong nền
+    // Bước nâng cấp v1.3.0 + tự động chọn vùng mặc định bằng probe ngắn khi mở lần đầu / đổi GeoIP / hết hạn cache
     LaunchedEffect(Unit) {
-        val upgradedSrv = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = false)
-        if (upgradedSrv != null) {
-            onSelectServer(upgradedSrv)
-        }
+        VpnManager.ensureInitialOrGeoUpdatedOptimalServer(context = context, force = false)
         if (serverPings.isEmpty() && !isTestingAll) {
             VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
         }
@@ -177,7 +176,6 @@ fun ServersScreen(
                 )
                 val distSuffix = if (distKm != null) " • ~${distKm}km" else ""
                 if (bestPing > 0) {
-                    onSelectServer(best)
                     val msg = if (isEn) {
                         "Selected best server: ${best.flag} ${best.name} (${bestPing}ms$distSuffix)"
                     } else {
@@ -185,7 +183,6 @@ fun ServersScreen(
                     }
                     android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
                 } else if (isSmartBypassEngine) {
-                    onSelectServer(best)
                     val msg = if (isEn) {
                         "Selected optimal server: ${best.flag} ${best.name}$distSuffix"
                     } else {
@@ -666,6 +663,36 @@ fun ServersScreen(
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                val selectionReasonText = remember(
+                                    currentServer.id,
+                                    isEn,
+                                    vpnState.detectedGeoIp,
+                                    serverMeasurements[currentServer.id],
+                                    serverPings[currentServer.id],
+                                    recentSessions,
+                                    vpnState.userManuallySelectedServer
+                                ) {
+                                    VpnManager.buildServerSelectionReasonText(
+                                        server = currentServer,
+                                        isEn = isEn,
+                                        geo = vpnState.detectedGeoIp,
+                                        measurementsMap = serverMeasurements,
+                                        pingMap = serverPings,
+                                        sessions = recentSessions
+                                    )
+                                }
+                                Text(
+                                    text = selectionReasonText,
+                                    color = DirectCyan,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .testTag("selected_server_reason_label")
+                                        .semantics { contentDescription = selectionReasonText }
+                                )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -804,8 +831,7 @@ fun ServersScreen(
                                         .clickable {
                                             if (!isAutoOff) {
                                                 SettingsRepository.updateAutoBypass(true)
-                                                val best = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
-                                                if (best != null) onSelectServer(best)
+                                                VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
                                             }
                                         }
                                         .testTag("mode_auto_off_distance_first_chip"),
@@ -830,7 +856,7 @@ fun ServersScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isEn) "1st: Geo Distance (KR ~70ms)" else "Ưu tiên: Vị trí gần (KR ~70ms)",
+                                            text = if (isEn) "75% Session RTT + 25% Unlock" else "75% RTT phiên + 25% Mở khóa",
                                             color = if (isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
                                             fontSize = 9.sp,
                                             maxLines = 1,
@@ -846,8 +872,7 @@ fun ServersScreen(
                                         .clickable {
                                             if (isAutoOff) {
                                                 SettingsRepository.updateAutoBypass(false)
-                                                val best = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
-                                                if (best != null) onSelectServer(best)
+                                                VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
                                             }
                                         }
                                         .testTag("mode_keep_vpn_ping_first_chip"),
@@ -1417,20 +1442,30 @@ private fun ServerCard(
                     }
 
                     val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
-                    val estDirectPing = remember(server.countryCode, config.autoBypassEnabled) {
-                        if (config.autoBypassEnabled && (server.countryCode == "KR" || server.countryCode == "JP")) {
-                            com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs(server.countryCode)
-                        } else null
+                    val recentSessionsForCard by com.example.data.SessionHistoryRepository.sessions.collectAsState()
+                    val regionSessionStats = remember(server.name, server.countryCode, recentSessionsForCard) {
+                        com.example.data.SessionHistoryRepository.getRegionSessionStats(
+                            serverName = server.name,
+                            countryCode = server.countryCode,
+                            sessionsList = recentSessionsForCard
+                        )
                     }
-                    val directPingNote = if (estDirectPing != null) {
-                        if (isEn) " • ~${estDirectPing}ms in-game" else " • ~${estDirectPing}ms khi tắt VPN"
-                    } else ""
+                    val directPingNote = if (regionSessionStats != null && regionSessionStats.sampleCount > 0) {
+                        if (isEn) {
+                            " • ~${regionSessionStats.avgRttMs}ms • last ${regionSessionStats.sampleCount} sessions"
+                        } else {
+                            " • ~${regionSessionStats.avgRttMs}ms • ${regionSessionStats.sampleCount} phiên gần nhất"
+                        }
+                    } else {
+                        if (isEn) " • No data yet" else " • Chưa có dữ liệu"
+                    }
                     Text(
                         text = "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}",
                         color = TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("server_card_subtitle_${server.id}")
                     )
                 }
             }

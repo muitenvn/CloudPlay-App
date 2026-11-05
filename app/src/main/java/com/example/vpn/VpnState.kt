@@ -924,5 +924,7 @@ data class VpnConnectionState(
     val serverMeasurements: Map<String, EndpointPingMeasurement> = emptyMap(),
     val selectedServerProbeEstimate: GlobalpingProbeEstimate? = null,
     val isTestingPings: Boolean = false,
-    val activeStreamServerId: String? = null
+    val activeStreamServerId: String? = null,
+    val userManuallySelectedServer: Boolean = false,
+    val lastAutoSelectTimestampMs: Long = 0L
 )

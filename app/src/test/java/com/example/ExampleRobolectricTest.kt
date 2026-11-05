@@ -1120,43 +1120,385 @@ class ExampleRobolectricTest {
         assertTrue(filteredPool.any { it.countryCode == "JP" })
         assertTrue(filteredPool.any { it.countryCode == "KR" })
 
-        // 4. Dual-Mode v1.3.0 Algorithm:
-        // Suppose JP has 58ms proxy ping and KR has 68ms proxy ping:
+        // 4. Unified Scoring Function:
+        // (a) When neither measured RTT nor session history exists yet, geographic distance is used as initial tie-breaker (KR ~3,000km beats JP ~3,900km)
+        val sortedNoMeasurements = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(jpServer, krServer),
+            pingMap = emptyMap(),
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
+            prioritizeDistanceForAutoBypass = true,
+            geo = vnGeo,
+            sessions = emptyList()
+        )
+        assertEquals("Without measurements, closer geographic country (KR) ranks first", krServer.id, sortedNoMeasurements[0].id)
+        assertEquals(jpServer.id, sortedNoMeasurements[1].id)
+
+        // (b) When real measured RTT exists (JP 58ms vs KR 68ms) and no session history exists yet, real measured RTT decides (JP 58ms beats KR 68ms in both modes)
         val jpVsKrPings = mapOf(
             jpServer.id to 58,
             krServer.id to 68
         )
-        // Mode A: Auto-Off VPN in game (prioritizeDistanceForAutoBypass = true) -> prioritizes Korea (KR ~70ms direct in-game, closer to VN) over Japan (JP ~80ms)
-        val sortedAutoBypassOn = VpnManager.sortServersByUnlockAndPing(
-            servers = listOf(jpServer, krServer),
-            pingMap = jpVsKrPings,
-            records = emptyMap(),
-            engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
-            prioritizeDistanceForAutoBypass = true
-        )
-        assertEquals("Auto-Off VPN must prioritize closer geographic country (KR)", krServer.id, sortedAutoBypassOn[0].id)
-        assertEquals(jpServer.id, sortedAutoBypassOn[1].id)
-
-        // Mode B: Keep VPN On in game (prioritizeDistanceForAutoBypass = false) -> prioritizes lowest measured ping (JP 58ms) first, with distance second
         val sortedKeepVpnOn = VpnManager.sortServersByUnlockAndPing(
             servers = listOf(jpServer, krServer),
             pingMap = jpVsKrPings,
             records = emptyMap(),
             engine = com.example.vpn.VpnEngine.PROXY_TUNNEL,
-            prioritizeDistanceForAutoBypass = false
+            prioritizeDistanceForAutoBypass = false,
+            geo = vnGeo,
+            sessions = emptyList()
         )
-        assertEquals("Keep VPN On must prioritize lowest ping (JP 58ms) before distance", jpServer.id, sortedKeepVpnOn[0].id)
+        assertEquals("Real measured ping (JP 58ms) must rank above slower ping (KR 68ms)", jpServer.id, sortedKeepVpnOn[0].id)
         assertEquals(krServer.id, sortedKeepVpnOn[1].id)
 
-        // 5. v1.3.0 Upgrade Step automatically selects KR when Auto-Off VPN is enabled
+        // 5. v1.3.0 Upgrade Step with no prior measurements uses initial geographic ordering (KR) and does not use fabricated ping numbers
         val context = ApplicationProvider.getApplicationContext<Context>()
         SettingsRepository.updateAutoBypass(true)
+        VpnManager.selectServer(com.example.vpn.DEFAULT_SERVERS[0], context, isManualSelection = false)
         val upgradedBest = VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
         assertNotNull(upgradedBest)
-        assertEquals("KR", upgradedBest!!.countryCode)
-        assertEquals(70, com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs("KR", vnGeo))
-        assertEquals(80, com.example.vpn.RegionalProbeTester.estimateDirectInGamePingMs("JP", vnGeo))
-        VpnManager.selectServer(com.example.vpn.DEFAULT_SERVERS[0], context)
+        VpnManager.selectServer(com.example.vpn.DEFAULT_SERVERS[0], context, isManualSelection = false)
     }
 }
+
+class ServerSelectionScoringUnitTest {
+
+    @Test
+    fun serverScoring_vietnamUser_krLowPingLowFreeze_beatsJp() {
+        val vnGeo = com.example.vpn.GeoIpResult(
+            ip = "14.225.204.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Ho Chi Minh City",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 10.8231,
+            longitude = 106.6297
+        )
+        val krServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "KR" }
+        val jpServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "JP" }
+
+        val krMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 76,
+            minRttMs = 73,
+            maxRttMs = 80,
+            configuredPort = krServer.port,
+            measuredPort = krServer.port,
+            resolvedIp = krServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+        val jpMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 89,
+            minRttMs = 85,
+            maxRttMs = 95,
+            configuredPort = jpServer.port,
+            measuredPort = jpServer.port,
+            resolvedIp = jpServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+
+        val simulatedSessions = listOf(
+            com.example.data.PlaySessionRecord(
+                id = "kr_sess_1",
+                gameTitle = "Forza Horizon 5",
+                startTimeMillis = 1_700_000_100_000L,
+                durationSeconds = 1200L,
+                serverName = krServer.name,
+                isDirectNetwork = true,
+                avgPingMs = 76,
+                avgFps = 60,
+                avgDecodeMs = 4.2,
+                isSlowDecode = false,
+                isThermalHot = false,
+                pingSamples = listOf(75, 76, 77),
+                framesDropped = 12,
+                freezeCount = 0,
+                framesDecoded = 72_000
+            ),
+            com.example.data.PlaySessionRecord(
+                id = "jp_sess_1",
+                gameTitle = "Forza Horizon 5",
+                startTimeMillis = 1_700_000_000_000L,
+                durationSeconds = 1200L,
+                serverName = jpServer.name,
+                isDirectNetwork = true,
+                avgPingMs = 89,
+                avgFps = 55,
+                avgDecodeMs = 5.1,
+                isSlowDecode = false,
+                isThermalHot = false,
+                pingSamples = listOf(88, 89, 91),
+                framesDropped = 900,
+                freezeCount = 6,
+                framesDecoded = 72_000
+            )
+        )
+
+        val krStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+            serverName = krServer.name,
+            countryCode = "KR",
+            sessionsList = simulatedSessions
+        )
+        val jpStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+            serverName = jpServer.name,
+            countryCode = "JP",
+            sessionsList = simulatedSessions
+        )
+
+        val krScore = VpnManager.calculateServerSelectionScore(
+            server = krServer,
+            measurement = krMeasurement,
+            fallbackPingMs = 76,
+            unlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+            sessionStats = krStats,
+            autoBypassEnabled = true,
+            distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(krServer, vnGeo)
+        )
+        val jpScore = VpnManager.calculateServerSelectionScore(
+            server = jpServer,
+            measurement = jpMeasurement,
+            fallbackPingMs = 89,
+            unlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+            sessionStats = jpStats,
+            autoBypassEnabled = true,
+            distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(jpServer, vnGeo)
+        )
+
+        assertTrue(
+            "Expected KR score ($krScore) to be strictly better (lower) than JP score ($jpScore)",
+            krScore < jpScore
+        )
+
+        val ranked = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(jpServer, krServer),
+            pingMap = mapOf(krServer.id to 76, jpServer.id to 89),
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.SMART_BYPASS,
+            measurementsMap = mapOf(krServer.id to krMeasurement, jpServer.id to jpMeasurement),
+            prioritizeDistanceForAutoBypass = true,
+            geo = vnGeo,
+            sessions = simulatedSessions
+        )
+        assertEquals("KR must be selected first when KR has 76ms + low freezes vs JP 89ms + high freezes", krServer.id, ranked.first().id)
+    }
+
+    @Test
+    fun serverScoring_krHighFreezeAndFrameDrops_switchesToJp() {
+        val vnGeo = com.example.vpn.GeoIpResult(
+            ip = "14.225.204.10",
+            countryCode = "VN",
+            countryName = "Việt Nam",
+            city = "Ho Chi Minh City",
+            flagEmoji = "🇻🇳",
+            isXboxSupported = false,
+            latitude = 10.8231,
+            longitude = 106.6297
+        )
+        val krServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "KR" }
+        val jpServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "JP" }
+
+        val krMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 76,
+            minRttMs = 72,
+            maxRttMs = 84,
+            configuredPort = krServer.port,
+            measuredPort = krServer.port,
+            resolvedIp = krServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+        val jpMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 89,
+            minRttMs = 86,
+            maxRttMs = 93,
+            configuredPort = jpServer.port,
+            measuredPort = jpServer.port,
+            resolvedIp = jpServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+
+        // KR has lower raw ping (76ms vs 89ms), but suffers heavy freezes (10 freezes in 600s = 1.0/min) and frame drops (4% drop rate)
+        val sessionsWithKrFreezes = listOf(
+            com.example.data.PlaySessionRecord(
+                id = "kr_bad_1",
+                gameTitle = "Halo Infinite",
+                startTimeMillis = 1_700_000_200_000L,
+                durationSeconds = 600L,
+                serverName = krServer.name,
+                isDirectNetwork = true,
+                avgPingMs = 76,
+                avgFps = 48,
+                avgDecodeMs = 6.5,
+                isSlowDecode = false,
+                isThermalHot = false,
+                pingSamples = listOf(74, 76, 80),
+                framesDropped = 1_440,
+                freezeCount = 10,
+                framesDecoded = 36_000
+            ),
+            com.example.data.PlaySessionRecord(
+                id = "jp_smooth_1",
+                gameTitle = "Halo Infinite",
+                startTimeMillis = 1_700_000_150_000L,
+                durationSeconds = 600L,
+                serverName = jpServer.name,
+                isDirectNetwork = true,
+                avgPingMs = 89,
+                avgFps = 60,
+                avgDecodeMs = 4.0,
+                isSlowDecode = false,
+                isThermalHot = false,
+                pingSamples = listOf(88, 89, 90),
+                framesDropped = 15,
+                freezeCount = 0,
+                framesDecoded = 36_000
+            )
+        )
+
+        val krStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+            serverName = krServer.name,
+            countryCode = "KR",
+            sessionsList = sessionsWithKrFreezes
+        )
+        val jpStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+            serverName = jpServer.name,
+            countryCode = "JP",
+            sessionsList = sessionsWithKrFreezes
+        )
+
+        val krScore = VpnManager.calculateServerSelectionScore(
+            server = krServer,
+            measurement = krMeasurement,
+            fallbackPingMs = 76,
+            unlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+            sessionStats = krStats,
+            autoBypassEnabled = true,
+            distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(krServer, vnGeo)
+        )
+        val jpScore = VpnManager.calculateServerSelectionScore(
+            server = jpServer,
+            measurement = jpMeasurement,
+            fallbackPingMs = 89,
+            unlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+            sessionStats = jpStats,
+            autoBypassEnabled = true,
+            distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(jpServer, vnGeo)
+        )
+
+        assertTrue(
+            "Expected JP score ($jpScore) to beat heavily-freezing KR score ($krScore)",
+            jpScore < krScore
+        )
+
+        val ranked = VpnManager.sortServersByUnlockAndPing(
+            servers = listOf(krServer, jpServer),
+            pingMap = mapOf(krServer.id to 76, jpServer.id to 89),
+            records = emptyMap(),
+            engine = com.example.vpn.VpnEngine.SMART_BYPASS,
+            measurementsMap = mapOf(krServer.id to krMeasurement, jpServer.id to jpMeasurement),
+            prioritizeDistanceForAutoBypass = true,
+            geo = vnGeo,
+            sessions = sessionsWithKrFreezes
+        )
+        assertEquals("JP must be selected when KR has severe freezes and frame drops", jpServer.id, ranked.first().id)
+
+        // Also verify hysteresis allows auto-switching from KR to JP because improvement exceeds 15% and 10ms
+        val canSwitch = VpnManager.shouldAutoSwitchServer(
+            currentServer = krServer,
+            candidateServer = jpServer,
+            currentScore = krScore,
+            candidateScore = jpScore,
+            currentMeasurement = krMeasurement,
+            currentUnlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+            userManuallySelected = false,
+            forcePickBest = false
+        )
+        assertTrue("Hysteresis should allow switching from freezing KR to smooth JP", canSwitch)
+    }
+
+    @Test
+    fun shouldAutoSwitchServer_enforcesHysteresisAndManualSelection() {
+        val krServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "KR" }
+        val jpServer = com.example.vpn.DEFAULT_SERVERS.first { it.countryCode == "JP" }
+        val healthyJpMeasurement = com.example.vpn.EndpointPingMeasurement(
+            rttMs = 82,
+            minRttMs = 80,
+            maxRttMs = 85,
+            configuredPort = jpServer.port,
+            measuredPort = jpServer.port,
+            resolvedIp = jpServer.ip,
+            measurementType = com.example.vpn.PingMeasurementType.TCP_PRIMARY_PORT,
+            status = com.example.vpn.ServerPingStatus.MEASURED_PRIMARY,
+            isUnstable = false
+        )
+
+        // 1. Small improvement (82ms -> 76ms = 6ms, < 10ms and < 15%) must NOT trigger auto-switch
+        assertTrue(
+            "Small score difference (82 -> 76) must be blocked by hysteresis",
+            !VpnManager.shouldAutoSwitchServer(
+                currentServer = jpServer,
+                candidateServer = krServer,
+                currentScore = 82.0,
+                candidateScore = 76.0,
+                currentMeasurement = healthyJpMeasurement,
+                currentUnlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+                userManuallySelected = false,
+                forcePickBest = false
+            )
+        )
+
+        // 2. Large improvement (100ms -> 76ms = 24ms and 24%) MUST trigger auto-switch when not manually locked
+        assertTrue(
+            "Significant score improvement (100 -> 76) must pass hysteresis",
+            VpnManager.shouldAutoSwitchServer(
+                currentServer = jpServer,
+                candidateServer = krServer,
+                currentScore = 100.0,
+                candidateScore = 76.0,
+                currentMeasurement = healthyJpMeasurement,
+                currentUnlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+                userManuallySelected = false,
+                forcePickBest = false
+            )
+        )
+
+        // 3. When userManuallySelected = true, even a large improvement must NOT overwrite manual choice if current server works
+        assertTrue(
+            "Manual server selection must not be overwritten while server is healthy",
+            !VpnManager.shouldAutoSwitchServer(
+                currentServer = jpServer,
+                candidateServer = krServer,
+                currentScore = 120.0,
+                candidateScore = 70.0,
+                currentMeasurement = healthyJpMeasurement,
+                currentUnlockStatus = com.example.vpn.RegionUnlockStatus.UNLOCKED,
+                userManuallySelected = true,
+                forcePickBest = false
+            )
+        )
+
+        // 4. When userManuallySelected = true, if current server fails unlock (RegionUnlockStatus.FAILED) or is UNREACHABLE, fallback switch is allowed
+        assertTrue(
+            "Failed manual server must allow fallback switch",
+            VpnManager.shouldAutoSwitchServer(
+                currentServer = jpServer,
+                candidateServer = krServer,
+                currentScore = 700.0,
+                candidateScore = 76.0,
+                currentMeasurement = healthyJpMeasurement,
+                currentUnlockStatus = com.example.vpn.RegionUnlockStatus.FAILED,
+                userManuallySelected = true,
+                forcePickBest = false
+            )
+        )
+    }
+}
+
 

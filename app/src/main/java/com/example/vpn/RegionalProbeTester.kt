@@ -445,9 +445,8 @@ object RegionalProbeTester {
     }
 
     /**
-     * Xếp hạng chính xác thứ tự khoảng cách quốc gia hỗ trợ Xbox tính từ vị trí người dùng (0 = quốc gia gần nhất, 1 = gần nhì, ...).
-     * Ví dụ từ Việt Nam: Hàn Quốc (KR ~2.740 - 3.590 km) có hạng 0 (gần nhất, khi tắt VPN vào game ping ~70ms),
-     * Nhật Bản (JP ~3.670 - 4.350 km) có hạng 1 (khi tắt VPN vào game ping ~80ms), Mỹ (US ~12.600 km) có hạng 2.
+     * Xếp hạng thứ tự khoảng cách quốc gia hỗ trợ Xbox tính từ vị trí người dùng (0 = quốc gia gần nhất, 1 = gần nhì, ...).
+     * Chỉ dùng làm thứ tự ước tính ban đầu khi chưa có số đo thực tế hoặc khi điểm số bằng nhau.
      */
     fun getExactCountryDistanceRank(
         serverCountryCode: String,
@@ -478,34 +477,6 @@ object RegionalProbeTester {
 
         val idx = orderedCodes.indexOf(code)
         return if (idx >= 0) idx else 99
-    }
-
-    /**
-     * Ước tính độ trễ trực tiếp trong game (ms) sau khi Tự động tắt VPN dựa trên khoảng cách địa lý tới cụm máy chủ Xbox của vùng.
-     * Từ Việt Nam / Đông Nam Á: Hàn Quốc (KR) đạt ~70ms, Nhật Bản (JP) đạt ~80ms.
-     */
-    fun estimateDirectInGamePingMs(
-        countryCode: String,
-        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
-        allowTimezoneFallback: Boolean = true
-    ): Int? {
-        val code = countryCode.trim().uppercase()
-        val userCoords = if (allowTimezoneFallback) {
-            resolveUserCoordinatesWithTimezoneFallback(geo)
-        } else {
-            resolveUserCoordinatesOrNull(geo)
-        } ?: return null
-        val (uLat, uLon) = userCoords
-        val (cLat, cLon) = COUNTRY_REFERENCE_COORDS[code] ?: return null
-        val distKm = haversineDistanceKm(uLat, uLon, cLat, cLon)
-        return when {
-            code == "KR" && distKm in 1500.0..4200.0 -> 70
-            code == "JP" && distKm in 2500.0..5200.0 -> 80
-            distKm <= 1200.0 -> 35
-            distKm <= 3600.0 -> 70
-            distKm <= 5000.0 -> 80
-            else -> (35 + (distKm * 0.014)).toInt()
-        }
     }
 
     /**

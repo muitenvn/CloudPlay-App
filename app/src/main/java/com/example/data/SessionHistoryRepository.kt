@@ -188,10 +188,153 @@ object SessionHistoryRepository {
         prefs?.edit()?.remove(KEY_SESSIONS_JSON)?.apply()
     }
 
+    /** Hệ số giảm trọng số theo thời gian cho các phiên chơi từ mới nhất về cũ hơn (phiên mới nhất = 1.0, tiếp theo = 0.75, 0.5625...) */
+    const val RECENCY_DECAY_FACTOR = 0.75
+
+    @androidx.compose.runtime.Immutable
+    data class RegionSessionStats(
+        val avgRttMs: Int,
+        val sampleCount: Int,
+        val weightedFreezePerMin: Double,
+        val weightedFrameDropPercent: Double
+    )
+
+    private fun doesSessionMatchCountryCode(record: PlaySessionRecord, countryCode: String): Boolean {
+        val code = countryCode.trim().uppercase()
+        if (code.isBlank()) return false
+        val nameLower = record.serverName.trim().lowercase()
+        if (nameLower.isBlank()) return false
+        return when (code) {
+            "KR" -> nameLower.contains("seoul") ||
+                nameLower.contains("korea") ||
+                nameLower.contains("hàn quốc") ||
+                nameLower.contains("busan") ||
+                nameLower.contains("incheon") ||
+                nameLower.contains("🇰🇷") ||
+                nameLower.contains(" kt") ||
+                nameLower.startsWith("kt ") ||
+                nameLower.contains("sk broadband") ||
+                nameLower.contains("uplus") ||
+                nameLower.contains("dacom")
+            "JP" -> nameLower.contains("tokyo") ||
+                nameLower.contains("osaka") ||
+                nameLower.contains("tsukuba") ||
+                nameLower.contains("japan") ||
+                nameLower.contains("nhật bản") ||
+                nameLower.contains("🇯🇵") ||
+                nameLower.contains("ntt") ||
+                nameLower.contains("kddi") ||
+                nameLower.contains("iij") ||
+                nameLower.contains("sakura") ||
+                nameLower.contains("softbank") ||
+                nameLower.contains("nagoya") ||
+                nameLower.contains("fukuoka") ||
+                nameLower.contains("sapporo") ||
+                nameLower.contains("yokohama")
+            "US" -> nameLower.contains("usa") ||
+                nameLower.contains("united states") ||
+                nameLower.contains("hoa kỳ") ||
+                nameLower.contains("🇺🇸") ||
+                nameLower.contains("virginia") ||
+                nameLower.contains("oregon") ||
+                nameLower.contains("california") ||
+                nameLower.contains("san jose") ||
+                nameLower.contains("seattle") ||
+                nameLower.contains("dallas") ||
+                nameLower.contains("chicago") ||
+                nameLower.contains("new york") ||
+                nameLower.contains("ashburn") ||
+                nameLower.contains("los angeles")
+            else -> false
+        }
+    }
+
     /**
-     * Returns the average WebRTC RTT (ms) of saved sessions for a specific server.
-     * Only matches sessions played on that exact server so different servers never share the same number.
-     * Returns -1 if no valid session RTT exists for this server yet.
+     * Tính thống kê thực tế từ lịch sử phiên chơi gần nhất của máy chủ hoặc vùng quốc gia (`countryCode`).
+     * Trả về `null` nếu chưa có bất kỳ phiên chơi hợp lệ nào (không bao giờ trả về số giả định).
+     */
+    fun getRegionSessionStats(
+        serverName: String = "",
+        countryCode: String = "",
+        sameCountryServerNames: Set<String> = emptySet(),
+        maxRecentSessions: Int = 5,
+        sessionsList: List<PlaySessionRecord> = _sessions.value
+    ): RegionSessionStats? {
+        if (sessionsList.isEmpty() || maxRecentSessions <= 0) return null
+        val cleanTarget = serverName.trim()
+        val normalizedPoolNames = sameCountryServerNames
+            .map { it.trim().lowercase() }
+            .filter { it.isNotBlank() }
+            .toSet()
+
+        val sortedValid = sessionsList
+            .filter { it.avgPingMs > 0 }
+            .sortedByDescending { it.startTimeMillis }
+        if (sortedValid.isEmpty()) return null
+
+        val exactMatches = if (cleanTarget.isNotBlank()) {
+            sortedValid.filter { it.serverName.trim().equals(cleanTarget, ignoreCase = true) }
+        } else {
+            emptyList()
+        }
+
+        val regionMatches = if (countryCode.isNotBlank() || normalizedPoolNames.isNotEmpty()) {
+            sortedValid.filter { rec ->
+                val recNameLower = rec.serverName.trim().lowercase()
+                (cleanTarget.isNotBlank() && rec.serverName.trim().equals(cleanTarget, ignoreCase = true)) ||
+                    (recNameLower.isNotBlank() && normalizedPoolNames.contains(recNameLower)) ||
+                    doesSessionMatchCountryCode(rec, countryCode)
+            }
+        } else {
+            emptyList()
+        }
+
+        // Ưu tiên kết hợp các phiên của chính máy chủ đó trước, sau đó bổ sung các phiên cùng vùng quốc gia cho đủ mẫu gần nhất
+        val combinedRecent = (exactMatches + regionMatches)
+            .distinctBy { it.id }
+            .take(maxRecentSessions)
+
+        if (combinedRecent.isEmpty()) return null
+
+        var totalWeight = 0.0
+        var weightedRttSum = 0.0
+        var weightedFreezePerMinSum = 0.0
+        var weightedDropPercentSum = 0.0
+
+        combinedRecent.forEachIndexed { index, session ->
+            val weight = Math.pow(RECENCY_DECAY_FACTOR, index.toDouble())
+            val durationMinutes = (session.durationSeconds.coerceAtLeast(30L)).toDouble() / 60.0
+            val freezePerMin = session.freezeCount.coerceAtLeast(0).toDouble() / durationMinutes
+            val dropPercent = when {
+                session.framesDecoded > 0 -> {
+                    (session.framesDropped.coerceAtLeast(0).toDouble() / session.framesDecoded.toDouble()) * 100.0
+                }
+                session.framesDropped > 0 -> {
+                    val estimatedTotalFrames = (session.durationSeconds.coerceAtLeast(30L) * session.avgFps.coerceAtLeast(30)).toDouble()
+                    (session.framesDropped.toDouble() / estimatedTotalFrames.coerceAtLeast(100.0)) * 100.0
+                }
+                else -> 0.0
+            }.coerceIn(0.0, 100.0)
+
+            totalWeight += weight
+            weightedRttSum += session.avgPingMs.toDouble() * weight
+            weightedFreezePerMinSum += freezePerMin * weight
+            weightedDropPercentSum += dropPercent * weight
+        }
+
+        if (totalWeight <= 0.0) return null
+
+        return RegionSessionStats(
+            avgRttMs = (weightedRttSum / totalWeight).roundToInt(),
+            sampleCount = combinedRecent.size,
+            weightedFreezePerMin = weightedFreezePerMinSum / totalWeight,
+            weightedFrameDropPercent = weightedDropPercentSum / totalWeight
+        )
+    }
+
+    /**
+     * Returns the average WebRTC RTT (ms) of saved sessions for a specific server or its region.
+     * Returns -1 if no valid session RTT exists yet.
      */
     fun getAverageRttForServerOrRegion(
         serverName: String,
@@ -200,14 +343,22 @@ object SessionHistoryRepository {
         sessionsList: List<PlaySessionRecord> = _sessions.value
     ): Int {
         val cleanTarget = serverName.trim()
-        if (cleanTarget.isBlank()) return -1
-        val exactServerMatches = sessionsList.filter {
-            it.avgPingMs > 0 && it.serverName.trim().equals(cleanTarget, ignoreCase = true)
+        if (cleanTarget.isNotBlank()) {
+            val exactServerMatches = sessionsList.filter {
+                it.avgPingMs > 0 && it.serverName.trim().equals(cleanTarget, ignoreCase = true)
+            }
+            if (exactServerMatches.isNotEmpty()) {
+                return exactServerMatches.take(5).map { it.avgPingMs }.average().roundToInt()
+            }
         }
-        if (exactServerMatches.isNotEmpty()) {
-            return exactServerMatches.map { it.avgPingMs }.average().roundToInt()
-        }
-        return -1
+        val stats = getRegionSessionStats(
+            serverName = cleanTarget,
+            countryCode = countryCode,
+            sameCountryServerNames = sameRegionServerNames,
+            maxRecentSessions = 5,
+            sessionsList = sessionsList
+        )
+        return stats?.avgRttMs ?: -1
     }
 
     /**

@@ -1,6 +1,6 @@
 {
-  "summary":  "Kế hoạch nâng cấp hệ thống điều khiển CloudPlay v1.3.0 (đã cập nhật 5 điều chỉnh: giữ nguyên vibrationActuator gốc của tay cầm thật, vùng chết tay cầm thật mặc định trong=0/ngoài=1.0 áp dụng trước mergedAxes, 3 tổ hợp phím tắt không trễ nút View, kiểm tra thực tế tự ẩn tay cầm ảo tại dòng 688/920/881 CloudBrowserScreen.kt, và rà soát toàn bộ từ khoá gyro trên app/src).",
-  "updatedAt":  "2026-11-01T08:01:10.945656372Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Bản kế hoạch sửa đổi (Revise #16) đối chiếu chính xác 100% tên biến, hàm, enum và dòng code thật trong dự án (autoBypassEnabled, RegionUnlockStatus, ServerPingStatus, NetworkOptimizer, RegionalProbeTester.getServerDistanceKm, PingTester.measureServerEndpoint, PlaySessionRecord) và cập nhật trọng số 75%/25% ở Mục 4.",
+  "updatedAt": "2026-11-05T08:38:46.310694377Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

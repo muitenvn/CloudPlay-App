@@ -1,6 +1,6 @@
 {
-  "summary": "Bản kế hoạch sửa đổi (Revise #16) đối chiếu chính xác 100% tên biến, hàm, enum và dòng code thật trong dự án (autoBypassEnabled, RegionUnlockStatus, ServerPingStatus, NetworkOptimizer, RegionalProbeTester.getServerDistanceKm, PingTester.measureServerEndpoint, PlaySessionRecord) và cập nhật trọng số 75%/25% ở Mục 4.",
-  "updatedAt": "2026-11-05T08:38:46.310694377Z",
+  "summary": "Kế hoạch chi tiết cách chia 7 file giao diện lớn (SettingsScreen, ServersScreen, GameLibraryScreen, SessionHistoryScreen, HomeScreen, VirtualGamepad, FloatingHud) thành các file nhỏ theo chức năng, kèm tên từng file mới và nội dung bên trong.",
+  "updatedAt": "2026-11-05T10:11:10.604080926Z",
   "requestFeedback": true,
   "userFacing": true
 }

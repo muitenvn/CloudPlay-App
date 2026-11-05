@@ -1,0 +1,560 @@
+package com.example.ui.tabs
+
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.data.AppConfig
+import com.example.data.CellularOptimizationMode
+import com.example.data.SettingsRepository
+import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.XboxCardBorder
+import com.example.ui.theme.XboxNeonGreen
+
+@Composable
+internal fun SettingsGraphicsFpsSection(
+    config: AppConfig,
+    isEn: Boolean,
+    expandGraphics: Boolean,
+    onToggleExpand: () -> Unit
+) {
+    val context = LocalContext.current
+    CollapsibleSettingsGroup(
+        title = if (isEn) "Resolution, Graphics & FPS" else "Độ phân giải, Đồ họa & FPS",
+        subtitle = "${config.cellularMode.localizedTitle(isEn)} • ${config.streamFpsCap.fps} FPS",
+        icon = Icons.Default.Speed,
+        expanded = expandGraphics,
+        onToggle = onToggleExpand,
+        testTag = "settings_group_graphics"
+    ) {
+        // 1.1 Độ phân giải & Đồ họa (gộp 1) + Nhịp FPS
+        SettingsCard(title = if (isEn) "Resolution & Bitrate (Wi-Fi / 4G / 5G)" else "Độ phân giải & Băng thông (Wi-Fi / 4G / 5G)") {
+            val selectedMode = config.cellularMode
+            val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        1.2.dp,
+                        if (isAutoSelected) XboxNeonGreen else XboxCardBorder,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .clickable { SettingsRepository.updateCellularMode(CellularOptimizationMode.AUTO) }
+                    .testTag("settings_graphics_mode_auto"),
+                color = if (isAutoSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = if (isAutoSelected) XboxNeonGreen else TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Column {
+                            Text(
+                                text = if (isEn) "Auto • 720p ⇄ 1080p (Recommended)" else "Tự động • 720p ⇄ 1080p (Khuyên dùng)",
+                                color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isEn) "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi" else "Tự hạ độ phân giải để giảm độ trễ trên cả 4G, 5G và Wi-Fi",
+                                color = TextSecondary,
+                                fontSize = 10.5.sp
+                            )
+                        }
+                    }
+                    if (isAutoSelected) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            val manualModes = listOf(
+                CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
+                CellularOptimizationMode.MEDIUM,
+                CellularOptimizationMode.HIGH,
+                CellularOptimizationMode.MAX_SPEED_UNCAPPED
+            )
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                manualModes.chunked(2).forEach { rowModes ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowModes.forEach { mode ->
+                            val isSelected = selectedMode == mode
+                            val isLowOrMed = mode == CellularOptimizationMode.DATA_SAVER_HIGH_SPEED ||
+                                mode == CellularOptimizationMode.MEDIUM
+                            val accent = if (isLowOrMed) XboxNeonGreen else DirectCyan
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) accent else XboxCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { SettingsRepository.updateCellularMode(mode) }
+                                    .testTag("settings_graphics_mode_${mode.id}"),
+                                color = if (isSelected) {
+                                    if (isLowOrMed) Color(0xFF132219) else Color(0xFF0F2327)
+                                } else {
+                                    Color(0xFF0F1813)
+                                }
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .padding(horizontal = 10.dp, vertical = 9.dp),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = mode.localizedTitle(isEn),
+                                            color = if (isSelected) accent else TextPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = accent,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = mode.localizedSubtitle(isEn),
+                                        color = TextSecondary,
+                                        fontSize = 9.5.sp,
+                                        lineHeight = 12.5.sp,
+                                        maxLines = 3
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = if (isEn) "Frame Rate (FPS)" else "Nhịp khung hình (FPS)",
+                color = XboxNeonGreen,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
+                    val isSelected = config.streamFpsCap == fpsCap
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateStreamFpsCap(fpsCap) }
+                            .testTag("settings_fps_cap_${fpsCap.fps}"),
+                        color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "${fpsCap.fps} FPS",
+                                color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                text = fpsCap.localizedDesc(isEn),
+                                color = TextSecondary,
+                                fontSize = 9.sp,
+                                lineHeight = 11.5.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2
+                            )
+                        }
+                    }
+                }
+            }
+            SettingToggleRow(
+                title = if (isEn) "Low-End & Battery Saver Mode" else "Chế độ máy yếu & Tiết kiệm pin",
+                subtitle = if (isEn) "Light 720p stream & reduced effects to keep phone cool" else "Dùng mức 720p nhẹ và tắt hiệu ứng thừa giúp máy mát, đỡ hao pin",
+                checked = config.lowEndDeviceMode && config.gpuLoadReductionEnabled,
+                onCheckedChange = { enabled ->
+                    SettingsRepository.updateLowEndDeviceMode(enabled)
+                    SettingsRepository.updateGpuLoadReductionEnabled(enabled)
+                },
+                switchTestTag = "settings_low_end_device_mode_switch"
+            )
+        }
+
+        // 1.2 Độ nét & Màu sắc hình ảnh
+        SettingsCard(title = if (isEn) "Sharpness & Image Colors" else "Độ nét & Màu sắc hình ảnh") {
+            SettingToggleRow(
+                title = if (isEn) "Sharpen Image" else "Tăng độ nét hình ảnh",
+                subtitle = if (isEn) "Makes characters and scenery clearer" else "Làm rõ chi tiết nhân vật và khung cảnh",
+                checked = config.clarityBoostEnabled,
+                onCheckedChange = { SettingsRepository.updateClarityBoost(it) }
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                LabeledSlider(
+                    label = if (isEn) "Contrast" else "Độ tương phản",
+                    valueText = "${config.videoContrast}%",
+                    value = config.videoContrast.toFloat(),
+                    onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
+                    valueRange = 80f..140f,
+                    accentColor = XboxNeonGreen
+                )
+                LabeledSlider(
+                    label = if (isEn) "Color Saturation" else "Độ tươi màu",
+                    valueText = "${config.videoSaturation}%",
+                    value = config.videoSaturation.toFloat(),
+                    onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
+                    valueRange = 80f..150f,
+                    accentColor = DirectCyan
+                )
+                LabeledSlider(
+                    label = if (isEn) "Brightness" else "Độ sáng",
+                    valueText = "${config.videoBrightness}%",
+                    value = config.videoBrightness.toFloat(),
+                    onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
+                    valueRange = 80f..130f,
+                    accentColor = XboxNeonGreen
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    SettingsRepository.resetVideoDisplayDefaults()
+                    Toast.makeText(
+                        context,
+                        if (isEn) "Reset colors to default" else "Đã đặt lại màu sắc mặc định",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định"
+                    }
+                    .testTag("advanced_reset_video_defaults_btn"),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    text = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định",
+                    color = DirectCyan,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsScreenRecordingSection(
+    config: AppConfig,
+    isEn: Boolean,
+    expandRecording: Boolean,
+    onToggleExpand: () -> Unit
+) {
+    CollapsibleSettingsGroup(
+        title = if (isEn) "Screen Recording" else "Quay màn hình",
+        subtitle = config.screenRecordQuality.localizedShort(isEn),
+        icon = Icons.Default.Videocam,
+        expanded = expandRecording,
+        onToggle = onToggleExpand,
+        testTag = "settings_group_recording"
+    ) {
+        SettingsCard(title = if (isEn) "Video Quality (.MP4)" else "Độ nét video (.MP4)") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                com.example.data.ScreenRecordQuality.entries.forEach { recQuality ->
+                    val isSelected = config.screenRecordQuality == recQuality
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) DirectCyan else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateScreenRecordQuality(recQuality) }
+                            .testTag("settings_record_quality_${recQuality.id}"),
+                        color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = recQuality.localizedTitle(isEn),
+                                color = if (isSelected) DirectCyan else TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = recQuality.localizedDesc(isEn),
+                                color = TextSecondary,
+                                fontSize = 9.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = if (isEn) {
+                    "Reduces background animations while recording to save battery."
+                } else {
+                    "Tạm giảm hiệu ứng chuyển động nền khi đang quay để đỡ nặng máy."
+                },
+                color = TextSecondary,
+                fontSize = 10.5.sp
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SettingsBackgroundMusicSection(
+    config: AppConfig,
+    isEn: Boolean
+) {
+    val isMusicPlaying by com.example.audio.BackgroundMusicManager.isPlaying.collectAsState()
+
+    SettingsCard(title = if (isEn) "Background Music" else "Nhạc nền") {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(
+                    text = if (isEn) "Manual Playback" else "Phát / Dừng nhạc nền",
+                    color = TextPrimary,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (isMusicPlaying) {
+                        if (isEn) "Currently playing (${(config.backgroundMusicVolume * 100).toInt()}%)" else "Đang phát (${(config.backgroundMusicVolume * 100).toInt()}%)"
+                    } else {
+                        if (isEn) "Stopped • Tap to play manually" else "Đang dừng • Bấm để bật tay khi cần"
+                    },
+                    color = if (isMusicPlaying) XboxNeonGreen else TextSecondary,
+                    fontSize = 10.5.sp
+                )
+            }
+
+            OutlinedButton(
+                onClick = {
+                    if (config.lowEndDeviceMode && !isMusicPlaying) {
+                        SettingsRepository.updateLowEndDeviceMode(false)
+                        SettingsRepository.updateGpuLoadReductionEnabled(false)
+                    }
+                    com.example.audio.BackgroundMusicManager.toggleManualPlayback()
+                },
+                modifier = Modifier
+                    .semantics {
+                        contentDescription = if (isMusicPlaying) {
+                            if (isEn) "Stop background music" else "Dừng nhạc nền"
+                        } else {
+                            if (isEn) "Play background music" else "Phát nhạc nền"
+                        }
+                    }
+                    .testTag("settings_background_music_manual_play_btn"),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isMusicPlaying) DirectCyan else XboxNeonGreen.copy(alpha = 0.7f)
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (isMusicPlaying) DirectCyan.copy(alpha = 0.14f) else XboxNeonGreen.copy(alpha = 0.12f)
+                )
+            ) {
+                Text(
+                    text = if (isMusicPlaying) {
+                        if (isEn) "⏹ Stop" else "⏹ Dừng"
+                    } else {
+                        if (isEn) "▶ Play" else "▶ Phát"
+                    },
+                    color = if (isMusicPlaying) DirectCyan else XboxNeonGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.5.sp
+                )
+            }
+        }
+
+        SettingToggleRow(
+            title = if (isEn) "Auto-start music on app launch" else "Tự động bật nhạc khi mở app",
+            subtitle = if (config.lowEndDeviceMode) {
+                if (isEn) {
+                    "Auto-muted while Low-End & Battery Saver Mode is active"
+                } else {
+                    "Đang tự tắt do bật Chế độ máy yếu"
+                }
+            } else {
+                if (isEn) {
+                    "Default OFF • Plays automatically in Home, Games, Servers & Settings"
+                } else {
+                    "Mặc định tắt • Tự phát khi mở ứng dụng ở Trang chủ, Game, Máy chủ, Cài đặt"
+                }
+            },
+            checked = config.backgroundMusicEnabled && !config.lowEndDeviceMode,
+            onCheckedChange = { enabled ->
+                if (config.lowEndDeviceMode && enabled) {
+                    SettingsRepository.updateLowEndDeviceMode(false)
+                    SettingsRepository.updateGpuLoadReductionEnabled(false)
+                }
+                SettingsRepository.updateBackgroundMusicEnabled(enabled)
+            },
+            activeColor = XboxNeonGreen,
+            switchTestTag = "settings_background_music_switch"
+        )
+
+        SettingToggleRow(
+            title = if (isEn) "Play music while in game" else "Phát nhạc khi đang chơi",
+            subtitle = if (config.lowEndDeviceMode) {
+                if (isEn) {
+                    "Auto-stops when entering game in Low-End Mode"
+                } else {
+                    "Chế độ máy yếu: vẫn tự tắt nhạc khi vào game"
+                }
+            } else {
+                if (isEn) {
+                    "Keeps playing at the same volume during gameplay if music is already on"
+                } else {
+                    "Nếu nhạc đang phát sẽ tiếp tục phát cùng âm lượng khi vào game; tắt sẽ dừng (fade 800ms)"
+                }
+            },
+            checked = config.backgroundMusicPlayInGame && !config.lowEndDeviceMode,
+            onCheckedChange = { enabled ->
+                SettingsRepository.updateBackgroundMusicPlayInGame(enabled)
+            },
+            activeColor = DirectCyan,
+            switchTestTag = "settings_background_music_play_in_game_switch"
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            LabeledSlider(
+                label = if (isEn) "Background Music Volume" else "Âm lượng nhạc nền",
+                valueText = "${(config.backgroundMusicVolume * 100).toInt()}%",
+                value = config.backgroundMusicVolume,
+                onValueChange = { SettingsRepository.updateBackgroundMusicVolume(it) },
+                valueRange = 0f..1f,
+                accentColor = XboxNeonGreen
+            )
+        }
+
+        Text(
+            text = if (isEn) {
+                "Excluded from screen recording"
+            } else {
+                "Không thu vào video quay màn hình"
+            },
+            color = TextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.testTag("settings_music_capture_notice_text")
+        )
+    }
+}

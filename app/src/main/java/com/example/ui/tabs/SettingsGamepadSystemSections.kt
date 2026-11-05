@@ -141,9 +141,9 @@ internal fun SettingsGamepadTouchSection(
                 ) {
                     Text(
                         text = if (isGlobalLayoutActive) {
-                            if (isEn) "✓ Using Global Layout" else "✓ Đang dùng bố cục chung"
+                            config.tr("✓ Đang dùng bố cục chung", "✓ Using Global Layout")
                         } else {
-                            if (isEn) "Use Global Layout" else "Dùng bố cục chung"
+                            config.tr("Dùng bố cục chung", "Use Global Layout")
                         },
                         color = DirectCyan,
                         fontSize = 11.sp,
@@ -172,9 +172,9 @@ internal fun SettingsGamepadTouchSection(
                 ) {
                     Text(
                         text = if (savedPerGameCount > 0) {
-                            if (isEn) "Reset ($savedPerGameCount)" else "Đặt lại ($savedPerGameCount)"
+                            "${config.tr("Đặt lại", "Reset")} ($savedPerGameCount)"
                         } else {
-                            if (isEn) "Reset" else "Đặt lại"
+                            config.tr("Đặt lại", "Reset")
                         },
                         color = XboxNeonGreen,
                         fontSize = 11.sp,
@@ -185,7 +185,7 @@ internal fun SettingsGamepadTouchSection(
             }
 
             Text(
-                text = if (isEn) "Button Layout" else "Bố cục nút bấm",
+                text = config.tr("Bố cục nút bấm", "Button Layout"),
                 color = TextPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
@@ -270,13 +270,13 @@ internal fun SettingsGamepadTouchSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isEn) "Virtual Stick Inner / Outer Deadzones" else "Vùng chết trong / ngoài (Cần ảo)",
+                        text = config.tr("Vùng chết trong / ngoài (Cần ảo)", "Virtual Stick Inner / Outer Deadzones"),
                         color = DirectCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (isEn) "Reset" else "Đặt lại",
+                        text = config.tr("Đặt lại", "Reset"),
                         color = XboxNeonGreen,
                         fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -325,7 +325,7 @@ internal fun SettingsGamepadTouchSection(
             }
 
             Text(
-                text = if (isEn) "Touch Button Vibration" else "Độ rung khi bấm nút cảm ứng",
+                text = config.tr("Độ rung khi bấm nút cảm ứng", "Touch Button Vibration"),
                 color = TextPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold

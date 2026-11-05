@@ -1060,6 +1060,397 @@ object AppUiTranslator {
                 "fr" -> "Ajouter un proxy"; "de" -> "Eigenen Proxy hinzufügen"; "ru" -> "Добавить прокси"; "th" -> "เพิ่มพร็อกซีส่วนตัว"; "id" -> "Tambah Proxy Kustom"
                 else -> en
             }
+            // --- MÀN HÌNH CÀI ĐẶT (SETTINGS SCREEN) ---
+            "Resolution, Graphics & FPS" -> return when (lang) {
+                "zh" -> "分辨率、画质与帧率 (FPS)"; "ja" -> "解像度・画質・FPS"; "ko" -> "해상도, 그래픽 및 FPS"; "es" -> "Resolución, Gráficos y FPS"; "pt" -> "Resolução, Gráficos e FPS"
+                "fr" -> "Résolution, Graphismes et FPS"; "de" -> "Auflösung, Grafik & FPS"; "ru" -> "Разрешение, Графика и FPS"; "th" -> "ความละเอียด กราฟิก และ FPS"; "id" -> "Resolusi, Grafik & FPS"
+                else -> en
+            }
+            "Resolution & Bitrate (Wi-Fi / 4G / 5G)" -> return when (lang) {
+                "zh" -> "分辨率与码率 (Wi-Fi / 4G / 5G)"; "ja" -> "解像度とビットレート (Wi-Fi / 4G / 5G)"; "ko" -> "해상도 및 비트레이트 (Wi-Fi / 4G / 5G)"; "es" -> "Resolución y Bitrate (Wi-Fi / 4G / 5G)"; "pt" -> "Resolução e Bitrate (Wi-Fi / 4G / 5G)"
+                "fr" -> "Résolution et Débit (Wi-Fi / 4G / 5G)"; "de" -> "Auflösung & Bitrate (Wi-Fi / 4G / 5G)"; "ru" -> "Разрешение и битрейт (Wi-Fi / 4G / 5G)"; "th" -> "ความละเอียดและบิตเรต (Wi-Fi / 4G / 5G)"; "id" -> "Resolusi & Bitrate (Wi-Fi / 4G / 5G)"
+                else -> en
+            }
+            "Auto • 720p ⇄ 1080p (Recommended)" -> return when (lang) {
+                "zh" -> "自动 • 720p ⇄ 1080p (推荐)"; "ja" -> "自動 • 720p ⇄ 1080p (推奨)"; "ko" -> "자동 • 720p ⇄ 1080p (권장)"; "es" -> "Auto • 720p ⇄ 1080p (Recomendado)"; "pt" -> "Auto • 720p ⇄ 1080p (Recomendado)"
+                "fr" -> "Auto • 720p ⇄ 1080p (Recommandé)"; "de" -> "Auto • 720p ⇄ 1080p (Empfohlen)"; "ru" -> "Авто • 720p ⇄ 1080p (Рекомендуется)"; "th" -> "อัตโนมัติ • 720p ⇄ 1080p (แนะนำ)"; "id" -> "Otomatis • 720p ⇄ 1080p (Disarankan)"
+                else -> en
+            }
+            "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi" -> return when (lang) {
+                "zh" -> "在 4G、5G 和 Wi-Fi 下自动降低分辨率以减少卡顿"; "ja" -> "4G/5G/Wi-Fiで遅延を減らすため解像度を自動調整"; "ko" -> "4G, 5G 및 Wi-Fi에서 렉을 줄이기 위해 해상도 자동 조절"; "es" -> "Baja la resolución automáticamente para reducir lag"; "pt" -> "Reduz a resolução automaticamente para cortar lag"
+                "fr" -> "Réduit automatiquement la résolution pour éviter le lag"; "de" -> "Senkt Auflösung automatisch gegen Lag bei 4G/5G & Wi-Fi"; "ru" -> "Авто-снижение разрешения для уменьшения лагов"; "th" -> "ลดความละเอียดอัตโนมัติเพื่อลดอาการแล็ก"; "id" -> "Otomatis turunkan resolusi untuk kurangi lag"
+                else -> en
+            }
+            "Frame Rate (FPS)" -> return when (lang) {
+                "zh" -> "帧率上限 (FPS)"; "ja" -> "フレームレート (FPS)"; "ko" -> "프레임 속도 (FPS)"; "es" -> "Cuadros por segundo (FPS)"; "pt" -> "Taxa de Quadros (FPS)"
+                "fr" -> "Fréquence d'images (FPS)"; "de" -> "Bildrate (FPS)"; "ru" -> "Частота кадров (FPS)"; "th" -> "เฟรมเรต (FPS)"; "id" -> "Frame Rate (FPS)"
+                else -> en
+            }
+            "Low-End & Battery Saver Mode" -> return when (lang) {
+                "zh" -> "低配设备与省电模式"; "ja" -> "軽量・省電力モード"; "ko" -> "저사양 및 배터리 절약 모드"; "es" -> "Modo ahorro de batería y gama baja"; "pt" -> "Modo Economia de Bateria e Leve"
+                "fr" -> "Mode Économie d'énergie"; "de" -> "Energiespar- & Leichtmodus"; "ru" -> "Режим экономии заряда и слабых ПК"; "th" -> "โหมดเครื่องสเปกต่ำและประหยัดแบต"; "id" -> "Mode Hemat Baterai & Perangkat Ringan"
+                else -> en
+            }
+            "Light 720p stream & reduced effects to keep phone cool" -> return when (lang) {
+                "zh" -> "使用轻量 720p 串流并减少特效，保持手机清凉省电"; "ja" -> "軽量720pとエフェクト軽減で発熱と電池消費を抑えます"; "ko" -> "가벼운 720p 스트리밍 및 효과 감소로 발열과 배터리 절약"; "es" -> "Stream 720p ligero y menos efectos para enfriar el móvil"; "pt" -> "Stream 720p leve e menos efeitos para manter o celular frio"
+                "fr" -> "Flux 720p léger et effets réduits contre la chauffe"; "de" -> "Leichter 720p-Stream & weniger Effekte gegen Überhitzung"; "ru" -> "Лёгкий поток 720p и меньше эффектов от нагрева"; "th" -> "ใช้สตรีม 720p เบาๆ และลดเอฟเฟกต์ช่วยให้เครื่องเย็น"; "id" -> "Stream 720p ringan & kurangi efek agar ponsel tetap dingin"
+                else -> en
+            }
+            "Sharpness & Image Colors" -> return when (lang) {
+                "zh" -> "画面锐度与色彩调节"; "ja" -> "シャープネスと色彩調整"; "ko" -> "선명도 및 화면 색상"; "es" -> "Nitidez y Colores de Imagen"; "pt" -> "Nitidez e Cores da Imagem"
+                "fr" -> "Netteté et Couleurs de l'image"; "de" -> "Schärfe & Bildfarben"; "ru" -> "Резкость и цвет изображения"; "th" -> "ความคมชัดและสีสันภาพ"; "id" -> "Ketajaman & Warna Gambar"
+                else -> en
+            }
+            "Sharpen Image" -> return when (lang) {
+                "zh" -> "增强画面锐度"; "ja" -> "映像をくっきり表示"; "ko" -> "화면 선명도 향상"; "es" -> "Aumentar nitidez"; "pt" -> "Aumentar nitidez"
+                "fr" -> "Améliorer la netteté"; "de" -> "Bild schärfen"; "ru" -> "Повысить резкость"; "th" -> "เพิ่มความคมชัดของภาพ"; "id" -> "Pertajam Gambar"
+                else -> en
+            }
+            "Makes characters and scenery clearer" -> return when (lang) {
+                "zh" -> "让角色细节与远景画面更清晰"; "ja" -> "キャラクターや背景の輪郭をより鮮明にします"; "ko" -> "캐릭터와 배경 디테일을 더 뚜렷하게 표시합니다"; "es" -> "Hace más nítidos los personajes y escenarios"; "pt" -> "Torna personagens e cenários mais nítidos"
+                "fr" -> "Rend les personnages et décors plus nets"; "de" -> "Macht Charaktere und Landschaften schärfer"; "ru" -> "Делает персонажей и окружение чётче"; "th" -> "ทำให้ตัวละครและฉากคมชัดขึ้น"; "id" -> "Membuat karakter dan pemandangan lebih jelas"
+                else -> en
+            }
+            "Contrast" -> return when (lang) {
+                "zh" -> "对比度"; "ja" -> "コントラスト"; "ko" -> "대비 (Contrast)"; "es" -> "Contraste"; "pt" -> "Contraste"
+                "fr" -> "Contraste"; "de" -> "Kontrast"; "ru" -> "Контрастность"; "th" -> "ความคมชัดลึก (Contrast)"; "id" -> "Kontras"
+                else -> en
+            }
+            "Color Saturation" -> return when (lang) {
+                "zh" -> "色彩饱和度"; "ja" -> "彩度 (色の鮮やかさ)"; "ko" -> "채도 (색감)"; "es" -> "Saturación de color"; "pt" -> "Saturação de cor"
+                "fr" -> "Saturation des couleurs"; "de" -> "Farbsättigung"; "ru" -> "Насыщенность цвета"; "th" -> "ความสดของสี"; "id" -> "Saturasi Warna"
+                else -> en
+            }
+            "Brightness" -> return when (lang) {
+                "zh" -> "画面亮度"; "ja" -> "明るさ"; "ko" -> "밝기"; "es" -> "Brillo"; "pt" -> "Brilho"
+                "fr" -> "Luminosité"; "de" -> "Helligkeit"; "ru" -> "Яркость"; "th" -> "ความสว่าง"; "id" -> "Kecerahan"
+                else -> en
+            }
+            "Reset Colors to Default" -> return when (lang) {
+                "zh" -> "恢复默认色彩"; "ja" -> "色をデフォルトに戻す"; "ko" -> "색상 기본값으로 초기화"; "es" -> "Restablecer colores"; "pt" -> "Restaurar cores padrão"
+                "fr" -> "Réinitialiser les couleurs"; "de" -> "Farben zurücksetzen"; "ru" -> "Сбросить цвета по умолчанию"; "th" -> "รีเซ็ตสีเป็นค่าเริ่มต้น"; "id" -> "Reset Warna ke Default"
+                else -> en
+            }
+            "Network & Region Unlock" -> return when (lang) {
+                "zh" -> "网络与跨区解锁"; "ja" -> "ネットワークと地域ロック解除"; "ko" -> "네트워크 및 지역 잠금 해제"; "es" -> "Red y Desbloqueo de Región"; "pt" -> "Rede e Desbloqueio de Região"
+                "fr" -> "Réseau et Déblocage de Région"; "de" -> "Netzwerk & Regionsfreischaltung"; "ru" -> "Сеть и разблокировка региона"; "th" -> "เครือข่ายและปลดล็อกโซน"; "id" -> "Jaringan & Buka Kunci Wilayah"
+                else -> en
+            }
+            "Auto VPN & Server Selection" -> return when (lang) {
+                "zh" -> "自动 VPN 与服务器选择"; "ja" -> "自動VPNとサーバー選択"; "ko" -> "자동 VPN 및 서버 선택"; "es" -> "VPN Automático y Servidor"; "pt" -> "VPN Automático e Servidor"
+                "fr" -> "VPN Auto et Choix du Serveur"; "de" -> "Auto-VPN & Serverauswahl"; "ru" -> "Авто-VPN и выбор сервера"; "th" -> "VPN อัตโนมัติและเลือกเซิร์ฟเวอร์"; "id" -> "VPN Otomatis & Pilihan Server"
+                else -> en
+            }
+            "Auto VPN (Unlock on launch ➔ Turn off in-game)" -> return when (lang) {
+                "zh" -> "自动 VPN (启动游戏时解锁 ➔ 进入后自动关闭)"; "ja" -> "自動VPN (起動時に解除 ➔ ゲーム開始後にオフ)"; "ko" -> "자동 VPN (실행 시 잠금 해제 ➔ 게임 진입 후 자동 끄기)"; "es" -> "VPN Auto (Desbloquear al abrir ➔ Apagar en juego)"; "pt" -> "VPN Auto (Desbloquear ao abrir ➔ Desligar no jogo)"
+                "fr" -> "VPN Auto (Débloquer au lancement ➔ Couper en jeu)"; "de" -> "Auto-VPN (Beim Start entsperren ➔ Im Spiel ausschalten)"; "ru" -> "Авто-VPN (Разблок. при запуске ➔ Выкл. в игре)"; "th" -> "VPN อัตโนมัติ (เปิดตอนเข้าเกม ➔ ปิดเองเมื่อเล่น)"; "id" -> "VPN Otomatis (Buka saat mulai ➔ Matikan di game)"
+                else -> en
+            }
+            "Connects VPN to open the game, then switches back to direct network" -> return when (lang) {
+                "zh" -> "启动游戏时连接 VPN 跨区验证，进入画面后切回直连网络以降低延迟"; "ja" -> "ゲーム起動時のみVPNで地域認証し、開始後は直連通信に切り替えます"; "ko" -> "게임 실행 시 VPN으로 지역 인증 후 직접 연결로 전환하여 핑을 낮춥니다"; "es" -> "Conecta VPN para abrir el juego y luego vuelve a red directa"; "pt" -> "Conecta a VPN para abrir o jogo e volta para a rede direta"
+                "fr" -> "Active le VPN au lancement puis repasse en connexion directe"; "de" -> "Verbindet VPN zum Spielstart und wechselt dann auf Direktverbindung"; "ru" -> "Включает VPN для запуска игры, затем переключает на прямую сеть"; "th" -> "ต่อ VPN เพื่อผ่านการตรวจโซนแล้วสลับกลับเป็นเน็ตตรง"; "id" -> "Hubungkan VPN saat membuka game lalu kembali ke jaringan langsung"
+                else -> en
+            }
+            "VPN disconnect delay" -> return when (lang) {
+                "zh" -> "关闭 VPN 延迟时间"; "ja" -> "VPN切断までの待機時間"; "ko" -> "VPN 자동 해제 대기 시간"; "es" -> "Retraso al desconectar VPN"; "pt" -> "Atraso para desligar VPN"
+                "fr" -> "Délai de coupure VPN"; "de" -> "VPN-Trennverzögerung"; "ru" -> "Задержка отключения VPN"; "th" -> "เวลาหน่วงก่อนปิด VPN"; "id" -> "Jeda putus VPN"
+                else -> en
+            }
+            "Allow public server auto-sync on mobile data" -> return when (lang) {
+                "zh" -> "允许使用移动数据自动同步公共节点"; "ja" -> "モバイル通信での公開サーバー自動同期を許可"; "ko" -> "모바일 데이터(4G/5G)에서 공개 서버 자동 동기화 허용"; "es" -> "Sincronizar servidores públicos con datos móviles"; "pt" -> "Sincronizar servidores públicos nos dados móveis"
+                "fr" -> "Synchroniser les serveurs publics sur données mobiles"; "de" -> "Server-Synchronisierung über mobile Daten erlauben"; "ru" -> "Авто-синхронизация серверов по мобильной сети"; "th" -> "อนุญาตซิงค์เซิร์ฟเวอร์สาธารณะผ่านเน็ตมือถือ"; "id" -> "Izinkan sinkronisasi server publik via data seluler"
+                else -> en
+            }
+            "Region Unlock Mode" -> return when (lang) {
+                "zh" -> "地区解锁模式"; "ja" -> "地域ロック解除モード"; "ko" -> "지역 잠금 해제 모드"; "es" -> "Modo de Desbloqueo Regional"; "pt" -> "Modo de Desbloqueio Regional"
+                "fr" -> "Mode de Déblocage Régional"; "de" -> "Regionsfreischaltungs-Modus"; "ru" -> "Режим разблокировки региона"; "th" -> "โหมดปลดล็อกโซน"; "id" -> "Mode Buka Kunci Wilayah"
+                else -> en
+            }
+            "Unlock on Launch Only 🇯🇵 (Recommended)" -> return when (lang) {
+                "zh" -> "仅在启动游戏时解锁 🇯🇵 (推荐)"; "ja" -> "ゲーム起動時のみ解除 🇯🇵 (推奨)"; "ko" -> "게임 시작 시에만 잠금 해제 🇯🇵 (권장)"; "es" -> "Desbloquear solo al iniciar 🇯🇵 (Recomendado)"; "pt" -> "Desbloquear só ao iniciar 🇯🇵 (Recomendado)"
+                "fr" -> "Débloquer au lancement uniquement 🇯🇵 (Recommandé)"; "de" -> "Nur beim Spielstart entsperren 🇯🇵 (Empfohlen)"; "ru" -> "Разблокировка только при запуске 🇯🇵 (Рекомендуется)"; "th" -> "ปลดล็อกเฉพาะตอนเริ่มเกม 🇯🇵 (แนะนำ)"; "id" -> "Buka Kunci Saat Mulai Saja 🇯🇵 (Disarankan)"
+                else -> en
+            }
+            "Uses proxy only during game launch" -> return when (lang) {
+                "zh" -> "仅在启动游戏时经过代理节点"; "ja" -> "ゲーム起動時のみプロキシサーバーを経由します"; "ko" -> "게임을 처음 열 때만 프록시 서버를 거칩니다"; "es" -> "Usa proxy solo durante el inicio del juego"; "pt" -> "Usa proxy apenas durante a abertura do jogo"
+                "fr" -> "Utilise le proxy uniquement à l'ouverture du jeu"; "de" -> "Nutzt Proxy nur beim Starten des Spiels"; "ru" -> "Использует прокси только при запуске игры"; "th" -> "ผ่านเซิร์ฟเวอร์กลางเฉพาะตอนเริ่มเปิดเกม"; "id" -> "Gunakan proxy hanya saat membuka game"
+                else -> en
+            }
+            "Intermediate Server 🌐" -> return when (lang) {
+                "zh" -> "中转代理服务器 🌐"; "ja" -> "中継サーバー経由 🌐"; "ko" -> "중계 서버 경유 🌐"; "es" -> "Servidor Intermedio 🌐"; "pt" -> "Servidor Intermediário 🌐"
+                "fr" -> "Serveur Intermédiaire 🌐"; "de" -> "Zwischenserver 🌐"; "ru" -> "Промежуточный сервер 🌐"; "th" -> "เซิร์ฟเวอร์ตัวกลาง 🌐"; "id" -> "Server Perantara 🌐"
+                else -> en
+            }
+            "Connects via JP/KR/US servers" -> return when (lang) {
+                "zh" -> "通过日本 / 韩国 / 美国节点连接"; "ja" -> "日本・韓国・米国サーバーを経由して接続"; "ko" -> "일본 / 한국 / 미국 서버를 통해 연결"; "es" -> "Conecta mediante servidores JP/KR/US"; "pt" -> "Conecta via servidores JP/KR/US"
+                "fr" -> "Connexion via serveurs JP/KR/US"; "de" -> "Verbindet über JP/KR/US-Server"; "ru" -> "Подключение через серверы JP/KR/US"; "th" -> "เชื่อมต่อผ่านเซิร์ฟเวอร์ ญี่ปุ่น / เกาหลี / สหรัฐฯ"; "id" -> "Terhubung lewat server JP/KR/US"
+                else -> en
+            }
+            "External VPN App" -> return when (lang) {
+                "zh" -> "外部 VPN 应用"; "ja" -> "外部VPNアプリを使用"; "ko" -> "외부 VPN 앱 사용"; "es" -> "App VPN Externa"; "pt" -> "App VPN Externo"
+                "fr" -> "Application VPN Externe"; "de" -> "Externe VPN-App"; "ru" -> "Внешнее VPN-приложение"; "th" -> "แอป VPN ภายนอก"; "id" -> "Aplikasi VPN Eksternal"
+                else -> en
+            }
+            "Use with your own VPN app" -> return when (lang) {
+                "zh" -> "配合手机上的第三方 VPN 使用"; "ja" -> "端末内の別VPNアプリと併用します"; "ko" -> "기기에 설치된 별도 VPN 앱과 함께 사용"; "es" -> "Usar con tu propia aplicación VPN"; "pt" -> "Usar com seu próprio app de VPN"
+                "fr" -> "Utiliser avec votre propre application VPN"; "de" -> "Mit eigener VPN-App auf dem Gerät nutzen"; "ru" -> "Использовать со своим VPN-приложением"; "th" -> "ใช้ร่วมกับแอป VPN แยกในเครื่อง"; "id" -> "Gunakan bersama aplikasi VPN Anda sendiri"
+                else -> en
+            }
+            "Gamepad & Touch Controls" -> return when (lang) {
+                "zh" -> "手柄与触控设置"; "ja" -> "コントローラーとタッチ操作"; "ko" -> "게임패드 및 터치 컨트롤"; "es" -> "Mando y Controles Táctiles"; "pt" -> "Controle e Comandos de Toque"
+                "fr" -> "Manette et Commandes Tactiles"; "de" -> "Gamepad & Touch-Steuerung"; "ru" -> "Геймпад и сенсорное управление"; "th" -> "จอยเกมและปุ่มสัมผัส"; "id" -> "Gamepad & Kontrol Sentuh"
+                else -> en
+            }
+            "Virtual Gamepad: ON" -> return when (lang) {
+                "zh" -> "虚拟手柄: 已开启"; "ja" -> "仮想パッド: オン"; "ko" -> "가상 패드: 켜짐"; "es" -> "Mando virtual: ACTIVADO"; "pt" -> "Controle virtual: LIGADO"
+                "fr" -> "Manette virtuelle : ACTIVÉE"; "de" -> "Virtuelles Gamepad: EIN"; "ru" -> "Виртуальный геймпад: ВКЛ"; "th" -> "จอยจำลอง: เปิดอยู่"; "id" -> "Gamepad Virtual: AKTIF"
+                else -> en
+            }
+            "Virtual Gamepad: OFF" -> return when (lang) {
+                "zh" -> "虚拟手柄: 已关闭"; "ja" -> "仮想パッド: オフ"; "ko" -> "가상 패드: 꺼짐"; "es" -> "Mando virtual: DESACTIVADO"; "pt" -> "Controle virtual: DESLIGADO"
+                "fr" -> "Manette virtuelle : DÉSACTIVÉE"; "de" -> "Virtuelles Gamepad: AUS"; "ru" -> "Виртуальный геймпад: ВЫКЛ"; "th" -> "จอยจำลอง: ปิดอยู่"; "id" -> "Gamepad Virtual: MATI"
+                else -> en
+            }
+            "Touch Gamepad" -> return when (lang) {
+                "zh" -> "屏幕虚拟手柄"; "ja" -> "画面上の仮想コントローラー"; "ko" -> "화면 가상 게임패드"; "es" -> "Mando Táctil en Pantalla"; "pt" -> "Controle Virtual na Tela"
+                "fr" -> "Manette Tactile à l'écran"; "de" -> "Touch-Gamepad auf dem Bildschirm"; "ru" -> "Экранный сенсорный геймпад"; "th" -> "จอยจำลองบนหน้าจอ"; "id" -> "Gamepad Sentuh di Layar"
+                else -> en
+            }
+            "Show Virtual Gamepad" -> return when (lang) {
+                "zh" -> "显示虚拟手柄"; "ja" -> "仮想コントローラーを表示"; "ko" -> "가상 게임패드 표시"; "es" -> "Mostrar mando virtual"; "pt" -> "Mostrar controle virtual"
+                "fr" -> "Afficher la manette virtuelle"; "de" -> "Virtuelles Gamepad anzeigen"; "ru" -> "Показать виртуальный геймпад"; "th" -> "เปิดจอยจำลองบนหน้าจอ"; "id" -> "Tampilkan Gamepad Virtual"
+                else -> en
+            }
+            "Auto-Hide Virtual Gamepad on Physical Controller" -> return when (lang) {
+                "zh" -> "连接实体手柄时自动隐藏虚拟按键"; "ja" -> "物理コントローラー接続時に自動非表示"; "ko" -> "실제 컨트롤러 연결 시 가상 패드 자동 숨김"; "es" -> "Ocultar mando virtual al conectar mando físico"; "pt" -> "Ocultar controle virtual ao conectar controle físico"
+                "fr" -> "Masquer la manette virtuelle si manette physique"; "de" -> "Virtuelles Gamepad bei physischem Controller ausblenden"; "ru" -> "Скрывать виртуальный геймпад при подключении физического"; "th" -> "ซ่อนจอยจำลองอัตโนมัติเมื่อต่อจอยจริง"; "id" -> "Sembunyikan Gamepad Virtual saat Kontroler Fisik Terhubung"
+                else -> en
+            }
+            "Save Layout Per Game" -> return when (lang) {
+                "zh" -> "按游戏分别保存按键布局"; "ja" -> "ゲームごとに配置を保存"; "ko" -> "게임별 버튼 배치 개별 저장"; "es" -> "Guardar diseño por cada juego"; "pt" -> "Salvar layout por jogo"
+                "fr" -> "Enregistrer la disposition par jeu"; "de" -> "Layout pro Spiel speichern"; "ru" -> "Сохранять раскладку для каждой игры"; "th" -> "บันทึกผังปุ่มแยกตามแต่ละเกม"; "id" -> "Simpan Tata Letak per Game"
+                else -> en
+            }
+            "✓ Using Global Layout" -> return when (lang) {
+                "zh" -> "✓ 正在使用全局布局"; "ja" -> "✓ 共通配置を使用中"; "ko" -> "✓ 공통 배치 사용 중"; "es" -> "✓ Usando diseño global"; "pt" -> "✓ Usando layout global"
+                "fr" -> "✓ Disposition globale active"; "de" -> "✓ Globales Layout aktiv"; "ru" -> "✓ Общая раскладка активна"; "th" -> "✓ กำลังใช้ผังปุ่มร่วมกัน"; "id" -> "✓ Menggunakan Tata Letak Global"
+                else -> en
+            }
+            "Use Global Layout" -> return when (lang) {
+                "zh" -> "使用全局通用布局"; "ja" -> "共通の配置を使用"; "ko" -> "공통 배치 사용"; "es" -> "Usar diseño global"; "pt" -> "Usar layout global"
+                "fr" -> "Utiliser la disposition globale"; "de" -> "Globales Layout nutzen"; "ru" -> "Использовать общую раскладку"; "th" -> "ใช้ผังปุ่มร่วมกัน"; "id" -> "Gunakan Tata Letak Global"
+                else -> en
+            }
+            "Reset" -> return when (lang) {
+                "zh" -> "重置"; "ja" -> "リセット"; "ko" -> "초기화"; "es" -> "Restablecer"; "pt" -> "Redefinir"
+                "fr" -> "Réinitialiser"; "de" -> "Zurücksetzen"; "ru" -> "Сброс"; "th" -> "รีเซ็ต"; "id" -> "Reset"
+                else -> en
+            }
+            "Button Layout" -> return when (lang) {
+                "zh" -> "按键预设布局"; "ja" -> "ボタン配置プリセット"; "ko" -> "버튼 배치 프리셋"; "es" -> "Diseño de botones"; "pt" -> "Layout dos botões"
+                "fr" -> "Disposition des boutons"; "de" -> "Tasten-Layout"; "ru" -> "Раскладка кнопок"; "th" -> "รูปแบบการจัดปุ่ม"; "id" -> "Tata Letak Tombol"
+                else -> en
+            }
+            "Button Size" -> return when (lang) {
+                "zh" -> "按键大小"; "ja" -> "ボタンサイズ"; "ko" -> "버튼 크기"; "es" -> "Tamaño de botones"; "pt" -> "Tamanho dos botões"
+                "fr" -> "Taille des boutons"; "de" -> "Tastengröße"; "ru" -> "Размер кнопок"; "th" -> "ขนาดปุ่ม"; "id" -> "Ukuran Tombol"
+                else -> en
+            }
+            "Opacity" -> return when (lang) {
+                "zh" -> "按键透明度"; "ja" -> "不透明度"; "ko" -> "투명도"; "es" -> "Opacidad"; "pt" -> "Opacidade"
+                "fr" -> "Opacité"; "de" -> "Deckkraft"; "ru" -> "Прозрачность"; "th" -> "ความทึบแสง"; "id" -> "Transparansi"
+                else -> en
+            }
+            "Stick Sensitivity" -> return when (lang) {
+                "zh" -> "摇杆灵敏度"; "ja" -> "スティック感度"; "ko" -> "스틱 감도"; "es" -> "Sensibilidad del stick"; "pt" -> "Sensibilidade do analógico"
+                "fr" -> "Sensibilité du stick"; "de" -> "Stick-Empfindlichkeit"; "ru" -> "Чувствительность стиков"; "th" -> "ความไวก้านอนาล็อก"; "id" -> "Sensitivitas Analog"
+                else -> en
+            }
+            "Language, Auto-Translate & System" -> return when (lang) {
+                "zh" -> "语言、自动翻译与系统"; "ja" -> "言語・自動翻訳・システム"; "ko" -> "언어, 자동 번역 및 시스템"; "es" -> "Idioma, Traducción y Sistema"; "pt" -> "Idioma, Tradução e Sistema"
+                "fr" -> "Langue, Traduction et Système"; "de" -> "Sprache, Auto-Übersetzung & System"; "ru" -> "Язык, автоперевод и система"; "th" -> "ภาษา แปลอัตโนมัติ และระบบ"; "id" -> "Bahasa, Terjemahan & Sistem"
+                else -> en
+            }
+            "12 World Languages, Translator, Account" -> return when (lang) {
+                "zh" -> "12 种国际语言、翻译器与账号"; "ja" -> "12言語対応・翻訳・アカウント"; "ko" -> "12개국 언어, 번역기 및 계정"; "es" -> "12 idiomas, Traductor y Cuenta"; "pt" -> "12 idiomas, Tradutor e Conta"
+                "fr" -> "12 langues, Traducteur et Compte"; "de" -> "12 Weltsprachen, Übersetzer & Konto"; "ru" -> "12 языков, переводчик и аккаунт"; "th" -> "12 ภาษา ตัวแปล และบัญชี"; "id" -> "12 Bahasa, Penerjemah & Akun"
+                else -> en
+            }
+            "Xbox Menu Translator" -> return when (lang) {
+                "zh" -> "Xbox 界面自动翻译"; "ja" -> "Xbox メニュー翻訳"; "ko" -> "Xbox 메뉴 자동 번역"; "es" -> "Traductor de Menú Xbox"; "pt" -> "Tradutor do Menu Xbox"
+                "fr" -> "Traducteur du Menu Xbox"; "de" -> "Xbox-Menü-Übersetzer"; "ru" -> "Переводчик меню Xbox"; "th" -> "แปลเมนูหน้าเว็บ Xbox"; "id" -> "Penerjemah Menu Xbox"
+                else -> en
+            }
+            "Auto-translate Xbox interface" -> return when (lang) {
+                "zh" -> "自动翻译 Xbox 云游戏界面"; "ja" -> "Xbox インターフェースを自動翻訳"; "ko" -> "Xbox 인터페이스 자동 번역"; "es" -> "Traducir interfaz de Xbox automáticamente"; "pt" -> "Traduzir interface do Xbox automaticamente"
+                "fr" -> "Traduire automatiquement l'interface Xbox"; "de" -> "Xbox-Oberfläche automatisch übersetzen"; "ru" -> "Автоматически переводить интерфейс Xbox"; "th" -> "แปลหน้าเว็บ Xbox อัตโนมัติ"; "id" -> "Terjemahkan antarmuka Xbox otomatis"
+                else -> en
+            }
+            "Translation Target Language:" -> return when (lang) {
+                "zh" -> "Xbox 界面翻译目标语言:"; "ja" -> "翻訳先の言語:"; "ko" -> "Xbox 번역 대상 언어:"; "es" -> "Idioma de destino:"; "pt" -> "Idioma de destino:"
+                "fr" -> "Langue cible de traduction :"; "de" -> "Zielsprache der Übersetzung:"; "ru" -> "Язык перевода:"; "th" -> "ภาษาที่ต้องการแปล:"; "id" -> "Bahasa Target Terjemahan:"
+                else -> en
+            }
+            "🚫 Off" -> return when (lang) {
+                "zh" -> "🚫 关闭"; "ja" -> "🚫 オフ"; "ko" -> "🚫 끄기"; "es" -> "🚫 Desactivado"; "pt" -> "🚫 Desligado"
+                "fr" -> "🚫 Désactivé"; "de" -> "🚫 Aus"; "ru" -> "🚫 Выкл."; "th" -> "🚫 ปิด"; "id" -> "🚫 Mati"
+                else -> en
+            }
+            "Bilingual mode (Translated + Original)" -> return when (lang) {
+                "zh" -> "双语对照模式 (译文 + 原文)"; "ja" -> "二ヶ国語表示モード (翻訳 + 原文)"; "ko" -> "이중 언어 모드 (번역 + 원문)"; "es" -> "Modo bilingüe (Traducción + Original)"; "pt" -> "Modo bilíngue (Tradução + Original)"
+                "fr" -> "Mode bilingue (Traduction + Original)"; "de" -> "Zweisprachiger Modus (Übersetzung + Original)"; "ru" -> "Двуязычный режим (Перевод + Оригинал)"; "th" -> "โหมดสองภาษา (คำแปล + ต้นฉบับ)"; "id" -> "Mode Dwibahasa (Terjemahan + Asli)"
+                else -> en
+            }
+            "Shows original text in parentheses" -> return when (lang) {
+                "zh" -> "在括号内同时显示原始语言文本"; "ja" -> "括弧内に元のテキストを併記します"; "ko" -> "괄호 안에 원문을 함께 표시합니다"; "es" -> "Muestra el texto original entre paréntesis"; "pt" -> "Mostra o texto original entre parênteses"
+                "fr" -> "Affiche le texte original entre parenthèses"; "de" -> "Zeigt den Originaltext in Klammern an"; "ru" -> "Показывает оригинал в скобках"; "th" -> "แสดงข้อความภาษาต้นฉบับในวงเล็บ"; "id" -> "Tampilkan teks asli di dalam kurung"
+                else -> en
+            }
+            "App Language (Global)" -> return when (lang) {
+                "zh" -> "应用界面语言 (全球)"; "ja" -> "アプリの表示言語 (グローバル)"; "ko" -> "앱 인터페이스 언어 (글로벌)"; "es" -> "Idioma de la Aplicación (Global)"; "pt" -> "Idioma do Aplicativo (Global)"
+                "fr" -> "Langue de l'Application (Global)"; "de" -> "App-Sprache (Global)"; "ru" -> "Язык приложения (Глобальный)"; "th" -> "ภาษาของแอปพลิเคชัน (สากล)"; "id" -> "Bahasa Aplikasi (Global)"
+                else -> en
+            }
+            "✓ Active" -> return when (lang) {
+                "zh" -> "✓ 当前使用"; "ja" -> "✓ 使用中"; "ko" -> "✓ 현재 사용 중"; "es" -> "✓ Activo"; "pt" -> "✓ Ativo"
+                "fr" -> "✓ Actif"; "de" -> "✓ Aktiv"; "ru" -> "✓ Активно"; "th" -> "✓ กำลังใช้"; "id" -> "✓ Aktif"
+                else -> en
+            }
+            "🌐 System" -> return when (lang) {
+                "zh" -> "🌐 跟随系统"; "ja" -> "🌐 システム"; "ko" -> "🌐 시스템"; "es" -> "🌐 Sistema"; "pt" -> "🌐 Sistema"
+                "fr" -> "🌐 Système"; "de" -> "🌐 System"; "ru" -> "🌐 Система"; "th" -> "🌐 ตามระบบ"; "id" -> "🌐 Sistem"
+                else -> en
+            }
+            "Xbox Cloud Storefront Market" -> return when (lang) {
+                "zh" -> "Xbox 云游戏商店区域"; "ja" -> "Xbox Cloud ストア地域"; "ko" -> "Xbox 클라우드 스토어 지역"; "es" -> "Región de la Tienda Xbox Cloud"; "pt" -> "Região da Loja Xbox Cloud"
+                "fr" -> "Marché de la Boutique Xbox Cloud"; "de" -> "Xbox Cloud Store-Region"; "ru" -> "Регион магазина Xbox Cloud"; "th" -> "โซนร้านค้าหน้าเว็บ Xbox Cloud"; "id" -> "Wilayah Toko Xbox Cloud"
+                else -> en
+            }
+            "🇺🇸 Default Market (en-US • Recommended)" -> return when (lang) {
+                "zh" -> "🇺🇸 默认美区市场 (en-US • 推荐)"; "ja" -> "🇺🇸 デフォルト地域 (en-US • 推奨)"; "ko" -> "🇺🇸 기본 마켓 (en-US • 권장)"; "es" -> "🇺🇸 Mercado predeterminado (en-US • Recomendado)"; "pt" -> "🇺🇸 Mercado padrão (en-US • Recomendado)"
+                "fr" -> "🇺🇸 Marché par défaut (en-US • Recommandé)"; "de" -> "🇺🇸 Standard-Markt (en-US • Empfohlen)"; "ru" -> "🇺🇸 Регион по умолчанию (en-US • Рекомендуется)"; "th" -> "🇺🇸 โซนมาตรฐาน (en-US • แนะนำ)"; "id" -> "🇺🇸 Pasar Default (en-US • Disarankan)"
+                else -> en
+            }
+            "Account, IP Geolocation & Terms" -> return when (lang) {
+                "zh" -> "账号、IP 定位与使用条款"; "ja" -> "アカウント・IP位置情報・利用規約"; "ko" -> "계정, IP 위치 확인 및 이용약관"; "es" -> "Cuenta, Geolocalización IP y Términos"; "pt" -> "Conta, Geolocalização IP e Termos"
+                "fr" -> "Compte, Géolocalisation IP et Conditions"; "de" -> "Konto, IP-Geolokalisierung & Bedingungen"; "ru" -> "Аккаунт, геолокация IP и условия"; "th" -> "บัญชี ระบุตำแหน่ง IP และข้อกำหนด"; "id" -> "Akun, Geolokasi IP & Ketentuan"
+                else -> en
+            }
+            "Sign Out & Clear Login Session" -> return when (lang) {
+                "zh" -> "退出登录并清除 Xbox 会话"; "ja" -> "サインアウトとログイン情報の消去"; "ko" -> "로그아웃 및 Xbox 로그인 세션 초기화"; "es" -> "Cerrar sesión y borrar datos de acceso"; "pt" -> "Sair e limpar sessão de login"
+                "fr" -> "Se déconnecter et effacer la session"; "de" -> "Abmelden & Xbox-Sitzung löschen"; "ru" -> "Выйти и очистить сессию входа"; "th" -> "ออกจากระบบและล้างเซสชัน Xbox"; "id" -> "Keluar & Hapus Sesi Login Xbox"
+                else -> en
+            }
+            "View Full Terms", "View Full Terms (Web)" -> return when (lang) {
+                "zh" -> "查看完整使用条款"; "ja" -> "利用規約の全文を表示"; "ko" -> "전체 이용약관 보기"; "es" -> "Ver Términos Completos"; "pt" -> "Ver Termos Completos"
+                "fr" -> "Voir les Conditions Complètes"; "de" -> "Vollständige Bedingungen anzeigen"; "ru" -> "Полные условия использования"; "th" -> "ดูข้อกำหนดการใช้งานฉบับเต็ม"; "id" -> "Lihat Ketentuan Lengkap"
+                else -> en
+            }
+            "System Activity Log (Track Probe & App)", "📋 View App Log (Track Probe & Ping)" -> return when (lang) {
+                "zh" -> "📋 查看系统日志 (追踪节点与延迟)"; "ja" -> "📋 システムログを表示 (Ping・通信履歴)"; "ko" -> "📋 시스템 로그 보기 (프로브 및 핑 추적)"; "es" -> "📋 Ver Registro del Sistema (Ping y Red)"; "pt" -> "📋 Ver Log do Sistema (Ping e Rede)"
+                "fr" -> "📋 Journal d'activité système"; "de" -> "📋 Systemprotokoll anzeigen (Probe & Ping)"; "ru" -> "📋 Журнал активности системы"; "th" -> "📋 ดูบันทึกระบบ (ติดตามแอปและปิง)"; "id" -> "📋 Lihat Log Sistem (Lacak Probe & Ping)"
+                else -> en
+            }
+            "Copy Diagnostic Report" -> return when (lang) {
+                "zh" -> "复制诊断报告"; "ja" -> "診断レポートをコピー"; "ko" -> "진단 보고서 복사"; "es" -> "Copiar informe de diagnóstico"; "pt" -> "Copiar relatório de diagnóstico"
+                "fr" -> "Copier le rapport de diagnostic"; "de" -> "Diagnosebericht kopieren"; "ru" -> "Скопировать отчёт диагностики"; "th" -> "คัดลอกรายงานการวินิจฉัย"; "id" -> "Salin Laporan Diagnostik"
+                else -> en
+            }
+            "Screen Recording" -> return when (lang) {
+                "zh" -> "屏幕录制"; "ja" -> "画面録画"; "ko" -> "화면 녹화"; "es" -> "Grabación de Pantalla"; "pt" -> "Gravação de Tela"
+                "fr" -> "Enregistrement d'écran"; "de" -> "Bildschirmaufnahme"; "ru" -> "Запись экрана"; "th" -> "บันทึกหน้าจอ"; "id" -> "Perekaman Layar"
+                else -> en
+            }
+            "Video Quality (.MP4)" -> return when (lang) {
+                "zh" -> "视频录制画质 (.MP4)"; "ja" -> "録画品質 (.MP4)"; "ko" -> "비디오 화질 (.MP4)"; "es" -> "Calidad de Video (.MP4)"; "pt" -> "Qualidade de Vídeo (.MP4)"
+                "fr" -> "Qualité Vidéo (.MP4)"; "de" -> "Videoqualität (.MP4)"; "ru" -> "Качество видео (.MP4)"; "th" -> "คุณภาพวิดีโอ (.MP4)"; "id" -> "Kualitas Video (.MP4)"
+                else -> en
+            }
+            "Background Music" -> return when (lang) {
+                "zh" -> "背景音乐"; "ja" -> "BGM (背景音楽)"; "ko" -> "배경 음악 (BGM)"; "es" -> "Música de Fondo"; "pt" -> "Música de Fundo"
+                "fr" -> "Musique de Fond"; "de" -> "Hintergrundmusik"; "ru" -> "Фоновая музыка"; "th" -> "เพลงประกอบพื้นหลัง"; "id" -> "Musik Latar"
+                else -> en
+            }
+            "Manual Playback" -> return when (lang) {
+                "zh" -> "手动播放 / 停止"; "ja" -> "手動再生 / 停止"; "ko" -> "수동 재생 / 정지"; "es" -> "Reproducción manual"; "pt" -> "Reprodução manual"
+                "fr" -> "Lecture manuelle"; "de" -> "Manuelle Wiedergabe"; "ru" -> "Ручное воспроизведение"; "th" -> "เล่น / หยุดเพลงด้วยตนเอง"; "id" -> "Putar / Hentikan Manual"
+                else -> en
+            }
+            "Stopped • Tap to play manually" -> return when (lang) {
+                "zh" -> "已停止 • 点击手动播放"; "ja" -> "停止中 • タップで再生"; "ko" -> "정지됨 • 탭하여 재생"; "es" -> "Detenido • Toca para reproducir"; "pt" -> "Parado • Toque para tocar"
+                "fr" -> "Arrêté • Appuyez pour lire"; "de" -> "Gestoppt • Zum Abspielen tippen"; "ru" -> "Остановлено • Нажмите для запуска"; "th" -> "หยุดอยู่ • แตะเพื่อเปิดเพลง"; "id" -> "Berhenti • Ketuk untuk memutar"
+                else -> en
+            }
+            "▶ Play" -> return when (lang) {
+                "zh" -> "▶ 播放"; "ja" -> "▶ 再生"; "ko" -> "▶ 재생"; "es" -> "▶ Reproducir"; "pt" -> "▶ Tocar"
+                "fr" -> "▶ Lire"; "de" -> "▶ Start"; "ru" -> "▶ Пуск"; "th" -> "▶ เล่น"; "id" -> "▶ Putar"
+                else -> en
+            }
+            "⏹ Stop" -> return when (lang) {
+                "zh" -> "⏹ 停止"; "ja" -> "⏹ 停止"; "ko" -> "⏹ 정지"; "es" -> "⏹ Detener"; "pt" -> "⏹ Parar"
+                "fr" -> "⏹ Arrêter"; "de" -> "⏹ Stopp"; "ru" -> "⏹ Стоп"; "th" -> "⏹ หยุด"; "id" -> "⏹ Hentikan"
+                else -> en
+            }
+            "Auto-start music on app launch" -> return when (lang) {
+                "zh" -> "打开应用时自动播放背景音乐"; "ja" -> "アプリ起動時にBGMを自動再生"; "ko" -> "앱 실행 시 배경 음악 자동 재생"; "es" -> "Iniciar música al abrir la app"; "pt" -> "Iniciar música ao abrir o app"
+                "fr" -> "Lancer la musique à l'ouverture"; "de" -> "Musik beim App-Start automatisch abspielen"; "ru" -> "Автозапуск музыки при входе"; "th" -> "เปิดเพลงอัตโนมัติเมื่อเข้าแอป"; "id" -> "Putar musik otomatis saat buka aplikasi"
+                else -> en
+            }
+            "Play music while in game" -> return when (lang) {
+                "zh" -> "游玩时继续播放背景音乐"; "ja" -> "ゲームプレイ中もBGMを再生"; "ko" -> "게임 플레이 중에도 배경 음악 유지"; "es" -> "Reproducir música durante el juego"; "pt" -> "Tocar música durante o jogo"
+                "fr" -> "Jouer la musique pendant le jeu"; "de" -> "Musik während des Spiels abspielen"; "ru" -> "Играть музыку во время игры"; "th" -> "เล่นเพลงต่อเนื่องขณะอยู่ในเกม"; "id" -> "Putar musik saat sedang bermain"
+                else -> en
+            }
+            "Background Music Volume" -> return when (lang) {
+                "zh" -> "背景音乐音量"; "ja" -> "BGM 音量"; "ko" -> "배경 음악 볼륨"; "es" -> "Volumen de música de fondo"; "pt" -> "Volume da música de fundo"
+                "fr" -> "Volume de la musique"; "de" -> "Hintergrundmusik-Lautstärke"; "ru" -> "Громкость фоновой музыки"; "th" -> "ระดับเสียงเพลงพื้นหลัง"; "id" -> "Volume Musik Latar"
+                else -> en
+            }
+            "App Updates, About & Share QR" -> return when (lang) {
+                "zh" -> "应用更新、关于与二维码分享"; "ja" -> "アップデート・情報・QR共有"; "ko" -> "앱 업데이트, 정보 및 QR 공유"; "es" -> "Actualizaciones, Info y Compartir QR"; "pt" -> "Atualizações, Sobre e QR Code"
+                "fr" -> "Mises à jour, À propos et Partage QR"; "de" -> "App-Updates, Info & QR teilen"; "ru" -> "Обновления, о приложении и QR-код"; "th" -> "อัปเดตแอป เกี่ยวกับ และแชร์ QR"; "id" -> "Pembaruan, Tentang & Bagikan QR"
+                else -> en
+            }
+            "Check for updates on launch" -> return when (lang) {
+                "zh" -> "启动时自动检查新版本"; "ja" -> "起動時にアップデートを確認"; "ko" -> "앱 실행 시 새 버전 자동 확인"; "es" -> "Buscar actualizaciones al iniciar"; "pt" -> "Verificar atualizações ao iniciar"
+                "fr" -> "Vérifier les mises à jour au lancement"; "de" -> "Beim Start nach Updates suchen"; "ru" -> "Проверять обновления при запуске"; "th" -> "ตรวจหาอัปเดตใหม่เมื่อเปิดแอป"; "id" -> "Periksa pembaruan saat aplikasi dibuka"
+                else -> en
+            }
+            "Check now" -> return when (lang) {
+                "zh" -> "立即检查"; "ja" -> "今すぐ確認"; "ko" -> "지금 확인"; "es" -> "Comprobar ahora"; "pt" -> "Verificar agora"
+                "fr" -> "Vérifier"; "de" -> "Jetzt prüfen"; "ru" -> "Проверить"; "th" -> "ตรวจสอบเลย"; "id" -> "Periksa sekarang"
+                else -> en
+            }
+            "Checking..." -> return when (lang) {
+                "zh" -> "检查中..."; "ja" -> "確認中..."; "ko" -> "확인 중..."; "es" -> "Comprobando..."; "pt" -> "Verificando..."
+                "fr" -> "Vérification..."; "de" -> "Prüfe..."; "ru" -> "Проверка..."; "th" -> "กำลังตรวจ..."; "id" -> "Memeriksa..."
+                else -> en
+            }
+            "Share & QR" -> return when (lang) {
+                "zh" -> "分享与二维码"; "ja" -> "共有 & QR"; "ko" -> "QR 및 공유"; "es" -> "Compartir y QR"; "pt" -> "Compartilhar e QR"
+                "fr" -> "Partager & QR"; "de" -> "Teilen & QR"; "ru" -> "QR и Поделиться"; "th" -> "แชร์ & QR"; "id" -> "Bagikan & QR"
+                else -> en
+            }
+            "Terms & Privacy" -> return when (lang) {
+                "zh" -> "使用条款与隐私说明"; "ja" -> "利用規約とプライバシー"; "ko" -> "이용약관 및 개인정보 보호"; "es" -> "Términos y Privacidad"; "pt" -> "Termos e Privacidade"
+                "fr" -> "Conditions et Confidentialité"; "de" -> "Bedingungen & Datenschutz"; "ru" -> "Условия и конфиденциальность"; "th" -> "ข้อกำหนดและความเป็นส่วนตัว"; "id" -> "Ketentuan & Privasi"
+                else -> en
+            }
+            "Quick summary & link to full terms" -> return when (lang) {
+                "zh" -> "快速摘要与完整条款链接"; "ja" -> "概要と全文へのリンク"; "ko" -> "요약 및 전체 이용약관 링크"; "es" -> "Resumen rápido y enlace a términos"; "pt" -> "Resumo rápido e link para termos"
+                "fr" -> "Résumé rapide et conditions complètes"; "de" -> "Kurzzusammenfassung & vollständige Bedingungen"; "ru" -> "Краткая сводка и полные условия"; "th" -> "สรุปย่อและลิงก์ข้อกำหนดฉบับเต็ม"; "id" -> "Ringkasan cepat & tautan ketentuan lengkap"
+                else -> en
+            }
+            "Quick Summary" -> return when (lang) {
+                "zh" -> "核心条款摘要"; "ja" -> "規約の要約"; "ko" -> "핵심 요약"; "es" -> "Resumen Rápido"; "pt" -> "Resumo Rápido"
+                "fr" -> "Résumé Rapide"; "de" -> "Kurzzusammenfassung"; "ru" -> "Краткая сводка"; "th" -> "สรุปสาระสำคัญ"; "id" -> "Ringkasan Cepat"
+                else -> en
+            }
+            "Re-open Terms Consent Dialog" -> return when (lang) {
+                "zh" -> "重新打开条款同意弹窗"; "ja" -> "規約同意ダイアログを再表示"; "ko" -> "약관 동의 대화상자 다시 열기"; "es" -> "Reabrir diálogo de aceptación"; "pt" -> "Reabrir diálogo de consentimento"
+                "fr" -> "Rouvrir la boîte d'acceptation"; "de" -> "Zustimmungsdialog erneut öffnen"; "ru" -> "Открыть окно принятия условий"; "th" -> "เปิดหน้าต่างยอมรับข้อกำหนดอีกครั้ง"; "id" -> "Buka Ulang Dialog Persetujuan"
+                else -> en
+            }
         }
         return en
     }

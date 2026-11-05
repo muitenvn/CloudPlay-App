@@ -212,9 +212,9 @@ fun SettingsScreen(
                         Text(
                             text = when (updateState) {
                                 is com.example.data.UpdateCheckState.Checking ->
-                                    if (isEn) "Checking..." else "Đang kiểm tra..."
+                                    config.tr("Đang kiểm tra...", "Checking...")
                                 else ->
-                                    if (isEn) "Check now" else "Kiểm tra ngay"
+                                    config.tr("Kiểm tra ngay", "Check now")
                             },
                             color = XboxNeonGreen,
                             fontWeight = FontWeight.Bold,
@@ -241,7 +241,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(14.dp))
                             Text(
-                                text = if (isEn) "Share & QR" else "Mã QR & Chia sẻ",
+                                text = config.tr("Mã QR & Chia sẻ", "Share & QR"),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.5.sp,
                                 maxLines = 1
@@ -333,7 +333,7 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.Tune, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
                         Text(
-                            text = if (isEn) "📋 View App Log (Track Probe & Ping)" else "📋 Xem Log Hệ Thống (Theo dõi App & Trạm đo)",
+                            text = config.tr("📋 Xem Log Hệ Thống (Theo dõi App & Trạm đo)", "📋 View App Log (Track Probe & Ping)"),
                             color = DirectCyan,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 12.sp
@@ -411,7 +411,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(15.dp))
                             Text(
-                                text = if (isEn) "View Full Terms (Web)" else "Xem điều khoản đầy đủ (Web)",
+                                text = config.tr("Xem điều khoản đầy đủ (Web)", "View Full Terms (Web)"),
                                 color = XboxNeonGreen,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -443,7 +443,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(15.dp))
                             Text(
-                                text = if (isEn) "Re-open Terms Consent Dialog" else "Mở lại hộp thoại Đồng ý Điều khoản",
+                                text = config.tr("Mở lại hộp thoại Đồng ý Điều khoản", "Re-open Terms Consent Dialog"),
                                 color = DirectCyan,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp

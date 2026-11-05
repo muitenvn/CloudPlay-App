@@ -729,17 +729,12 @@ data class AppConfig(
     }
 
     /**
-     * Dùng riêng cho màn hình Cài đặt (`SettingsScreen`):
-     * Khi người dùng chọn Tiếng Trung (`zh`) hoặc các ngôn ngữ quốc tế khác (`ja`, `ko`, `es`, ...),
-     * toàn bộ app chuyển sang ngôn ngữ đó TRỪ phần Cài đặt vẫn giữ Tiếng Việt (chỉ hiện Tiếng Anh khi chọn đúng English),
-     * giúp người dùng luôn đọc và điều chỉnh lại cài đặt dễ dàng.
+     * Dùng cho màn hình Cài đặt (`SettingsScreen`):
+     * Trả về `true` cho mọi ngôn ngữ khác Tiếng Việt (`en`, `de`, `ko`, `ja`, `zh`, `es`, `pt`, `fr`, `id`, `th`, `ru`)
+     * để kết hợp cùng `AppUiTranslator` dịch sang ngôn ngữ đã chọn và không bao giờ bị rơi về Tiếng Việt.
      */
     fun isSettingsEnglishUI(): Boolean {
-        return when (appLanguage) {
-            AppLanguage.ENGLISH -> true
-            AppLanguage.SYSTEM -> !AppLanguage.resolveOsSystemLanguage().startsWith("vi")
-            else -> false
-        }
+        return appLanguage.effectiveLanguageCode() != "vi"
     }
 
     /**

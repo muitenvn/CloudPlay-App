@@ -58,7 +58,10 @@ internal fun CollapsibleSettingsGroup(
     testTag: String,
     content: @Composable () -> Unit
 ) {
-    val isEnGroup = SettingsRepository.config.value.isSettingsEnglishUI()
+    val config = SettingsRepository.config.value
+    val isEnGroup = config.isSettingsEnglishUI()
+    val displayTitle = config.tr(title, title)
+    val displaySubtitle = config.tr(subtitle, subtitle)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Surface(
             modifier = Modifier
@@ -72,9 +75,9 @@ internal fun CollapsibleSettingsGroup(
                 .clickable { onToggle() }
                 .semantics {
                     contentDescription = if (expanded) {
-                        if (isEnGroup) "$title, expanded, tap to collapse" else "$title, đang mở, bấm để thu gọn"
+                        if (isEnGroup) "$displayTitle, expanded, tap to collapse" else "$displayTitle, đang mở, bấm để thu gọn"
                     } else {
-                        if (isEnGroup) "$title, collapsed, tap to expand" else "$title, đang thu gọn, bấm để mở rộng"
+                        if (isEnGroup) "$displayTitle, collapsed, tap to expand" else "$displayTitle, đang thu gọn, bấm để mở rộng"
                     }
                 }
                 .testTag(testTag),
@@ -110,14 +113,14 @@ internal fun CollapsibleSettingsGroup(
                     }
                     Column {
                         Text(
-                            text = title,
+                            text = displayTitle,
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = subtitle,
+                            text = displaySubtitle,
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -153,6 +156,9 @@ internal fun SettingToggleRow(
     activeColor: Color = XboxNeonGreen,
     switchTestTag: String? = null
 ) {
+    val config = SettingsRepository.config.value
+    val displayTitle = config.tr(title, title)
+    val displaySubtitle = config.tr(subtitle, subtitle)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -160,13 +166,13 @@ internal fun SettingToggleRow(
     ) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
             Text(
-                text = title,
+                text = displayTitle,
                 color = TextPrimary,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = subtitle,
+                text = displaySubtitle,
                 color = TextSecondary,
                 fontSize = 10.5.sp
             )
@@ -189,9 +195,11 @@ internal fun LabeledSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     accentColor: Color
 ) {
+    val config = SettingsRepository.config.value
+    val displayLabel = config.tr(label, label)
     Column {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = label, color = TextSecondary, fontSize = 11.sp)
+            Text(text = displayLabel, color = TextSecondary, fontSize = 11.sp)
             Text(
                 text = valueText,
                 color = accentColor,
@@ -214,6 +222,8 @@ internal fun SettingsCard(
     title: String,
     content: @Composable () -> Unit
 ) {
+    val config = SettingsRepository.config.value
+    val displayTitle = config.tr(title, title)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -237,7 +247,7 @@ internal fun SettingsCard(
                         .background(Brush.verticalGradient(listOf(XboxNeonGreen, DirectCyan)))
                 )
                 Text(
-                    text = title,
+                    text = displayTitle,
                     color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
                     fontSize = 12.sp,

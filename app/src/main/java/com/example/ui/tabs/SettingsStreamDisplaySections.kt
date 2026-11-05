@@ -100,13 +100,13 @@ internal fun SettingsGraphicsFpsSection(
                         )
                         Column {
                             Text(
-                                text = if (isEn) "Auto • 720p ⇄ 1080p (Recommended)" else "Tự động • 720p ⇄ 1080p (Khuyên dùng)",
+                                text = config.tr("Tự động • 720p ⇄ 1080p (Khuyên dùng)", "Auto • 720p ⇄ 1080p (Recommended)"),
                                 color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (isEn) "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi" else "Tự hạ độ phân giải để giảm độ trễ trên cả 4G, 5G và Wi-Fi",
+                                text = config.tr("Tự hạ độ phân giải để giảm độ trễ trên cả 4G, 5G và Wi-Fi", "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi"),
                                 color = TextSecondary,
                                 fontSize = 10.5.sp
                             )
@@ -198,7 +198,7 @@ internal fun SettingsGraphicsFpsSection(
             }
 
             Text(
-                text = if (isEn) "Frame Rate (FPS)" else "Nhịp khung hình (FPS)",
+                text = config.tr("Nhịp khung hình (FPS)", "Frame Rate (FPS)"),
                 color = XboxNeonGreen,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
@@ -324,7 +324,7 @@ internal fun SettingsGraphicsFpsSection(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định",
+                    text = config.tr("Đặt lại màu sắc mặc định", "Reset Colors to Default"),
                     color = DirectCyan,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold
@@ -421,7 +421,7 @@ internal fun SettingsBackgroundMusicSection(
         ) {
             Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                 Text(
-                    text = if (isEn) "Manual Playback" else "Phát / Dừng nhạc nền",
+                    text = config.tr("Phát / Dừng nhạc nền", "Manual Playback"),
                     color = TextPrimary,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold
@@ -430,7 +430,7 @@ internal fun SettingsBackgroundMusicSection(
                     text = if (isMusicPlaying) {
                         if (isEn) "Currently playing (${(config.backgroundMusicVolume * 100).toInt()}%)" else "Đang phát (${(config.backgroundMusicVolume * 100).toInt()}%)"
                     } else {
-                        if (isEn) "Stopped • Tap to play manually" else "Đang dừng • Bấm để bật tay khi cần"
+                        config.tr("Đang dừng • Bấm để bật tay khi cần", "Stopped • Tap to play manually")
                     },
                     color = if (isMusicPlaying) XboxNeonGreen else TextSecondary,
                     fontSize = 10.5.sp
@@ -466,9 +466,9 @@ internal fun SettingsBackgroundMusicSection(
             ) {
                 Text(
                     text = if (isMusicPlaying) {
-                        if (isEn) "⏹ Stop" else "⏹ Dừng"
+                        config.tr("⏹ Dừng", "⏹ Stop")
                     } else {
-                        if (isEn) "▶ Play" else "▶ Phát"
+                        config.tr("▶ Phát", "▶ Play")
                     },
                     color = if (isMusicPlaying) DirectCyan else XboxNeonGreen,
                     fontWeight = FontWeight.Bold,

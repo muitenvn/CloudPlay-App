@@ -95,7 +95,7 @@ internal fun SettingsNetworkVpnSection(
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
-                            text = if (isEn) "VPN disconnect delay" else "Thời gian chờ tắt VPN",
+                            text = config.tr("Thời gian chờ tắt VPN", "VPN disconnect delay"),
                             color = TextSecondary,
                             fontSize = 11.sp
                         )
@@ -138,18 +138,18 @@ internal fun SettingsNetworkVpnSection(
             listOf(
                 Triple(
                     VpnEngine.SMART_BYPASS,
-                    if (isEn) "Unlock on Launch Only 🇯🇵 (Recommended)" else "Chỉ mở khóa lúc vào game 🇯🇵 (Khuyên dùng)",
-                    if (isEn) "Uses proxy only during game launch" else "Chỉ đi qua máy chủ trung gian lúc mới mở game"
+                    config.tr("Chỉ mở khóa lúc vào game 🇯🇵 (Khuyên dùng)", "Unlock on Launch Only 🇯🇵 (Recommended)"),
+                    config.tr("Chỉ đi qua máy chủ trung gian lúc mới mở game", "Uses proxy only during game launch")
                 ),
                 Triple(
                     VpnEngine.PROXY_TUNNEL,
-                    if (isEn) "Intermediate Server 🌐" else "Máy chủ trung gian 🌐",
-                    if (isEn) "Connects via JP/KR/US servers" else "Kết nối qua máy chủ Nhật / Hàn / Mỹ"
+                    config.tr("Máy chủ trung gian 🌐", "Intermediate Server 🌐"),
+                    config.tr("Kết nối qua máy chủ Nhật / Hàn / Mỹ", "Connects via JP/KR/US servers")
                 ),
                 Triple(
                     VpnEngine.EXTERNAL_VPN,
-                    if (isEn) "External VPN App" else "Ứng dụng VPN ngoài",
-                    if (isEn) "Use with your own VPN app" else "Dùng kèm app VPN riêng trên máy"
+                    config.tr("Ứng dụng VPN ngoài", "External VPN App"),
+                    config.tr("Dùng kèm app VPN riêng trên máy", "Use with your own VPN app")
                 )
             ).forEach { (engine, title, desc) ->
                 val isSelected = vpnState.engine == engine
@@ -228,14 +228,14 @@ internal fun SettingsLanguageMarketAccountSection(
             )
 
             Text(
-                text = if (isEn) "Translation Target Language:" else "Ngôn ngữ dịch giao diện Xbox:",
+                text = config.tr("Ngôn ngữ dịch giao diện Xbox:", "Translation Target Language:"),
                 color = TextSecondary,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold
             )
 
             val translateOptions = listOf(
-                Triple(SettingsRepository.TRANSLATE_LANG_OFF, if (isEn) "🚫 Off" else "🚫 Tắt", "translate_lang_off_btn"),
+                Triple(SettingsRepository.TRANSLATE_LANG_OFF, config.tr("🚫 Tắt", "🚫 Off"), "translate_lang_off_btn"),
                 Triple("vi", "🇻🇳 Tiếng Việt", "translate_lang_vi_btn"),
                 Triple("es", "🇪🇸 Español", "translate_lang_es_btn"),
                 Triple("pt", "🇧🇷 Português", "translate_lang_pt_btn"),
@@ -307,30 +307,16 @@ internal fun SettingsLanguageMarketAccountSection(
                     color = DirectCyan.copy(alpha = 0.12f),
                     border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.45f))
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isEn) {
-                                "✓ Active: ${config.appLanguage.effectiveFlag()} ${config.appLanguage.titleEn} (${config.appLanguage.effectiveShortBadge()})"
-                            } else {
-                                "✓ Đang dùng: ${config.appLanguage.effectiveFlag()} ${config.appLanguage.title} (${config.appLanguage.effectiveShortBadge()})"
-                            },
+                            text = "${config.tr("✓ Đang dùng", "✓ Active")}: ${config.appLanguage.effectiveFlag()} ${config.appLanguage.title} (${config.appLanguage.effectiveShortBadge()})",
                             color = DirectCyan,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        if (config.appLanguage != AppLanguage.VIETNAMESE &&
-                            config.appLanguage != AppLanguage.ENGLISH &&
-                            config.appLanguage != AppLanguage.SYSTEM
-                        ) {
-                            Text(
-                                text = "Trang chủ, Thư viện, Máy chủ & HUD đã chuyển sang ${config.appLanguage.title}. Mục Cài đặt giữ Tiếng Việt để bạn dễ điều chỉnh.",
-                                color = TextSecondary,
-                                fontSize = 10.sp
-                            )
-                        }
                     }
                 }
 
@@ -339,7 +325,7 @@ internal fun SettingsLanguageMarketAccountSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(
-                        Triple(AppLanguage.SYSTEM, if (isEn) "🌐 System" else "🌐 Hệ thống", "app_lang_system_button"),
+                        Triple(AppLanguage.SYSTEM, config.tr("🌐 Hệ thống", "🌐 System"), "app_lang_system_button"),
                         Triple(AppLanguage.VIETNAMESE, "🇻🇳 Tiếng Việt", "app_lang_vi_button"),
                         Triple(AppLanguage.ENGLISH, "🇺🇸 English", "app_lang_en_button")
                     ).forEach { (lang, label, tag) ->
@@ -480,17 +466,16 @@ internal fun SettingsLanguageMarketAccountSection(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isEn) "🇺🇸 Default Market (en-US • Recommended)" else "🇺🇸 Thị trường mặc định (en-US • Khuyên dùng)",
+                            text = config.tr("🇺🇸 Thị trường mặc định (en-US • Khuyên dùng)", "🇺🇸 Default Market (en-US • Recommended)"),
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp
                         )
                         Text(
-                            text = if (isEn) {
+                            text = config.tr(
+                                "Tách biệt với ngôn ngữ ứng dụng để tránh bị chuyển hướng sang vùng không hỗ trợ xCloud",
                                 "Separated from app UI language to prevent unsupported region redirects"
-                            } else {
-                                "Tách biệt với ngôn ngữ ứng dụng để tránh bị chuyển hướng sang vùng không hỗ trợ xCloud"
-                            },
+                            ),
                             color = TextSecondary,
                             fontSize = 10.sp
                         )
@@ -535,7 +520,7 @@ internal fun SettingsLanguageMarketAccountSection(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                text = if (isEn) "Return to en-US" else "Quay về en-US",
+                                text = config.tr("Quay về en-US", "Return to en-US"),
                                 color = Color.Black,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.5.sp
@@ -560,7 +545,7 @@ internal fun SettingsLanguageMarketAccountSection(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (isEn) "⚙️ Advanced: Manual Xbox Market Override" else "⚙️ Nâng cao: Tự chọn thị trường Xbox thủ công",
+                        text = config.tr("⚙️ Nâng cao: Tự chọn thị trường Xbox thủ công", "⚙️ Advanced: Manual Xbox Market Override"),
                         color = TextSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -677,7 +662,7 @@ internal fun SettingsLanguageMarketAccountSection(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "Sign Out & Clear Login Session" else "Xóa phiên & Đăng nhập lại Xbox",
+                        text = config.tr("Xóa phiên & Đăng nhập lại Xbox", "Sign Out & Clear Login Session"),
                         color = TextPrimary,
                         fontSize = 12.sp
                     )
@@ -701,7 +686,7 @@ internal fun SettingsLanguageMarketAccountSection(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "View Full Terms" else "Xem điều khoản đầy đủ",
+                        text = config.tr("Xem điều khoản đầy đủ", "View Full Terms"),
                         color = TextPrimary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
@@ -727,7 +712,7 @@ internal fun SettingsLanguageMarketAccountSection(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Tune, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "System Activity Log (Track Probe & App)" else "Nhật ký hệ thống (Log theo dõi App & Trạm đo)",
+                        text = config.tr("Nhật ký hệ thống (Log theo dõi App & Trạm đo)", "System Activity Log (Track Probe & App)"),
                         color = XboxNeonGreen,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
@@ -787,7 +772,7 @@ internal fun SettingsLanguageMarketAccountSection(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Public, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
                     Text(
-                        text = if (isEn) "Copy Diagnostic Report" else "Sao chép báo cáo chẩn đoán",
+                        text = config.tr("Sao chép báo cáo chẩn đoán", "Copy Diagnostic Report"),
                         color = DirectCyan,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold

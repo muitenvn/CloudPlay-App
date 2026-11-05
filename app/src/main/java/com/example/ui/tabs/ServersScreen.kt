@@ -606,13 +606,13 @@ fun ServersScreen(
                             }
                         }
                         currentMeasurement != null && currentMeasurement.status != ServerPingStatus.UNTESTED -> {
-                            val prefix = if (isEn) "Network latency: " else "Độ trễ mạng: "
+                            val prefix = if (isEn) "Latency: " else "Độ trễ: "
                             prefix + currentMeasurement.formatDisplayBadge(isEn, showPort = false)
                         }
                         hasTriedCurrentPing && currentPingMs > 0 -> if (isEn) {
-                            "Network latency: ${currentPingMs}ms"
+                            "Latency: ${currentPingMs}ms"
                         } else {
-                            "Độ trễ mạng: ${currentPingMs}ms"
+                            "Độ trễ: ${currentPingMs}ms"
                         }
                         isTestingAll -> if (isEn) "Testing network latency..." else "Đang đo độ trễ mạng..."
                         hasTriedCurrentPing && currentPingMs <= 0 -> if (isEn) {
@@ -797,25 +797,32 @@ fun ServersScreen(
                             ) {
                                 Text(
                                     text = if (isEn) {
-                                        "⚡ v1.3.0 Upgrade • Smart Selection Algorithm"
+                                        "⚡ Smart Server Selection"
                                     } else {
-                                        "⚡ Cải tiến v1.3 • Thuật toán chọn máy chủ thông minh"
+                                        "⚡ Thuật toán chọn máy chủ thông minh"
                                     },
                                     color = DirectCyan,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(end = 6.dp)
                                 )
                                 Text(
                                     text = if (config.autoBypassEnabled) {
-                                        if (isEn) "Distance ➔ Ping" else "Vị trí gần ➔ Ping"
+                                        if (isEn) "Session ➔ Unlock" else "RTT phiên ➔ Mở khóa"
                                     } else {
-                                        if (isEn) "Ping ➔ Distance" else "Ping thấp ➔ Vị trí"
+                                        if (isEn) "VPN Ping ➔ Session" else "Ping VPN ➔ Phiên"
                                     },
                                     color = XboxNeonGreen,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    softWrap = false,
+                                    maxLines = 1
                                 )
                             }
 
@@ -856,9 +863,9 @@ fun ServersScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isEn) "75% Session RTT + 25% Unlock" else "75% RTT phiên + 25% Mở khóa",
+                                            text = if (isEn) "75% Session • 25% Unlock" else "75% RTT phiên • 25% Mở khóa",
                                             color = if (isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
-                                            fontSize = 9.sp,
+                                            fontSize = 8.8.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -897,9 +904,9 @@ fun ServersScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = if (isEn) "1st: Lowest Ping ➔ Distance" else "Ưu tiên: Ping thấp ➔ Vị trí",
+                                            text = if (isEn) "75% VPN Ping • 25% Session" else "75% Ping VPN • 25% RTT phiên",
                                             color = if (!isAutoOff) Color(0xFFD6EAE0) else TextSecondary,
-                                            fontSize = 9.sp,
+                                            fontSize = 8.8.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )

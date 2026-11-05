@@ -21,8 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -235,15 +237,32 @@ fun diagnoseSessionLag(session: PlaySessionRecord, isEn: Boolean): SessionLagDia
     }
 
     if (session.freezeCount > 0 || dropRatioPct > LagDiagnosticConfig.FAIR_DROP_MAX_PCT) {
-        val evidence = if (isEn) {
-            "Network latency (${session.avgPingMs}ms), network jitter (${session.jitterMs}ms), and decode time (${session.avgDecodeMs}ms) were normal, but ${session.freezeCount} temporary freezes ($dropStr% dropped frames$estSuffix) occurred."
+        val isDecodeElevated = session.avgDecodeMs > LagDiagnosticConfig.SLOW_DECODE_MIN_MS || session.isSlowDecode
+        val evidence = if (isDecodeElevated) {
+            if (isEn) {
+                "Network latency (${session.avgPingMs}ms) and network jitter (${session.jitterMs}ms) were normal, while decode time was elevated (${session.avgDecodeMs}ms, $dropStr% dropped frames$estSuffix) with ${session.freezeCount} temporary freezes."
+            } else {
+                "Độ trễ mạng (${session.avgPingMs}ms) và độ biến động mạng (${session.jitterMs}ms) đều bình thường, thời gian giải mã cao (${session.avgDecodeMs}ms, rớt $dropStr%$estSuffix) kèm ${session.freezeCount} lần đứng hình tạm thời."
+            }
         } else {
-            "Độ trễ mạng (${session.avgPingMs}ms), độ biến động mạng (${session.jitterMs}ms) và thời gian giải mã (${session.avgDecodeMs}ms) đều bình thường, nhưng có ${session.freezeCount} lần đứng hình tạm thời (rớt $dropStr%$estSuffix)."
+            if (isEn) {
+                "Network latency (${session.avgPingMs}ms), network jitter (${session.jitterMs}ms), and decode time (${session.avgDecodeMs}ms) were normal, but ${session.freezeCount} temporary freezes ($dropStr% dropped frames$estSuffix) occurred."
+            } else {
+                "Độ trễ mạng (${session.avgPingMs}ms), độ biến động mạng (${session.jitterMs}ms) và thời gian giải mã (${session.avgDecodeMs}ms) đều bình thường, nhưng có ${session.freezeCount} lần đứng hình tạm thời (rớt $dropStr%$estSuffix)."
+            }
         }
-        val suggestion = if (isEn) {
-            "Suggestion: This pattern may come from remote cloud encoder spikes or background tasks on the device rather than network latency."
+        val suggestion = if (isDecodeElevated) {
+            if (isEn) {
+                "Suggestion: Network latency was stable; locking 60Hz refresh rate or lowering stream resolution to 720p can help reduce hardware decode spikes."
+            } else {
+                "Gợi ý: Mạng ổn định, hiện tượng đứng hình có thể do tải giải mã trên thiết bị hoặc luồng đám mây (không phải do độ trễ mạng)."
+            }
         } else {
-            "Gợi ý: Hiện tượng này có thể đến từ phía luồng máy chủ đám mây hoặc tác vụ chạy nền trên thiết bị, không phải do độ trễ mạng."
+            if (isEn) {
+                "Suggestion: This pattern may come from remote cloud encoder spikes or background tasks on the device rather than network latency."
+            } else {
+                "Gợi ý: Hiện tượng này có thể đến từ phía luồng máy chủ đám mây hoặc tác vụ chạy nền trên thiết bị, không phải do độ trễ mạng."
+            }
         }
         return SessionLagDiagnosis(
             isInsufficientData = false,
@@ -789,7 +808,9 @@ private fun SummaryStatTile(
                     fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 6.dp)
                 )
                 if (!statusBadgeText.isNullOrBlank()) {
                     Text(
@@ -798,6 +819,7 @@ private fun SummaryStatTile(
                         fontFamily = SpaceGroteskFontFamily,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
+                        softWrap = false,
                         maxLines = 1
                     )
                 }
@@ -1148,8 +1170,9 @@ private fun SessionDetailDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(9.dp)
             ) {
                 // Header
                 Row(
@@ -1222,7 +1245,7 @@ private fun SessionDetailDialog(
                     } else {
                         String.format(
                             Locale.US,
-                            "Khung hình bị rớt %.1f%% • Đứng hình tạm thời %.1f lần/phút • Độ trễ mạng %dms • Độ biến động mạng %dms",
+                            "Rớt khung hình %.1f%% • Đứng hình %.1f lần/phút • Độ trễ %dms • Biến động %dms",
                             verdict.dropRatioPct,
                             verdict.freezesPerMinute,
                             session.avgPingMs,
@@ -1254,7 +1277,7 @@ private fun SessionDetailDialog(
                     ) {
                         Column(
                             modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1287,7 +1310,9 @@ private fun SessionDetailDialog(
                                 color = TextSecondary,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 9.5.sp,
-                                maxLines = 2
+                                lineHeight = 13.5.sp,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

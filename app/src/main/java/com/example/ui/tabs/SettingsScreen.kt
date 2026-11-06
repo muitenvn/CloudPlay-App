@@ -361,18 +361,18 @@ fun SettingsScreen(
                     val summaryLines = if (isEn) {
                         listOf(
                             "• Independent app, not affiliated with Microsoft, Xbox, or Epic Games.",
-                            "• Using VPN/region switching may violate third-party terms; you are responsible for your own use.",
-                            "• Public servers are operated by independent third parties.",
-                            "• The app does not collect your account credentials or passwords.",
+                            "• Optional network/proxy settings are your choice; please use the service in compliance with Microsoft's terms.",
+                            "• Free public servers are operated by independent third parties.",
+                            "• Your password is never collected; settings stay on your phone.",
                             "• IP geolocation by DB-IP.com (CC BY 4.0)."
                         )
                     } else {
                         listOf(
                             "• Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games.",
-                            "• Dùng VPN/đổi vùng có thể vi phạm điều khoản bên thứ ba; người dùng tự chịu trách nhiệm.",
-                            "• Máy chủ công cộng do bên thứ ba độc lập vận hành.",
-                            "• Ứng dụng không thu thập tài khoản hay mật khẩu của bạn.",
-                            "• Dữ liệu định vị IP: IP geolocation by DB-IP.com (CC BY 4.0)."
+                            "• Kết nối mạng/máy chủ trung gian là tùy chọn; bạn tự quyết định và tuân thủ quy định của Microsoft.",
+                            "• Máy chủ công cộng miễn phí do các bên thứ ba độc lập vận hành.",
+                            "• Không thu thập mật khẩu; mọi cài đặt chỉ lưu trên điện thoại của bạn.",
+                            "• Dữ liệu vị trí IP: IP geolocation by DB-IP.com (CC BY 4.0)."
                         )
                     }
 

@@ -1,67 +1,57 @@
-# CloudPlay (Trình duyệt hỗ trợ Xbox Cloud Gaming trên Android)
+# CloudPlay – Hỗ trợ chơi Xbox Cloud Gaming trên Android
 
-**CloudPlay** là một ứng dụng Android nhỏ gọn đóng gói trang web `xbox.com/play` bên trong WebView, kèm theo một số tiện ích cơ bản hỗ trợ người dùng chơi Xbox Cloud Gaming trên điện thoại (lấy cảm hứng từ tiện ích mở rộng [Better-xCloud](https://github.com/redphx/better-xcloud) theo giấy phép MIT).
+**CloudPlay** là ứng dụng gọn nhẹ giúp bạn mở và chơi **Xbox Cloud Gaming** (`xbox.com/play`) thuận tiện hơn trên điện thoại Android, tích hợp sẵn tay cầm cảm ứng trên màn hình, bộ dịch ngôn ngữ và các tùy chỉnh độ nét hình ảnh dễ dùng (lấy cảm hứng từ tiện ích mã nguồn mở [Better-xCloud](https://github.com/redphx/better-xcloud)).
 
-**CloudPlay** is a lightweight Android WebView wrapper for `xbox.com/play` with basic helper utilities for playing Xbox Cloud Gaming on mobile devices (inspired by the open-source [Better-xCloud](https://github.com/redphx/better-xcloud) project under the MIT License).
-
----
-
-## Cách dùng cơ bản / How to Use
-
-1. **Đăng nhập tài khoản Microsoft:**
-   - Mở ứng dụng và đăng nhập tài khoản Microsoft trực tiếp trên trang `xbox.com/play`.
-   - **Fortnite** được Microsoft cho phép chơi miễn phí trên đám mây (chỉ cần tài khoản Microsoft thường). Các trò chơi khác trong danh mục yêu cầu tài khoản có gói **Xbox Game Pass**.
-2. **Mở khóa vùng khi vào game (nếu ở Việt Nam hoặc khu vực chưa hỗ trợ):**
-   - Xbox Cloud Gaming hiện chưa mở chính thức tại Việt Nam nên cần đi qua máy chủ trung gian (proxy/VPN) ở Nhật Bản, Hàn Quốc hoặc Mỹ lúc bấm mở game.
-   - Sau khi hình ảnh trò chơi đã hiện lên màn hình, bạn có thể tắt VPN (hoặc bật tùy chọn *Tự tắt VPN khi vào game*) để kết nối truyền hình ảnh chạy trực tiếp qua mạng của bạn, đỡ bị trễ hơn so với việc đi vòng qua proxy suốt lúc chơi.
-3. **Điều khiển trò chơi:**
-   - **Tay cầm rời:** Cắm cáp USB-C hoặc kết nối Bluetooth với tay cầm Xbox, PlayStation hoặc tay cầm điện thoại để chơi bình thường.
-   - **Tay cầm cảm ứng:** Nếu không có tay cầm rời, chạm vào nút tròn nổi trên màn hình khi đang ở trong game để bật bộ nút bấm cảm ứng ảo (hoặc chọn chế độ cảm ứng riêng của trò chơi nếu trò chơi đó có hỗ trợ).
-4. **Chỉnh độ phân giải và xử lý lỗi thường gặp:**
-   - Trong mục **Cài đặt**, bạn có thể giới hạn mức độ phân giải/băng thông (720p hoặc 1080p) tùy theo mạng Wi-Fi hay 4G/5G đang dùng.
-   - Nếu gặp thông báo giới hạn vùng khi mở game, hãy sang tab **Máy chủ** chọn một máy chủ khác còn hoạt động hoặc dùng một ứng dụng VPN bên ngoài rồi thử lại.
-   - Nếu màn hình bị đứng hoặc mất tiếng, mở menu nút nổi trong game và bấm **Tải lại** để kết nối lại phiên đang chơi.
+**CloudPlay** is a lightweight Android app designed to make playing **Xbox Cloud Gaming** (`xbox.com/play`) more convenient on mobile phones, with built-in touch controls, menu translation, and simple display settings (inspired by the open-source [Better-xCloud](https://github.com/redphx/better-xcloud) project).
 
 ---
 
-## Các tính năng có trong ứng dụng / Features
+## Hướng dẫn sử dụng nhanh / Quick Start
 
-- **Trình duyệt WebView cho `xbox.com/play`:** Lưu danh sách phím tắt mở nhanh game, lọc danh mục cơ bản và xem lại lịch sử thời lượng các phiên đã chơi trên máy.
-- **Hỗ trợ đổi máy chủ trung gian (Proxy / VPN):** Tích hợp danh sách máy chủ công cộng kèm công cụ đo độ trễ (ping) cơ bản và hỗ trợ nhập proxy HTTP/SOCKS5 thủ công để vượt bước kiểm tra vùng khi bắt đầu vào game.
-- **Bàn phím / Tay cầm ảo trên màn hình:** Hiển thị các nút bấm ảo cơ bản (ABXY, D-Pad, 2 cần xoay, LB/RB/LT/RT), cho phép kéo đổi vị trí nút, chỉnh kích thước, độ mờ và hỗ trợ nghiêng máy (Gyro) cơ bản. Không có tính năng bắn liên thanh (Turbo/Macro) hay can thiệp vào trò chơi.
-- **Tùy chỉnh hiển thị & Dịch menu trang web:** Cho phép giới hạn mức băng thông WebRTC, chỉnh độ sáng/tương phản CSS cơ bản, và dịch các nút menu tiếng Anh ngoài sảnh chờ của trang web Xbox sang tiếng Việt (kết hợp từ điển có sẵn và Google Translate).
-- **Quay màn hình cơ bản:** Hỗ trợ ghi lại màn hình phiên chơi ra tệp `.mp4` lưu trên máy.
-
----
-
-## Bản phát hành & Cập nhật (Releases)
-
-- **Cách đóng gói bản phát hành:** Mỗi khi có thay đổi mã nguồn trên nhánh chính hoặc tạo thẻ phiên bản (`v*`), GitHub Actions sẽ tự động biên dịch tệp cài đặt APK và đăng lên mục **GitHub Releases**.
-- **🤖 AI mô tả bản phát hành (`scripts/generate_release_notes.py`):** Khi tạo bản phát hành mới, con AI (sử dụng Gemini / GitHub Models) sẽ đọc trực tiếp `git diff` và lịch sử commit của bản dựng đó để tóm tắt thành các gạch đầu dòng ngắn gọn, trung thực về những lỗi vừa sửa hoặc tính năng vừa thêm (không lặp lại mô tả cũ và không dùng từ ngữ quảng cáo phóng đại), kèm theo mã kiểm tra `SHA-256`.
-- **Cài đặt cập nhật:** Các bản APK được ký bằng cùng một khóa ký cố định của dự án để người dùng có thể tải tệp APK mới về và cài đè lên phiên bản cũ mà không cần gỡ ứng dụng hay đăng nhập lại từ đầu.
-
----
-
-## Bảo mật & Quyền riêng tư / Security & Privacy
-
-Chi tiết được trình bày tại [SECURITY.md](SECURITY.md):
-
-1. **Đăng nhập trực tiếp trên trang Microsoft:** Việc đăng nhập diễn ra trên tên miền của Microsoft (`login.live.com`, `xbox.com`). Ứng dụng không thu thập mật khẩu của người dùng.
-2. **Lưu ý về máy chủ công cộng:** Các máy chủ lấy từ danh sách công cộng (như VPNGate, ProxyScrape) do bên thứ ba vận hành và chỉ được ứng dụng kiểm tra khả năng kết nối. Không sử dụng các máy chủ công cộng này cho các giao dịch nhạy cảm; ứng dụng cũng tự động ngắt chuyển tiếp khi phát hiện các đường dẫn thanh toán của Microsoft.
-3. **Lưu trữ nội bộ trên thiết bị:** Cài đặt, danh sách game yêu thích và lịch sử phiên chơi chỉ lưu trong bộ nhớ ứng dụng trên thiết bị của bạn.
+1. **Đăng nhập tài khoản:**
+   - Mở ứng dụng và đăng nhập bằng tài khoản Microsoft của bạn ngay trên trang Xbox chính thức.
+   - Trò chơi **Fortnite** được Microsoft hỗ trợ chơi miễn phí trên đám mây (chỉ cần tài khoản Microsoft thông thường). Các trò chơi khác trong thư viện cần tài khoản có gói **Xbox Game Pass**.
+2. **Kết nối mạng ổn định:**
+   - Để hình ảnh mượt và bấm nút không bị trễ, bạn nên ngồi gần bộ phát **Wi-Fi 5GHz** hoặc dùng mạng **4G/5G** có sóng khỏe.
+   - Nếu bạn có sử dụng máy chủ kết nối tùy chọn (VPN/Proxy), bạn có thể kiểm tra độ trễ (ping) trong mục **Máy chủ** để chọn kết nối ổn định nhất, hoặc dùng mạng trực tiếp khi đang chơi để giảm độ trễ.
+3. **Cách điều khiển trong game:**
+   - **Có tay cầm rời:** Chỉ cần kết nối tay cầm Bluetooth hoặc cắm qua cổng USB-C là có thể chơi ngay.
+   - **Không có tay cầm rời:** Chạm vào nút tròn nổi trên màn hình khi vào game để bật **tay cầm ảo cảm ứng**. Bạn có thể kéo các nút tới vị trí vừa tay hoặc phóng to/thu nhỏ tùy ý.
+4. **Chỉnh độ nét & Mẹo xử lý nhanh:**
+   - Trong mục **Cài đặt**, bạn có thể chọn chế độ hình ảnh **Tự động** hoặc **Tiết kiệm dữ liệu (720p)** nếu muốn máy mát và đỡ tốn dung lượng 4G/5G.
+   - Nếu đang chơi mà hình ảnh bị khựng hoặc mất tiếng, hãy chạm vào nút tròn nổi trên màn hình và bấm **Tải lại** để làm mới hình ảnh mà không cần thoát game.
 
 ---
 
-## Miễn trừ trách nhiệm / Disclaimer
+## Tính năng chính / Main Features
 
-- **Dự án cộng đồng độc lập:** Ứng dụng này không liên kết, không được tài trợ hay phê duyệt bởi Microsoft Corporation hay Xbox. Các nhãn hiệu *Xbox*, *Xbox Cloud Gaming* và *Fortnite* thuộc về chủ sở hữu tương ứng.
-- **Trách nhiệm sử dụng:** Người dùng tự chịu trách nhiệm tuân thủ Điều khoản Dịch vụ của Microsoft khi sử dụng dịch vụ.
-- **Giấy phép mã nguồn mở:** Phát hành theo [Giấy phép MIT (MIT License)](https://opensource.org/licenses/MIT), cung cấp "nguyên trạng" (AS-IS) không kèm theo bất kỳ cam kết bảo đảm nào.
-- **Điều khoản & Quyền riêng tư:** Xem chi tiết tại [Điều khoản sử dụng & Quyền riêng tư (Terms & Privacy)](https://muitenvn.github.io/CloudPlay-App/terms.html).
+- **Giao diện gọn gàng, dễ tìm game:** Lưu lại các trò chơi bạn yêu thích, lọc game theo thể loại và xem lại lịch sử những lần chơi gần đây kèm đánh giá độ mượt của mạng.
+- **Tay cầm cảm ứng tùy chỉnh tự do:** Hỗ trợ đầy đủ các nút bấm tiêu chuẩn, cho phép kéo thả vị trí, chỉnh độ trong suốt, độ rung phản hồi và lưu bố cục nút riêng cho từng trò chơi. Hoàn toàn **không** có các tính năng gian lận hay bắn tự động.
+- **Hỗ trợ 12 ngôn ngữ & Dịch menu:** Giao diện ứng dụng và các mục menu trên trang Xbox có thể hiển thị bằng tiếng Việt, tiếng Anh và 10 ngôn ngữ phổ biến khác.
+- **Tùy chỉnh hình ảnh & Quay màn hình:** Dễ dàng chỉnh độ sáng, độ nét, giới hạn mức tiêu thụ mạng cho phù hợp với điện thoại của bạn và ghi lại video màn hình khi đang chơi.
+- **Kiểm tra độ trễ mạng (Tùy chọn):** Cung cấp công cụ đo độ trễ thực tế và quản lý kết nối máy chủ tùy chọn do người dùng tự quyết định.
 
 ---
 
-## Hướng dẫn tự biên dịch / Build Instructions
+## Cập nhật phiên bản mới / Updates
 
-1. Mở thư mục dự án bằng **Android Studio** (cài đặt sẵn Android SDK 34 trở lên).
-2. Đồng bộ Gradle (`Sync Project with Gradle Files`) và chạy cấu hình `app` trên thiết bị Android (Android 8.0 trở lên), hoặc chạy lệnh `gradle assembleDebug` từ dòng lệnh.
+- Bạn có thể kiểm tra và tải bản cập nhật mới nhất ngay trong mục **Cài đặt** của ứng dụng hoặc tại trang [GitHub Releases](https://github.com/muitenvn/CloudPlay-App/releases).
+- Khi cài bản mới, bạn chỉ cần tải tệp APK về và bấm **Cài đặt đè lên bản cũ** — mọi cài đặt tay cầm và tài khoản đã đăng nhập sẽ được giữ nguyên.
+
+---
+
+## An toàn & Quyền riêng tư / Safety & Privacy
+
+Xem chi tiết tại [Chính sách Bảo mật (SECURITY.md)](SECURITY.md):
+
+1. **An toàn tài khoản:** Bạn đăng nhập trực tiếp trên trang chính thức của Microsoft (`login.live.com`, `xbox.com`). Ứng dụng hoàn toàn không nhìn thấy và không lưu mật khẩu của bạn.
+2. **Bảo vệ khi thanh toán:** Khi bạn mở các trang mua hàng hoặc quản lý tài khoản, ứng dụng tự động dùng kết nối trực tiếp để giữ an toàn cho thông tin thanh toán của bạn.
+3. **Dữ liệu nằm trên máy của bạn:** Mọi cài đặt, danh sách game yêu thích và lịch sử chơi chỉ lưu ngay trên điện thoại của bạn, không gửi đi đâu khác.
+
+---
+
+## Lưu ý quan trọng / Disclaimer
+
+- **Ứng dụng độc lập:** CloudPlay là dự án cá nhân/cộng đồng độc lập, **không** liên kết, không thuộc sở hữu và không được tài trợ bởi Microsoft Corporation, Xbox hay Epic Games.
+- **Trách nhiệm người dùng:** Người dùng tự chịu trách nhiệm tuân thủ Điều khoản Dịch vụ của Microsoft và quy định tại khu vực của mình khi sử dụng dịch vụ.
+- **Điều khoản & Quyền riêng tư đầy đủ:** Xem tại [Trang Điều khoản & Quyền riêng tư](https://muitenvn.github.io/CloudPlay-App/terms.html).

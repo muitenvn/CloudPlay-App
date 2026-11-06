@@ -148,7 +148,7 @@ fun HowToUseGuideDialog(
                                 letterSpacing = 0.8.sp
                             )
                             Text(
-                                text = config.tr("Các bước đăng nhập, mở khóa vùng và chỉnh nút điều khiển", "Sign in, unlock region, and set up controls"),
+                                text = config.tr("Các bước đăng nhập, kiểm tra mạng và chỉnh nút điều khiển", "Sign in, check network, and set up controls"),
                                 color = XboxNeonGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -245,11 +245,11 @@ fun HowToUseGuideDialog(
                             item {
                                 GuideStepCard(
                                     stepNum = "2",
-                                    badge = config.tr("Mở vùng", "Region"),
-                                    title = config.tr("Bật VPN/Proxy lúc mở game rồi tắt khi đã vào", "Use VPN/Proxy to launch, then turn it off in-game"),
+                                    badge = config.tr("Kết nối", "Network"),
+                                    title = config.tr("Chọn kết nối mạng ổn định trước khi chơi", "Choose a stable network connection"),
                                     desc = config.tr(
-                                        "• Xbox Cloud chưa hỗ trợ chính thức ở Việt Nam nên cần bật VPN/Proxy lúc bấm mở game.\n• Khi hình ảnh game đã hiện lên, hãy tắt VPN (hoặc bật 'Tự tắt VPN') để truyền hình ảnh trực tiếp qua mạng của bạn, đỡ bị trễ hơn.",
-                                        "• If your region is unsupported, enable VPN/Proxy when launching a game.\n• Once video starts, turn off VPN (or use 'Auto turn off VPN') so the video stream uses your direct connection."
+                                        "• Ưu tiên dùng mạng Wi-Fi 5GHz hoặc 4G/5G có sóng khỏe để hình ảnh mượt và ít trễ.\n• Nếu bạn có dùng máy chủ trung gian (VPN/Proxy tùy chọn), việc chuyển về mạng trực tiếp khi đang chơi sẽ giúp giảm độ trễ nút bấm.",
+                                        "• Use a stable 5GHz Wi-Fi or strong 4G/5G signal for smooth video and responsive controls.\n• If you use an optional relay server (VPN/Proxy), switching back to direct connection during gameplay helps reduce input lag."
                                     )
                                 )
                             }
@@ -271,10 +271,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = config.tr("Vì sao nên tắt VPN sau khi vào game?", "Why turn off VPN after the game starts?"),
+                                    title = config.tr("Mẹo giữ kết nối mượt và giảm độ trễ", "Tips for smooth connection and low latency"),
                                     content = config.tr(
-                                        "Xbox chỉ kiểm tra quốc gia lúc bạn bấm mở trò chơi. Khi đã vào trong game, việc tắt VPN giúp dữ liệu hình ảnh không phải đi vòng qua máy chủ trung gian nên thao tác đỡ trễ hơn.",
-                                        "Xbox only checks your region when launching a game. Once video starts, turning off the relay avoids routing video traffic through an extra server."
+                                        "Khi truyền hình ảnh trò chơi trực tiếp qua mạng của bạn mà không đi vòng qua máy chủ trung gian, tín hiệu tay cầm và hình ảnh sẽ phản hồi nhanh hơn. Bạn có thể xem độ trễ (ping) thực tế ngay trên màn hình.",
+                                        "Streaming video directly over your own network without routing through an extra relay server keeps controls and video more responsive. You can check your real-time latency (ping) on screen."
                                     )
                                 )
                             }
@@ -332,10 +332,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Speed,
                                     iconColor = WarningAmber,
-                                    title = config.tr("Báo lỗi vùng (Region) hoặc không vào được game?", "Region error or game won't start?"),
+                                    title = config.tr("Không kết nối được hoặc tải trang chậm?", "Connection error or slow loading?"),
                                     content = config.tr(
-                                        "Máy chủ công cộng đôi khi bị quá tải hoặc ngừng hoạt động. Hãy sang tab 'Máy chủ' bấm Đo Ping để chọn máy chủ khác, hoặc dùng ứng dụng VPN riêng trên máy của bạn.",
-                                        "Public proxy servers can go offline or get crowded. Open the 'Servers' tab to test ping and pick another server, or use your own external VPN app."
+                                        "Các máy chủ công cộng miễn phí đôi khi bị đông người dùng hoặc tạm ngưng. Bạn có thể sang mục 'Máy chủ' bấm Đo Ping để kiểm tra độ trễ, hoặc chuyển sang mạng trực tiếp / kết nối riêng của bạn.",
+                                        "Free public servers can sometimes get busy or go offline. Open the 'Servers' tab to test ping and check latency, or switch to your direct connection."
                                     )
                                 )
                             }

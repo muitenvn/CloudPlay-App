@@ -170,51 +170,51 @@ fun UserTermsAgreementDialog(
                 ) {
                     LegalSection(
                         icon = Icons.Default.Gavel,
-                        title = if (isEn) "1. Non-Affiliation Disclaimer" else "1. Tuyên Bố Độc Lập",
+                        title = if (isEn) "1. Independent App" else "1. Ứng Dụng Độc Lập",
                         content = if (isEn) {
-                            "CloudPlay is an independent open-source application and is NOT affiliated with, owned by, sponsored, or authorized by Microsoft Corporation, Xbox, or Epic Games. All trademarks (Xbox, Xbox Cloud Gaming, Game Pass, Microsoft) belong to their respective owners."
+                            "CloudPlay is an independent application and is NOT affiliated with, owned by, or sponsored by Microsoft Corporation, Xbox, or Epic Games. All game names and logos belong to their respective owners."
                         } else {
-                            "CloudPlay là ứng dụng mã nguồn mở độc lập, HOÀN TOÀN KHÔNG liên kết, không thuộc sở hữu, không được tài trợ hay ủy quyền bởi Microsoft Corporation, Xbox hay Epic Games. Mọi nhãn hiệu thuộc về chủ sở hữu tương ứng."
+                            "CloudPlay là ứng dụng độc lập, HOÀN TOÀN KHÔNG liên kết, không thuộc sở hữu và không được tài trợ bởi Microsoft, Xbox hay Epic Games. Tên và hình ảnh các trò chơi thuộc về chủ sở hữu tương ứng."
                         }
                     )
 
                     LegalSection(
                         icon = Icons.Default.Public,
-                        title = if (isEn) "2. VPN, Proxy & Third-Party Public Servers" else "2. VPN, Proxy & Máy Chủ Công Cộng Bên Thứ Ba",
+                        title = if (isEn) "2. Optional Network & Public Servers" else "2. Kết Nối Mạng Tùy Chọn & Máy Chủ Công Cộng",
                         content = if (isEn) {
-                            "• Using VPN/proxy or switching regions may violate third-party terms of service (Microsoft/Xbox/publishers); you decide whether to enable VPN and assume full responsibility for your account.\n• Public relay servers (VPNGate, ProxyScrape) are operated by independent third parties and may experience instability or disconnection."
+                            "• Using optional VPN/proxy settings is your own choice; please make sure your use complies with the terms of Microsoft/Xbox and game publishers.\n• Free public servers are run by independent third parties and may sometimes be slow or disconnect."
                         } else {
-                            "• Việc dùng VPN/proxy hoặc đổi vùng có thể vi phạm điều khoản dịch vụ của bên thứ ba (Microsoft/Xbox/nhà phát hành); bạn tự quyết định bật/tắt VPN và tự chịu trách nhiệm với tài khoản của mình.\n• Máy chủ công cộng (VPNGate, ProxyScrape) do bên thứ ba độc lập vận hành, có thể chậm hoặc ngắt kết nối."
+                            "• Tính năng máy chủ trung gian (VPN/Proxy) là tùy chọn do bạn tự quyết định bật hoặc tắt; bạn tự chịu trách nhiệm sử dụng đúng quy định của Microsoft/Xbox và nhà phát hành game.\n• Các máy chủ công cộng miễn phí do bên thứ ba vận hành nên đôi khi có thể chậm hoặc mất kết nối."
                         }
                     )
 
                     LegalSection(
                         icon = Icons.Default.Lock,
-                        title = if (isEn) "3. Privacy, Local Storage & IP Geolocation" else "3. Quyền Riêng Tư, Lưu Trữ Cục Bộ & Định Vị IP",
+                        title = if (isEn) "3. Account Safety & Privacy" else "3. An Toàn Tài Khoản & Quyền Riêng Tư",
                         content = if (isEn) {
-                            "• No credential collection: Sign-in occurs directly on official Microsoft pages (login.live.com, xbox.com) over HTTPS.\n• Payment isolation: Relay servers are automatically bypassed on external or payment pages.\n• Settings, bookmarks, and session history are stored locally on your device.\n• IP geolocation by DB-IP.com (CC BY 4.0)."
+                            "• We never collect your password: You sign in directly on Microsoft's official pages (login.live.com, xbox.com).\n• Safe checkout: Optional relay servers are automatically paused on payment pages.\n• Your settings and play history stay on your phone.\n• IP geolocation by DB-IP.com (CC BY 4.0)."
                         } else {
-                            "• Không thu thập tài khoản/mật khẩu: Đăng nhập diễn ra trực tiếp trên trang chính thức của Microsoft (login.live.com, xbox.com) qua HTTPS.\n• Tự động ngắt máy chủ trung gian khi mở trang thanh toán hoặc trang ngoài.\n• Cài đặt và lịch sử phiên chơi chỉ lưu cục bộ trên máy bạn.\n• Nguồn định vị IP: IP geolocation by DB-IP.com (CC BY 4.0)."
+                            "• Không thu thập mật khẩu: Bạn đăng nhập trực tiếp trên trang chính thức của Microsoft (login.live.com, xbox.com).\n• Bảo vệ khi thanh toán: Tự động ngắt máy chủ trung gian khi mở trang mua hàng hoặc quản lý tài khoản.\n• Cài đặt và lịch sử chơi chỉ lưu ngay trên điện thoại của bạn.\n• Dữ liệu vị trí IP: IP geolocation by DB-IP.com (CC BY 4.0)."
                         }
                     )
 
                     LegalSection(
                         icon = Icons.Default.SportsEsports,
-                        title = if (isEn) "4. Fair Play & User Responsibility" else "4. Chơi Công Bằng & Trách Nhiệm Người Dùng",
+                        title = if (isEn) "4. Fair Play" else "4. Chơi Công Bằng",
                         content = if (isEn) {
-                            "CloudPlay contains NO cheats, NO macro/turbo fire, and NEVER modifies game memory. You are solely responsible for your own conduct and compliance with Microsoft Services Agreement and applicable laws."
+                            "CloudPlay only provides standard touch controls and display settings—NO cheats, NO auto-fire macros, and NO game modification. You are responsible for following Microsoft's rules when playing."
                         } else {
-                            "CloudPlay KHÔNG chứa gian lận (cheat), KHÔNG có macro/turbo và KHÔNG can thiệp dữ liệu game. Bạn tự chịu trách nhiệm về hành vi sử dụng của chính mình theo Thỏa thuận Dịch vụ Microsoft và pháp luật hiện hành."
+                            "CloudPlay chỉ hỗ trợ nút bấm cảm ứng tiêu chuẩn và chỉnh độ nét màn hình — KHÔNG có gian lận (cheat), KHÔNG có bắn tự động (macro/turbo) và KHÔNG can thiệp vào trò chơi."
                         }
                     )
 
                     LegalSection(
                         icon = Icons.Default.Code,
-                        title = if (isEn) "5. 'AS IS' Provision & Limitation of Liability" else "5. Cung Cấp 'Như Hiện Có' & Giới Hạn Trách Nhiệm",
+                        title = if (isEn) "5. Provided As-Is & Responsibility" else "5. Giới Hạn Trách Nhiệm",
                         content = if (isEn) {
-                            "The app is provided 'AS IS' and 'AS AVAILABLE' without warranty of continuous operation or compatibility with Microsoft/Xbox services. To the maximum extent permitted by law, the developer is not liable for indirect damages, account suspension, data/progress loss, or mobile data charges."
+                            "The app is provided free of charge 'as is'. The developer is not responsible for network interruptions, account issues, game progress, or mobile data charges (4G/5G) from your carrier."
                         } else {
-                            "Ứng dụng được cung cấp 'như hiện có' (AS IS) và 'theo khả năng hiện có', không bảo đảm hoạt động liên tục hay tương thích cố định với dịch vụ Microsoft/Xbox. Trong phạm vi pháp luật cho phép, nhà phát triển không chịu trách nhiệm về thiệt hại gián tiếp, khóa tài khoản, mất dữ liệu/tiến trình game hay cước dữ liệu di động."
+                            "Ứng dụng được cung cấp miễn phí như hiện có. Nhà phát triển không chịu trách nhiệm nếu mạng gián đoạn, phát sinh vấn đề tài khoản hay cước phí dữ liệu di động (4G/5G) từ nhà mạng của bạn."
                         }
                     )
                 }

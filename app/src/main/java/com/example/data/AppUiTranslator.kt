@@ -1451,6 +1451,31 @@ object AppUiTranslator {
                 "fr" -> "Rouvrir la boîte d'acceptation"; "de" -> "Zustimmungsdialog erneut öffnen"; "ru" -> "Открыть окно принятия условий"; "th" -> "เปิดหน้าต่างยอมรับข้อกำหนดอีกครั้ง"; "id" -> "Buka Ulang Dialog Persetujuan"
                 else -> en
             }
+            "Sign in, check network, and set up controls" -> return when (lang) {
+                "zh" -> "登录账号、检查网络连接并设置操控方式"; "ja" -> "サインイン・通信確認・操作設定のガイド"; "ko" -> "로그인, 네트워크 확인 및 컨트롤 설정"; "es" -> "Inicia sesión, revisa la red y configura controles"; "pt" -> "Entre na conta, verifique a rede e configure controles"
+                "fr" -> "Connexion, vérification réseau et configuration des commandes"; "de" -> "Anmelden, Netzwerk prüfen & Steuerung einrichten"; "ru" -> "Вход, проверка сети и настройка управления"; "th" -> "ลงชื่อเข้าใช้ ตรวจสอบเครือข่าย และตั้งค่าปุ่มควบคุม"; "id" -> "Masuk, periksa jaringan, dan atur kontrol"
+                else -> en
+            }
+            "Network" -> return when (lang) {
+                "zh" -> "网络"; "ja" -> "通信"; "ko" -> "네트워크"; "es" -> "Red"; "pt" -> "Rede"
+                "fr" -> "Réseau"; "de" -> "Netzwerk"; "ru" -> "Сеть"; "th" -> "เครือข่าย"; "id" -> "Jaringan"
+                else -> en
+            }
+            "Choose a stable network connection" -> return when (lang) {
+                "zh" -> "在开始游戏前选择稳定的网络连接"; "ja" -> "プレイ前に安定した通信接続を選択"; "ko" -> "플레이 전 안정적인 네트워크 연결 선택"; "es" -> "Elige una conexión de red estable antes de jugar"; "pt" -> "Escolha uma conexão de rede estável antes de jogar"
+                "fr" -> "Choisissez une connexion réseau stable avant de jouer"; "de" -> "Wähle vor dem Spielen eine stabile Netzwerkverbindung"; "ru" -> "Выберите стабильное подключение к сети перед игрой"; "th" -> "เลือกการเชื่อมต่อเครือข่ายที่เสถียรก่อนเริ่มเล่น"; "id" -> "Pilih koneksi jaringan yang stabil sebelum bermain"
+                else -> en
+            }
+            "Tips for smooth connection and low latency" -> return when (lang) {
+                "zh" -> "保持流畅连接与降低延迟的技巧"; "ja" -> "快適な通信と低遅延を保つコツ"; "ko" -> "원활한 연결 및 지연 시간 감소 팁"; "es" -> "Consejos para una conexión fluida y baja latencia"; "pt" -> "Dicas para conexão estável e baixa latência"
+                "fr" -> "Astuces pour une connexion fluide et une faible latence"; "de" -> "Tipps für stabile Verbindung und niedrige Latenz"; "ru" -> "Советы для плавного соединения и низкого пинга"; "th" -> "เคล็ดลับการเชื่อมต่อที่ลื่นไหลและลดความหน่วง"; "id" -> "Tips koneksi lancar dan latensi rendah"
+                else -> en
+            }
+            "Connection error or slow loading?" -> return when (lang) {
+                "zh" -> "无法连接或页面加载缓慢？"; "ja" -> "接続エラーや読み込みが遅い場合は？"; "ko" -> "연결 오류 또는 페이지 로딩이 느린가요?"; "es" -> "¿Error de conexión o carga lenta?"; "pt" -> "Erro de conexão ou carregamento lento?"
+                "fr" -> "Erreur de connexion ou chargement lent ?"; "de" -> "Verbindungsfehler oder langsames Laden?"; "ru" -> "Ошибка подключения или долгая загрузка?"; "th" -> "เชื่อมต่อไม่ได้หรือโหลดหน้าเว็บช้า?"; "id" -> "Gagal terhubung atau pemuatan lambat?"
+                else -> en
+            }
         }
         return en
     }

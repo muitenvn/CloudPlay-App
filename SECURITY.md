@@ -1,53 +1,52 @@
-# Chính sách Bảo mật / Security Policy
+# Chính sách An toàn & Quyền riêng tư / Security & Privacy Policy
 
-Tài liệu này trình bày các nguyên tắc bảo vệ tài khoản, quyền riêng tư dữ liệu và cách báo cáo lỗ hổng bảo mật cho dự án **CloudPlay Optimizer**.
+Tài liệu này giải thích ngắn gọn, dễ hiểu cách **CloudPlay** bảo vệ tài khoản, dữ liệu cá nhân của bạn và cách liên hệ khi bạn phát hiện vấn đề về an toàn bảo mật.
 
-This document outlines account protection principles, data privacy practices, and how to report security vulnerabilities for **CloudPlay Optimizer**.
+This document explains in simple terms how **CloudPlay** protects your account and personal data, and how to contact us if you find a security issue.
 
 ---
 
 ## 1. Phiên bản được hỗ trợ / Supported Versions
 
-Chỉ phiên bản mới nhất trên nhánh `main` được cập nhật bản vá bảo mật:
-Only the latest version on the `main` branch actively receives security updates:
+Để đảm bảo an toàn tốt nhất, bạn nên luôn sử dụng phiên bản mới nhất của ứng dụng:
+For the best protection, please always use the latest version of the app:
 
-| Phiên bản / Version | Hỗ trợ / Supported |
+| Phiên bản / Version | Được cập nhật bảo mật / Security Updates |
 | :--- | :--- |
-| `main` (Mới nhất / Latest) | :white_check_mark: Có / Yes |
-| Các bản cũ / Older releases | :x: Không / No |
+| Bản mới nhất (Latest release) | :white_check_mark: Có / Yes |
+| Các bản cũ hơn (Older versions) | :x: Không / No |
 
 ---
 
-## 2. Nguyên tắc Bảo mật & Quyền riêng tư / Security & Privacy Principles
+## 2. Cam kết An toàn cho Người dùng / How We Protect You
 
-### 2.1. Bảo vệ tài khoản Microsoft & Xbox / Account Protection
-- **Đăng nhập trực tiếp (Direct Sign-In):** Mọi thao tác đăng nhập diễn ra trực tiếp trên trang chính thức của Microsoft (`login.live.com`, `microsoftonline.com`, `xbox.com`) qua kết nối mã hóa HTTPS.
-- **Không thu thập mật khẩu (Zero Credential Collection):** Ứng dụng không đọc, không ghi nhật ký và không gửi mật khẩu, mã xác thực hai bước (2FA) hay thông tin cá nhân của bạn ra bất kỳ máy chủ bên thứ ba nào.
-- **Direct HTTPS Sign-In:** All authentication happens directly on official Microsoft pages over HTTPS. The app never reads, logs, or transmits your password, 2FA codes, or personal credentials to any third-party server.
+### 2.1. An toàn tuyệt đối cho tài khoản Microsoft & Xbox / Account Safety
+- **Đăng nhập chính chủ:** Khi bạn đăng nhập, bạn đang nhập trực tiếp trên trang web chính thức của Microsoft (`login.live.com`, `xbox.com`) thông qua kết nối bảo mật.
+- **Không thu thập mật khẩu:** Ứng dụng không bao giờ đọc, lưu giữ hay gửi mật khẩu, mã xác nhận (OTP/2FA) hoặc thông tin cá nhân của bạn đi bất kỳ đâu.
+- **Official Sign-In Only:** You sign in directly on official Microsoft pages (`login.live.com`, `xbox.com`) over a secure connection. The app never sees, saves, or sends your password or verification codes anywhere.
 
-### 2.2. Cách ly trang thanh toán & liên kết ngoài / Payment & External Page Isolation
-- **Tự động ngắt chuyển tiếp mạng khi thanh toán:** Khi phát hiện trang mua hàng, thanh toán (`cart`, `checkout`, `billing`, `payment`, `redeem`) hoặc tên miền bên ngoài danh sách tin cậy, ứng dụng sẽ tự động tạm dừng chế độ chuyển tiếp mạng hoặc mở bằng trình duyệt mặc định của điện thoại để bảo vệ thông tin thẻ/tài khoản ngân hàng.
-- **Automatic Payment Isolation:** When navigating to billing, checkout, or untrusted external pages, network relay automatically pauses or opens in your system browser to keep payment details strictly between your device and Microsoft.
+### 2.2. Tự động bảo vệ khi mở trang thanh toán / Payment Protection
+- **Tự động ngắt máy chủ trung gian khi thanh toán:** Nếu bạn đang dùng máy chủ kết nối tùy chọn (VPN/Proxy) và chuyển sang trang mua hàng, nạp thẻ hoặc quản lý tài khoản của Microsoft, ứng dụng sẽ tự động ngắt máy chủ trung gian hoặc mở bằng trình duyệt chính trên điện thoại để bảo vệ thông tin thẻ ngân hàng của bạn.
+- **Automatic Payment Protection:** Whenever you open a billing, checkout, or account management page, any optional relay connection is automatically paused or opened in your phone's main browser to keep your payment details safe.
 
-### 2.3. Dữ liệu 100% nội bộ trên máy / 100% Local On-Device Storage
-- **Lưu trữ riêng tư (`MODE_PRIVATE`):** Cài đặt ứng dụng, danh sách game yêu thích và lịch sử phiên chơi (thời lượng, FPS, độ trễ mạng) chỉ được lưu cục bộ trong bộ nhớ riêng của ứng dụng trên điện thoại.
-- **Không theo dõi từ xa (No Cloud Tracking):** Dự án không tích hợp bộ thu thập hành vi người dùng và không đồng bộ lịch sử chơi lên đám mây. Bạn có thể xóa toàn bộ dữ liệu bất cứ lúc nào trong phần **Cài đặt**.
-- **Strictly Local Data:** Settings, saved games, and play session history (duration, average FPS, ping) are stored exclusively on your device (`SharedPreferences` in `MODE_PRIVATE`) and can be cleared anytime in **Settings**.
+### 2.3. Dữ liệu chỉ nằm trên điện thoại của bạn / Your Data Stays on Your Phone
+- **Lưu trữ riêng trên máy:** Các cài đặt hình ảnh, vị trí nút bấm tay cầm, danh sách game yêu thích và lịch sử các lần chơi đều chỉ được lưu ngay bên trong bộ nhớ riêng của ứng dụng trên điện thoại của bạn.
+- **Không theo dõi ngầm:** Ứng dụng không gắn quảng cáo và không thu thập thói quen sử dụng của bạn. Bạn có thể xóa sạch dữ liệu đăng nhập bất cứ lúc nào bằng nút **Xóa phiên & Đăng nhập lại** trong phần **Cài đặt**.
+- **Stored Only on Your Device:** Your display preferences, button layouts, favorite games, and play history stay on your phone. We do not track your activity or run ads, and you can clear your saved session anytime in **Settings**.
 
-### 2.4. Ràng buộc an toàn hệ thống / Technical Safeguards
-- **Chặn kết nối không mã hóa (`usesCleartextTraffic="false"`):** Toàn bộ kết nối trong ứng dụng bắt buộc dùng HTTPS.
-- **Kiểm tra tên miền nghiêm ngặt (Strict Origin Verification):** Cầu nối giao tiếp giữa trang web và ứng dụng (`JavascriptInterface`) cùng quyền truy cập âm thanh/tay cầm chỉ hoạt động khi trang hiện tại thuộc danh sách tên miền chính thức của Microsoft/Xbox qua giao thức `https://`.
-- **Chơi công bằng (Fair Play):** Ứng dụng chỉ hỗ trợ hiển thị nút bấm cảm ứng tiêu chuẩn và tối ưu độ mượt hình ảnh; hoàn toàn không có tính năng bắn liên thanh (macro/turbo), khóa tâm hay can thiệp dữ liệu trò chơi.
-- **System Safeguards:** Enforces HTTPS-only traffic (`usesCleartextTraffic="false"`), strict domain boundary validation for WebView bridges and permissions, safe parameter quoting, and a strict Fair Play policy (no macros, turbo fire, or game data modification).
+### 2.4. Chơi công bằng & Kết nối an toàn / Fair Play & Safe Connection
+- **Chỉ dùng kết nối bảo mật:** Ứng dụng chỉ cho phép kết nối tới các trang được mã hóa an toàn (`https://`).
+- **Không gian lận (Fair Play):** Ứng dụng chỉ cung cấp nút bấm cảm ứng tiêu chuẩn và chỉnh độ nét màn hình; tuyệt đối không có tính năng bắn tự động (macro/turbo), khóa mục tiêu hay can thiệp vào trò chơi.
+- **Fair Play:** The app only provides standard touch controls and display adjustments—never cheats, macros, turbo fire, or game modifications.
 
 ---
 
-## 3. Báo cáo Lỗ hổng Bảo mật / Reporting a Vulnerability
+## 3. Cách báo cáo khi gặp vấn đề bảo mật / How to Report a Security Issue
 
-Nếu bạn phát hiện lỗi bảo mật (ví dụ: rò rỉ phiên đăng nhập, vượt qua kiểm tra tên miền tin cậy, hoặc lỗi thực thi mã trong WebView), vui lòng **không công khai lỗi ngay trên mục Issues chung**:
+Nếu bạn phát hiện bất kỳ lỗi nào có thể ảnh hưởng đến sự an toàn của tài khoản người dùng, xin đừng đăng công khai lên phần bình luận chung mà hãy báo riêng cho chúng tôi:
 
-If you discover a security vulnerability (such as session leakage, origin validation bypass, or WebView injection), please **do not open a public issue immediately**:
+If you find any issue that could affect user account safety, please report it privately rather than posting it publicly:
 
-1. Sử dụng tính năng **Report a vulnerability** (Private Security Advisory) trong tab **Security** của kho lưu trữ GitHub này. / Use the **Report a vulnerability** button under the **Security** tab of this GitHub repository.
-2. Mô tả ngắn gọn các bước tái hiện lỗi và mức độ ảnh hưởng. / Provide clear steps to reproduce the issue and its potential impact.
-3. Nhóm phát triển sẽ phản hồi trong vòng **48 giờ** và phối hợp phát hành bản vá sớm nhất. / We will review and respond within **48 hours** to coordinate a fix.
+1. Bấm vào mục **Security** trên trang GitHub này và chọn **Report a vulnerability** (Báo cáo lỗ hổng riêng tư). / Click the **Security** tab on this GitHub page and select **Report a vulnerability**.
+2. Mô tả ngắn gọn lỗi bạn gặp phải để chúng tôi kiểm tra. / Briefly describe what happened so we can look into it.
+3. Chúng tôi sẽ phản hồi trong vòng **48 giờ** và phát hành bản sửa lỗi sớm nhất. / We will reply within **48 hours** and release a fix as soon as possible.

@@ -2105,6 +2105,7 @@ object VpnManager {
     }
 
     fun setSmartVpnPhase(phase: SmartVpnPhase) {
+        if (_state.value.smartVpnPhase == phase) return
         _state.value = _state.value.copy(smartVpnPhase = phase)
     }
 
@@ -2621,35 +2622,40 @@ object VpnManager {
         pingJob?.cancel()
         pingJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                val isDirect = _state.value.mode == NetworkMode.DIRECT_NETWORK
-                val currentEngine = _state.value.engine
+                val cur = _state.value
+                val isDirect = cur.mode == NetworkMode.DIRECT_NETWORK
+                val currentEngine = cur.engine
                 val liveWebRtcRtt = com.example.cloudplay.NetworkOptimizer.telemetry.value.rttMs
 
                 if (liveWebRtcRtt > 0) {
-                    // pingHistory chỉ lấy từ WebRTC khi đang chơi
-                    val newHistory = (_state.value.pingHistory + liveWebRtcRtt).takeLast(16)
-                    if (isDirect) {
-                        _state.value = _state.value.copy(directLatencyMs = liveWebRtcRtt, pingHistory = newHistory)
-                    } else {
-                        _state.value = _state.value.copy(latencyMs = liveWebRtcRtt, pingHistory = newHistory)
+                    // Chỉ ghi lại state và cấp phát danh sách pingHistory mới khi độ trễ thực sự thay đổi
+                    val prevRtt = if (isDirect) cur.directLatencyMs else cur.latencyMs
+                    val lastSample = cur.pingHistory.lastOrNull()
+                    if (prevRtt != liveWebRtcRtt || lastSample != liveWebRtcRtt) {
+                        val newHistory = (cur.pingHistory + liveWebRtcRtt).takeLast(16)
+                        if (isDirect) {
+                            _state.value = cur.copy(directLatencyMs = liveWebRtcRtt, pingHistory = newHistory)
+                        } else {
+                            _state.value = cur.copy(latencyMs = liveWebRtcRtt, pingHistory = newHistory)
+                        }
                     }
                 } else if (!isInGameStreamActive) {
                     if (isDirect) {
                         val tcpPing = PingTester.measureDirectLatency()
-                        if (tcpPing > 0) {
+                        if (tcpPing > 0 && _state.value.directLatencyMs != tcpPing) {
                             _state.value = _state.value.copy(directLatencyMs = tcpPing)
                         }
                     } else if (currentEngine == VpnEngine.PROXY_TUNNEL) {
                         val srv = _state.value.currentServer
                         val tcpPing = PingTester.measureServerLatency(srv)
-                        if (tcpPing > 0) {
+                        if (tcpPing > 0 && (_state.value.latencyMs != tcpPing || _state.value.serverPings[srv.id] != tcpPing)) {
                             val updatedMap = _state.value.serverPings.toMutableMap()
                             updatedMap[srv.id] = tcpPing
                             _state.value = _state.value.copy(latencyMs = tcpPing, serverPings = updatedMap)
                         }
                     }
                 }
-                delay(if (isInGameStreamActive || liveWebRtcRtt > 0) 7500L else 5000L)
+                delay(if (isInGameStreamActive || liveWebRtcRtt > 0) 10000L else 5000L)
             }
         }
     }

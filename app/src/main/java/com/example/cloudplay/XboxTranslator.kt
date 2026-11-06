@@ -805,8 +805,8 @@ object XboxTranslator {
                     } catch(e) {}
                     if (!deferFlush) {
                         flushTranslationBatch();
+                        reportStatus();
                     }
-                    reportStatus();
                 }
 
                 function revertAllTextNodes(root) {
@@ -830,7 +830,14 @@ object XboxTranslator {
                     } catch(e) {}
                 }
 
+                let lastReportedEnabled = null;
+                let lastReportedCount = -1;
                 function reportStatus() {
+                    if (lastReportedEnabled === isTranslationEnabled && lastReportedCount === translatedCount) {
+                        return;
+                    }
+                    lastReportedEnabled = isTranslationEnabled;
+                    lastReportedCount = translatedCount;
                     try {
                         if (window.CloudPlayBridge && window.CloudPlayBridge.onTranslationStatus) {
                             window.CloudPlayBridge.onTranslationStatus(isTranslationEnabled, translatedCount);

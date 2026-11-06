@@ -82,6 +82,8 @@ import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.vpn.NetworkMode
 import com.example.vpn.VpnManager
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private const val EDGE_DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
 
@@ -94,9 +96,22 @@ fun CloudBrowserScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val vpnState by VpnManager.state.collectAsState()
+    val currentServer by remember {
+        VpnManager.state.map { it.currentServer }.distinctUntilChanged()
+    }.collectAsState(initial = VpnManager.state.value.currentServer)
+    val hasUnlockFailPrompt by remember {
+        VpnManager.state.map { it.unlockFailPromptServer != null }.distinctUntilChanged()
+    }.collectAsState(initial = VpnManager.state.value.unlockFailPromptServer != null)
     val config by SettingsRepository.config.collectAsState()
-    val streamUiState by streamController.uiState.collectAsState()
+    val streamUiState by remember(streamController) {
+        streamController.uiState.distinctUntilChanged { old, new ->
+            old.isGameActive == new.isGameActive &&
+                old.isStreamConnected == new.isStreamConnected &&
+                old.gameTitle == new.gameTitle &&
+                old.shortcutVirtualPadOverrideTick == new.shortcutVirtualPadOverrideTick &&
+                old.shortcutToggleRecordingTick == new.shortcutToggleRecordingTick
+        }
+    }.collectAsState(initial = streamController.uiState.value)
 
     val gamepadDetector = remember { GamepadDetector(context) }
     val gamepadStatus by gamepadDetector.status.collectAsState()
@@ -121,10 +136,12 @@ fun CloudBrowserScreen(
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
 
-    val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
+    val isRecording by remember {
+        com.example.cloudplay.ZeroLagScreenRecorder.state.map { it.isRecording }.distinctUntilChanged()
+    }.collectAsState(initial = com.example.cloudplay.ZeroLagScreenRecorder.state.value.isRecording)
 
-    LaunchedEffect(recorderState.isRecording) {
-        com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(recorderState.isRecording)
+    LaunchedEffect(isRecording) {
+        com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(isRecording)
     }
 
     LaunchedEffect(streamUiState.isGameActive, streamUiState.isStreamConnected) {
@@ -288,8 +305,12 @@ fun CloudBrowserScreen(
         currentMainFrameUrl = targetUrl
     }
 
-    val translationInfo by XboxBridge.translationInfo.collectAsState()
-    val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
+    val isCellular by remember {
+        com.example.cloudplay.NetworkOptimizer.status.map { it.isCellular }.distinctUntilChanged()
+    }.collectAsState(initial = com.example.cloudplay.NetworkOptimizer.status.value.isCellular)
+    val effectiveBitrateMbps by remember {
+        com.example.cloudplay.NetworkOptimizer.status.map { it.effectiveBitrateMbps }.distinctUntilChanged()
+    }.collectAsState(initial = com.example.cloudplay.NetworkOptimizer.status.value.effectiveBitrateMbps)
 
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
@@ -316,7 +337,7 @@ fun CloudBrowserScreen(
     val injectionScript = remember(
         config.clarityBoostEnabled,
         config.clarityPreset,
-        vpnState.currentServer,
+        currentServer,
         effectiveLocale,
         effectiveTranslate,
         config.translateLanguage,
@@ -331,7 +352,7 @@ fun CloudBrowserScreen(
         config.streamRenderScale,
         config.streamFpsCap,
         config.gpuLoadReductionEnabled,
-        networkStatus.isCellular,
+        isCellular,
         config.physicalGamepadButtonMap,
         config.physLeftStickInnerDeadzone,
         config.physLeftStickOuterDeadzone,
@@ -345,8 +366,8 @@ fun CloudBrowserScreen(
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
             clarityPreset = config.clarityPreset.name,
-            targetCountry = vpnState.currentServer.countryCode,
-            targetIp = vpnState.currentServer.ip,
+            targetCountry = currentServer.countryCode,
+            targetIp = currentServer.ip,
             userLocale = effectiveLocale,
             xcloudTranslate = effectiveTranslate,
             preserveTitles = config.preserveGameTitles,
@@ -355,26 +376,26 @@ fun CloudBrowserScreen(
             cellularMode = config.cellularMode.id,
             networkTuningMode = config.networkTuningMode.id,
             speedFirstPriority = config.wifiSpeedFirstPriority,
-            effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps,
+            effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else effectiveBitrateMbps,
             lowEndDeviceMode = config.lowEndDeviceMode,
             virtualGamepadEnabled = effectiveShowVirtualController,
             renderScaleFactor = config.streamRenderScale.scaleFactor,
             fpsCap = config.streamFpsCap.fps,
             gpuLoadReduction = config.gpuLoadReductionEnabled,
-            isCellular = networkStatus.isCellular
+            isCellular = isCellular
         )
     }
 
     val currentInjectionScript by rememberUpdatedState(injectionScript)
 
     // Dynamically update active WebView when user changes server or locale
-    LaunchedEffect(vpnState.currentServer, effectiveLocale) {
+    LaunchedEffect(currentServer, effectiveLocale) {
         CookieManager.getInstance().setCookie(
             "https://www.xbox.com",
             "MSPC-LOCALE=$effectiveLocale; domain=.xbox.com; path=/"
         )
-        val safeCountry = org.json.JSONObject.quote(vpnState.currentServer.countryCode)
-        val safeIp = org.json.JSONObject.quote(vpnState.currentServer.ip)
+        val safeCountry = org.json.JSONObject.quote(currentServer.countryCode)
+        val safeIp = org.json.JSONObject.quote(currentServer.ip)
         val safeLocale = org.json.JSONObject.quote(effectiveLocale)
         webViewInstance?.evaluateJavascript(
             "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale });",
@@ -400,10 +421,10 @@ fun CloudBrowserScreen(
         }
     }
 
-    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, networkStatus.effectiveBitrateMbps, config.lowEndDeviceMode, networkStatus.isCellular) {
-        val targetMbps = if (config.lowEndDeviceMode) 5 else networkStatus.effectiveBitrateMbps
+    LaunchedEffect(config.cellularMode, config.networkTuningMode, config.wifiSpeedFirstPriority, effectiveBitrateMbps, config.lowEndDeviceMode, isCellular) {
+        val targetMbps = if (config.lowEndDeviceMode) 5 else effectiveBitrateMbps
         webViewInstance?.evaluateJavascript(
-            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: $targetMbps, lowEndDeviceMode: ${config.lowEndDeviceMode}, isCellular: ${networkStatus.isCellular} });",
+            "if (window.__updateNetworkProfile) window.__updateNetworkProfile({ cellularMode: '${config.cellularMode.id}', networkTuningMode: '${config.networkTuningMode.id}', speedFirst: ${config.wifiSpeedFirstPriority}, targetBitrate: $targetMbps, lowEndDeviceMode: ${config.lowEndDeviceMode}, isCellular: $isCellular });",
             null
         )
     }
@@ -730,14 +751,12 @@ fun CloudBrowserScreen(
             }
         }
 
-        // Dedicated Game Loading Screen (Optimized for Portrait & Landscape)
-        com.example.ui.components.InGameLoadingOverlay(
+        // Dedicated Game Loading Screen (Optimized for Portrait & Landscape, isolated state collection)
+        IsolatedInGameLoadingOverlay(
             isLoading = isPageLoading && pageLoadingProgress < 0.80f,
             progress = pageLoadingProgress,
-            targetServerName = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
             hasGamepad = gamepadStatus.hasPhysicalController,
             gameProfile = gameProfile,
-            realLatencyMs = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs,
             lowEndDeviceMode = config.lowEndDeviceMode,
             onNavigateHome = onNavigateBackToDashboard,
             onSkip = { isPageLoading = false },
@@ -756,85 +775,19 @@ fun CloudBrowserScreen(
             )
         }
 
-        // Heads-up Notification Banner (Auto-Switch Countdown / Direct Active)
-        AnimatedVisibility(
-            visible = streamUiState.showBanner,
-            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+        // Heads-up Notification Banner (Auto-Switch Countdown / Direct Active, isolated state collection)
+        IsolatedStatusBanner(
+            streamController = streamController,
+            isEnglishUI = config.isEnglishUI(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))
-                    .testTag("status_banner"),
-                color = XboxSurface.copy(alpha = 0.95f),
-                shadowElevation = 8.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = when (streamUiState.bannerType) {
-                            BannerType.COUNTDOWN -> Icons.Default.FlashOn
-                            BannerType.SUCCESS -> Icons.Default.CheckCircle
-                            else -> Icons.Default.Info
-                        },
-                        contentDescription = null,
-                        tint = when (streamUiState.bannerType) {
-                            BannerType.COUNTDOWN -> DirectCyan
-                            BannerType.SUCCESS -> XboxNeonGreen
-                            else -> TextPrimary
-                        },
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Text(
-                        text = streamUiState.bannerMessage,
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    if (streamUiState.bannerType == BannerType.COUNTDOWN) {
-                        Button(
-                            onClick = { streamController.cancelAutoBypass() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
-                            modifier = Modifier.testTag("cancel_bypass_button")
-                        ) {
-                            Text(
-                                text = if (config.isEnglishUI()) "Cancel" else "Hủy",
-                                fontSize = 11.sp,
-                                color = Color.White
-                            )
-                        }
-                    } else if (streamUiState.bannerType == BannerType.WARNING && vpnState.mode == NetworkMode.VPN_JAPAN) {
-                        Button(
-                            onClick = { streamController.forceSwitchToDirectNetwork() },
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
-                            modifier = Modifier.testTag("disconnect_vpn_banner_button")
-                        ) {
-                            Text(
-                                text = if (config.isEnglishUI()) "Disconnect VPN" else "Ngắt VPN ngay",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        )
 
         // Mục 7e: Khi người dùng đã tự đổi thị trường Xbox khác en-US và vào game thất bại (unlock fail),
         // hiện gợi ý "Quay về en-US" để người dùng bấm (không tự ý đổi ngầm).
         AnimatedVisibility(
-            visible = vpnState.unlockFailPromptServer != null && !effectiveLocale.equals("en-US", ignoreCase = true),
+            visible = hasUnlockFailPrompt && !effectiveLocale.equals("en-US", ignoreCase = true),
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             modifier = Modifier
@@ -991,13 +944,12 @@ fun CloudBrowserScreen(
 
         // In-game Floating HUD Pill (isolated state collection so WebView never recomposes on telemetry ticks)
         IsolatedFloatingHud(
-            vpnState = vpnState,
             isGameActive = streamUiState.isGameActive,
             virtualControllerEnabled = effectiveShowVirtualController,
             physicalControllerConnected = gamepadStatus.hasPhysicalController,
             controllerName = gamepadStatus.controllerName,
             onToggleNetwork = {
-                if (vpnState.mode == NetworkMode.VPN_JAPAN) {
+                if (VpnManager.state.value.mode == NetworkMode.VPN_JAPAN) {
                     streamController.forceSwitchToDirectNetwork()
                 } else {
                     VpnManager.connect(context)
@@ -1028,7 +980,6 @@ fun CloudBrowserScreen(
             },
             clarityBoostActive = config.clarityBoostEnabled,
             translationActive = effectiveTranslate,
-            translatedCount = translationInfo.translatedCount,
             onToggleTranslation = { enabled ->
                 if (config.isEnglishUI() && enabled) {
                     SettingsRepository.updateAppLanguage(com.example.data.AppLanguage.VIETNAMESE)
@@ -1047,7 +998,6 @@ fun CloudBrowserScreen(
                     null
                 )
             },
-            networkStatus = networkStatus,
             onSelectLadderStep = { stepIdx ->
                 com.example.cloudplay.AdaptiveQualityManager.setStepManually(stepIdx)
             },
@@ -1076,7 +1026,6 @@ fun CloudBrowserScreen(
                     webViewInstance?.evaluateJavascript("if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled(false);", null)
                 }
             },
-            recorderState = recorderState,
             onToggleRecording = {
                 com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
             }
@@ -1084,6 +1033,7 @@ fun CloudBrowserScreen(
 
         // In-Game Video Settings & Stream Capture Dialog (Opened from "🎬 Cài đặt Video" in Expanded HUD)
         if (showQuickSettingsDialog) {
+            val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
             val isEn = config.isEnglishUI()
             val dialogScrollState = rememberScrollState()
             androidx.compose.ui.window.Dialog(
@@ -1632,8 +1582,117 @@ fun CloudBrowserScreen(
 }
 
 @Composable
+private fun IsolatedInGameLoadingOverlay(
+    isLoading: Boolean,
+    progress: Float,
+    hasGamepad: Boolean,
+    gameProfile: com.example.data.GameOptimizationProfile,
+    lowEndDeviceMode: Boolean,
+    onNavigateHome: () -> Unit,
+    onSkip: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val vpnState by VpnManager.state.collectAsState()
+    com.example.ui.components.InGameLoadingOverlay(
+        isLoading = isLoading,
+        progress = progress,
+        targetServerName = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
+        hasGamepad = hasGamepad,
+        gameProfile = gameProfile,
+        realLatencyMs = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs,
+        lowEndDeviceMode = lowEndDeviceMode,
+        onNavigateHome = onNavigateHome,
+        onSkip = onSkip,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun IsolatedStatusBanner(
+    streamController: StreamController,
+    isEnglishUI: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val streamUiState by streamController.uiState.collectAsState()
+    val vpnMode by remember {
+        VpnManager.state.map { it.mode }.distinctUntilChanged()
+    }.collectAsState(initial = VpnManager.state.value.mode)
+
+    AnimatedVisibility(
+        visible = streamUiState.showBanner,
+        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+        modifier = modifier
+    ) {
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))
+                .testTag("status_banner"),
+            color = XboxSurface.copy(alpha = 0.95f),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = when (streamUiState.bannerType) {
+                        BannerType.COUNTDOWN -> Icons.Default.FlashOn
+                        BannerType.SUCCESS -> Icons.Default.CheckCircle
+                        else -> Icons.Default.Info
+                    },
+                    contentDescription = null,
+                    tint = when (streamUiState.bannerType) {
+                        BannerType.COUNTDOWN -> DirectCyan
+                        BannerType.SUCCESS -> XboxNeonGreen
+                        else -> TextPrimary
+                    },
+                    modifier = Modifier.size(20.dp)
+                )
+
+                Text(
+                    text = streamUiState.bannerMessage,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (streamUiState.bannerType == BannerType.COUNTDOWN) {
+                    Button(
+                        onClick = { streamController.cancelAutoBypass() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray),
+                        modifier = Modifier.testTag("cancel_bypass_button")
+                    ) {
+                        Text(
+                            text = if (isEnglishUI) "Cancel" else "Hủy",
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                } else if (streamUiState.bannerType == BannerType.WARNING && vpnMode == NetworkMode.VPN_JAPAN) {
+                    Button(
+                        onClick = { streamController.forceSwitchToDirectNetwork() },
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxNeonGreen),
+                        modifier = Modifier.testTag("disconnect_vpn_banner_button")
+                    ) {
+                        Text(
+                            text = if (isEnglishUI) "Disconnect VPN" else "Ngắt VPN ngay",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun IsolatedFloatingHud(
-    vpnState: com.example.vpn.VpnConnectionState,
     isGameActive: Boolean,
     virtualControllerEnabled: Boolean,
     physicalControllerConnected: Boolean,
@@ -1646,11 +1705,9 @@ private fun IsolatedFloatingHud(
     onToggleClarityBoost: (Boolean) -> Unit,
     clarityBoostActive: Boolean,
     translationActive: Boolean,
-    translatedCount: Int,
     onToggleTranslation: (Boolean) -> Unit,
     hideStreamStats: Boolean,
     onToggleHideStreamStats: (Boolean) -> Unit,
-    networkStatus: com.example.cloudplay.NetworkOptimizerStatus,
     onSelectLadderStep: (Int) -> Unit,
     onToggleAutoAdapting: (Boolean) -> Unit,
     onSelectCellularMode: (com.example.data.CellularOptimizationMode) -> Unit,
@@ -1661,9 +1718,12 @@ private fun IsolatedFloatingHud(
     videoTopRatio: Float,
     lowEndDeviceMode: Boolean,
     onSelectFortniteControlMode: (Boolean) -> Unit,
-    recorderState: com.example.cloudplay.ScreenRecorderState,
     onToggleRecording: () -> Unit
 ) {
+    val vpnState by VpnManager.state.collectAsState()
+    val translationInfo by XboxBridge.translationInfo.collectAsState()
+    val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
+    val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
     val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
     val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
 
@@ -1681,7 +1741,7 @@ private fun IsolatedFloatingHud(
         onToggleClarityBoost = onToggleClarityBoost,
         clarityBoostActive = clarityBoostActive,
         translationActive = translationActive,
-        translatedCount = translatedCount,
+        translatedCount = translationInfo.translatedCount,
         onToggleTranslation = onToggleTranslation,
         hideStreamStats = hideStreamStats,
         onToggleHideStreamStats = onToggleHideStreamStats,
@@ -1702,5 +1762,6 @@ private fun IsolatedFloatingHud(
         onToggleRecording = onToggleRecording
     )
 }
+
 
 

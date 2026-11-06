@@ -292,21 +292,33 @@ object NetworkOptimizer {
             }
         }
 
+        val prev = _status.value
+        val stabilizedRssi = if (isStreamCurrentlyActive && isWeakWifi == prev.isWeakWifiSignal && kotlin.math.abs(wifiRssi - prev.wifiRssiDbm) < 3) {
+            prev.wifiRssiDbm
+        } else {
+            wifiRssi
+        }
+        val stabilizedDownstream = if (isStreamCurrentlyActive && isWeakCellular == prev.isWeakCellularSignal && kotlin.math.abs(downstreamKbps - prev.downstreamBandwidthKbps) < 500) {
+            prev.downstreamBandwidthKbps
+        } else {
+            downstreamKbps
+        }
+
         val config = SettingsRepository.config.value
-        _status.value = _status.value.copy(
+        val candidateStatus = prev.copy(
             physicalType = type,
             isWifi = isWifi,
             isCellular = isCellular,
             isMetered = isMetered,
             wifiFrequencyMhz = wifiFreq,
-            wifiRssiDbm = wifiRssi,
+            wifiRssiDbm = stabilizedRssi,
             wifiLinkSpeedMbps = wifiLinkMbps,
-            downstreamBandwidthKbps = downstreamKbps,
+            downstreamBandwidthKbps = stabilizedDownstream,
             isWeakWifiSignal = isWeakWifi,
             isWeakCellularSignal = isWeakCellular
         )
 
-        recomputeEffectiveProfile(config)
+        recomputeEffectiveProfile(config, candidateStatus)
     }
 
     /**
@@ -339,8 +351,8 @@ object NetworkOptimizer {
         return Triple(0, -55, 0)
     }
 
-    fun recomputeEffectiveProfile(config: AppConfig) {
-        val current = _status.value
+    fun recomputeEffectiveProfile(config: AppConfig, baseStatus: NetworkOptimizerStatus = _status.value) {
+        val current = baseStatus
         val isWifi = current.isWifi
         val isCellular = current.isCellular || (!isWifi && current.physicalType == PhysicalNetworkType.CELLULAR_4G_5G)
         val is3gOrHPlus = isCellular && current.downstreamBandwidthKbps in 1..4500
@@ -418,14 +430,17 @@ object NetworkOptimizer {
             }
         }
 
-        _status.value = current.copy(
+        val updatedStatus = current.copy(
             activeProfileName = profileName,
             effectiveBitrateMbps = bitrate,
             speedFirstPriority = true,
             summaryText = summary,
             profileBadge = badge
         )
-        AdaptiveQualityManager.onNetworkStatusChanged(_status.value)
+        if (_status.value != updatedStatus) {
+            _status.value = updatedStatus
+            AdaptiveQualityManager.onNetworkStatusChanged(updatedStatus)
+        }
     }
 
     /**

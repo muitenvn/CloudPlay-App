@@ -1,112 +1,101 @@
-# Kế hoạch chi tiết chia nhỏ 7 File Giao diện lớn
+# Kế Hoạch Tối Ưu Giảm Giật / Lắc Khi Duyệt Trang Xbox Và Khi Đang Chơi (Stream)
 
-Kế hoạch này trình bày cụ thể cách chia 7 file giao diện lớn của CloudPlay (tổng cộng **14.602 dòng**) thành các file nhỏ theo từng nhóm chức năng. Quá trình thực hiện làm **lần lượt từng file từ 1 đến 7**, xong mỗi file sẽ **kiểm tra biên dịch (`compile_applet`) ngay** rồi mới sang file tiếp theo; hoàn toàn **chỉ di chuyển code, không đổi hành vi hay giao diện**.
+Kế hoạch này giải quyết tình trạng giật/khựng giao diện trong lúc duyệt danh mục Xbox và khi đang chơi game trên mây, dựa hoàn toàn trên bằng chứng mã nguồn thực tế mà không làm thay đổi giao diện hiển thị, logic chọn máy chủ hay các hàm cầu nối JavaScript (`@JavascriptInterface`).
 
-### User Review & Critical Decisions
+## Quyết Định Đã Xác Nhận Từ Chủ Dự Án
 
 > [!IMPORTANT]
-> - **Nguyên tắc an toàn tuyệt đối**:
->   1. Làm lần lượt theo đúng thứ tự 1 ➔ 7. Xong mỗi mục đều chạy biên dịch kiểm tra ngay. Nếu mục nào vướng phụ thuộc trạng thái phức tạp hoặc có nguy cơ lỗi, sẽ giữ nguyên mục đó, báo rõ lý do rồi sang mục tiếp theo.
->   2. Các hàm/thành phần tách ra được đặt trong **cùng package** với file gốc (`com.example.ui.tabs` hoặc `com.example.ui.components`) và dùng phạm vi `internal` cho phần dùng chung, giúp mọi file khác trong dự án và bộ Unit Test gọi như cũ mà không bị gãy liên kết.
->   3. **KHÔNG đụng tới**: `XboxBridge.kt`, `VpnManager.kt`, `AppSettings.kt`, `CloudBrowserScreen.kt`, và các file web/tài liệu.
+> Các nguyên tắc và phạm vi đã được chủ dự án chốt:
+> - **Phạm vi tối ưu**: Áp dụng đồng bộ cả 3 nhóm giải pháp: (1) Tách và đẩy việc đọc dữ liệu trạng thái (state) xuống đúng thành phần con thay vì đọc tất cả ở gốc màn hình; (2) Chống ghi trùng trạng thái khi giá trị không đổi; (3) Tạm dừng hoàn toàn vòng lặp đo độ trễ nền khi đang trong phiên phát luồng (stream).
+> - **Ràng buộc an toàn**: Giữ nguyên 100% logic chọn máy chủ, các hàm cầu nối JavaScript (`@JavascriptInterface`) và giao diện nhìn thấy của người dùng.
 
 ---
 
-### 1. Overview & Core Concept (Chi tiết cách chia 7 file)
+## 1. Tổng Quan & Phân Tích Nguyên Nhân Gây Giật (Theo Thứ Tự Ảnh Hưởng)
 
-#### Mục 1: `SettingsScreen.kt` (Hiện tại: 2.727 dòng ➔ Chia thành 5 file)
-- **`SettingsScreen.kt` (~350 dòng)**: Khung màn hình Cài đặt chính, thanh tìm kiếm cài đặt, trạng thái đóng/mở các nhóm và lời gọi tới từng nhóm cài đặt.
-- **`SettingsNetworkVpnSections.kt` (~650 dòng)**: Nhóm cài đặt Mạng, VPN, Tự động tắt VPN khi vào game, Chọn vùng/Quốc gia và Chẩn đoán mạng.
-- **`SettingsStreamDisplaySections.kt` (~650 dòng)**: Nhóm cài đặt Chất lượng hình ảnh (Bitrate, Độ phân giải, FPS, Codec), Giải mã phần cứng và Âm thanh.
-- **`SettingsGamepadSystemSections.kt` (~750 dòng)**: Nhóm cài đặt Tay cầm ảo/vật lý, Cảm biến con quay (Gyro), Rung, Ngôn ngữ, Sao lưu và Thông tin ứng dụng.
-- **`SettingsSharedComponents.kt` (~320 dòng)**: Các thành phần giao diện dùng chung trong màn hình cài đặt (`CollapsibleSettingsGroup`, `SettingToggleRow`, `LabeledSlider`, `SettingsCard`).
+Dưới đây là danh sách các nguyên nhân gây vẽ lại giao diện (recomposition) và chiếm dụng luồng chính (Main Thread) đã được xác minh trực tiếp trong mã nguồn:
 
-#### Mục 2: `ServersScreen.kt` (Hiện tại: 1.926 dòng ➔ Chia thành 3 file)
-- **`ServersScreen.kt` (~950 dòng)**: Khung màn hình Máy chủ chính, thanh trạng thái máy chủ đang chọn, thẻ chọn chế độ VPN thông minh, bộ lọc quốc gia và danh sách máy chủ.
-- **`ServerItemCard.kt` (~400 dòng)**: Thẻ hiển thị từng máy chủ (`ServerCard`), huy hiệu trạng thái mở khóa vùng, khoảng cách, lịch sử phiên và 4 vạch sóng tín hiệu.
-- **`ServerDialogs.kt` (~580 dòng)**: Hai hộp thoại tách riêng gồm hộp thoại thêm Proxy cá nhân (`CustomProxyDialog`) và hộp thoại xem chi tiết kỹ thuật máy chủ (`ServerDetailDialog`).
+### Hạng 1 (Ảnh hưởng lớn nhất khi đang chơi và duyệt web): Gốc màn hình trình duyệt thu thập toàn bộ trạng thái tổng (`VpnConnectionState`) thay đổi mỗi 5–7,5 giây
+- **Bằng chứng trong mã nguồn**:
+  - Gốc màn hình chơi game thu thập toàn bộ trạng thái VPN tại đầu hàm giao diện (dòng 97 của màn hình trình duyệt đám mây) và gốc màn hình chính cũng thu thập toàn bộ trạng thái này (dòng 119 của màn hình bảng điều khiển).
+  - Trong khi đó, vòng lặp giám sát độ trễ nền (dòng 2620–2655 của bộ quản lý VPN) chạy liên tục mỗi **5 giây** (khi duyệt web) và **7,5 giây** (khi đang chơi).
+  - Ngay cả khi đang chơi game (`liveWebRtcRtt > 0`), vòng lặp này vẫn tạo một danh sách lịch sử ping mới (`pingHistory`) và ghi đè vào trạng thái tổng mỗi 7,5 giây (dòng 2630–2635). Vì danh sách `pingHistory` luôn là đối tượng mới, toàn bộ gốc màn hình trình duyệt (bao gồm khung WebView, lớp phủ tay cầm ảo và các khối hiệu ứng) bị buộc phải kiểm tra và vẽ lại định kỳ.
+  - Thực tế, gốc màn hình trình duyệt chỉ cần biết **máy chủ đang chọn**, **chế độ mạng** và **cờ nhắc đổi thị trường**, chứ không cần danh sách máy chủ hay lịch sử ping từng giây.
 
-#### Mục 3: `GameLibraryScreen.kt` (Hiện tại: 1.413 dòng ➔ Chia thành 3 file)
-- **`GameLibraryScreen.kt` (~650 dòng)**: Khung màn hình Thư viện game chính, thanh tìm kiếm, bộ lọc danh mục (`GameTabSection`), đồng bộ danh mục và lưới hiển thị game.
-- **`LibraryGameCard.kt` (~380 dòng)**: Thẻ hiển thị từng tựa game (`LibraryGameCard`), ảnh bìa, nhãn hỗ trợ cảm ứng/chuột bàn phím và nút vào chơi nhanh.
-- **`GameLibraryDialogs.kt` (~380 dòng)**: Hai hộp thoại gồm hộp thoại chi tiết game (`XboxGameDetailDialog`) và hộp thoại tự thêm game mới (`AddGameDialog`).
+### Hạng 2 (Ảnh hưởng lớn khi cuộn/duyệt trang Xbox): Số câu đã dịch (`translationInfo`) cập nhật liên tục ở gốc màn hình trình duyệt
+- **Bằng chứng trong mã nguồn**:
+  - Gốc màn hình trình duyệt thu thập trực tiếp trạng thái dịch thuật (dòng 291), nhưng biến `translatedCount` chỉ được dùng duy nhất ở một chỗ là truyền vào thanh công cụ nổi (`IsolatedFloatingHud` tại dòng 1031).
+  - Khi người dùng cuộn trang Xbox có bật dịch Tiếng Việt/quốc tế, bộ quan sát DOM trong trang web gọi về hàm cầu nối `onTranslationStatus` (dòng 2618–2621 của cầu nối Xbox, kích hoạt từ dòng 836 của bộ dịch). Mỗi đợt dịch văn bản mới đều gán lại đối tượng `TranslationInfo` mới (kể cả khi số câu dịch không đổi) và kích hoạt vẽ lại toàn bộ gốc màn hình trình duyệt ngay trong lúc người dùng đang vuốt cuộn trang.
 
-#### Mục 4: `SessionHistoryScreen.kt` (Hiện tại: 1.813 dòng ➔ Chia thành 4 file)
-- **`SessionHistoryScreen.kt` (~450 dòng)**: Khung màn hình Lịch sử phiên chơi chính, bộ lọc phiên (`HistoryFilterMode`: Tất cả / Mượt / Cảnh báo) và danh sách phiên.
-- **`SessionHistoryCards.kt` (~450 dòng)**: Thẻ tổng kết tuần (`WeeklySummaryCard`), thẻ từng phiên chơi (`SessionHistoryItemCard`), ô chỉ số (`SummaryStatTile`), thẻ gợi ý (`SmartSuggestionBanner`), `MetricChip`, `WarningBadgePill`.
-- **`SessionDetailDialog.kt` (~520 dòng)**: Hộp thoại chi tiết phiên chơi (`SessionDetailDialog`), biểu đồ độ trễ mạng và nút chơi lại / xóa phiên.
-- **`SessionLagAnalyzer.kt` (~390 dòng)**: Toàn bộ bộ máy tính toán & chẩn đoán dùng chung (`LagDiagnosticConfig`, `SessionLagDiagnosis`, `computeSessionDropRatio`, `diagnoseSessionLag`, `SessionVerdictThresholds`, `evaluateSessionVerdict`, `getMetricOneSentenceExplanation`, và các hàm thang màu/nhãn `pingMetricColor`, `decodeStatusLabel`...).
+### Hạng 3 (Ảnh hưởng khi sóng Wi-Fi/4G dao động): Bộ tối ưu mạng phát 2 lần cập nhật liên tiếp trên luồng chính mỗi khi cường độ sóng thay đổi nhẹ
+- **Bằng chứng trong mã nguồn**:
+  - Bộ tối ưu mạng khởi tạo trên luồng chính (`Dispatchers.Main`, dòng 75) và đăng ký lắng nghe thay đổi mạng từ hệ điều hành (`onCapabilitiesChanged`, dòng 132–139).
+  - Trên Android, mỗi khi cường độ sóng Wi-Fi (`wifiRssiDbm`) hoặc băng thông ước tính nhích nhẹ (ví dụ từ `-54 dBm` sang `-55 dBm`), hàm đánh giá mạng (dòng 252–310) ghi vào trạng thái `_status.value` **2 lần liên tiếp**: lần 1 ở dòng 296 và lần 2 ngay sau đó ở dòng 421 trong hàm tính cấu hình.
+  - Vì gốc màn hình trình duyệt thu thập toàn bộ trạng thái mạng (dòng 292) dù chỉ dùng 2 trường (`isCellular` và `effectiveBitrateMbps`), mỗi lần sóng Wi-Fi nhích 1 dBm nhưng chưa đổi ngưỡng đều làm gốc màn hình nhận 2 đợt cập nhật thừa.
 
-#### Mục 5: `HomeScreen.kt` (Hiện tại: 1.406 dòng ➔ Chia thành 3 file)
-- **`HomeScreen.kt` (~360 dòng)**: Khung màn hình Trang chủ chính, điều phối bố cục dọc/ngang và kết nối trạng thái.
-- **`HomeHeroAndNetworkCards.kt` (~520 dòng)**: Bảng điều khiển vào chơi chính (`HeroConsolePlayDeck`) và thẻ trạng thái mạng/VPN nhanh (`QuickNetworkCockpitCard`).
-- **`HomeFeaturedGamesSection.kt` (~530 dòng)**: Khu vực danh sách game nổi bật/chơi gần đây (`FeaturedGamesSection`) và thẻ game trang chủ (`FeaturedGameCard`).
+### Hạng 4 (Ảnh hưởng khi bật quay màn hình và khi đếm ngược tắt VPN): Bộ đếm giây quay màn hình và băng rôn đếm ngược nằm ở gốc màn hình
+- **Bằng chứng trong mã nguồn**:
+  - Gốc màn hình trình duyệt thu thập toàn bộ trạng thái quay màn hình (dòng 124). Khi đang quay video `.MP4`, số giây đã quay (`elapsedSeconds`) tăng mỗi **1 giây**, làm toàn bộ gốc màn hình trình duyệt vẽ lại mỗi giây thay vì chỉ cập nhật viên thuốc HUD và hộp thoại cài đặt nhanh.
+  - Khi vào game và đếm ngược tự tắt VPN (dòng 522–543 của bộ điều khiển luồng), mỗi giây đếm ngược cập nhật `StreamUiState`, trong khi gốc màn hình trình duyệt đang đọc cả `StreamUiState` (dòng 99).
 
-#### Mục 6: `VirtualGamepad.kt` (Hiện tại: 2.789 dòng ➔ Chia thành 4 file)
-- **`VirtualGamepad.kt` (~1.150 dòng)**: Khung phủ tay cầm ảo (`VirtualGamepadOverlay`), bộ xử lý đa điểm chạm và bố cục vị trí các nút trên màn hình.
-- **`VirtualGamepadTunerModals.kt` (~600 dòng)**: Hộp thoại ẩn/hiện nút (`AddOrManageButtonsModal`), bảng chỉnh nhanh kích thước/độ mờ/cảm biến (`ControlQuickTunerPanel`) và `QuickFeatureChip`.
-- **`VirtualGamepadControls.kt` (~850 dòng)**: Toàn bộ các thành phần vẽ nút bấm (`VirtualAnalogStick`, `VirtualDpadCross`, `StandaloneDpadButton`, `DpadVisualKey`, `GamepadTriggerButton`, `GamepadShoulderButton`, `GamepadThumbClickMiniButton`, `GamepadSmallButton`, `GamepadXboxNexusButton`, `StandaloneAbxyButton`, `VirtualAbxyPad`, `AbxyVisualButton`).
-- **`VirtualGamepadStorage.kt` (~190 dòng)**: Mô hình `GamepadEditableNodeInfo` và các hàm đọc/lưu tọa độ, tỷ lệ kích thước, danh sách nút ẩn (`parseControlOffsets`, `serializeControlOffsets`, `parseButtonScales`, `parseHiddenButtons`...).
-
-#### Mục 7: `FloatingHud.kt` (Hiện tại: 2.528 dòng ➔ Chia thành 3 file)
-- **`FloatingHud.kt` (~1.250 dòng)**: Enum `HudMode`, `HudDockedEdge`, và khung bảng điều khiển nổi `FloatingHud` (xử lý kéo thả, neo cạnh màn hình, chế độ thu gọn và khung mở rộng).
-- **`FloatingHudTelemetryAndQuality.kt` (~720 dòng)**: Thẻ chuyên biệt Fortnite (`FortniteExclusiveHudCard`), thanh tiêu đề thu gọn (`ExpandedHudCollapseHeader`, `CollapseTouchButton48dp`), khu vực thông số mạng/giải mã (`DenseCoreTelemetrySection`, `DenseMetricRowItem`) và khu vực chỉnh chất lượng luồng (`DenseQualityModeSection`, `DenseQualityPresetChip`).
-- **`FloatingHudQuickControls.kt` (~560 dòng)**: Khu vực bật/tắt tính năng nhanh (`DenseFeatureTogglesSection`, `DenseQuickTogglePill`), chỉnh nhanh tay cầm (`DenseQuickGamepadSection`) và hàng nút tác vụ cuối bảng (`DenseBottomActionsSection`, `DenseBottomActionChip`).
+### Hạng 5 (Kiểm tra ảnh bìa danh mục và hiệu ứng động vô hạn):
+- **Đã kiểm chứng an toàn trong mã nguồn**:
+  - Thẻ game trong Thư viện (dòng 174–188) và Trang chủ (dòng 472–486) đã giới hạn kích thước giải mã ảnh ở mức `320x440`, bật `allowRgb565(true)` và tắt `crossfade(false)`.
+  - Hiệu ứng nhịp thở `rememberInfiniteTransition` trong màn hình chờ vào game (dòng 157) nằm bên trong khối `AnimatedVisibility(visible = isLoading)` nên tự động ngừng hoàn toàn ngay khi trang game tải đạt 80%.
 
 ---
 
-### 2. User Experience & Visual Design
+## 2. Trải Nghiệm Người Dùng & Giao Diện
 
-- **Trải nghiệm người dùng và giao diện giữ nguyên 100%**: Không thay đổi bất kỳ màu sắc, phông chữ, kích thước, khoảng cách hay hiệu ứng chuyển động nào.
-- **Bảo toàn toàn bộ `testTag` và `contentDescription`**: Đảm bảo các bài kiểm tra tự động và trình đọc màn hình hoạt động như cũ.
-
----
-
-### 3. Key Product Decisions & Trade-Offs
-
-- **Quyết định 1**: Giữ nguyên tên file gốc làm điểm vào chính (ví dụ `SettingsScreen.kt` vẫn chứa `fun SettingsScreen(...)`), chỉ tách các thành phần con, hộp thoại và hàm phụ trợ sang các file đi kèm có tiền tố cùng tên (`Settings...`, `Server...`, `Session...`, `VirtualGamepad...`, `FloatingHud...`) để khi mở thư mục code, các file cùng nhóm sẽ nằm sát nhau theo thứ tự bảng chữ cái.
-- **Quyết định 2**: Chuyển các hàm/lớp phụ trợ từ `private` sang `internal` trong cùng package để các file con gọi nhau trực tiếp mà không làm lộ API không cần thiết ra ngoài module.
+- **Giữ nguyên 100% thiết kế và tính năng**: Mọi thành phần giao diện (khung chơi game, tay cầm ảo, viên thuốc HUD, bảng thông số mạng, danh mục game) giữ nguyên hình thức và cách hoạt động.
+- **Cải thiện độ mượt thực tế**:
+  - Khi vuốt cuộn trang Xbox Cloud Gaming: không còn hiện tượng khựng nhẹ mỗi khi bộ dịch dịch xong một đoạn văn bản mới trên trang.
+  - Khi đang chơi game (stream): loại bỏ hoàn toàn các đợt vẽ lại ngầm mỗi 5–7,5 giây từ bộ đo ping nền và các đợt vẽ lại thừa khi sóng Wi-Fi dao động nhẹ.
 
 ---
 
-### 4. Technical Architecture & Data Strategy *(Technical Reference)*
+## 3. Quyết Định Kỹ Thuật & Đánh Đổi
+
+- **Quyết định 1: Cô lập việc đọc trạng thái theo đúng thành phần tiêu thụ (State Scoping & `derivedStateOf`)**
+  - *Cách làm*: Ở gốc màn hình trình duyệt đám mây, chỉ trích xuất các trường cấu trúc thật sự cần thiết thông qua `distinctUntilChanged` / `derivedStateOf` (như `currentServer`, `mode`, `unlockFailPromptServer`, `isCellular`, `effectiveBitrateMbps`). Đẩy việc thu thập chi tiết `vpnState`, `translationInfo`, `networkStatus` và `recorderState` vào thẳng bên trong `IsolatedFloatingHud` và các thành phần con riêng biệt.
+  - *Lý do*: Ngăn chặn triệt để việc toàn bộ hàm giao diện gốc phải chạy lại khi các chỉ số thời gian thực (ping, số từ đã dịch, số giây quay video, cường độ dBm Wi-Fi) thay đổi.
+- **Quyết định 2: Gộp cập nhật trạng thái mạng và chỉ phát trạng thái mới khi giá trị thực sự thay đổi**
+  - *Cách làm*: Trong bộ tối ưu mạng, gộp 2 lần gán `_status.value` trong `evaluateCurrentNetwork` + `recomputeEffectiveProfile` thành **1 lần gán duy nhất**, đồng thời làm tròn/lọc biến động nhỏ của `wifiRssiDbm` khi chưa vượt ngưỡng sóng yếu để tránh phát trạng thái mới liên tục trên luồng chính. Trong cầu nối dịch thuật, chỉ cập nhật `_translationInfo.value` khi `enabled` hoặc `count` thực sự khác giá trị cũ.
+  - *Lý do*: Giảm số lần phát sự kiện thừa trên `StateFlow` ngay từ gốc.
+- **Quyết định 3: Tạm dừng hẳn vòng lặp đo độ trễ nền khi đang trong phiên chơi (`isInGameStreamActive`)**
+  - *Cách làm*: Trong vòng lặp `startLatencyMonitoring()` của bộ quản lý VPN, khi đang trong phiên chơi thực tế (`isInGameStreamActive` và đã có luồng WebRTC), chỉ cập nhật `pingHistory` khi độ trễ chênh lệch đáng kể hoặc khi người dùng mở HUD, và không tạo danh sách mới nếu giá trị không đổi; tuyệt đối không chạy đo TCP/HTTP nền khi đang mở màn hình chơi game.
+  - *Lý do*: Nhường tối đa chu kỳ CPU và luồng chính cho bộ giải mã video phần cứng WebRTC.
+
+---
+
+## 4. Kiến Trúc Kỹ Thuật & Luồng Dữ Liệu Sau Tối Ưu
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                 CẤU TRÚC NHÓM FILE SAU KHI TÁCH (7 NHÓM)                     │
-└──────────────────────────────────────┬───────────────────────────────────────┘
-                                       │
-        ┌──────────────────────────────┴───────────────────────────────┐
-        ▼                                                              ▼
-┌──────────────────────────────────────┐      ┌────────────────────────────────┐
-│   GÓI GIAO DIỆN TAB (5 MÀN HÌNH)     │      │ GÓI THÀNH PHẦN NỔI (2 CỤM LỚN) │
-├──────────────────────────────────────┤      ├────────────────────────────────┤
-│ 1. Nhóm Settings (5 file)            │      │ 6. Nhóm VirtualGamepad (4 file)│
-│  ├─ Khung chính & tìm kiếm           │      │  ├─ Khung phủ & đa điểm chạm   │
-│  ├─ Mạng, VPN & Vùng                 │      │  ├─ Bảng chỉnh nhanh & ẩn/hiện │
-│  ├─ Hình ảnh, Âm thanh & Luồng       │      │  ├─ Các nút Analog/Dpad/ABXY   │
-│  ├─ Tay cầm, Cảm biến & Hệ thống     │      │  └─ Lưu/đọc tọa độ & tỷ lệ nút │
-│  └─ Thành phần khung/nút dùng chung  │      │                                │
-│                                      │      │ 7. Nhóm FloatingHud (3 file)   │
-│ 2. Nhóm Servers (3 file)             │      │  ├─ Khung kéo thả & neo cạnh   │
-│  ├─ Khung danh sách & thanh trạng thái│      │  ├─ Thông số mạng & chất lượng │
-│  ├─ Thẻ máy chủ & vạch tín hiệu      │      │  └─ Bật/tắt nhanh & nút tác vụ │
-│  └─ Hộp thoại thêm Proxy & chi tiết  │      └────────────────────────────────┘
-│                                      │
-│ 3. Nhóm GameLibrary (3 file)         │
-│  ├─ Khung lọc, tìm kiếm & lưới game  │
-│  ├─ Thẻ game & huy hiệu trạng thái   │
-│  └─ Hộp thoại chi tiết & thêm game   │
-│                                      │
-│ 4. Nhóm SessionHistory (4 file)      │
-│  ├─ Khung danh sách & bộ lọc phiên   │
-│  ├─ Thẻ tuần, thẻ phiên & ô chỉ số   │
-│  ├─ Hộp thoại chi tiết & biểu đồ trễ │
-│  └─ Bộ chẩn đoán lag & thang màu/nhãn│
-│                                      │
-│ 5. Nhóm Home (3 file)                │
-│  ├─ Khung trang chủ chính            │
-│  ├─ Bảng vào chơi & thẻ mạng nhanh   │
-│  └─ Khu vực game nổi bật & thẻ game  │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CloudBrowserScreen (Gốc màn hình)                    │
+│  Chỉ lắng nghe các trường cấu trúc ít thay đổi (distinctUntilChanged):   │
+│  • Server hiện tại & Chế độ mạng (mode)                                 │
+│  • Cấu hình luồng (isCellular, effectiveBitrateMbps)                    │
+│  • Trạng thái vào trận (isGameActive, isStreamConnected)                │
+└───────────────┬─────────────────────────────────────────┬───────────────┘
+                │                                         │
+                ▼                                         ▼
+┌───────────────────────────────┐         ┌───────────────────────────────┐
+│   AndroidView (Xbox WebView)  │         │      IsolatedFloatingHud      │
+│ • Không bị vẽ lại khi nhảy    │         │ Tự thu thập riêng bên trong:  │
+│   ping, dịch chữ hay đếm giây │         │ • VpnManager.state (ping)     │
+│ • Chỉ chạy evaluateJavascript │         │ • XboxBridge.translationInfo  │
+│   khi cấu hình thực sự đổi    │         │ • NetworkOptimizer.telemetry  │
+└───────────────────────────────┘         │ • ZeroLagScreenRecorder.state │
+                                          └───────────────────────────────┘
 ```
+
+### Tóm tắt các điểm cập nhật kỹ thuật:
+1. **Tối ưu gốc màn hình trình duyệt (`CloudBrowserScreen`)**:
+   - Đưa việc thu thập `XboxBridge.translationInfo`, `ZeroLagScreenRecorder.state`, và toàn bộ `VpnManager.state` / `NetworkOptimizer.status` vào bên trong `IsolatedFloatingHud` (và thành phần băng rôn/màn hình chờ con), còn ở gốc màn hình chỉ lắng nghe các trường cấu trúc bằng `remember` + `distinctUntilChanged`.
+   - Kiểm tra các khối `LaunchedEffect` gọi `evaluateJavascript` để đảm bảo chỉ gọi khi `webViewInstance != null` và khi giá trị cấu hình thực sự thay đổi.
+2. **Tối ưu bộ quản lý VPN (`VpnManager`)**:
+   - Trong `startLatencyMonitoring()`: không tạo danh sách `pingHistory` mới hay ghi lại `_state.value` khi đang ở màn hình chơi game nếu giá trị độ trễ không thay đổi đáng kể; đảm bảo dừng mọi phép đo ping TCP nền khi `isInGameStreamActive == true`.
+3. **Tối ưu bộ tối ưu mạng (`NetworkOptimizer`) và cầu nối dịch (`XboxBridge`)**:
+   - Gộp 2 lần gán `_status.value` liên tiếp trong `evaluateCurrentNetwork()` và `recomputeEffectiveProfile()` thành 1 lần gán duy nhất.
+   - Trong `XboxBridge.onTranslationStatus()`, kiểm tra nếu `enabled` và `count` bằng đúng giá trị hiện tại thì bỏ qua không phát lại sự kiện.

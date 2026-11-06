@@ -1,6 +1,6 @@
 {
-  "summary": "Kế hoạch chi tiết cách chia 7 file giao diện lớn (SettingsScreen, ServersScreen, GameLibraryScreen, SessionHistoryScreen, HomeScreen, VirtualGamepad, FloatingHud) thành các file nhỏ theo chức năng, kèm tên từng file mới và nội dung bên trong.",
-  "updatedAt": "2026-11-05T10:11:10.604080926Z",
+  "summary": "Kế hoạch giảm giật/lắc khi duyệt trang Xbox và khi đang chơi (stream) dựa trên đối chiếu mã nguồn thực tế: cô lập state ở gốc màn hình, chống ghi trùng state, gộp cập nhật trạng thái mạng và dừng hẳn vòng lặp đo nền khi đang stream.",
+  "updatedAt": "2026-11-06T11:11:48.877680304Z",
   "requestFeedback": true,
   "userFacing": true
 }

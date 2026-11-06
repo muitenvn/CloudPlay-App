@@ -2617,6 +2617,8 @@ class XboxBridge(
     @JavascriptInterface
     fun onTranslationStatus(enabled: Boolean, count: Int) {
         if (!isCallerTrusted()) return
+        val current = _translationInfo.value
+        if (current.isEnabled == enabled && current.translatedCount == count) return
         _translationInfo.value = TranslationInfo(isEnabled = enabled, translatedCount = count)
     }
 

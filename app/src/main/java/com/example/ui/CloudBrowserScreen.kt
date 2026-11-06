@@ -136,21 +136,6 @@ fun CloudBrowserScreen(
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
 
-    val isRecording by remember {
-        com.example.cloudplay.ZeroLagScreenRecorder.state.map { it.isRecording }.distinctUntilChanged()
-    }.collectAsState(initial = com.example.cloudplay.ZeroLagScreenRecorder.state.value.isRecording)
-
-    LaunchedEffect(isRecording) {
-        com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(isRecording)
-    }
-
-    LaunchedEffect(streamUiState.isGameActive, streamUiState.isStreamConnected) {
-        com.example.audio.BackgroundMusicManager.onGameStreamStateChanged(
-            isGameActive = streamUiState.isGameActive,
-            isStreamConnected = streamUiState.isStreamConnected
-        )
-    }
-
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewInstance, context) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -208,14 +193,11 @@ fun CloudBrowserScreen(
     }
 
     DisposableEffect(activity) {
-        com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = false)
         VpnManager.setInGameStreamActive(true)
         (activity as? com.example.MainActivity)?.applyImmersiveFullscreen(true)
         onDispose {
             VpnManager.setInGameStreamActive(false)
             com.example.cloudplay.ZeroLagScreenRecorder.stopRecording(context)
-            com.example.audio.BackgroundMusicManager.onScreenRecordingStateChanged(false)
-            com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = true)
             gamepadDetector.release()
             bridgeInstance?.release()
             bridgeInstance = null

@@ -704,9 +704,6 @@ data class AppConfig(
     val githubRepoSlug: String = "muitenvn/CloudPlay-App",
     val userAcceptedTerms: Boolean = false,
     val autoCheckUpdatesOnLaunch: Boolean = true,
-    val backgroundMusicEnabled: Boolean = false, // Mặc định TẮT cho người dùng mới
-    val backgroundMusicVolume: Float = 0.08f, // 0.0f .. 1.0f (mặc định 8% cho người dùng mới)
-    val backgroundMusicPlayInGame: Boolean = true, // Mặc định BẬT phát nhạc khi đang chơi
     val enableGlobalpingProbe: Boolean = false, // A4: Mặc định TẮT đo qua trạm Globalping bên thứ ba
     val hideUnreachableDynamicServers: Boolean = false, // A8: Tùy chọn ẩn máy chủ động không đo được
     val enableGeoIpHttpsFallback: Boolean = true,
@@ -973,19 +970,6 @@ object SettingsRepository {
             ) ?: "muitenvn/CloudPlay-App",
             userAcceptedTerms = sp.getBoolean("user_accepted_terms_v2", false),
             autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true),
-            backgroundMusicEnabled = if (effectiveLowEnd) {
-                sp.getBoolean("background_music_enabled_low_end", false)
-            } else if (sp.contains("background_music_user_explicit")) {
-                sp.getBoolean("background_music_user_explicit", false)
-            } else {
-                false
-            },
-            backgroundMusicVolume = if (sp.contains("background_music_volume_user_explicit")) {
-                sp.getFloat("background_music_volume_user_explicit", 0.08f).coerceIn(0f, 1f)
-            } else {
-                0.08f
-            },
-            backgroundMusicPlayInGame = sp.getBoolean("background_music_play_in_game", true),
             enableGlobalpingProbe = sp.getBoolean("enable_globalping_probe", false),
             hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false),
             enableGeoIpHttpsFallback = sp.getBoolean("enable_geoip_https_fallback", true),
@@ -1080,14 +1064,6 @@ object SettingsRepository {
             putBoolean("user_accepted_terms", c.userAcceptedTerms)
             putBoolean("user_accepted_terms_v2", c.userAcceptedTerms)
             putBoolean("auto_check_updates_on_launch", c.autoCheckUpdatesOnLaunch)
-            putBoolean("background_music_enabled", c.backgroundMusicEnabled)
-            if (c.lowEndDeviceMode) {
-                putBoolean("background_music_enabled_low_end", c.backgroundMusicEnabled)
-            } else {
-                putBoolean("background_music_user_pref", c.backgroundMusicEnabled)
-            }
-            putFloat("background_music_volume", c.backgroundMusicVolume.coerceIn(0f, 1f))
-            putBoolean("background_music_play_in_game", c.backgroundMusicPlayInGame)
             putBoolean("enable_globalping_probe", c.enableGlobalpingProbe)
             putBoolean("hide_unreachable_dynamic_servers", c.hideUnreachableDynamicServers)
             putBoolean("enable_geoip_https_fallback", c.enableGeoIpHttpsFallback)
@@ -1411,15 +1387,9 @@ object SettingsRepository {
     }
 
     fun updateLowEndDeviceMode(enabled: Boolean) {
-        val restoredMusicPref = if (enabled) {
-            false
-        } else {
-            prefs?.getBoolean("background_music_user_explicit", false) ?: false
-        }
         _config.update {
             it.copy(
                 lowEndDeviceMode = enabled,
-                backgroundMusicEnabled = restoredMusicPref,
                 streamRenderScale = if (enabled) StreamRenderScale.PERFORMANCE_75 else it.cellularMode.autoRenderScale
             )
         }
@@ -1960,24 +1930,6 @@ object SettingsRepository {
         persist(_config.value)
     }
 
-    fun updateBackgroundMusicEnabled(enabled: Boolean) {
-        prefs?.edit()?.putBoolean("background_music_user_explicit", enabled)?.apply()
-        _config.update { it.copy(backgroundMusicEnabled = enabled) }
-        persist(_config.value)
-    }
-
-    fun updateBackgroundMusicVolume(volume: Float) {
-        val clamped = volume.coerceIn(0f, 1f)
-        prefs?.edit()?.putFloat("background_music_volume_user_explicit", clamped)?.apply()
-        _config.update { it.copy(backgroundMusicVolume = clamped) }
-        persist(_config.value)
-    }
-
-    fun updateBackgroundMusicPlayInGame(enabled: Boolean) {
-        _config.update { it.copy(backgroundMusicPlayInGame = enabled) }
-        persist(_config.value)
-    }
-
     fun updateEnableGlobalpingProbe(enabled: Boolean) {
         _config.update { it.copy(enableGlobalpingProbe = enabled) }
         persist(_config.value)
@@ -2000,6 +1952,46 @@ object SettingsRepository {
 
     fun updateAllowCellularLiveProxySync(allowed: Boolean) {
         _config.update { it.copy(allowCellularLiveProxySync = allowed) }
+        persist(_config.value)
+    }
+
+    /**
+     * Chỉ khôi phục mặc định các cài đặt nằm trong mục "Nâng cao".
+     * KHÔNG xóa phiên đăng nhập Xbox, lịch sử phiên, danh sách game, điều khoản hay các cài đặt Cơ bản.
+     */
+    fun resetAdvancedSettingsOnly() {
+        _config.update { current ->
+            current.copy(
+                videoContrast = 100,
+                videoSaturation = 100,
+                videoBrightness = 100,
+                lowEndDeviceMode = false,
+                gpuLoadReductionEnabled = true,
+                streamRenderScale = current.cellularMode.autoRenderScale,
+                leftStickInnerDeadzone = 0.08f,
+                leftStickOuterDeadzone = 0.95f,
+                rightStickInnerDeadzone = 0.08f,
+                rightStickOuterDeadzone = 0.95f,
+                physLeftStickInnerDeadzone = 0.0f,
+                physLeftStickOuterDeadzone = 1.0f,
+                physRightStickInnerDeadzone = 0.0f,
+                physRightStickOuterDeadzone = 1.0f,
+                gamepadLayoutPreset = GamepadLayoutPreset.STANDARD,
+                physicalGamepadButtonMap = "",
+                controllerShortcutsEnabled = true,
+                shortcutToggleStatsButton = 3, // Y
+                shortcutToggleVirtualPadButton = 1, // B
+                shortcutToggleRecordingButton = 5, // RB
+                bilingualMode = false,
+                useSystemLanguage = true,
+                customLocale = "en-US",
+                autoBypassDelaySeconds = 2,
+                allowCellularLiveProxySync = false,
+                enableGlobalpingProbe = false,
+                enableGeoIpHttpsFallback = true,
+                allowDbIpCellularDownload = false
+            )
+        }
         persist(_config.value)
     }
 }

@@ -1159,6 +1159,58 @@ class ExampleRobolectricTest {
         assertNotNull(upgradedBest)
         VpnManager.selectServer(com.example.vpn.DEFAULT_SERVERS[0], context, isManualSelection = false)
     }
+
+    @Test
+    fun testResetAdvancedSettingsOnlyPreservesBasicAndUserDataAndIgnoresLegacyMusicPrefs() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
+        sp.edit()
+            .putBoolean("background_music_enabled", true)
+            .putFloat("background_music_volume", 0.5f)
+            .putBoolean("background_music_play_in_game", false)
+            .commit()
+
+        // Reading legacy music keys must never crash
+        SettingsRepository.init(context)
+
+        // Set Basic settings and user consent
+        SettingsRepository.updateUserAcceptedTerms(true)
+        SettingsRepository.updateClarityBoost(true)
+        SettingsRepository.updateShowVirtualController(true)
+        SettingsRepository.updateGamepadScale(1.20f)
+        SettingsRepository.updateGamepadSensitivity(1.30f)
+
+        // Set Advanced settings to non-default values
+        SettingsRepository.updateVideoContrast(125)
+        SettingsRepository.updateVideoSaturation(135)
+        SettingsRepository.updateVideoBrightness(115)
+        SettingsRepository.updateLeftStickInnerDeadzone(0.20f)
+        SettingsRepository.updatePhysRightStickOuterDeadzone(0.80f)
+        SettingsRepository.updateBilingualMode(true)
+        SettingsRepository.updateCustomLocale("ja-JP")
+        SettingsRepository.updateEnableGlobalpingProbe(true)
+
+        // Reset ONLY Advanced settings
+        SettingsRepository.resetAdvancedSettingsOnly()
+        val after = SettingsRepository.config.value
+
+        // Advanced settings restored to defaults
+        assertEquals(100, after.videoContrast)
+        assertEquals(100, after.videoSaturation)
+        assertEquals(100, after.videoBrightness)
+        assertEquals(0.08f, after.leftStickInnerDeadzone, 0.001f)
+        assertEquals(1.0f, after.physRightStickOuterDeadzone, 0.001f)
+        org.junit.Assert.assertFalse(after.bilingualMode)
+        assertEquals("en-US", after.getEffectiveLocale())
+        org.junit.Assert.assertFalse(after.enableGlobalpingProbe)
+
+        // Basic settings & user consent untouched
+        assertTrue(after.userAcceptedTerms)
+        assertTrue(after.clarityBoostEnabled)
+        assertTrue(after.showVirtualController)
+        assertEquals(1.20f, after.gamepadScale, 0.01f)
+        assertEquals(1.30f, after.gamepadSensitivity, 0.01f)
+    }
 }
 
 class ServerSelectionScoringUnitTest {
@@ -1498,6 +1550,42 @@ class ServerSelectionScoringUnitTest {
                 forcePickBest = false
             )
         )
+    }
+
+    @Test
+    fun resetAdvancedSettingsOnly_preservesBasicSettingsAndUserConsent() {
+        SettingsRepository.updateUserAcceptedTerms(true)
+        SettingsRepository.updateClarityBoost(true)
+        SettingsRepository.updateShowVirtualController(true)
+        SettingsRepository.updateGamepadScale(1.20f)
+        SettingsRepository.updateGamepadSensitivity(1.30f)
+
+        SettingsRepository.updateVideoContrast(125)
+        SettingsRepository.updateVideoSaturation(135)
+        SettingsRepository.updateVideoBrightness(115)
+        SettingsRepository.updateLeftStickInnerDeadzone(0.20f)
+        SettingsRepository.updatePhysRightStickOuterDeadzone(0.80f)
+        SettingsRepository.updateBilingualMode(true)
+        SettingsRepository.updateCustomLocale("ja-JP")
+        SettingsRepository.updateEnableGlobalpingProbe(true)
+
+        SettingsRepository.resetAdvancedSettingsOnly()
+        val after = SettingsRepository.config.value
+
+        assertEquals(100, after.videoContrast)
+        assertEquals(100, after.videoSaturation)
+        assertEquals(100, after.videoBrightness)
+        assertEquals(0.08f, after.leftStickInnerDeadzone, 0.001f)
+        assertEquals(1.0f, after.physRightStickOuterDeadzone, 0.001f)
+        org.junit.Assert.assertFalse(after.bilingualMode)
+        assertEquals("en-US", after.getEffectiveLocale())
+        org.junit.Assert.assertFalse(after.enableGlobalpingProbe)
+
+        assertTrue(after.userAcceptedTerms)
+        assertTrue(after.clarityBoostEnabled)
+        assertTrue(after.showVirtualController)
+        assertEquals(1.20f, after.gamepadScale, 0.01f)
+        assertEquals(1.30f, after.gamepadSensitivity, 0.01f)
     }
 }
 

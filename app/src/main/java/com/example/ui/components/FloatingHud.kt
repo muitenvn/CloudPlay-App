@@ -929,6 +929,13 @@ fun FloatingHud(
                     val panelMaxWidth = (screenMaxWidth * 0.48f).coerceIn(248.dp, 312.dp)
                     val panelMaxHeight = (screenMaxHeight * 0.68f).coerceAtLeast(220.dp)
                     val scrollState = rememberScrollState()
+                    var showMoreHudOptions by rememberSaveable { mutableStateOf(false) }
+
+                    LaunchedEffect(hudMode) {
+                        if (hudMode != HudMode.EXPANDED) {
+                            showMoreHudOptions = false
+                        }
+                    }
 
                     AnimatedVisibility(
                         visible = hudMode == HudMode.EXPANDED,
@@ -990,7 +997,7 @@ fun FloatingHud(
                                 verticalArrangement = Arrangement.spacedBy(5.dp)
                             ) {
                                 // ========================================================
-                                // BẢNG THÔNG SỐ CỐT LÕI (Ping, FPS, Giải mã, Tay cầm, Nhiệt độ & Pin)
+                                // 1. BẢNG THÔNG SỐ CỐT LÕI (Ping, FPS, Giải mã, Tay cầm, Nhiệt độ & Pin)
                                 // ========================================================
                                 DenseCoreTelemetrySection(
                                     vpnState = vpnState,
@@ -1018,133 +1025,7 @@ fun FloatingHud(
                                 )
 
                                 // ========================================================
-                                // NHÓM 1: ĐỘ PHÂN GIẢI (Tự động / 720p / 900p / 1080p / 1080p+)
-                                // ========================================================
-                                DenseQualityModeSection(
-                                    networkStatus = networkStatus,
-                                    adaptiveQualityState = adaptiveQualityState,
-                                    telemetry = telemetry,
-                                    isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
-                                    onSelectCellularMode = { mode ->
-                                        markUserInteraction()
-                                        onSelectCellularMode(mode)
-                                    },
-                                    onToggleAutoAdapting = { enabled ->
-                                        markUserInteraction()
-                                        onToggleAutoAdapting(enabled)
-                                    },
-                                    onToggleWifiSpeedFirst = { enabled ->
-                                        markUserInteraction()
-                                        onToggleWifiSpeedFirst(enabled)
-                                    }
-                                )
-
-                                // ========================================================
-                                // NHÓM 2: ĐIỀU KHIỂN (Chế độ điều khiển & Công tắc nhanh)
-                                // ========================================================
-                                if (gameProfile?.gameId == "fortnite") {
-                                    FortniteExclusiveHudCard(
-                                        isEn = isEn,
-                                        virtualControllerEnabled = virtualControllerEnabled,
-                                        onSelectFortniteControlMode = { useVirtualFpsPro ->
-                                            markUserInteraction()
-                                            onSelectFortniteControlMode(useVirtualFpsPro)
-                                        }
-                                    )
-                                }
-
-                                DenseFeatureTogglesSection(
-                                    clarityBoostActive = clarityBoostActive,
-                                    hideStreamStats = hideStreamStats,
-                                    translationActive = translationActive,
-                                    translatedCount = translatedCount,
-                                    onToggleClarityBoost = { enabled ->
-                                        markUserInteraction()
-                                        onToggleClarityBoost(enabled)
-                                    },
-                                    onToggleHideStreamStats = { enabled ->
-                                        markUserInteraction()
-                                        onToggleHideStreamStats(enabled)
-                                    },
-                                    onToggleTranslation = { enabled ->
-                                        markUserInteraction()
-                                        onToggleTranslation(enabled)
-                                    },
-                                    onToggleGpuLoadReduction = {
-                                        markUserInteraction()
-                                        val nextState = !config.gpuLoadReductionEnabled
-                                        com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
-                                    }
-                                )
-
-                                if (virtualControllerEnabled) {
-                                    DenseQuickGamepadSection(
-                                        virtualControllerEnabled = true,
-                                        onInteraction = { markUserInteraction() }
-                                    )
-                                }
-
-                                // ========================================================
-                                // NHÓM 3: MÀU SẮC (Độ nét, FPS & Màu sắc hình ảnh)
-                                // ========================================================
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onOpenSettings()
-                                        }
-                                        .testTag("hud_expanded_video_settings_card"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color(0xFF121D17),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF24382C))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.weight(1f),
-                                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                                        ) {
-                                            Text(
-                                                text = if (isEn) "Colors & Graphics" else "Màu sắc & Đồ họa",
-                                                color = TextPrimary,
-                                                fontSize = 11.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = if (isEn) {
-                                                    "${config.cellularMode.localizedTitle(true)} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
-                                                } else {
-                                                    "${config.cellularMode.localizedTitle(false)} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
-                                                },
-                                                color = TextSecondary,
-                                                fontSize = 11.sp,
-                                                maxLines = 2
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = Color(0xFF1C2E24)
-                                        ) {
-                                            Text(
-                                                text = if (isEn) "Open" else "Mở",
-                                                color = XboxNeonGreen,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // ========================================================
-                                // NHÓM 4: QUAY MÀN HÌNH (.MP4)
+                                // 2. NÚT QUAY MÀN HÌNH (.MP4) — Luôn hiện ở chế độ thu gọn mặc định
                                 // ========================================================
                                 Surface(
                                     modifier = Modifier
@@ -1223,7 +1104,174 @@ fun FloatingHud(
                                 }
 
                                 // ========================================================
-                                // HÀNG NÚT TÁC VỤ DƯỚI CÙNG (Tải lại, Xoay, Đồ họa, Thoát)
+                                // 3. NÚT MỞ RỘNG CÁC BẢNG TÙY CHỈNH PHỤ (Mặc định thu gọn)
+                                // ========================================================
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            showMoreHudOptions = !showMoreHudOptions
+                                        }
+                                        .testTag("hud_more_options_toggle_button"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (showMoreHudOptions) DirectCyan.copy(alpha = 0.16f) else Color(0xFF101C16),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        0.8.dp,
+                                        if (showMoreHudOptions) DirectCyan else XboxCardBorder.copy(alpha = 0.65f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = if (showMoreHudOptions) {
+                                                if (isEn) "Hide Resolution, Gamepad & Color Options" else "Thu gọn Độ phân giải, Tay cầm & Màu sắc"
+                                            } else {
+                                                if (isEn) "Expand (Resolution, Quick Toggles, Gamepad, Colors)" else "Mở rộng (Độ phân giải, Công tắc, Tay cầm, Màu sắc)"
+                                            },
+                                            color = if (showMoreHudOptions) DirectCyan else XboxNeonGreen,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (showMoreHudOptions) "▲" else "▼",
+                                            color = if (showMoreHudOptions) DirectCyan else XboxNeonGreen,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+                                }
+
+                                // CÁC BẢNG PHỤ NẰM SAU NÚT "MỞ RỘNG":
+                                // Độ phân giải, Công tắc nhanh, Chỉnh tay cầm ảo, Chỉnh màu
+                                if (showMoreHudOptions) {
+                                    DenseQualityModeSection(
+                                        networkStatus = networkStatus,
+                                        adaptiveQualityState = adaptiveQualityState,
+                                        telemetry = telemetry,
+                                        isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
+                                        onSelectCellularMode = { mode ->
+                                            markUserInteraction()
+                                            onSelectCellularMode(mode)
+                                        },
+                                        onToggleAutoAdapting = { enabled ->
+                                            markUserInteraction()
+                                            onToggleAutoAdapting(enabled)
+                                        },
+                                        onToggleWifiSpeedFirst = { enabled ->
+                                            markUserInteraction()
+                                            onToggleWifiSpeedFirst(enabled)
+                                        }
+                                    )
+
+                                    if (gameProfile?.gameId == "fortnite") {
+                                        FortniteExclusiveHudCard(
+                                            isEn = isEn,
+                                            virtualControllerEnabled = virtualControllerEnabled,
+                                            onSelectFortniteControlMode = { useVirtualFpsPro ->
+                                                markUserInteraction()
+                                                onSelectFortniteControlMode(useVirtualFpsPro)
+                                            }
+                                        )
+                                    }
+
+                                    DenseFeatureTogglesSection(
+                                        clarityBoostActive = clarityBoostActive,
+                                        hideStreamStats = hideStreamStats,
+                                        translationActive = translationActive,
+                                        translatedCount = translatedCount,
+                                        onToggleClarityBoost = { enabled ->
+                                            markUserInteraction()
+                                            onToggleClarityBoost(enabled)
+                                        },
+                                        onToggleHideStreamStats = { enabled ->
+                                            markUserInteraction()
+                                            onToggleHideStreamStats(enabled)
+                                        },
+                                        onToggleTranslation = { enabled ->
+                                            markUserInteraction()
+                                            onToggleTranslation(enabled)
+                                        },
+                                        onToggleGpuLoadReduction = {
+                                            markUserInteraction()
+                                            val nextState = !config.gpuLoadReductionEnabled
+                                            com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
+                                        }
+                                    )
+
+                                    if (virtualControllerEnabled) {
+                                        DenseQuickGamepadSection(
+                                            virtualControllerEnabled = true,
+                                            onInteraction = { markUserInteraction() }
+                                        )
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                markUserInteraction()
+                                                onOpenSettings()
+                                            }
+                                            .testTag("hud_expanded_video_settings_card"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF121D17),
+                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF24382C))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (isEn) "Colors & Graphics" else "Màu sắc & Đồ họa",
+                                                    color = TextPrimary,
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = if (isEn) {
+                                                        "${config.cellularMode.localizedTitle(true)} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
+                                                    } else {
+                                                        "${config.cellularMode.localizedTitle(false)} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
+                                                    },
+                                                    color = TextSecondary,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 2
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFF1C2E24)
+                                            ) {
+                                                Text(
+                                                    text = if (isEn) "Open" else "Mở",
+                                                    color = XboxNeonGreen,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ========================================================
+                                // 4. HÀNG NÚT TÁC VỤ DƯỚI CÙNG (Tải lại, Xoay, Đồ họa, Thoát)
                                 // ========================================================
                                 DenseBottomActionsSection(
                                     onReloadPage = {

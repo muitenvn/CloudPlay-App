@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
@@ -51,6 +52,7 @@ import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
+import com.example.ui.theme.XboxSurfaceVariant
 import com.example.vpn.VpnConnectionState
 
 @Composable
@@ -66,13 +68,17 @@ fun SettingsScreen(
     var showFullTermsDialog by remember { mutableStateOf(false) }
     var showResetGamepadConfirmDialog by remember { mutableStateOf(false) }
 
-    // 6 nhóm gập/mở (mặc định gập, chỉ nhóm đồ họa chính mở)
+    // Bố cục 3 tầng:
+    // - Tầng 1 (Cơ bản): Đồ họa & FPS, Mạng & Mở khóa vùng, Tay cầm, Ngôn ngữ & Dịch, Quay màn hình
+    // - Tầng 2 (Nâng cao): Mặc định đóng sẵn (expandAdvanced = false)
+    // - Tầng 3 (Thông tin & Điều khoản): Ở dưới cùng, mở sẵn để bấm vào dễ dàng
     var expandGraphics by rememberSaveable { mutableStateOf(true) }
     var expandNetwork by rememberSaveable { mutableStateOf(false) }
     var expandControls by rememberSaveable { mutableStateOf(false) }
-    var expandAdvanced by rememberSaveable { mutableStateOf(false) }
+    var expandLanguage by rememberSaveable { mutableStateOf(false) }
     var expandRecording by rememberSaveable { mutableStateOf(false) }
-    var expandTermsPrivacy by rememberSaveable { mutableStateOf(false) }
+    var expandAdvanced by rememberSaveable { mutableStateOf(false) }
+    var expandTermsPrivacy by rememberSaveable { mutableStateOf(true) }
 
     val context = LocalContext.current
     val isEn = config.isSettingsEnglishUI()
@@ -108,7 +114,11 @@ fun SettingsScreen(
     ) {
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        // NHÓM 1: ĐỒ HỌA & KHUNG HÌNH (FPS) (Mặc định mở)
+        // =========================================================================
+        // TẦNG 1: CÀI ĐẶT CƠ BẢN (Chất lượng, Mạng & Mở khóa vùng, Tay cầm, Ngôn ngữ, Quay màn hình)
+        // =========================================================================
+
+        // 1. ĐỒ HỌA & KHUNG HÌNH (FPS) (Mặc định mở)
         item {
             SettingsGraphicsFpsSection(
                 config = config,
@@ -118,7 +128,7 @@ fun SettingsScreen(
             )
         }
 
-        // NHÓM 2: MẠNG & MỞ KHÓA VÙNG (Mặc định gập)
+        // 2. MẠNG & MỞ KHÓA VÙNG (Tự bật/tắt VPN & Chế độ mở khóa vùng)
         item {
             SettingsNetworkVpnSection(
                 config = config,
@@ -129,7 +139,7 @@ fun SettingsScreen(
             )
         }
 
-        // NHÓM 3: TAY CẦM & CẢM ỨNG (Mặc định gập)
+        // 3. TAY CẦM & CẢM ỨNG (Tay cầm ảo, cỡ nút, độ mờ, 1 thanh độ nhạy cần)
         item {
             SettingsGamepadTouchSection(
                 config = config,
@@ -140,21 +150,17 @@ fun SettingsScreen(
             )
         }
 
-        // NHÓM 4: NGÔN NGỮ, DỊCH TỰ ĐỘNG & HỆ THỐNG (Mặc định gập)
+        // 4. NGÔN NGỮ & DỊCH GIAO DIỆN XBOX
         item {
-            SettingsLanguageMarketAccountSection(
+            SettingsLanguageBasicSection(
                 config = config,
-                vpnState = vpnState,
                 isEn = isEn,
-                expandAdvanced = expandAdvanced,
-                onToggleExpand = { expandAdvanced = !expandAdvanced },
-                onClearCookies = onClearCookies,
-                onOpenExternalTerms = { openExternalTermsPage() },
-                onOpenAppLog = { showAppLogDialog = true }
+                expandLanguage = expandLanguage,
+                onToggleExpand = { expandLanguage = !expandLanguage }
             )
         }
 
-        // NHÓM 5: QUAY MÀN HÌNH (TÙY CHỌN PHỤ) (Mặc định gập)
+        // 5. QUAY MÀN HÌNH (.MP4)
         item {
             SettingsScreenRecordingSection(
                 config = config,
@@ -164,15 +170,25 @@ fun SettingsScreen(
             )
         }
 
-        // NHÓM 5.5: NHẠC NỀN (Tự phát, Phát thủ công & Phát khi đang chơi)
+        // =========================================================================
+        // TẦNG 2: CÀI ĐẶT NÂNG CAO (Mặc định ĐÓNG SẴN)
+        // =========================================================================
         item {
-            SettingsBackgroundMusicSection(
+            SettingsAdvancedSection(
                 config = config,
-                isEn = isEn
+                vpnState = vpnState,
+                isEn = isEn,
+                expandAdvanced = expandAdvanced,
+                onToggleExpand = { expandAdvanced = !expandAdvanced },
+                onOpenAppLog = { showAppLogDialog = true }
             )
         }
 
-        // NHÓM 6: CẬP NHẬT ỨNG DỤNG, GIỚI THIỆU & CHIA SẺ MÃ QR
+        // =========================================================================
+        // TẦNG 3: THÔNG TIN, TÀI KHOẢN & ĐIỀU KHOẢN (Ở dưới cùng, bấm vào dễ dàng)
+        // =========================================================================
+
+        // 7. CẬP NHẬT ỨNG DỤNG, GIỚI THIỆU & CHIA SẺ MÃ QR
         item {
             val updateState by com.example.data.UpdateChecker.state.collectAsState()
             val currentVersionName = remember { com.example.data.UpdateChecker.getCurrentVersionName(context) }
@@ -312,6 +328,7 @@ fun SettingsScreen(
                     }
                     else -> {}
                 }
+
                 OutlinedButton(
                     onClick = { showAppLogDialog = true },
                     modifier = Modifier
@@ -343,21 +360,21 @@ fun SettingsScreen(
             }
         }
 
-        // NHÓM 7: ĐIỀU KHOẢN & QUYỀN RIÊNG TƯ
+        // 8. ĐIỀU KHOẢN, QUYỀN RIÊNG TƯ & TÀI KHOẢN (Mặc định mở sẵn ở cuối để dễ bấm)
         item {
             CollapsibleSettingsGroup(
-                title = if (isEn) "Terms & Privacy" else "Điều khoản & Quyền riêng tư",
+                title = if (isEn) "Terms, Privacy & Account" else "Điều khoản, Quyền riêng tư & Tài khoản",
                 subtitle = if (isEn) {
-                    "Quick summary & link to full terms"
+                    "Tap to view full terms, privacy policy & sign out"
                 } else {
-                    "Tóm tắt nhanh & liên kết điều khoản đầy đủ"
+                    "Xem điều khoản đầy đủ, quyền riêng tư & đăng xuất tài khoản"
                 },
                 icon = Icons.Default.Shield,
                 expanded = expandTermsPrivacy,
                 onToggle = { expandTermsPrivacy = !expandTermsPrivacy },
                 testTag = "settings_group_terms_privacy"
             ) {
-                SettingsCard(title = if (isEn) "Quick Summary" else "Tóm tắt nhanh") {
+                SettingsCard(title = if (isEn) "Terms of Use & Privacy Summary" else "Tóm tắt Điều khoản & Quyền riêng tư") {
                     val summaryLines = if (isEn) {
                         listOf(
                             "• Independent app, not affiliated with Microsoft, Xbox, or Epic Games.",
@@ -446,6 +463,31 @@ fun SettingsScreen(
                                 text = config.tr("Mở lại hộp thoại Đồng ý Điều khoản", "Re-open Terms Consent Dialog"),
                                 color = DirectCyan,
                                 fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = onClearCookies,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .semantics {
+                                contentDescription = if (isEn) {
+                                    "Sign Out and Clear Login Session"
+                                } else {
+                                    "Xóa phiên và Đăng nhập lại Xbox"
+                                }
+                            }
+                            .testTag("clear_xbox_cookies_btn"),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                            Text(
+                                text = config.tr("Xóa phiên & Đăng nhập lại Xbox", "Sign Out & Clear Login Session"),
+                                color = TextPrimary,
                                 fontSize = 12.sp
                             )
                         }
@@ -671,4 +713,3 @@ private fun FullTermsInAppDialog(
         }
     }
 }
-

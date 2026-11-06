@@ -14,20 +14,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,15 +50,22 @@ import com.example.data.AppLanguage
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxNeonGreen
+import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
 import com.example.vpn.VpnConnectionState
 import com.example.vpn.VpnEngine
 import com.example.vpn.VpnManager
 
+/**
+ * Tầng 1 (Cơ bản) — Mạng & Mở khóa vùng:
+ * Chỉ hiển thị công tắc Tự bật/tắt VPN và thẻ "Chế độ mở khóa vùng" rõ ràng ở phần chính.
+ * Các công tắc kỹ thuật mạng được đưa xuống mục "Nâng cao" (Tầng 2).
+ */
 @Composable
 internal fun SettingsNetworkVpnSection(
     config: AppConfig,
@@ -66,7 +76,7 @@ internal fun SettingsNetworkVpnSection(
 ) {
     CollapsibleSettingsGroup(
         title = if (isEn) "Network & Region Unlock" else "Mạng & Mở khóa vùng",
-        subtitle = if (isEn) "Auto VPN & Server Selection" else "Tự bật/tắt VPN & Chọn máy chủ",
+        subtitle = if (isEn) "Auto VPN & Region Unlock Mode" else "Tự bật/tắt VPN & Chế độ mở khóa vùng",
         icon = Icons.Default.Public,
         expanded = expandNetwork,
         onToggle = onToggleExpand,
@@ -84,56 +94,9 @@ internal fun SettingsNetworkVpnSection(
                 },
                 switchTestTag = "settings_switch_smart_vpn"
             )
-
-            if (config.autoBypassEnabled) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.Black.copy(alpha = 0.35f))
-                        .padding(10.dp)
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(
-                            text = config.tr("Thời gian chờ tắt VPN", "VPN disconnect delay"),
-                            color = TextSecondary,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = if (isEn) "${config.autoBypassDelaySeconds}s" else "${config.autoBypassDelaySeconds} giây",
-                            color = DirectCyan,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
-                    }
-                    Slider(
-                        value = config.autoBypassDelaySeconds.toFloat(),
-                        onValueChange = { SettingsRepository.updateAutoBypassDelay(it.toInt()) },
-                        valueRange = 1f..8f,
-                        steps = 6,
-                        colors = SliderDefaults.colors(
-                            thumbColor = DirectCyan,
-                            activeTrackColor = DirectCyan,
-                            inactiveTrackColor = Color.DarkGray
-                        )
-                    )
-                }
-            }
-
-            SettingToggleRow(
-                title = if (isEn) "Allow public server auto-sync on mobile data" else "Cho phép tự cập nhật máy chủ công cộng bằng 4G/5G",
-                subtitle = if (isEn) {
-                    "Default OFF (auto-sync runs on Wi-Fi every 60 min; manual refresh always works)"
-                } else {
-                    "Mặc định TẮT (chỉ tự đồng bộ trên Wi-Fi mỗi 60 phút; nút cập nhật thủ công luôn hoạt động)"
-                },
-                checked = config.allowCellularLiveProxySync,
-                onCheckedChange = { SettingsRepository.updateAllowCellularLiveProxySync(it) },
-                switchTestTag = "settings_switch_cellular_live_proxy_sync"
-            )
         }
 
-        // 2.2 Chế độ mở khóa vùng
+        // 2.2 Chế độ mở khóa vùng (Giữ rõ ràng ở Tầng 1 Cơ bản)
         SettingsCard(title = if (isEn) "Region Unlock Mode" else "Chế độ mở khóa vùng") {
             listOf(
                 Triple(
@@ -176,43 +139,32 @@ internal fun SettingsNetworkVpnSection(
                     }
                 }
             }
-
-            SettingToggleRow(
-                title = if (isEn) "Estimate Ping via Globalping Probe" else "Ước lượng độ trễ qua trạm Globalping",
-                subtitle = if (isEn) {
-                    "Sends server IP to third-party Globalping service for reference (free tier: 250 tests/hr, local cap: 200/hr)"
-                } else {
-                    "Gửi IP máy chủ tới dịch vụ bên thứ ba Globalping để đo tham khảo cho máy chủ đang chọn (miễn phí 250 lượt/giờ, giới hạn app 200 lượt/giờ)"
-                },
-                checked = config.enableGlobalpingProbe,
-                onCheckedChange = { SettingsRepository.updateEnableGlobalpingProbe(it) },
-                switchTestTag = "settings_switch_globalping_probe"
-            )
         }
     }
 }
 
+/**
+ * Tầng 1 (Cơ bản) — Ngôn ngữ & Dịch giao diện Xbox:
+ * Phần chính chỉ giữ "Dịch giao diện trang Xbox" và "Ngôn ngữ ứng dụng".
+ * Chế độ song ngữ và chọn thị trường thủ công nằm trong mục "Nâng cao" (Tầng 2).
+ */
 @Composable
-internal fun SettingsLanguageMarketAccountSection(
+internal fun SettingsLanguageBasicSection(
     config: AppConfig,
-    vpnState: VpnConnectionState,
     isEn: Boolean,
-    expandAdvanced: Boolean,
-    onToggleExpand: () -> Unit,
-    onClearCookies: () -> Unit,
-    onOpenExternalTerms: () -> Unit,
-    onOpenAppLog: () -> Unit
+    expandLanguage: Boolean,
+    onToggleExpand: () -> Unit
 ) {
     val context = LocalContext.current
     CollapsibleSettingsGroup(
-        title = if (isEn) "Language, Auto-Translate & System" else "Ngôn ngữ, Dịch tự động & Hệ thống",
-        subtitle = if (isEn) "12 World Languages, Translator, Account" else "12 ngôn ngữ quốc tế, Bộ dịch & Tài khoản",
-        icon = Icons.Default.Tune,
-        expanded = expandAdvanced,
+        title = if (isEn) "Language & Xbox Translation" else "Ngôn ngữ & Dịch giao diện Xbox",
+        subtitle = "${config.appLanguage.effectiveFlag()} ${config.appLanguage.title} • ${if (config.isEffectiveTranslateEnabled()) config.getTargetTranslateLanguageCode().uppercase() else "OFF"}",
+        icon = Icons.Default.Language,
+        expanded = expandLanguage,
         onToggle = onToggleExpand,
-        testTag = "settings_group_advanced"
+        testTag = "settings_group_language"
     ) {
-        // 4.1 Bộ dịch đa ngôn ngữ & hiển thị
+        // 4.1 Dịch giao diện trang Xbox
         SettingsCard(title = if (isEn) "Xbox Menu Translator" else "Dịch giao diện trang Xbox") {
             val activeTargetLangCode = if (config.isEffectiveTranslateEnabled()) config.getTargetTranslateLanguageCode() else SettingsRepository.TRANSLATE_LANG_OFF
             SettingToggleRow(
@@ -289,13 +241,6 @@ internal fun SettingsLanguageMarketAccountSection(
                     }
                 }
             }
-
-            SettingToggleRow(
-                title = if (isEn) "Bilingual mode (Translated + Original)" else "Chế độ song ngữ (Bản dịch + Gốc)",
-                subtitle = if (isEn) "Shows original text in parentheses" else "Hiện kèm ngôn ngữ gốc trong ngoặc",
-                checked = config.bilingualMode,
-                onCheckedChange = { SettingsRepository.updateBilingualMode(it) }
-            )
         }
 
         // 4.2 Ngôn ngữ ứng dụng
@@ -439,9 +384,64 @@ internal fun SettingsLanguageMarketAccountSection(
                 }
             }
         }
+    }
+}
 
-        // 4.3 Thị trường trang Xbox Cloud
-        SettingsCard(title = if (isEn) "Xbox Cloud Storefront Market" else "Thị trường trang Xbox Cloud") {
+/**
+ * Tầng 2 — Mục "Nâng cao" (Mặc định ĐÓNG SẴN):
+ * Gom toàn bộ các tùy chọn chuyên sâu:
+ * - 3 thanh chỉnh màu hình ảnh & Chế độ máy yếu
+ * - 8 thanh vùng chết (cần ảo + cần thật), bố cục nút, đổi nút tay cầm thật & phím tắt View + nút
+ * - Chế độ song ngữ & Thị trường trang Xbox Cloud thủ công (mặc định en-US)
+ * - Các công tắc kỹ thuật mạng (thời gian chờ tắt VPN, Globalping, HTTPS GeoIP, DB-IP di động, đồng bộ máy chủ 4G/5G)
+ * - Nút "Khôi phục mặc định" chỉ đặt lại các cài đặt trong mục Nâng cao (không chạm tới đăng nhập Xbox, lịch sử phiên hay danh sách game).
+ */
+@Composable
+internal fun SettingsAdvancedSection(
+    config: AppConfig,
+    vpnState: VpnConnectionState,
+    isEn: Boolean,
+    expandAdvanced: Boolean,
+    onToggleExpand: () -> Unit,
+    onOpenAppLog: () -> Unit
+) {
+    val context = LocalContext.current
+    var showResetAdvancedConfirmDialog by remember { mutableStateOf(false) }
+
+    CollapsibleSettingsGroup(
+        title = if (isEn) "Advanced Settings" else "Nâng cao",
+        subtitle = if (isEn) {
+            "Image colors, stick deadzones, Xbox market & technical network options"
+        } else {
+            "Chỉnh màu, vùng chết cần, thị trường Xbox & tùy chọn mạng kỹ thuật"
+        },
+        icon = Icons.Default.Tune,
+        expanded = expandAdvanced,
+        onToggle = onToggleExpand,
+        testTag = "settings_group_advanced"
+    ) {
+        // Nâng cao 1: 3 thanh chỉnh màu hình ảnh & Chế độ máy yếu
+        SettingsAdvancedVideoColorsAndPerfCard(
+            config = config,
+            isEn = isEn
+        )
+
+        // Nâng cao 2: 8 thanh vùng chết (cần ảo + cần thật), đổi nút & tổ hợp phím tắt
+        SettingsAdvancedGamepadControlsCard(
+            config = config,
+            isEn = isEn
+        )
+
+        // Nâng cao 3: Chế độ song ngữ & Thị trường trang Xbox Cloud (mặc định en-US)
+        SettingsCard(title = if (isEn) "Bilingual Translation & Xbox Storefront Market" else "Chế độ song ngữ & Thị trường trang Xbox Cloud") {
+            SettingToggleRow(
+                title = if (isEn) "Bilingual mode (Translated + Original)" else "Chế độ song ngữ (Bản dịch + Gốc)",
+                subtitle = if (isEn) "Shows original text in parentheses" else "Hiện kèm ngôn ngữ gốc trong ngoặc",
+                checked = config.bilingualMode,
+                onCheckedChange = { SettingsRepository.updateBilingualMode(it) },
+                switchTestTag = "settings_switch_bilingual_mode"
+            )
+
             var expandManualXboxMarket by rememberSaveable { mutableStateOf(false) }
             val effectiveMarket = config.getEffectiveLocale()
             val isDefaultEnUs = effectiveMarket.equals("en-US", ignoreCase = true)
@@ -545,7 +545,7 @@ internal fun SettingsLanguageMarketAccountSection(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = config.tr("⚙️ Nâng cao: Tự chọn thị trường Xbox thủ công", "⚙️ Advanced: Manual Xbox Market Override"),
+                        text = config.tr("⚙️ Tự chọn thị trường Xbox thủ công", "⚙️ Manual Xbox Market Override"),
                         color = TextSecondary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -612,8 +612,67 @@ internal fun SettingsLanguageMarketAccountSection(
             }
         }
 
-        // 4.4 Tài khoản, Định vị IP (DB-IP) & Điều khoản
-        SettingsCard(title = if (isEn) "Account, IP Geolocation & Terms" else "Tài khoản, Tra cứu IP & Điều khoản") {
+        // Nâng cao 4: Tùy chọn mạng kỹ thuật, Tra cứu IP & Nhật ký chẩn đoán
+        SettingsCard(title = if (isEn) "Technical Network, IP Lookup & Diagnostics" else "Mạng kỹ thuật, Tra cứu IP & Chẩn đoán") {
+            if (config.autoBypassEnabled) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(10.dp)
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = config.tr("Thời gian chờ tắt VPN", "VPN disconnect delay"),
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = if (isEn) "${config.autoBypassDelaySeconds}s" else "${config.autoBypassDelaySeconds} giây",
+                            color = DirectCyan,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+                    Slider(
+                        value = config.autoBypassDelaySeconds.toFloat(),
+                        onValueChange = { SettingsRepository.updateAutoBypassDelay(it.toInt()) },
+                        valueRange = 1f..8f,
+                        steps = 6,
+                        colors = SliderDefaults.colors(
+                            thumbColor = DirectCyan,
+                            activeTrackColor = DirectCyan,
+                            inactiveTrackColor = Color.DarkGray
+                        )
+                    )
+                }
+            }
+
+            SettingToggleRow(
+                title = if (isEn) "Allow public server auto-sync on mobile data" else "Cho phép tự cập nhật máy chủ công cộng bằng 4G/5G",
+                subtitle = if (isEn) {
+                    "Default OFF (auto-sync runs on Wi-Fi every 60 min; manual refresh always works)"
+                } else {
+                    "Mặc định TẮT (chỉ tự đồng bộ trên Wi-Fi mỗi 60 phút; nút cập nhật thủ công luôn hoạt động)"
+                },
+                checked = config.allowCellularLiveProxySync,
+                onCheckedChange = { SettingsRepository.updateAllowCellularLiveProxySync(it) },
+                switchTestTag = "settings_switch_cellular_live_proxy_sync"
+            )
+
+            SettingToggleRow(
+                title = if (isEn) "Estimate Ping via Globalping Probe" else "Ước lượng độ trễ qua trạm Globalping",
+                subtitle = if (isEn) {
+                    "Sends server IP to third-party Globalping service for reference (free tier: 250 tests/hr, local cap: 200/hr)"
+                } else {
+                    "Gửi IP máy chủ tới dịch vụ bên thứ ba Globalping để đo tham khảo cho máy chủ đang chọn (miễn phí 250 lượt/giờ, giới hạn app 200 lượt/giờ)"
+                },
+                checked = config.enableGlobalpingProbe,
+                onCheckedChange = { SettingsRepository.updateEnableGlobalpingProbe(it) },
+                switchTestTag = "settings_switch_globalping_probe"
+            )
+
             SettingToggleRow(
                 title = if (isEn) "Fallback HTTPS IP lookup (api.country.is)" else "Dịch vụ tra IP dự phòng qua HTTPS",
                 subtitle = if (isEn) {
@@ -644,55 +703,6 @@ internal fun SettingsLanguageMarketAccountSection(
                 fontSize = 10.sp,
                 modifier = Modifier.testTag("dbip_attribution_text")
             )
-
-            Button(
-                onClick = onClearCookies,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        contentDescription = if (isEn) {
-                            "Sign Out and Clear Login Session"
-                        } else {
-                            "Xóa phiên và Đăng nhập lại Xbox"
-                        }
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(16.dp))
-                    Text(
-                        text = config.tr("Xóa phiên & Đăng nhập lại Xbox", "Sign Out & Clear Login Session"),
-                        color = TextPrimary,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            Button(
-                onClick = onOpenExternalTerms,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        contentDescription = if (isEn) {
-                            "View Full Terms of Use and Privacy in external browser"
-                        } else {
-                            "Xem điều khoản đầy đủ và quyền riêng tư trên trình duyệt ngoài"
-                        }
-                    },
-                colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.Shield, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
-                    Text(
-                        text = config.tr("Xem điều khoản đầy đủ", "View Full Terms"),
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
 
             Button(
                 onClick = onOpenAppLog,
@@ -779,6 +789,95 @@ internal fun SettingsLanguageMarketAccountSection(
                     )
                 }
             }
+
+            OutlinedButton(
+                onClick = { showResetAdvancedConfirmDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = if (isEn) {
+                            "Restore Default Advanced Settings"
+                        } else {
+                            "Khôi phục mặc định các cài đặt Nâng cao"
+                        }
+                    }
+                    .testTag("settings_reset_advanced_defaults_btn"),
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.7f))
+            ) {
+                Text(
+                    text = config.tr("Khôi phục mặc định (Mục Nâng cao)", "Restore Defaults (Advanced Only)"),
+                    color = XboxNeonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
         }
+    }
+
+    if (showResetAdvancedConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetAdvancedConfirmDialog = false },
+            containerColor = XboxSurface,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = {
+                Text(
+                    text = if (isEn) "Restore Advanced Defaults?" else "Khôi phục mặc định mục Nâng cao?",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Text(
+                    text = if (isEn) {
+                        "This will reset only the settings inside the Advanced section (image colors, stick deadzones, button remaps, Xbox market to en-US, and technical network switches). Your Xbox login, session history, game library, and basic settings will NOT be affected."
+                    } else {
+                        "Chỉ đặt lại các tùy chỉnh trong mục Nâng cao (màu sắc hình ảnh, 8 thanh vùng chết, đổi nút tay cầm, thị trường Xbox về en-US và công tắc mạng kỹ thuật). Phiên đăng nhập Xbox, lịch sử chơi, danh sách game và các cài đặt cơ bản được giữ nguyên."
+                    },
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        SettingsRepository.resetAdvancedSettingsOnly()
+                        showResetAdvancedConfirmDialog = false
+                        Toast.makeText(
+                            context,
+                            if (isEn) "Restored Advanced settings to default" else "Đã khôi phục mặc định các cài đặt Nâng cao",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = if (isEn) "Confirm restore advanced defaults" else "Xác nhận khôi phục mặc định nâng cao"
+                        }
+                        .testTag("confirm_reset_advanced_settings_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Restore" else "Khôi phục",
+                        color = XboxNeonGreen,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetAdvancedConfirmDialog = false },
+                    modifier = Modifier
+                        .semantics {
+                            contentDescription = if (isEn) "Cancel restore advanced defaults" else "Hủy khôi phục mặc định nâng cao"
+                        }
+                        .testTag("cancel_reset_advanced_settings_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "Cancel" else "Hủy",
+                        color = TextSecondary
+                    )
+                }
+            }
+        )
     }
 }

@@ -19,14 +19,11 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +52,6 @@ internal fun SettingsGraphicsFpsSection(
     expandGraphics: Boolean,
     onToggleExpand: () -> Unit
 ) {
-    val context = LocalContext.current
     CollapsibleSettingsGroup(
         title = if (isEn) "Resolution, Graphics & FPS" else "Độ phân giải, Đồ họa & FPS",
         subtitle = "${config.cellularMode.localizedTitle(isEn)} • ${config.streamFpsCap.fps} FPS",
@@ -64,7 +60,6 @@ internal fun SettingsGraphicsFpsSection(
         onToggle = onToggleExpand,
         testTag = "settings_group_graphics"
     ) {
-        // 1.1 Độ phân giải & Đồ họa (gộp 1) + Nhịp FPS
         SettingsCard(title = if (isEn) "Resolution & Bitrate (Wi-Fi / 4G / 5G)" else "Độ phân giải & Băng thông (Wi-Fi / 4G / 5G)") {
             val selectedMode = config.cellularMode
             val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
@@ -251,86 +246,98 @@ internal fun SettingsGraphicsFpsSection(
                     }
                 }
             }
-            SettingToggleRow(
-                title = if (isEn) "Low-End & Battery Saver Mode" else "Chế độ máy yếu & Tiết kiệm pin",
-                subtitle = if (isEn) "Light 720p stream & reduced effects to keep phone cool" else "Dùng mức 720p nhẹ và tắt hiệu ứng thừa giúp máy mát, đỡ hao pin",
-                checked = config.lowEndDeviceMode && config.gpuLoadReductionEnabled,
-                onCheckedChange = { enabled ->
-                    SettingsRepository.updateLowEndDeviceMode(enabled)
-                    SettingsRepository.updateGpuLoadReductionEnabled(enabled)
-                },
-                switchTestTag = "settings_low_end_device_mode_switch"
-            )
-        }
 
-        // 1.2 Độ nét & Màu sắc hình ảnh
-        SettingsCard(title = if (isEn) "Sharpness & Image Colors" else "Độ nét & Màu sắc hình ảnh") {
             SettingToggleRow(
                 title = if (isEn) "Sharpen Image" else "Tăng độ nét hình ảnh",
                 subtitle = if (isEn) "Makes characters and scenery clearer" else "Làm rõ chi tiết nhân vật và khung cảnh",
                 checked = config.clarityBoostEnabled,
-                onCheckedChange = { SettingsRepository.updateClarityBoost(it) }
+                onCheckedChange = { SettingsRepository.updateClarityBoost(it) },
+                switchTestTag = "settings_switch_clarity_boost"
             )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                LabeledSlider(
-                    label = if (isEn) "Contrast" else "Độ tương phản",
-                    valueText = "${config.videoContrast}%",
-                    value = config.videoContrast.toFloat(),
-                    onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
-                    valueRange = 80f..140f,
-                    accentColor = XboxNeonGreen
-                )
-                LabeledSlider(
-                    label = if (isEn) "Color Saturation" else "Độ tươi màu",
-                    valueText = "${config.videoSaturation}%",
-                    value = config.videoSaturation.toFloat(),
-                    onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
-                    valueRange = 80f..150f,
-                    accentColor = DirectCyan
-                )
-                LabeledSlider(
-                    label = if (isEn) "Brightness" else "Độ sáng",
-                    valueText = "${config.videoBrightness}%",
-                    value = config.videoBrightness.toFloat(),
-                    onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
-                    valueRange = 80f..130f,
-                    accentColor = XboxNeonGreen
-                )
-            }
-
-            OutlinedButton(
-                onClick = {
-                    SettingsRepository.resetVideoDisplayDefaults()
-                    Toast.makeText(
-                        context,
-                        if (isEn) "Reset colors to default" else "Đã đặt lại màu sắc mặc định",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        contentDescription = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định"
-                    }
-                    .testTag("advanced_reset_video_defaults_btn"),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(
-                    text = config.tr("Đặt lại màu sắc mặc định", "Reset Colors to Default"),
-                    color = DirectCyan,
-                    fontSize = 11.5.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
+    }
+}
+
+/**
+ * Thẻ chỉnh Màu sắc hình ảnh (3 thanh Tương phản, Tươi màu, Độ sáng) & Chế độ máy yếu,
+ * được đặt trong mục "Nâng cao" (Tầng 2).
+ */
+@Composable
+internal fun SettingsAdvancedVideoColorsAndPerfCard(
+    config: AppConfig,
+    isEn: Boolean
+) {
+    val context = LocalContext.current
+    SettingsCard(title = if (isEn) "Image Colors & Low-End Performance" else "Màu sắc hình ảnh & Hiệu năng máy yếu") {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            LabeledSlider(
+                label = if (isEn) "Contrast" else "Độ tương phản",
+                valueText = "${config.videoContrast}%",
+                value = config.videoContrast.toFloat(),
+                onValueChange = { SettingsRepository.updateVideoContrast(it.toInt()) },
+                valueRange = 80f..140f,
+                accentColor = XboxNeonGreen
+            )
+            LabeledSlider(
+                label = if (isEn) "Color Saturation" else "Độ tươi màu",
+                valueText = "${config.videoSaturation}%",
+                value = config.videoSaturation.toFloat(),
+                onValueChange = { SettingsRepository.updateVideoSaturation(it.toInt()) },
+                valueRange = 80f..150f,
+                accentColor = DirectCyan
+            )
+            LabeledSlider(
+                label = if (isEn) "Brightness" else "Độ sáng",
+                valueText = "${config.videoBrightness}%",
+                value = config.videoBrightness.toFloat(),
+                onValueChange = { SettingsRepository.updateVideoBrightness(it.toInt()) },
+                valueRange = 80f..130f,
+                accentColor = XboxNeonGreen
+            )
+        }
+
+        OutlinedButton(
+            onClick = {
+                SettingsRepository.resetVideoDisplayDefaults()
+                Toast.makeText(
+                    context,
+                    if (isEn) "Reset colors to default" else "Đã đặt lại màu sắc mặc định",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định"
+                }
+                .testTag("advanced_reset_video_defaults_btn"),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(
+                text = config.tr("Đặt lại màu sắc mặc định", "Reset Colors to Default"),
+                color = DirectCyan,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        SettingToggleRow(
+            title = if (isEn) "Low-End & Battery Saver Mode" else "Chế độ máy yếu & Tiết kiệm pin",
+            subtitle = if (isEn) "Light 720p stream & reduced effects to keep phone cool" else "Dùng mức 720p nhẹ và tắt hiệu ứng thừa giúp máy mát, đỡ hao pin",
+            checked = config.lowEndDeviceMode && config.gpuLoadReductionEnabled,
+            onCheckedChange = { enabled ->
+                SettingsRepository.updateLowEndDeviceMode(enabled)
+                SettingsRepository.updateGpuLoadReductionEnabled(enabled)
+            },
+            switchTestTag = "settings_low_end_device_mode_switch"
+        )
     }
 }
 
@@ -403,158 +410,5 @@ internal fun SettingsScreenRecordingSection(
                 fontSize = 10.5.sp
             )
         }
-    }
-}
-
-@Composable
-internal fun SettingsBackgroundMusicSection(
-    config: AppConfig,
-    isEn: Boolean
-) {
-    val isMusicPlaying by com.example.audio.BackgroundMusicManager.isPlaying.collectAsState()
-
-    SettingsCard(title = if (isEn) "Background Music" else "Nhạc nền") {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                Text(
-                    text = config.tr("Phát / Dừng nhạc nền", "Manual Playback"),
-                    color = TextPrimary,
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (isMusicPlaying) {
-                        if (isEn) "Currently playing (${(config.backgroundMusicVolume * 100).toInt()}%)" else "Đang phát (${(config.backgroundMusicVolume * 100).toInt()}%)"
-                    } else {
-                        config.tr("Đang dừng • Bấm để bật tay khi cần", "Stopped • Tap to play manually")
-                    },
-                    color = if (isMusicPlaying) XboxNeonGreen else TextSecondary,
-                    fontSize = 10.5.sp
-                )
-            }
-
-            OutlinedButton(
-                onClick = {
-                    if (config.lowEndDeviceMode && !isMusicPlaying) {
-                        SettingsRepository.updateLowEndDeviceMode(false)
-                        SettingsRepository.updateGpuLoadReductionEnabled(false)
-                    }
-                    com.example.audio.BackgroundMusicManager.toggleManualPlayback()
-                },
-                modifier = Modifier
-                    .semantics {
-                        contentDescription = if (isMusicPlaying) {
-                            if (isEn) "Stop background music" else "Dừng nhạc nền"
-                        } else {
-                            if (isEn) "Play background music" else "Phát nhạc nền"
-                        }
-                    }
-                    .testTag("settings_background_music_manual_play_btn"),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    if (isMusicPlaying) DirectCyan else XboxNeonGreen.copy(alpha = 0.7f)
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = if (isMusicPlaying) DirectCyan.copy(alpha = 0.14f) else XboxNeonGreen.copy(alpha = 0.12f)
-                )
-            ) {
-                Text(
-                    text = if (isMusicPlaying) {
-                        config.tr("⏹ Dừng", "⏹ Stop")
-                    } else {
-                        config.tr("▶ Phát", "▶ Play")
-                    },
-                    color = if (isMusicPlaying) DirectCyan else XboxNeonGreen,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.5.sp
-                )
-            }
-        }
-
-        SettingToggleRow(
-            title = if (isEn) "Auto-start music on app launch" else "Tự động bật nhạc khi mở app",
-            subtitle = if (config.lowEndDeviceMode) {
-                if (isEn) {
-                    "Auto-muted while Low-End & Battery Saver Mode is active"
-                } else {
-                    "Đang tự tắt do bật Chế độ máy yếu"
-                }
-            } else {
-                if (isEn) {
-                    "Default OFF • Plays automatically in Home, Games, Servers & Settings"
-                } else {
-                    "Mặc định tắt • Tự phát khi mở ứng dụng ở Trang chủ, Game, Máy chủ, Cài đặt"
-                }
-            },
-            checked = config.backgroundMusicEnabled && !config.lowEndDeviceMode,
-            onCheckedChange = { enabled ->
-                if (config.lowEndDeviceMode && enabled) {
-                    SettingsRepository.updateLowEndDeviceMode(false)
-                    SettingsRepository.updateGpuLoadReductionEnabled(false)
-                }
-                SettingsRepository.updateBackgroundMusicEnabled(enabled)
-            },
-            activeColor = XboxNeonGreen,
-            switchTestTag = "settings_background_music_switch"
-        )
-
-        SettingToggleRow(
-            title = if (isEn) "Play music while in game" else "Phát nhạc khi đang chơi",
-            subtitle = if (config.lowEndDeviceMode) {
-                if (isEn) {
-                    "Auto-stops when entering game in Low-End Mode"
-                } else {
-                    "Chế độ máy yếu: vẫn tự tắt nhạc khi vào game"
-                }
-            } else {
-                if (isEn) {
-                    "Keeps playing at the same volume during gameplay if music is already on"
-                } else {
-                    "Nếu nhạc đang phát sẽ tiếp tục phát cùng âm lượng khi vào game; tắt sẽ dừng (fade 800ms)"
-                }
-            },
-            checked = config.backgroundMusicPlayInGame && !config.lowEndDeviceMode,
-            onCheckedChange = { enabled ->
-                SettingsRepository.updateBackgroundMusicPlayInGame(enabled)
-            },
-            activeColor = DirectCyan,
-            switchTestTag = "settings_background_music_play_in_game_switch"
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.35f))
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            LabeledSlider(
-                label = if (isEn) "Background Music Volume" else "Âm lượng nhạc nền",
-                valueText = "${(config.backgroundMusicVolume * 100).toInt()}%",
-                value = config.backgroundMusicVolume,
-                onValueChange = { SettingsRepository.updateBackgroundMusicVolume(it) },
-                valueRange = 0f..1f,
-                accentColor = XboxNeonGreen
-            )
-        }
-
-        Text(
-            text = if (isEn) {
-                "Excluded from screen recording"
-            } else {
-                "Không thu vào video quay màn hình"
-            },
-            color = TextSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.testTag("settings_music_capture_notice_text")
-        )
     }
 }

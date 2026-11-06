@@ -81,7 +81,6 @@ class MainActivity : ComponentActivity() {
         GameLibraryRepository.init(applicationContext)
         com.example.data.SessionHistoryRepository.init(applicationContext)
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
-        com.example.audio.BackgroundMusicManager.init(applicationContext)
         streamController = StreamController(applicationContext)
         lockDisplayRefreshRateTo60Hz(false)
 
@@ -136,24 +135,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        com.example.audio.BackgroundMusicManager.onAppForeground()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        com.example.audio.BackgroundMusicManager.onAppBackground()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        com.example.audio.BackgroundMusicManager.onAppBackground()
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        com.example.audio.BackgroundMusicManager.stopAndReleaseImmediately()
         if (::streamController.isInitialized) {
             streamController.release()
         }
@@ -313,36 +296,9 @@ fun MainContent(
         }
     }
 
-    val streamUiState by streamController.uiState.collectAsState()
-
-    // Synchronize BackgroundMusicManager with settings (auto-start, volume, play-in-game, low-end mode)
-    LaunchedEffect(
-        config.userAcceptedTerms,
-        config.backgroundMusicEnabled,
-        config.backgroundMusicVolume,
-        config.backgroundMusicPlayInGame,
-        config.lowEndDeviceMode
-    ) {
-        com.example.audio.BackgroundMusicManager.onSettingsUpdated(
-            autoStartEnabled = config.userAcceptedTerms && config.backgroundMusicEnabled,
-            volume = config.backgroundMusicVolume,
-            playInGameEnabled = config.backgroundMusicPlayInGame,
-            lowEndMode = config.lowEndDeviceMode
-        )
-    }
-
-    // Stop background music immediately when stream connects or game becomes active
-    LaunchedEffect(streamUiState.isGameActive, streamUiState.isStreamConnected) {
-        com.example.audio.BackgroundMusicManager.onGameStreamStateChanged(
-            isGameActive = streamUiState.isGameActive,
-            isStreamConnected = streamUiState.isStreamConnected
-        )
-    }
-
-    // Fullscreen Immersive Mode & Background Music controller for Cloud Gaming vs Dashboard
+    // Fullscreen Immersive Mode controller for Cloud Gaming vs Dashboard
     LaunchedEffect(currentScreen) {
         val isBrowser = currentScreen is AppScreen.Browser
-        com.example.audio.BackgroundMusicManager.onScreenChanged(isDashboard = !isBrowser)
         activity.applyImmersiveFullscreen(isBrowser)
         if (!isBrowser) {
             activity.resetOrientation()

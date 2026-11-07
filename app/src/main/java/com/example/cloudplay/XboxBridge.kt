@@ -270,11 +270,14 @@ class XboxBridge(
                 put("shortcutVpadBtn", currentConfig.shortcutToggleVirtualPadButton)
                 put("shortcutRecBtn", currentConfig.shortcutToggleRecordingButton)
             }.toString()
+            val vpnStateNow = VpnManager.state.value
+            val shouldSpoofXff = VpnManager.needsVpnToPlay() &&
+                vpnStateNow.engine == com.example.vpn.VpnEngine.SMART_BYPASS
             return """
                 (function() {
                     window.__cloudPlayIsEnglishUi = $isEnglishUi;
                     if (window.__cloudPlayInjected) {
-                        if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale" });
+                        if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale", spoofXff: $shouldSpoofXff });
                         if (window.__setClarityPreset) window.__setClarityPreset($clarityBoost ? "$clarityPreset" : "OFF");
                         if (window.__toggleClarityBoost) window.__toggleClarityBoost($clarityBoost);
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
@@ -396,11 +399,13 @@ class XboxBridge(
                     let targetCountry = "$targetCountry";
                     let bypassIp = "$targetIp";
                     let preferredLocale = "$userLocale";
+                    let shouldSpoofXff = $shouldSpoofXff;
 
                     window.__updateRegionAndLocale = function(conf) {
                         if (!conf) return;
                         if (conf.country) targetCountry = conf.country;
                         if (conf.ip) bypassIp = conf.ip;
+                        if (typeof conf.spoofXff === 'boolean') shouldSpoofXff = conf.spoofXff;
                         if (conf.locale) {
                             preferredLocale = conf.locale;
                             try {
@@ -415,34 +420,33 @@ class XboxBridge(
                     } catch(e) {}
 
                     // ==========================================
-                    // 1. Smart Region Header Interceptor
+                    // 1. Smart Region Header Interceptor (Compatible with new Xbox Cloud UI & CORS)
                     // ==========================================
                     try {
                         const NATIVE_FETCH = window.fetch;
                         window.fetch = async function(request, init) {
                             let url = typeof request === 'string' ? request : (request ? request.url : '');
-                            let isXboxApi = url.includes('/v2/login/user') || 
-                                           url.includes('/sessions/cloud/play') || 
-                                           url.includes('/titles') ||
-                                           url.includes('emerald.xboxservices.com') ||
-                                           url.includes('xboxlive.com');
+                            // Chỉ gắn X-Forwarded-For trên các endpoint xác thực/phiên GSSV (/v2/login/user, /sessions/cloud/play)
+                            // khi đang dùng chế độ giả lập header (shouldSpoofXff = true).
+                            // Tuyệt đối KHÔNG gắn X-Client-IP / X-Real-IP hoặc gắn lên emerald.xboxservices.com vì sẽ làm lỗi CORS preflight OPTIONS.
+                            let isGssvRegionEndpoint = (url.includes('/v2/login/user') || url.includes('/sessions/cloud/play')) &&
+                                !url.includes('xhome');
 
-                            if (isXboxApi && !url.includes('xhome')) {
+                            if (isGssvRegionEndpoint && shouldSpoofXff && bypassIp) {
                                 if (typeof request === 'string') {
                                     init = init || {};
                                     let headers = new Headers(init.headers || {});
                                     headers.set('X-Forwarded-For', bypassIp);
-                                    headers.set('X-Client-IP', bypassIp);
-                                    headers.set('X-Real-IP', bypassIp);
-                                    headers.set('Accept-Language', preferredLocale + ',en;q=0.9');
                                     init.headers = headers;
                                 } else if (request instanceof Request) {
-                                    let headers = new Headers(request.headers);
-                                    headers.set('X-Forwarded-For', bypassIp);
-                                    headers.set('X-Client-IP', bypassIp);
-                                    headers.set('X-Real-IP', bypassIp);
-                                    headers.set('Accept-Language', preferredLocale + ',en;q=0.9');
-                                    request = new Request(request, { headers: headers });
+                                    try {
+                                        request.headers.set('X-Forwarded-For', bypassIp);
+                                    } catch (hdrErr) {
+                                        init = init || {};
+                                        let headers = new Headers(init.headers || request.headers || {});
+                                        headers.set('X-Forwarded-For', bypassIp);
+                                        init.headers = headers;
+                                    }
                                 }
                             }
 
@@ -453,7 +457,7 @@ class XboxBridge(
                                 throw err;
                             }
 
-                            // Intercept /v2/login/user to spoof allowed regions to Japan East / Korea / US
+                            // Intercept /v2/login/user to ensure target region is selected and active
                             if (url.includes('/v2/login/user') && response && response.ok) {
                                 try {
                                     const clone = response.clone();
@@ -464,10 +468,16 @@ class XboxBridge(
 
                                         let foundTargetRegion = false;
                                         if (data.offeringSettings && Array.isArray(data.offeringSettings.regions)) {
+                                            data.offeringSettings.allowRegionSelection = true;
                                             let found = data.offeringSettings.regions.find(r => r && r.name && r.name.toUpperCase() === targetName);
                                             if (found) {
                                                 found.isDefault = true;
                                                 data.offeringSettings.regions.forEach(r => { if (r !== found) r.isDefault = false; });
+                                                // Đưa vùng được chọn lên đầu danh sách cho giao diện Xbox mới
+                                                data.offeringSettings.regions = [
+                                                    found,
+                                                    ...data.offeringSettings.regions.filter(r => r !== found)
+                                                ];
                                                 foundTargetRegion = true;
                                             } else if (data.offeringSettings.regions.length > 0) {
                                                 data.offeringSettings.regions[0].isDefault = true;
@@ -477,6 +487,8 @@ class XboxBridge(
 
                                         if (foundTargetRegion) {
                                             window.__lastUnlockSignal = 'UNLOCK_OK';
+                                            const oldBanner = document.getElementById('__cloudplay_unlock_fail_banner');
+                                            if (oldBanner) oldBanner.remove();
                                             notify('onRegionUnlockSignal', 'UNLOCK_OK');
                                             notify('onRegionBypassed', JSON.stringify({
                                                 country: targetCountry,
@@ -505,7 +517,7 @@ class XboxBridge(
                             return response;
                         };
 
-                        // Patch XMLHttpRequest for older components
+                        // Patch XMLHttpRequest for older components without breaking CORS
                         const origXhrOpen = XMLHttpRequest.prototype.open;
                         const origXhrSend = XMLHttpRequest.prototype.send;
                         XMLHttpRequest.prototype.open = function(method, url) {
@@ -513,11 +525,11 @@ class XboxBridge(
                             return origXhrOpen.apply(this, arguments);
                         };
                         XMLHttpRequest.prototype.send = function(data) {
-                            if (this._url && (this._url.includes('/v2/login/user') || this._url.includes('xboxlive.com'))) {
+                            if (shouldSpoofXff && bypassIp && this._url &&
+                                (this._url.includes('/v2/login/user') || this._url.includes('/sessions/cloud/play'))
+                            ) {
                                 try {
                                     this.setRequestHeader('X-Forwarded-For', bypassIp);
-                                    this.setRequestHeader('X-Client-IP', bypassIp);
-                                    this.setRequestHeader('Accept-Language', preferredLocale + ',en;q=0.9');
                                 } catch(e) {}
                             }
                             return origXhrSend.apply(this, arguments);
@@ -1410,11 +1422,14 @@ class XboxBridge(
                     }, true);
 
                     function hasPlayButtonOnPage() {
-                        const els = document.querySelectorAll('button, a[role="button"], [data-testid*="play" i], [data-testid*="launch" i]');
+                        if (document.querySelector('a[href*="/play/launch/"], [class*="PlayButton" i], [data-testid*="PlayButton" i], [data-testid*="launch-button" i]')) {
+                            return true;
+                        }
+                        const els = document.querySelectorAll('button, a[role="button"], [data-testid*="play" i], [data-testid*="launch" i], [data-testid*="primary" i]');
                         for (let i = 0; i < els.length; i++) {
                             const el = els[i];
-                            const txt = ((el.innerText || el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('data-testid') || '')).trim().toLowerCase();
-                            if (/\bplay\b/.test(txt) || txt.includes('play with cloud') || txt.includes('chơi ngay') || txt.includes('chơi trên đám mây') || txt.includes('playbutton')) {
+                            const txt = ((el.innerText || el.textContent || '') + ' ' + (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('data-testid') || '') + ' ' + (el.className || '')).trim().toLowerCase();
+                            if (/\bplay\b/.test(txt) || txt.includes('play with cloud') || txt.includes('chơi ngay') || txt.includes('chơi trên đám mây') || txt.includes('playbutton') || txt.includes('launchgame')) {
                                 return true;
                             }
                         }

@@ -379,8 +379,10 @@ fun CloudBrowserScreen(
         val safeCountry = org.json.JSONObject.quote(currentServer.countryCode)
         val safeIp = org.json.JSONObject.quote(currentServer.ip)
         val safeLocale = org.json.JSONObject.quote(effectiveLocale)
+        val spoofXff = VpnManager.needsVpnToPlay() &&
+            VpnManager.state.value.engine == com.example.vpn.VpnEngine.SMART_BYPASS
         webViewInstance?.evaluateJavascript(
-            "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale });",
+            "if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale, spoofXff: $spoofXff });",
             null
         )
     }
@@ -578,13 +580,19 @@ fun CloudBrowserScreen(
                     addJavascriptInterface(bridge, "CloudPlayBridge")
 
                     var hasDocumentStartScript = false
-                    // Inject document start script exclusively on authorized Xbox & Microsoft domains
+                    // Inject document start script exclusively on authorized Xbox & Microsoft domains (including play.xbox.com / *.xbox.com)
                     if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
                         try {
                             androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
                                 this,
                                 currentInjectionScript,
-                                setOf("https://www.xbox.com", "https://xbox.com", "https://login.live.com", "https://login.microsoftonline.com")
+                                setOf(
+                                    "https://www.xbox.com",
+                                    "https://xbox.com",
+                                    "https://*.xbox.com",
+                                    "https://login.live.com",
+                                    "https://login.microsoftonline.com"
+                                )
                             )
                             hasDocumentStartScript = true
                         } catch (e: Exception) {
@@ -603,8 +611,8 @@ fun CloudBrowserScreen(
                                 streamController.onUrlChanged(it)
                                 handleMainFrameNavigation(it)
                             }
-                            // Early injection to intercept Xbox login and region check using latest dynamic script
-                            if (!hasDocumentStartScript && XboxBridge.isTrustedHost(url)) {
+                            // Luôn đồng bộ cấu hình vùng/máy chủ mới nhất (currentInjectionScript tự chống chạy trùng nhờ window.__cloudPlayInjected)
+                            if (XboxBridge.isTrustedHost(url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }

@@ -601,6 +601,7 @@ fun CloudBrowserScreen(
                                 setOf(
                                     "https://www.xbox.com",
                                     "https://xbox.com",
+                                    "https://play.xbox.com",
                                     "https://login.live.com",
                                     "https://login.microsoftonline.com"
                                 )
@@ -1228,6 +1229,16 @@ fun CloudBrowserScreen(
                                         }
                                     }
                                 }
+                                Text(
+                                    text = if (isEn) {
+                                        "Tip: If Xbox stays in Preview UI, tap your Xbox avatar → Exit preview → tap Submit (do not tap Cancel/X)."
+                                    } else {
+                                        "Mẹo: Nếu trang Xbox vẫn ở Giao diện mới, hãy bấm ảnh đại diện Xbox → Exit preview → bấm nút Submit trong hộp thoại (đừng bấm X/Cancel)."
+                                    },
+                                    color = TextSecondary,
+                                    fontSize = 8.5.sp,
+                                    lineHeight = 11.5.sp
+                                )
                             }
                         }
 

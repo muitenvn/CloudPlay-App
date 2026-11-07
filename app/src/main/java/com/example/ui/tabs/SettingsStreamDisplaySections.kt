@@ -310,6 +310,18 @@ internal fun SettingsGraphicsFpsSection(
                     }
                 }
             }
+
+            Text(
+                text = if (isEn) {
+                    "Tip: If you enabled Preview on Xbox earlier, tap your Xbox avatar → Exit preview → tap Submit in the feedback box (do not tap Cancel/X) to return to Classic UI."
+                } else {
+                    "Lưu ý: Nếu trước đó bạn đã bật thử Giao diện mới trên Xbox, hãy bấm ảnh đại diện Xbox → chọn Exit preview → bấm nút Submit ở hộp thoại hiện ra (đừng bấm X/Cancel) thì mới thoát hẳn về Giao diện cũ."
+                },
+                color = TextSecondary,
+                fontSize = 9.5.sp,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }

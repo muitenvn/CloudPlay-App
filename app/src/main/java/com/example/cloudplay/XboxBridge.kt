@@ -421,7 +421,7 @@ class XboxBridge(
                         const NATIVE_FETCH = window.fetch;
                         window.fetch = async function(request, init) {
                             let url = typeof request === 'string' ? request : (request ? request.url : '');
-                            if (bypassIp && (url.includes('xboxlive.com') || url.includes('xboxservices.com') || url.includes('/v2/login/user') || url.includes('/sessions/cloud/play'))) {
+                            if (bypassIp && (url.includes('/v2/login/user') || url.includes('/sessions/cloud/play'))) {
                                 if (typeof request === 'string') {
                                     init = init || {};
                                     init.headers = Object.assign({}, init.headers, {
@@ -508,7 +508,7 @@ class XboxBridge(
                             return origXhrOpen.apply(this, arguments);
                         };
                         XMLHttpRequest.prototype.send = function(data) {
-                            if (bypassIp && this._url && (this._url.includes('xboxlive.com') || this._url.includes('xboxservices.com') || this._url.includes('/v2/login/user') || this._url.includes('/sessions/cloud/play'))) {
+                            if (bypassIp && this._url && (this._url.includes('/v2/login/user') || this._url.includes('/sessions/cloud/play'))) {
                                 try {
                                     this.setRequestHeader('X-Forwarded-For', bypassIp);
                                     this.setRequestHeader('X-Client-IP', bypassIp);

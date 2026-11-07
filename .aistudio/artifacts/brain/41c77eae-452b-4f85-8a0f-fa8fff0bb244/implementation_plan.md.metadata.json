@@ -1,6 +1,0 @@
-{
-  "summary":  "Cập nhật kế hoạch theo phản hồi #21 của Claude: thực hiện Hạng mục 1 ([PERF] giới hạn 40 dòng) và Hạng mục 2 (ServersScreen.kt, đảm bảo giữ nguyên cập nhật trực tiếp streamTelemetry.rttMs ở dòng 1205–1207 và 581–583 khi đang stream); bỏ Hạng mục 3 (CloudBrowserScreen onPageStarted) để bảo toàn đủ 10 hàm đồng bộ cài đặt ở XboxBridge.kt dòng 276–288.",
-  "updatedAt":  "2026-11-07T15:26:15.712338258Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

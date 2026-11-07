@@ -87,6 +87,48 @@ import kotlinx.coroutines.flow.map
 
 private const val EDGE_DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0"
 
+/**
+ * Tạo chuỗi User-Agent Chrome Android chuẩn từ WebView hệ thống (bỏ "; wv" và "Version/X.X ").
+ * Giúp khớp 100% với chữ ký TLS, phiên bản Chromium thực tế và Sec-CH-UA-Platform: "Android"
+ * khi đi qua tường lửa Akamai Bot Manager trên www.xbox.com (tránh lỗi Access Denied Reference #18),
+ * đồng thời giữ giao diện cảm ứng chuẩn cho trang Xbox.
+ * Độ phân giải 1080p đã được mở khóa riêng qua header x-ms-device-info trong XboxBridge.
+ */
+private fun buildCleanAndroidChromeUserAgent(context: android.content.Context): String {
+    val raw = try {
+        WebSettings.getDefaultUserAgent(context)
+    } catch (_: Exception) {
+        ""
+    }
+    if (raw.isBlank()) {
+        return "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+    }
+    return raw
+        .replace("; wv)", ")")
+        .replace(Regex("""\bVersion/\d+\.\d+\s+"""), "")
+}
+
+/**
+ * Chỉ xóa các cookie chấm điểm bot của Akamai (_abck, ak_bmsc, bm_sz, bm_sv, bm_mi, akavpau_xbox)
+ * trên miền xbox.com khi bị kẹt Reference #18, giữ nguyên 100% cookie đăng nhập Microsoft/Xbox của người dùng.
+ */
+private fun clearAkamaiBotCookies(cookieManager: CookieManager) {
+    val akamaiCookieNames = listOf("_abck", "ak_bmsc", "bm_sz", "bm_sv", "bm_mi", "akavpau_xbox")
+    val domains = listOf(".xbox.com", "www.xbox.com", "xbox.com")
+    val urls = listOf("https://www.xbox.com", "https://xbox.com")
+    for (url in urls) {
+        for (name in akamaiCookieNames) {
+            cookieManager.setCookie(url, "$name=; Max-Age=0; path=/")
+            for (domain in domains) {
+                cookieManager.setCookie(url, "$name=; Max-Age=0; domain=$domain; path=/")
+            }
+        }
+    }
+    try {
+        cookieManager.flush()
+    } catch (_: Exception) {}
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CloudBrowserScreen(
@@ -298,11 +340,15 @@ fun CloudBrowserScreen(
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
     val latestXboxWebUiMode by rememberUpdatedState(config.xboxWebUiMode)
     val latestEffectiveLocale by rememberUpdatedState(effectiveLocale)
+    var lastAppliedUiMode by remember { mutableStateOf(config.xboxWebUiMode) }
 
     LaunchedEffect(config.xboxWebUiMode) {
+        if (config.xboxWebUiMode == lastAppliedUiMode) return@LaunchedEffect
+        lastAppliedUiMode = config.xboxWebUiMode
         val wv = webViewInstance ?: return@LaunchedEffect
         val curUrl = wv.url ?: currentMainFrameUrl
         if (!streamUiState.isStreamConnected && !curUrl.contains("/launch/") && XboxBridge.isXboxHost(curUrl)) {
+            clearAkamaiBotCookies(CookieManager.getInstance())
             val adapted = SettingsRepository.formatXboxUrlWithLocale(curUrl, effectiveLocale, config.xboxWebUiMode)
             if (adapted.isNotBlank() && !adapted.equals(curUrl, ignoreCase = true)) {
                 wv.loadUrl(adapted)
@@ -559,6 +605,7 @@ fun CloudBrowserScreen(
                         setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
                     }
 
+                    val cleanChromeUa = buildCleanAndroidChromeUserAgent(ctx)
                     settings.apply {
                         javaScriptEnabled = true
                         domStorageEnabled = true
@@ -570,19 +617,14 @@ fun CloudBrowserScreen(
                         allowFileAccess = false
                         allowContentAccess = false
                         setSupportZoom(false)
-
-                        val initialUa = if (config.forceDesktopUserAgent) {
-                            EDGE_DESKTOP_UA
-                        } else {
-                            settings.userAgentString
-                        }
-                        userAgentString = initialUa
+                        userAgentString = cleanChromeUa
                     }
                     setTag(com.example.R.id.webview_desktop_ua_tag, config.forceDesktopUserAgent)
 
                     CookieManager.getInstance().let { cookieManager ->
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
+                        clearAkamaiBotCookies(cookieManager)
                         cookieManager.setCookie("https://www.xbox.com", "MSPC-LOCALE=$effectiveLocale; domain=.xbox.com; path=/")
                     }
 
@@ -616,6 +658,56 @@ fun CloudBrowserScreen(
                     }
 
                     var injectedForCurrentPage = false
+                    var akamaiRecoveryAttemptCount = 0
+
+                    val handleAkamaiAccessDeniedRecovery: (WebView?, String?) -> Unit = { view, blockedUrl ->
+                        val wv = view ?: this
+                        clearAkamaiBotCookies(CookieManager.getInstance())
+                        try {
+                            wv.clearCache(true)
+                        } catch (_: Exception) {}
+
+                        if (akamaiRecoveryAttemptCount == 0) {
+                            akamaiRecoveryAttemptCount = 1
+                            val retryUrl = if (!blockedUrl.isNullOrBlank() && blockedUrl.contains("xbox.com", ignoreCase = true)) {
+                                blockedUrl
+                            } else {
+                                "https://www.xbox.com/$latestEffectiveLocale/play"
+                            }
+                            android.util.Log.w("CloudBrowser", "Akamai Reference #18 detected; cleared Akamai bot cookies & cache, retrying: $retryUrl")
+                            wv.postDelayed({
+                                wv.loadUrl(
+                                    retryUrl,
+                                    mapOf(
+                                        "Accept-Language" to "$latestEffectiveLocale,en;q=0.9",
+                                        "Cache-Control" to "no-cache"
+                                    )
+                                )
+                            }, 350L)
+                        } else if (akamaiRecoveryAttemptCount == 1) {
+                            akamaiRecoveryAttemptCount = 2
+                            // Nếu Akamai (www.xbox.com / edgesuite.net) đang tạm khóa IP 10-15 phút do vòng lặp trước đó,
+                            // tự động chuyển sang play.xbox.com (chạy trên Microsoft Azure Front Door, không đi qua Akamai edgesuite.net).
+                            val fallbackPlayUrl = "https://play.xbox.com/$latestEffectiveLocale"
+                            android.util.Log.w("CloudBrowser", "Akamai IP rate-limit still active on www.xbox.com; falling back to Azure CDN: $fallbackPlayUrl")
+                            val isEnToast = SettingsRepository.config.value.isEnglishUI()
+                            android.widget.Toast.makeText(
+                                ctx,
+                                if (isEnToast) {
+                                    "www.xbox.com (Akamai) temporarily rate-limited your IP. Switched to play.xbox.com so you can play immediately!"
+                                } else {
+                                    "Trang www.xbox.com (Akamai) đang tạm chặn IP của bạn vài phút. Đã tự mở play.xbox.com để bạn vào chơi ngay!"
+                                },
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                            wv.postDelayed({
+                                wv.loadUrl(
+                                    fallbackPlayUrl,
+                                    mapOf("Accept-Language" to "$latestEffectiveLocale,en;q=0.9")
+                                )
+                            }, 250L)
+                        }
+                    }
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -651,26 +743,56 @@ fun CloudBrowserScreen(
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
+                            // Kiểm tra nếu trang trả về là trang lỗi Access Denied Reference #18 của Akamai (errors.edgesuite.net)
+                            if (url != null && url.contains("xbox.com", ignoreCase = true)) {
+                                view?.evaluateJavascript(
+                                    """
+                                    (function() {
+                                        try {
+                                            var t = (document.title || '').toLowerCase();
+                                            var b = (document.body && document.body.innerText) ? document.body.innerText : '';
+                                            if (t === 'access denied' || b.indexOf('errors.edgesuite.net') !== -1 || b.indexOf('Reference #18.') !== -1) {
+                                                return 'AKAMAI_BLOCKED';
+                                            }
+                                            if (b.length > 200) {
+                                                return 'OK';
+                                            }
+                                        } catch(e) {}
+                                        return '';
+                                    })();
+                                    """.trimIndent()
+                                ) { res ->
+                                    if (res != null && res.contains("AKAMAI_BLOCKED")) {
+                                        handleAkamaiAccessDeniedRecovery(view, url)
+                                    } else if (res != null && res.contains("OK")) {
+                                        akamaiRecoveryAttemptCount = 0
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun onReceivedHttpError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            errorResponse: android.webkit.WebResourceResponse?
+                        ) {
+                            super.onReceivedHttpError(view, request, errorResponse)
+                            val reqUrl = request?.url?.toString() ?: ""
+                            if (request?.isForMainFrame == true &&
+                                errorResponse?.statusCode == 403 &&
+                                reqUrl.contains("xbox.com", ignoreCase = true)
+                            ) {
+                                handleAkamaiAccessDeniedRecovery(view, reqUrl)
+                            }
                         }
 
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                             val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
-                                if (latestXboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
-                                    targetUrl.contains("://play.xbox.com", ignoreCase = true)
-                                ) {
-                                    val classicUrl = SettingsRepository.formatXboxUrlWithLocale(
-                                        targetUrl,
-                                        latestEffectiveLocale,
-                                        com.example.data.XboxWebUiMode.CLASSIC
-                                    )
-                                    bridge.updateCurrentUrl(classicUrl)
-                                    streamController.onUrlChanged(classicUrl)
-                                    handleMainFrameNavigation(classicUrl)
-                                    view?.loadUrl(classicUrl)
-                                    return true
-                                }
+                                // Không tự động ép chuyển hướng ngược từ play.xbox.com -> www.xbox.com/play trong shouldOverrideUrlLoading
+                                // vì khi tài khoản Xbox đang bật cờ Preview trên máy chủ Microsoft, www.xbox.com/play sẽ 302 ngược về play.xbox.com,
+                                // tạo vòng lặp chuyển hướng liên tục khiến Akamai (edgesuite.net) khóa IP với lỗi "Access Denied Reference #18".
                                 bridge.updateCurrentUrl(targetUrl)
                                 streamController.onUrlChanged(targetUrl)
                                 handleMainFrameNavigation(targetUrl)
@@ -729,21 +851,18 @@ fun CloudBrowserScreen(
 
                     val formattedInitialUrl = SettingsRepository.formatXboxUrlWithLocale(initialUrl, effectiveLocale)
                     val customHeaders = mapOf(
-                        "Accept-Language" to "$effectiveLocale,en;q=0.9",
-                        "X-Edge-Shopping-Flag" to "0"
+                        "Accept-Language" to "$effectiveLocale,en;q=0.9"
                     )
                     loadUrl(formattedInitialUrl, customHeaders)
                     webViewInstance = this
                 }
             },
             update = { view ->
-                // Tránh gọi IPC sang luồng Chromium (WebSettings.getDefaultUserAgent / view.settings.userAgentString)
-                // mỗi khi Compose vẽ lại theo nhịp telemetry trong trận.
                 val wantDesktopUa = config.forceDesktopUserAgent
                 val lastDesktopFlag = view.getTag(com.example.R.id.webview_desktop_ua_tag) as? Boolean
                 if (lastDesktopFlag != wantDesktopUa) {
                     view.setTag(com.example.R.id.webview_desktop_ua_tag, wantDesktopUa)
-                    val desiredUa = if (wantDesktopUa) EDGE_DESKTOP_UA else WebSettings.getDefaultUserAgent(context)
+                    val desiredUa = buildCleanAndroidChromeUserAgent(context)
                     if (view.settings.userAgentString != desiredUa) {
                         view.settings.userAgentString = desiredUa
                     }

@@ -432,19 +432,54 @@ class XboxBridge(
                             let isGssvRegionEndpoint = (url.includes('/v2/login/user') || url.includes('/sessions/cloud/play')) &&
                                 !url.includes('xhome');
 
-                            if (isGssvRegionEndpoint && shouldSpoofXff && bypassIp) {
+                            if (isGssvRegionEndpoint) {
+                                const upgradeDeviceInfoHeader = function(hdrs) {
+                                    try {
+                                        const rawDevInfo = hdrs.get('x-ms-device-info');
+                                        if (rawDevInfo) {
+                                            const devObj = JSON.parse(rawDevInfo);
+                                            if (devObj && devObj.appInfo && devObj.appInfo.env) {
+                                                devObj.appInfo.env.clientAppType = 'browser';
+                                            }
+                                            if (devObj && devObj.dev) {
+                                                if (devObj.dev.os) {
+                                                    devObj.dev.os.name = 'windows';
+                                                    devObj.dev.os.ver = '22631.2715';
+                                                }
+                                                if (devObj.dev.hw) {
+                                                    devObj.dev.hw.formFactor = 'desktop';
+                                                }
+                                                if (devObj.dev.displayInfo && devObj.dev.displayInfo.dimensions) {
+                                                    devObj.dev.displayInfo.dimensions.widthInPixels = 1920;
+                                                    devObj.dev.displayInfo.dimensions.heightInPixels = 1080;
+                                                }
+                                            }
+                                            hdrs.set('x-ms-device-info', JSON.stringify(devObj));
+                                        }
+                                    } catch (e) {}
+                                };
+
                                 if (typeof request === 'string') {
                                     init = init || {};
                                     let headers = new Headers(init.headers || {});
-                                    headers.set('X-Forwarded-For', bypassIp);
+                                    if (shouldSpoofXff && bypassIp) {
+                                        headers.set('X-Forwarded-For', bypassIp);
+                                    }
+                                    upgradeDeviceInfoHeader(headers);
                                     init.headers = headers;
                                 } else if (request instanceof Request) {
                                     try {
-                                        request.headers.set('X-Forwarded-For', bypassIp);
+                                        if (shouldSpoofXff && bypassIp) {
+                                            request.headers.set('X-Forwarded-For', bypassIp);
+                                        }
+                                        upgradeDeviceInfoHeader(request.headers);
                                     } catch (hdrErr) {
                                         init = init || {};
                                         let headers = new Headers(init.headers || request.headers || {});
-                                        headers.set('X-Forwarded-For', bypassIp);
+                                        if (shouldSpoofXff && bypassIp) {
+                                            headers.set('X-Forwarded-For', bypassIp);
+                                        }
+                                        upgradeDeviceInfoHeader(headers);
                                         init.headers = headers;
                                     }
                                 }

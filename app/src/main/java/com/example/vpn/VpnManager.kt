@@ -2687,6 +2687,17 @@ object VpnManager {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             try {
                 val builder = ProxyConfig.Builder()
+                // Không đẩy trang vỏ www.xbox.com / Akamai (edgesuite.net) và trang đăng nhập Microsoft qua proxy công cộng
+                // vì Akamai WAF sẽ chặn IP proxy với lỗi "Access Denied Reference #18 (errors.edgesuite.net)".
+                // Chỉ các API kiểm tra vùng của Xbox (*.xboxlive.com / *.xboxservices.com) mới cần đi qua proxy.
+                builder.addBypassRule("www.xbox.com")
+                builder.addBypassRule("xbox.com")
+                builder.addBypassRule("play.xbox.com")
+                builder.addBypassRule("*.edgesuite.net")
+                builder.addBypassRule("*.akamaiedge.net")
+                builder.addBypassRule("*.akamai.net")
+                builder.addBypassRule("login.live.com")
+                builder.addBypassRule("login.microsoftonline.com")
                 builder.addProxyRule(ruleFor(primaryServer))
 
                 // Add up to 3 backup servers from the same region (excluding FAILED / WRONG_REGION) for auto-fallback in Chromium

@@ -296,6 +296,19 @@ fun CloudBrowserScreen(
 
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
+    val latestXboxWebUiMode by rememberUpdatedState(config.xboxWebUiMode)
+    val latestEffectiveLocale by rememberUpdatedState(effectiveLocale)
+
+    LaunchedEffect(config.xboxWebUiMode) {
+        val wv = webViewInstance ?: return@LaunchedEffect
+        val curUrl = wv.url ?: currentMainFrameUrl
+        if (!streamUiState.isStreamConnected && !curUrl.contains("/launch/") && XboxBridge.isXboxHost(curUrl)) {
+            val adapted = SettingsRepository.formatXboxUrlWithLocale(curUrl, effectiveLocale, config.xboxWebUiMode)
+            if (adapted.isNotBlank() && !adapted.equals(curUrl, ignoreCase = true)) {
+                wv.loadUrl(adapted)
+            }
+        }
+    }
 
     var manualVirtualPadOverrideWithPhys by remember { mutableStateOf(false) }
     LaunchedEffect(gamepadStatus.hasPhysicalController) {
@@ -540,6 +553,8 @@ fun CloudBrowserScreen(
                     // Giữ LAYER_TYPE_NONE để tránh ép WebView vẽ qua bộ đệm phần mềm/lớp trung gian phụ.
                     setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                     keepScreenOn = true
+                    isFocusable = true
+                    isFocusableInTouchMode = true
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                         setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
                     }
@@ -642,6 +657,20 @@ fun CloudBrowserScreen(
                             val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
+                                if (latestXboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                                    targetUrl.contains("://play.xbox.com", ignoreCase = true)
+                                ) {
+                                    val classicUrl = SettingsRepository.formatXboxUrlWithLocale(
+                                        targetUrl,
+                                        latestEffectiveLocale,
+                                        com.example.data.XboxWebUiMode.CLASSIC
+                                    )
+                                    bridge.updateCurrentUrl(classicUrl)
+                                    streamController.onUrlChanged(classicUrl)
+                                    handleMainFrameNavigation(classicUrl)
+                                    view?.loadUrl(classicUrl)
+                                    return true
+                                }
                                 bridge.updateCurrentUrl(targetUrl)
                                 streamController.onUrlChanged(targetUrl)
                                 handleMainFrameNavigation(targetUrl)
@@ -1143,6 +1172,79 @@ fun CloudBrowserScreen(
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1
                                     )
+                                }
+                            }
+                        }
+
+                        // Chọn nhanh Giao diện cũ (www.xbox.com/play) / Giao diện mới (play.xbox.com)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF0E1B14),
+                            border = BorderStroke(0.9.dp, DirectCyan.copy(alpha = 0.50f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(9.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = if (isEn) "Xbox Web Interface (Old UI vs New UI)" else "Giao diện web Xbox (Cũ ổn định / Mới)",
+                                    color = DirectCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
+                                        val isSelected = config.xboxWebUiMode == uiMode
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    SettingsRepository.updateXboxWebUiMode(uiMode)
+                                                    val target = SettingsRepository.formatXboxUrlWithLocale(
+                                                        webViewInstance?.url ?: currentMainFrameUrl,
+                                                        effectiveLocale,
+                                                        uiMode
+                                                    )
+                                                    webViewInstance?.loadUrl(target)
+                                                },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isSelected) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF101A14),
+                                            border = BorderStroke(1.dp, if (isSelected) XboxNeonGreen else XboxCardBorder)
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                                        if (isEn) "Classic UI (Stable)" else "Giao diện cũ (Ổn định)"
+                                                    } else {
+                                                        if (isEn) "New UI (US/JP/VPN)" else "Giao diện mới (Mỹ/VPN)"
+                                                    },
+                                                    color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                                        if (isEn) "xbox.com/play • Best in VN" else "xbox.com/play • Khuyên dùng ở VN"
+                                                    } else {
+                                                        if (isEn) "play.xbox.com • Full VPN/US" else "play.xbox.com • Ở Mỹ/Nhật hoặc VPN"
+                                                    },
+                                                    color = TextSecondary,
+                                                    fontSize = 8.5.sp,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

@@ -254,6 +254,62 @@ internal fun SettingsGraphicsFpsSection(
                 onCheckedChange = { SettingsRepository.updateClarityBoost(it) },
                 switchTestTag = "settings_switch_clarity_boost"
             )
+
+            Text(
+                text = if (isEn) "Xbox Web Interface (Classic vs New UI)" else "Giao diện web Xbox (Giao diện cũ / Giao diện mới)",
+                color = DirectCyan,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
+                    val isSelected = config.xboxWebUiMode == uiMode
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { SettingsRepository.updateXboxWebUiMode(uiMode) }
+                            .testTag("settings_xbox_ui_mode_${uiMode.id}"),
+                        color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = uiMode.localizedTitle(isEn),
+                                color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = uiMode.localizedDesc(isEn),
+                                color = TextSecondary,
+                                fontSize = 9.sp,
+                                lineHeight = 11.5.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

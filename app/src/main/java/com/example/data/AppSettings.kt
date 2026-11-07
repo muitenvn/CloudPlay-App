@@ -618,6 +618,39 @@ enum class RecordingCaptureEngine(
     fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
 }
 
+enum class XboxWebUiMode(
+    val id: String,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String
+) {
+    CLASSIC(
+        id = "CLASSIC",
+        titleVi = "Giao diện cũ (Ổn định • Khuyên dùng ở VN)",
+        titleEn = "Classic UI (Stable • Best for Region Unlock)",
+        shortVi = "Giao diện cũ",
+        shortEn = "Classic UI",
+        descVi = "Dùng trang xbox.com/play cổ điển, bấm nút nhạy và tương thích tốt nhất khi mở khóa vùng ở Việt Nam",
+        descEn = "Uses classic xbox.com/play layout, responsive touch & best compatibility with Smart Region Unlock"
+    ),
+    NEW_UI(
+        id = "NEW_UI",
+        titleVi = "Giao diện mới (Dành cho Mỹ/Nhật hoặc VPN ngoài)",
+        titleEn = "New UI (For US/JP or External VPN)",
+        shortVi = "Giao diện mới",
+        shortEn = "New UI",
+        descVi = "Dùng trang play.xbox.com mới khi bạn đang ở nước được hỗ trợ (Mỹ, Nhật...) hoặc đã bật VPN ngoài sang đó",
+        descEn = "Uses new play.xbox.com dashboard when you are in a supported country or using a full external VPN"
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
 @androidx.compose.runtime.Immutable
 data class PerGameGamepadLayout(
     val offsets: String = "",
@@ -708,10 +741,15 @@ data class AppConfig(
     val hideUnreachableDynamicServers: Boolean = false, // A8: Tùy chọn ẩn máy chủ động không đo được
     val enableGeoIpHttpsFallback: Boolean = true,
     val allowDbIpCellularDownload: Boolean = false,
-    val allowCellularLiveProxySync: Boolean = false
+    val allowCellularLiveProxySync: Boolean = false,
+    val xboxWebUiMode: XboxWebUiMode = XboxWebUiMode.CLASSIC
 ) {
     val targetRegionUrl: String
-        get() = "https://www.xbox.com/${getEffectiveLocale()}/play"
+        get() = if (xboxWebUiMode == XboxWebUiMode.NEW_UI) {
+            "https://play.xbox.com/${getEffectiveLocale()}"
+        } else {
+            "https://www.xbox.com/${getEffectiveLocale()}/play"
+        }
 
     fun getEffectiveLocale(): String {
         return if (useSystemLanguage) {
@@ -974,7 +1012,13 @@ object SettingsRepository {
             hideUnreachableDynamicServers = sp.getBoolean("hide_unreachable_dynamic_servers", false),
             enableGeoIpHttpsFallback = sp.getBoolean("enable_geoip_https_fallback", true),
             allowDbIpCellularDownload = sp.getBoolean("allow_dbip_cellular_download", false),
-            allowCellularLiveProxySync = sp.getBoolean("allow_cellular_live_proxy_sync", false)
+            allowCellularLiveProxySync = sp.getBoolean("allow_cellular_live_proxy_sync", false),
+            xboxWebUiMode = try {
+                XboxWebUiMode.valueOf(
+                    sp.getString("xbox_web_ui_mode", XboxWebUiMode.CLASSIC.name)
+                        ?: XboxWebUiMode.CLASSIC.name
+                )
+            } catch (_: Exception) { XboxWebUiMode.CLASSIC }
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
         val synced = loaded.copy(
@@ -1069,6 +1113,7 @@ object SettingsRepository {
             putBoolean("enable_geoip_https_fallback", c.enableGeoIpHttpsFallback)
             putBoolean("allow_dbip_cellular_download", c.allowDbIpCellularDownload)
             putBoolean("allow_cellular_live_proxy_sync", c.allowCellularLiveProxySync)
+            putString("xbox_web_ui_mode", c.xboxWebUiMode.name)
             apply()
         }
     }
@@ -1110,14 +1155,38 @@ object SettingsRepository {
         return if (trimmed.isNotBlank()) trimmed else "en-US"
     }
 
-    fun formatXboxUrlWithLocale(url: String, targetLocale: String): String {
+    fun formatXboxUrlWithLocale(
+        url: String,
+        targetLocale: String,
+        uiMode: XboxWebUiMode = _config.value.xboxWebUiMode
+    ): String {
         if (!url.contains("xbox.com", ignoreCase = true)) return url
+
+        // Nếu đang ở chế độ Giao diện cũ (CLASSIC) mà URL là play.xbox.com, chuyển về www.xbox.com/<locale>/play...
+        val playSubdomainPattern = Regex("""https?://play\.xbox\.com(?:/([a-zA-Z]{2}-[a-zA-Z]{2}))?(/.*)?""", RegexOption.IGNORE_CASE)
+        val playSubMatch = playSubdomainPattern.find(url)
+        if (playSubMatch != null) {
+            val rawRest = playSubMatch.groupValues[2].ifBlank { "" }
+            return if (uiMode == XboxWebUiMode.CLASSIC) {
+                val normalizedPath = when {
+                    rawRest.isBlank() || rawRest == "/" -> "/play"
+                    rawRest.startsWith("/play") -> rawRest
+                    else -> "/play$rawRest"
+                }
+                "https://www.xbox.com/$targetLocale$normalizedPath"
+            } else {
+                "https://play.xbox.com/$targetLocale$rawRest"
+            }
+        }
 
         val localePattern = Regex("""(https?://(?:www\.)?xbox\.com)/([a-zA-Z]{2}-[a-zA-Z]{2})(/.*)?""")
         val match = localePattern.find(url)
         if (match != null) {
             val domain = match.groupValues[1]
             val rest = match.groupValues[3] ?: ""
+            if (uiMode == XboxWebUiMode.NEW_UI && (rest.isBlank() || rest == "/play" || rest == "/play/")) {
+                return "https://play.xbox.com/$targetLocale"
+            }
             return "$domain/$targetLocale$rest"
         }
 
@@ -1126,6 +1195,9 @@ object SettingsRepository {
         if (noLocaleMatch != null) {
             val domain = noLocaleMatch.groupValues[1]
             val rest = noLocaleMatch.groupValues[2] ?: "/play"
+            if (uiMode == XboxWebUiMode.NEW_UI && (rest == "/play" || rest == "/play/")) {
+                return "https://play.xbox.com/$targetLocale"
+            }
             return "$domain/$targetLocale$rest"
         }
 
@@ -1133,13 +1205,17 @@ object SettingsRepository {
     }
 
     fun getUrlForCountry(countryCode: String): String {
-        val effectiveLocale = _config.value.getEffectiveLocale()
-        return "https://www.xbox.com/$effectiveLocale/play"
+        return _config.value.targetRegionUrl
     }
 
     fun adaptPlayUrl(url: String, countryCode: String? = null): String {
         val effectiveLocale = _config.value.getEffectiveLocale()
-        return formatXboxUrlWithLocale(url, effectiveLocale)
+        return formatXboxUrlWithLocale(url, effectiveLocale, _config.value.xboxWebUiMode)
+    }
+
+    fun updateXboxWebUiMode(mode: XboxWebUiMode) {
+        _config.update { it.copy(xboxWebUiMode = mode) }
+        persist(_config.value)
     }
 
     fun update(newConfig: AppConfig) {

@@ -834,6 +834,9 @@ class XboxBridge(
                             const state = pc.iceConnectionState;
                             if (state === 'disconnected' || state === 'closed' || state === 'failed') {
                                 stopStatsPolling();
+                                if (window.__activePeerConnection === pc) {
+                                    window.__activePeerConnection = null;
+                                }
                                 notify('onStreamDisconnected', 'ice_closed');
                             }
                         });
@@ -841,6 +844,9 @@ class XboxBridge(
                             const state = pc.connectionState;
                             if (state === 'disconnected' || state === 'closed' || state === 'failed') {
                                 stopStatsPolling();
+                                if (window.__activePeerConnection === pc) {
+                                    window.__activePeerConnection = null;
+                                }
                                 notify('onStreamDisconnected', 'pc_closed');
                             }
                         });
@@ -1367,6 +1373,8 @@ class XboxBridge(
                             if (nowInLaunch) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
                             } else if (wasInLaunch && !nowInLaunch) {
+                                window.__activePeerConnection = null;
+                                removeFortniteMultiTouchClawCss();
                                 const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
                                 if (!isLowEnd && window.__resumeTranslator) {
                                     window.__resumeTranslator();
@@ -1495,12 +1503,92 @@ class XboxBridge(
                     }
 
                     function ensureFortniteMultiTouchClawCss() {
+                        if (location.href.indexOf('/play/launch/') === -1) return;
                         if (document.getElementById('__cloudplay_fortnite_claw_css')) return;
                         try {
                             const style = document.createElement('style');
                             style.id = '__cloudplay_fortnite_claw_css';
-                            style.textContent = 'video, canvas, #game-stream, [data-testid*="stream" i], [data-testid*="media" i], [data-testid*="touch" i] { touch-action: none !important; overscroll-behavior: none !important; user-select: none !important; -webkit-user-select: none !important; -webkit-touch-callout: none !important; -webkit-user-drag: none !important; -webkit-tap-highlight-color: transparent !important; }';
+                            // Chỉ áp dụng touch-action: none lên đúng thẻ video/canvas của luồng game đang phát,
+                            // TUYỆT ĐỐI KHÔNG gắn lên [data-testid*="touch"] hay [data-testid*="media"] vì sẽ khóa bấm nút trên danh mục game!
+                            style.textContent = 'video#stream-video, video[data-testid="stream-video"], #segmented-video video, #game-stream video, #game-stream canvas { touch-action: none !important; overscroll-behavior: none !important; user-select: none !important; -webkit-user-select: none !important; -webkit-touch-callout: none !important; -webkit-user-drag: none !important; -webkit-tap-highlight-color: transparent !important; }';
                             (document.head || document.documentElement).appendChild(style);
+                        } catch(e) {}
+                    }
+
+                    function removeFortniteMultiTouchClawCss() {
+                        try {
+                            const el = document.getElementById('__cloudplay_fortnite_claw_css');
+                            if (el) el.remove();
+                            if (document.documentElement && !window.__isRecordingPerformanceMode) {
+                                document.documentElement.style.touchAction = '';
+                                document.documentElement.style.userSelect = '';
+                                document.documentElement.style.webkitUserSelect = '';
+                            }
+                        } catch(e) {}
+                    }
+
+                    // Mở khóa các lớp phủ (backdrop/overlay) bị kẹt hoặc thuộc tính inert/pointer-events:none
+                    // khi chuyển qua lại giữa Giao diện mới và Giao diện cũ của Xbox (khiến trang chỉ vuốt được mà không bấm được nút).
+                    function ensureXboxWebClickable(tapX, tapY) {
+                        if (location.href.indexOf('/play/launch/') !== -1) return;
+                        try {
+                            const hasActiveVisibleDialogWithButtons = (function() {
+                                const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"]');
+                                for (let i = 0; i < dialogs.length; i++) {
+                                    const d = dialogs[i];
+                                    const st = window.getComputedStyle(d);
+                                    if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.05) continue;
+                                    const r = d.getBoundingClientRect();
+                                    if (r.width > 40 && r.height > 40 && d.querySelector('button, a[href], input, [role="button"]')) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            })();
+
+                            if (!hasActiveVisibleDialogWithButtons) {
+                                const roots = [
+                                    document.documentElement,
+                                    document.body,
+                                    document.getElementById('root'),
+                                    document.getElementById('PageContent'),
+                                    document.querySelector('main')
+                                ];
+                                for (let i = 0; i < roots.length; i++) {
+                                    const r = roots[i];
+                                    if (!r) continue;
+                                    if (r.hasAttribute && r.hasAttribute('inert')) {
+                                        r.removeAttribute('inert');
+                                    }
+                                    if (r.style && r.style.pointerEvents === 'none') {
+                                        r.style.pointerEvents = 'auto';
+                                    }
+                                }
+                            }
+
+                            const vw = window.innerWidth || 0;
+                            const vh = window.innerHeight || 0;
+                            if (vw <= 0 || vh <= 0) return;
+                            const checkX = (typeof tapX === 'number') ? tapX : (vw * 0.5);
+                            const checkY = (typeof tapY === 'number') ? tapY : (vh * 0.5);
+                            const topEl = document.elementFromPoint(checkX, checkY);
+                            if (topEl && topEl !== document.body && topEl !== document.documentElement) {
+                                const tag = (topEl.tagName || '').toUpperCase();
+                                if (tag !== 'BUTTON' && tag !== 'A' && tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'IMG' &&
+                                    !topEl.closest('button, a, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="switch"], [role="option"], input, select, [data-cloudplay-ui="1"]')
+                                ) {
+                                    const rect = topEl.getBoundingClientRect();
+                                    const coversScreen = rect.width >= vw * 0.80 && rect.height >= vh * 0.80;
+                                    if (coversScreen) {
+                                        const st = window.getComputedStyle(topEl);
+                                        const isOverlayPos = st.position === 'fixed' || st.position === 'absolute';
+                                        const interactiveChildren = topEl.querySelectorAll('button, a[href], input, [role="button"], [role="link"]');
+                                        if (isOverlayPos && interactiveChildren.length === 0) {
+                                            topEl.style.setProperty('pointer-events', 'none', 'important');
+                                        }
+                                    }
+                                }
+                            }
                         } catch(e) {}
                     }
 
@@ -1596,11 +1684,75 @@ class XboxBridge(
                                 tryAutoBypassFortniteControllerModal();
                             }
                         } else {
+                            removeFortniteMultiTouchClawCss();
+                            ensureXboxWebClickable();
                             scanVisibleCatalogGameCards();
                         }
                     }, 2500);
 
+                    let lastNativeClickAt = 0;
+                    let touchTapStartInfo = null;
+
+                    document.addEventListener('touchstart', function(e) {
+                        if (location.href.indexOf('/play/launch/') !== -1) return;
+                        if (!e.touches || e.touches.length !== 1) {
+                            touchTapStartInfo = null;
+                            return;
+                        }
+                        const t = e.touches[0];
+                        ensureXboxWebClickable(t.clientX, t.clientY);
+                        touchTapStartInfo = {
+                            x: t.clientX,
+                            y: t.clientY,
+                            time: Date.now(),
+                            target: e.target
+                        };
+                    }, { capture: true, passive: true });
+
+                    document.addEventListener('touchmove', function(e) {
+                        if (!touchTapStartInfo || !e.touches || e.touches.length !== 1) return;
+                        const t = e.touches[0];
+                        if (Math.hypot(t.clientX - touchTapStartInfo.x, t.clientY - touchTapStartInfo.y) >= 14) {
+                            // Người dùng đang vuốt cuộn trang -> hủy trạng thái chạm đơn
+                            touchTapStartInfo = null;
+                        }
+                    }, { capture: true, passive: true });
+
+                    document.addEventListener('touchend', function(e) {
+                        if (location.href.indexOf('/play/launch/') !== -1 || !touchTapStartInfo) return;
+                        const info = touchTapStartInfo;
+                        touchTapStartInfo = null;
+                        const ch = (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0] : null;
+                        if (!ch) return;
+                        const dx = ch.clientX - info.x;
+                        const dy = ch.clientY - info.y;
+                        const dt = Date.now() - info.time;
+                        // Chỉ hỗ trợ khi là chạm nhẹ tại chỗ (< 14px, < 500ms), không can thiệp khi vuốt
+                        if (Math.hypot(dx, dy) < 14 && dt < 500) {
+                            const tapX = ch.clientX;
+                            const tapY = ch.clientY;
+                            const tapEndTs = Date.now();
+                            setTimeout(function() {
+                                // Nếu trình duyệt đã tự phát sự kiện click bình thường thì không làm gì cả
+                                if (lastNativeClickAt >= info.time - 20) return;
+                                try {
+                                    ensureXboxWebClickable(tapX, tapY);
+                                    const hitEl = document.elementFromPoint(tapX, tapY) || info.target;
+                                    if (!hitEl || !hitEl.closest) return;
+                                    const clickable = hitEl.closest(
+                                        'button, a[href], [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="switch"], [role="option"], input, select, summary'
+                                    );
+                                    if (clickable && typeof clickable.click === 'function' && lastNativeClickAt < tapEndTs) {
+                                        lastNativeClickAt = Date.now();
+                                        clickable.click();
+                                    }
+                                } catch(err) {}
+                            }, 65);
+                        }
+                    }, { capture: true, passive: true });
+
                     document.addEventListener('click', function(e) {
+                        lastNativeClickAt = Date.now();
                         const target = e.target;
                         if (target) {
                             const gameLink = target.closest('a[href*="/play/games/"], a[href*="/play/launch/"]');
@@ -1863,7 +2015,11 @@ class XboxBridge(
                                 }
                             }
                             window.__hasPhysicalGamepadConnected = !!physPad;
-                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
+                            const isInLaunchOrRecentlyPressed = location.href.indexOf('/play/launch/') !== -1 ||
+                                (Date.now() - (window.__lastUserControlPulseAt || 0) < 4000);
+                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) &&
+                                virtualGamepadState.connected &&
+                                isInLaunchOrRecentlyPressed;
                             if (!physPad) {
                                 physViewDownAt = 0;
                                 physShortcutLatched = {};
@@ -2096,14 +2252,14 @@ class XboxBridge(
 
                             let cssRules = '';
                             if (reduceGpu) {
-                                // Strip heavy CSS blurs, shadows, and background animations on web UI (never mutating active video transform)
+                                // Chỉ tắt hiệu ứng làm mờ nặng (backdrop-filter / box-shadow) để nhẹ GPU;
+                                // KHÔNG tắt transition/animation trên [class*="background"] hay [class*="blur"]
+                                // vì sẽ làm kẹt sự kiện onTransitionEnd của hộp thoại/menu Xbox khiến lớp phủ vô hình chặn bấm nút!
                                 cssRules += `
                                     [class*="background" i], [class*="ambient" i], [class*="blur" i], [class*="shimmer" i] {
                                         backdrop-filter: none !important;
                                         -webkit-backdrop-filter: none !important;
                                         box-shadow: none !important;
-                                        animation: none !important;
-                                        transition: none !important;
                                     }
                                 `;
                             }

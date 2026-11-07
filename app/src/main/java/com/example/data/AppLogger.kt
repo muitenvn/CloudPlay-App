@@ -29,19 +29,40 @@ data class AppLogEntry(
 )
 
 /**
- * Bộ ghi nhật ký hệ thống (AppLogger) chỉ lưu trong bộ nhớ RAM cục bộ trên thiết bị:
- * - Tự động che (redact) mọi dữ liệu nhạy cảm (token, cookie, authorization, bearer, mật khẩu, email, URL auth, JSON lồng nhau) TRƯỚC khi lưu.
- * - Giới hạn cứng tối đa 300 dòng và <= 64 KB trong RAM; tự giải phóng khi đóng ứng dụng hoặc bấm Xóa log.
+ * Bộ ghi nhật ký hệ thống (AppLogger) lưu bền vững vào bộ nhớ riêng của ứng dụng (filesDir):
+ * - Tự động che (redact) mọi dữ liệu nhạy cảm (token, cookie, authorization, bearer, mật khẩu, email, URL auth, JSON lồng nhau) TRƯỚC khi lưu vào RAM và ghi xuống file.
+ * - Giới hạn tối đa 500 dòng trong RAM và <= 256 KB trên đĩa (tự động xoay vòng giữ phần mới nhất).
+ * - Ghi đĩa bất đồng bộ trên luồng nền riêng biệt, không chặn luồng chính.
  */
 object AppLogger {
 
-    const val MAX_LOGS = 300
-    const val MAX_TOTAL_BYTES = 64 * 1024 // 64 KB
-    const val STORAGE_LOCATION_DESC_VI = "Lưu tạm trong bộ nhớ RAM cục bộ trên máy (tối đa 300 dòng / 64 KB, tự xóa khi tắt app, không ghi cookie/token/tài khoản)"
-    const val STORAGE_LOCATION_DESC_EN = "Stored only in local device RAM (max 300 lines / 64 KB, cleared on exit, no cookies/tokens/account data)"
+    const val MAX_LOGS = 500
+    const val MAX_TOTAL_BYTES = 256 * 1024 // 256 KB
+    const val PERSISTENT_LOG_FILE_NAME = "cloudplay_activity_log.txt"
+    const val MAX_PERSISTENT_FILE_BYTES = 256 * 1024 // 256 KB
+    private const val ROTATED_KEEP_FILE_BYTES = 192 * 1024 // Giữ lại ~192 KB mới nhất khi vượt ngưỡng 256 KB
+    const val STORAGE_LOCATION_DESC_VI = "Lưu bền vững trong bộ nhớ nội bộ ứng dụng (filesDir, tối đa 256 KB, giữ qua các lần mở lại app, tự xóa khi bấm Xóa log, không ghi cookie/token/tài khoản)"
+    const val STORAGE_LOCATION_DESC_EN = "Persisted in internal app storage (filesDir, max 256 KB, retained across app restarts, deleted on Clear Log, no cookies/tokens/account data)"
 
     private val idGenerator = AtomicLong(1L)
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
+    private val fullDateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    private val fileLock = Any()
+
+    @Volatile
+    private var persistentLogFile: java.io.File? = null
+
+    @Volatile
+    private var processInitialized = false
+
+    private val diskExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "CloudPlay-AppLogger-IO").apply {
+            isDaemon = true
+            priority = Thread.NORM_PRIORITY - 1
+        }
+    }
+
+    private val PERSISTED_LINE_REGEX = Regex("^\\[([^\\]]+)]\\s+\\[([^\\]]+)](?:\\s+\\[(INFO|SUCCESS|WARN|ERROR)])?\\s+(.*)$")
 
     private val SENSITIVE_JSON_KEYS = setOf(
         "token", "access_token", "refresh_token", "id_token", "auth", "authorization",
@@ -67,6 +88,178 @@ object AppLogger {
     private fun nowString(): String {
         return synchronized(timeFormat) {
             timeFormat.format(Date())
+        }
+    }
+
+    private fun nowFullDateTimeString(): String {
+        return synchronized(fullDateTimeFormat) {
+            fullDateTimeFormat.format(Date())
+        }
+    }
+
+    /**
+     * Khởi tạo bộ lưu nhật ký bền vững trong `context.filesDir`.
+     * Tự động nạp lại log cũ từ đĩa khi tiến trình mới khởi động và ghi dòng đánh dấu PID.
+     */
+    fun init(context: android.content.Context) {
+        initWithDirectory(context.applicationContext.filesDir)
+    }
+
+    fun initWithDirectory(
+        filesDir: java.io.File,
+        pidOverride: Int? = null,
+        forceReinit: Boolean = false
+    ) {
+        if (processInitialized && !forceReinit) return
+        synchronized(fileLock) {
+            if (processInitialized && !forceReinit) return
+            try {
+                if (!filesDir.exists()) {
+                    filesDir.mkdirs()
+                }
+                val targetFile = java.io.File(filesDir, PERSISTENT_LOG_FILE_NAME)
+                persistentLogFile = targetFile
+
+                val loadedEntries = loadEntriesFromDiskLocked(targetFile)
+                val earlyEntries = synchronized(_logs) {
+                    val current = if (forceReinit) emptyList() else _logs.value
+                    val combined = (loadedEntries + current).takeLast(MAX_LOGS)
+                    trimEntriesByBytes(combined)
+                }
+                synchronized(_logs) {
+                    _logs.value = earlyEntries
+                }
+
+                // Nếu có các dòng log phát sinh sớm trước khi init() được gọi, ghi bù xuống file
+                if (!forceReinit) {
+                    val unsavedEarly = synchronized(_logs) {
+                        _logs.value.filter { it.id > (loadedEntries.lastOrNull()?.id ?: 0L) }
+                    }
+                    for (entry in unsavedEarly) {
+                        writeEntryToFileLocked(targetFile, entry)
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+            processInitialized = true
+        }
+
+        val pid = pidOverride ?: runCatching { android.os.Process.myPid() }.getOrDefault(0)
+        val startTimestamp = nowFullDateTimeString()
+        info("SYSTEM", "=== Khởi động tiến trình mới: $startTimestamp, PID $pid ===")
+    }
+
+    private fun loadEntriesFromDiskLocked(file: java.io.File): List<AppLogEntry> {
+        if (!file.exists() || !file.isFile) return emptyList()
+        return try {
+            val rawBytes = file.readBytes()
+            val cappedBytes = if (rawBytes.size > MAX_PERSISTENT_FILE_BYTES) {
+                keepNewestLinesBytes(rawBytes, ROTATED_KEEP_FILE_BYTES)
+            } else {
+                rawBytes
+            }
+            val content = String(cappedBytes, Charsets.UTF_8)
+            val parsed = mutableListOf<AppLogEntry>()
+            for (rawLine in content.lineSequence()) {
+                val line = rawLine.trim()
+                if (line.isEmpty()) continue
+                val match = PERSISTED_LINE_REGEX.matchEntire(line)
+                if (match != null) {
+                    val ts = match.groupValues[1]
+                    val tag = match.groupValues[2].trim().uppercase(Locale.ROOT)
+                    val levelStr = match.groupValues[3]
+                    val rawMsg = match.groupValues[4].replace(" ⏎ ", "\n")
+                    val level = runCatching {
+                        if (levelStr.isNotBlank()) AppLogLevel.valueOf(levelStr) else AppLogLevel.INFO
+                    }.getOrDefault(AppLogLevel.INFO)
+                    parsed.add(
+                        AppLogEntry(
+                            id = idGenerator.getAndIncrement(),
+                            timestamp = ts,
+                            tag = tag,
+                            message = sanitizeMessage(rawMsg),
+                            level = level
+                        )
+                    )
+                } else {
+                    parsed.add(
+                        AppLogEntry(
+                            id = idGenerator.getAndIncrement(),
+                            timestamp = nowString(),
+                            tag = "LOG",
+                            message = sanitizeMessage(line),
+                            level = AppLogLevel.INFO
+                        )
+                    )
+                }
+            }
+            parsed.takeLast(MAX_LOGS)
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    private fun formatEntryForDisk(entry: AppLogEntry): String {
+        val singleLineMsg = sanitizeMessage(entry.message)
+            .replace("\r\n", " ⏎ ")
+            .replace('\n', ' ')
+        return "[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] $singleLineMsg\n"
+    }
+
+    private fun writeEntryToFileLocked(file: java.io.File, entry: AppLogEntry) {
+        synchronized(fileLock) {
+            try {
+                // Nếu file đã bị thay đổi sang file khác hoặc chưa bật lưu đĩa thì bỏ qua
+                if (persistentLogFile != file) return
+                val lineBytes = formatEntryForDisk(entry).toByteArray(Charsets.UTF_8)
+                java.io.FileOutputStream(file, true).use { fos ->
+                    fos.write(lineBytes)
+                }
+                if (file.length() > MAX_PERSISTENT_FILE_BYTES) {
+                    val allBytes = file.readBytes()
+                    val rotated = keepNewestLinesBytes(allBytes, ROTATED_KEEP_FILE_BYTES)
+                    file.writeBytes(rotated)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    private fun keepNewestLinesBytes(bytes: ByteArray, targetMaxBytes: Int): ByteArray {
+        if (bytes.size <= targetMaxBytes) return bytes
+        var startIdx = bytes.size - targetMaxBytes
+        while (startIdx < bytes.size && bytes[startIdx] != '\n'.code.toByte()) {
+            startIdx++
+        }
+        if (startIdx < bytes.size && bytes[startIdx] == '\n'.code.toByte()) {
+            startIdx++
+        }
+        return if (startIdx < bytes.size) {
+            bytes.copyOfRange(startIdx, bytes.size)
+        } else {
+            bytes.copyOfRange(bytes.size - targetMaxBytes, bytes.size)
+        }
+    }
+
+    private fun trimEntriesByBytes(entries: List<AppLogEntry>): List<AppLogEntry> {
+        val trimmedByBytes = mutableListOf<AppLogEntry>()
+        var runningBytes = 0
+        for (i in entries.indices.reversed()) {
+            val item = entries[i]
+            val itemBytes = (item.timestamp.length + item.tag.length + item.message.length + 16) * 2
+            if (runningBytes + itemBytes > MAX_TOTAL_BYTES && trimmedByBytes.isNotEmpty()) {
+                break
+            }
+            runningBytes += itemBytes
+            trimmedByBytes.add(item)
+        }
+        return trimmedByBytes.asReversed()
+    }
+
+    fun flushDiskWritesForTest() {
+        try {
+            diskExecutor.submit {}.get(3, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: Throwable) {
         }
     }
 
@@ -163,19 +356,16 @@ object AppLogger {
         )
         synchronized(_logs) {
             val combined = (_logs.value + entry).takeLast(MAX_LOGS)
-            // Giới hạn tổng dung lượng không vượt quá 64 KB
-            val trimmedByBytes = mutableListOf<AppLogEntry>()
-            var runningBytes = 0
-            for (i in combined.indices.reversed()) {
-                val item = combined[i]
-                val itemBytes = (item.timestamp.length + item.tag.length + item.message.length + 16) * 2
-                if (runningBytes + itemBytes > MAX_TOTAL_BYTES && trimmedByBytes.isNotEmpty()) {
-                    break
+            _logs.value = trimEntriesByBytes(combined)
+        }
+        val targetFile = persistentLogFile
+        if (targetFile != null) {
+            try {
+                diskExecutor.execute {
+                    writeEntryToFileLocked(targetFile, entry)
                 }
-                runningBytes += itemBytes
-                trimmedByBytes.add(item)
+            } catch (_: Throwable) {
             }
-            _logs.value = trimmedByBytes.asReversed()
         }
         try {
             when (level) {
@@ -199,6 +389,23 @@ object AppLogger {
     fun clear() {
         synchronized(_logs) {
             _logs.value = emptyList()
+        }
+        synchronized(fileLock) {
+            try {
+                persistentLogFile?.delete()
+            } catch (_: Throwable) {
+            }
+        }
+        try {
+            diskExecutor.execute {
+                synchronized(fileLock) {
+                    try {
+                        persistentLogFile?.delete()
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+        } catch (_: Throwable) {
         }
     }
 

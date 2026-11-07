@@ -77,13 +77,30 @@ object VpnManager {
         return true
     }
 
-    init {
-        // Initial location check at launch
-        checkCurrentIp()
-    }
+    const val IP_FOREGROUND_COOLDOWN_MS = 10_000L
+    const val IP_NETWORK_CHANGE_DEBOUNCE_MS = 1_500L
+    const val IP_PRE_LAUNCH_MAX_AGE_MS = 60_000L
+    const val IP_PRE_LAUNCH_TIMEOUT_MS = 1_800L
+
+    @Volatile
+    private var lastRealGeoIp: GeoIpResult? = null
+
+    @Volatile
+    private var lastIpCheckTimestampMs: Long = 0L
+
+    @Volatile
+    private var isIpInvalidatedByNetworkChange: Boolean = false
 
     private var networkChangeMonitorJob: Job? = null
+    private var networkChangeDebounceJob: Job? = null
     private var lastObservedTransportTag: String = ""
+    private var lastObservedNetworkKey: String = ""
+    private var lastObservedHasVpnTransport: Boolean? = null
+
+    init {
+        // Initial location check at launch
+        checkCurrentIp(reason = "khởi động", force = true)
+    }
 
     fun init(context: Context) {
         val appCtx = context.applicationContext
@@ -94,6 +111,9 @@ object VpnManager {
         loadPersistedServers(appCtx)
         loadPersistedUnlockRecords(appCtx)
         lastObservedTransportTag = resolveCurrentNetworkTransportTag(appCtx)
+        val initialNetStatus = com.example.cloudplay.NetworkOptimizer.status.value
+        lastObservedNetworkKey = initialNetStatus.activeNetworkKey
+        lastObservedHasVpnTransport = initialNetStatus.hasVpnTransport
 
         // Khi mở app lần đầu, khi vị trí GeoIP thay đổi hoặc khi kết quả tự chọn đã quá 6 giờ: đo probe ngắn và chọn theo điểm số
         scope.launch(Dispatchers.IO) {
@@ -104,21 +124,57 @@ object VpnManager {
         }
         autoSyncPublicProxiesIfNeeded(context = appCtx, force = false)
 
-        // Theo dõi sự kiện đổi mạng (Wi-Fi <-> Di động) từ NetworkOptimizer để đánh giá lại khi không trong phiên stream
+        // Theo dõi sự kiện đổi mạng mặc định hoặc bật/tắt cờ TRANSPORT_VPN từ NetworkOptimizer
         if (networkChangeMonitorJob == null) {
             networkChangeMonitorJob = scope.launch(Dispatchers.IO) {
                 com.example.cloudplay.NetworkOptimizer.status.collect { netStatus ->
                     val newTag = when {
                         netStatus.isWifi -> "WIFI"
                         netStatus.isCellular -> "CELLULAR"
+                        netStatus.physicalType == com.example.cloudplay.PhysicalNetworkType.ETHERNET -> "ETHERNET"
                         else -> ""
                     }
-                    if (newTag.isNotBlank() && newTag != lastObservedTransportTag) {
-                        val hadPrevious = lastObservedTransportTag.isNotBlank()
+                    val newNetKey = netStatus.activeNetworkKey
+                    val newHasVpn = netStatus.hasVpnTransport
+
+                    val isInternalSmartBypassVpn = _state.value.engine == VpnEngine.SMART_BYPASS &&
+                        (_state.value.mode == NetworkMode.VPN_JAPAN || _state.value.isConnecting)
+
+                    val transportChanged = newTag.isNotBlank() &&
+                        lastObservedTransportTag.isNotBlank() &&
+                        newTag != lastObservedTransportTag
+                    val networkKeyChanged = newNetKey.isNotBlank() &&
+                        lastObservedNetworkKey.isNotBlank() &&
+                        newNetKey != lastObservedNetworkKey
+                    val vpnChanged = lastObservedHasVpnTransport != null &&
+                        newHasVpn != lastObservedHasVpnTransport &&
+                        !isInternalSmartBypassVpn
+
+                    if (newTag.isNotBlank()) {
                         lastObservedTransportTag = newTag
-                        if (hadPrevious && !isInGameStreamActive && !netStatus.isLowLatencyStreamActive) {
-                            com.example.data.AppLogger.info("VPN_NET", "Phát hiện chuyển đổi mạng sang $newTag -> đánh giá lại máy chủ tối ưu")
-                            ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = true)
+                    }
+                    if (newNetKey.isNotBlank()) {
+                        lastObservedNetworkKey = newNetKey
+                    }
+                    lastObservedHasVpnTransport = newHasVpn
+
+                    if (transportChanged || networkKeyChanged || vpnChanged) {
+                        val reason = if (vpnChanged) "VPN bật-tắt" else "mạng đổi"
+                        invalidateIpForNetworkChange(reason)
+                        if (!isInGameStreamActive && !netStatus.isLowLatencyStreamActive) {
+                            networkChangeDebounceJob?.cancel()
+                            networkChangeDebounceJob = scope.launch(Dispatchers.IO) {
+                                delay(IP_NETWORK_CHANGE_DEBOUNCE_MS)
+                                if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+                                    return@launch
+                                }
+                                com.example.data.AppLogger.info(
+                                    "VPN_NET",
+                                    "Phát hiện thay đổi mạng ($reason: tag=$newTag, vpn=$newHasVpn) -> kiểm tra lại IP và đánh giá lại máy chủ tối ưu"
+                                )
+                                checkCurrentIp(reason = reason, force = true)
+                                ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = true)
+                            }
                         }
                     }
                 }
@@ -1881,14 +1937,91 @@ object VpnManager {
         }
     }
 
-    fun checkCurrentIp() {
+    /**
+     * Vô hiệu hóa ngay kết quả IP cũ khi vừa đổi mạng hoặc bật/tắt VPN,
+     * đảm bảo app không dùng lại `detectedGeoIp` cũ trong lúc đang xác định lại IP mới.
+     */
+    fun invalidateIpForNetworkChange(reason: String = "mạng đổi") {
+        isIpInvalidatedByNetworkChange = true
+        lastRealGeoIp = null
+        lastIpCheckTimestampMs = 0L
+        if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+            return
+        }
+        val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
+        val checkingDecision = SmartVpnDecision(
+            checked = false,
+            needsVpn = true,
+            userCountryCode = "...",
+            userCountryName = if (isEn) "Checking IP..." else "Đang xác định IP...",
+            isSupportedRegion = false,
+            message = if (isEn) {
+                "🔄 Network/VPN changed ($reason). Re-checking IP location..."
+            } else {
+                "🔄 Phát hiện thay đổi mạng/VPN ($reason). Đang xác định lại vị trí IP..."
+            },
+            actionSummary = if (isEn) "Checking IP..." else "Đang xác định IP..."
+        )
+        _state.value = _state.value.copy(
+            detectedGeoIp = null,
+            smartDecision = checkingDecision,
+            statusMessage = if (isEn) "🔄 Checking IP..." else "🔄 Đang xác định IP..."
+        )
+    }
+
+    fun isIpInvalidatedOrChecking(): Boolean = isIpInvalidatedByNetworkChange
+
+    fun isIpStaleForLaunch(nowMs: Long = System.currentTimeMillis()): Boolean {
+        if (isIpInvalidatedByNetworkChange) return true
+        val realGeo = _state.value.detectedGeoIp?.takeIf { !it.isFromWebView } ?: lastRealGeoIp
+        if (realGeo == null) return true
+        val checkedAt = if (lastIpCheckTimestampMs > 0L) lastIpCheckTimestampMs else realGeo.timestamp
+        return (nowMs - checkedAt) > IP_PRE_LAUNCH_MAX_AGE_MS
+    }
+
+    fun onAppForeground() {
+        if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+            return
+        }
+        val now = System.currentTimeMillis()
+        val hasValidIp = !isIpInvalidatedByNetworkChange && (_state.value.detectedGeoIp != null || lastRealGeoIp != null)
+        if (hasValidIp && lastIpCheckTimestampMs > 0L && (now - lastIpCheckTimestampMs) < IP_FOREGROUND_COOLDOWN_MS) {
+            return
+        }
+        checkCurrentIp(reason = "quay lại foreground", force = true)
+    }
+
+    fun checkCurrentIp(reason: String = "khởi động", force: Boolean = false) {
+        if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (!force &&
+            !isIpInvalidatedByNetworkChange &&
+            lastIpCheckTimestampMs > 0L &&
+            (now - lastIpCheckTimestampMs) < IP_FOREGROUND_COOLDOWN_MS &&
+            (_state.value.detectedGeoIp != null || lastRealGeoIp != null)
+        ) {
+            return
+        }
+        com.example.data.AppLogger.info("VPN", "[VPN] Kiểm tra IP (lý do: $reason)")
         ipCheckJob?.cancel()
         ipCheckJob = scope.launch(Dispatchers.IO) {
+            if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+                return@launch
+            }
             val result = GeoIpDetector.checkCurrentIp()
+            if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+                return@launch
+            }
             val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
             if (result != null) {
+                isIpInvalidatedByNetworkChange = false
+                lastRealGeoIp = result
+                lastIpCheckTimestampMs = System.currentTimeMillis()
                 updateSmartDecision(result)
             } else {
+                isIpInvalidatedByNetworkChange = false
                 val offlineDecision = SmartVpnDecision(
                     checked = true,
                     needsVpn = false,
@@ -1931,6 +2064,12 @@ object VpnManager {
             )
             _state.value = _state.value.copy(smartDecision = offlineDecision)
             return
+        }
+
+        if (!currentGeo.isFromWebView) {
+            isIpInvalidatedByNetworkChange = false
+            lastRealGeoIp = currentGeo
+            lastIpCheckTimestampMs = currentGeo.timestamp
         }
 
         val isSupported = currentGeo.isXboxSupported
@@ -2051,17 +2190,55 @@ object VpnManager {
      * and auto-disconnects once inside the game.
      */
     fun needsVpnToPlay(): Boolean {
+        if (isIpInvalidatedByNetworkChange) {
+            return true
+        }
         val geo = _state.value.detectedGeoIp
         if (geo != null && !geo.isFromWebView) {
             return !geo.isXboxSupported
+        }
+        val realGeo = lastRealGeoIp
+        if (realGeo != null && !realGeo.isFromWebView) {
+            return !realGeo.isXboxSupported
         }
         return _state.value.smartDecision.needsVpn
     }
 
     /**
-     * Smart VPN Lifecycle: Auto Turn ON when launching game or opening catalog
+     * Smart VPN Lifecycle: Auto Turn ON when launching game or opening catalog.
+     * Nếu kết quả IP đã cũ hơn ngưỡng `IP_PRE_LAUNCH_MAX_AGE_MS` hoặc vừa có sự kiện đổi mạng/VPN,
+     * kiểm tra lại IP trước (với timeout ngắn `IP_PRE_LAUNCH_TIMEOUT_MS`) rồi mới quyết định bật VPN hay đi mạng trực tiếp.
      */
     fun autoTurnOnForLaunch(context: Context) {
+        val appCtx = context.applicationContext
+        if (isIpStaleForLaunch() && !com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+            if (!isIpInvalidatedByNetworkChange) {
+                invalidateIpForNetworkChange("trước khi vào game")
+            }
+            com.example.data.AppLogger.info("VPN", "[VPN] Kiểm tra IP (lý do: trước khi vào game)")
+            ipCheckJob?.cancel()
+            ipCheckJob = scope.launch {
+                val freshGeo = kotlinx.coroutines.withTimeoutOrNull(IP_PRE_LAUNCH_TIMEOUT_MS) {
+                    withContext(Dispatchers.IO) {
+                        GeoIpDetector.checkCurrentIp()
+                    }
+                }
+                if (freshGeo != null) {
+                    isIpInvalidatedByNetworkChange = false
+                    lastRealGeoIp = freshGeo
+                    lastIpCheckTimestampMs = System.currentTimeMillis()
+                    updateSmartDecision(freshGeo)
+                } else {
+                    isIpInvalidatedByNetworkChange = false
+                }
+                applyLaunchNetworkDecision(appCtx)
+            }
+            return
+        }
+        applyLaunchNetworkDecision(appCtx)
+    }
+
+    private fun applyLaunchNetworkDecision(context: Context) {
         if (!needsVpnToPlay()) {
             ensureDirectNetwork()
             return
@@ -2246,7 +2423,7 @@ object VpnManager {
                         autoBypassTriggered = false,
                         statusMessage = if (isEnNow) "External VPN mode: Ready to auto-switch on game start" else "Chế độ VPN ngoài: Sẵn sàng tự động chuyển mạng khi vào game"
                     )
-                    checkCurrentIp()
+                    checkCurrentIp(reason = "VPN bật-tắt", force = true)
                 }
             }
 
@@ -2265,7 +2442,7 @@ object VpnManager {
             smartVpnPhase = if (needsVpnToPlay()) SmartVpnPhase.IDLE else SmartVpnPhase.DIRECT_SUPPORTED_REGION,
             statusMessage = if (isEn) "Disconnected" else "Đã ngắt kết nối"
         )
-        checkCurrentIp()
+        checkCurrentIp(reason = "VPN bật-tắt", force = true)
     }
 
     /**
@@ -2598,6 +2775,7 @@ object VpnManager {
             batchPingJob?.cancel()
             lazyPingJob?.cancel()
             ipCheckJob?.cancel()
+            networkChangeDebounceJob?.cancel()
             _state.value = _state.value.copy(
                 activeStreamServerId = _state.value.currentServer.id,
                 isAutoSyncingLiveProxies = false,
@@ -2607,6 +2785,9 @@ object VpnManager {
             _state.value = _state.value.copy(
                 activeStreamServerId = null
             )
+            if (isIpInvalidatedByNetworkChange) {
+                checkCurrentIp(reason = "mạng đổi", force = true)
+            }
         }
         com.example.data.AppLogger.info(
             "STREAM",

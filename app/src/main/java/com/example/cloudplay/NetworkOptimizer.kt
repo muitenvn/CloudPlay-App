@@ -48,6 +48,8 @@ data class NetworkOptimizerStatus(
     val isWeakWifiSignal: Boolean = false,
     val isWeakCellularSignal: Boolean = false,
     val isLowLatencyStreamActive: Boolean = false,
+    val hasVpnTransport: Boolean = false,
+    val activeNetworkKey: String = "",
     val summaryText: String = "Đang tối ưu hóa đồ họa và hiệu năng thiết bị...",
     val profileBadge: String = "⚡ Tự Động"
 )
@@ -82,6 +84,7 @@ object NetworkOptimizer {
 
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var vpnNetworkCallback: ConnectivityManager.NetworkCallback? = null
     private var wifiLowLatencyLock: WifiManager.WifiLock? = null
     private var isInitialized = false
 
@@ -158,6 +161,28 @@ object NetworkOptimizer {
                     .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     .build()
                 cm.registerNetworkCallback(request, networkCallback!!)
+            }
+
+            // Theo dõi riêng cờ TRANSPORT_VPN để nhận diện ngay khi người dùng bật/tắt VPN ngoài
+            runCatching {
+                val vpnReq = NetworkRequest.Builder()
+                    .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                    .build()
+                vpnNetworkCallback = object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        evaluateCurrentNetwork(appCtx, cm.activeNetwork, forceHasVpn = true)
+                    }
+
+                    override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                        evaluateCurrentNetwork(appCtx, cm.activeNetwork)
+                    }
+
+                    override fun onLost(network: Network) {
+                        evaluateCurrentNetwork(appCtx, cm.activeNetwork, lostVpnNetwork = network)
+                    }
+                }
+                cm.registerNetworkCallback(vpnReq, vpnNetworkCallback!!)
             }
 
             // Observe user configuration changes to re-tune immediately
@@ -249,7 +274,12 @@ object NetworkOptimizer {
         }
     }
 
-    private fun evaluateCurrentNetwork(context: Context, network: Network?) {
+    private fun evaluateCurrentNetwork(
+        context: Context,
+        network: Network?,
+        forceHasVpn: Boolean = false,
+        lostVpnNetwork: Network? = null
+    ) {
         val cm = connectivityManager ?: return
         val currentNetwork = network ?: cm.activeNetwork
         val caps = if (currentNetwork != null) cm.getNetworkCapabilities(currentNetwork) else null
@@ -264,6 +294,17 @@ object NetworkOptimizer {
         var downstreamKbps = 0
         var isWeakWifi = false
         var isWeakCellular = false
+
+        val hasVpn = forceHasVpn ||
+            (currentNetwork != null && currentNetwork != lostVpnNetwork && caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) ||
+            runCatching {
+                @Suppress("DEPRECATION")
+                cm.allNetworks.any { net ->
+                    net != lostVpnNetwork &&
+                        cm.getNetworkCapabilities(net)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                }
+            }.getOrDefault(false)
+        val activeNetworkKey = currentNetwork?.toString().orEmpty()
 
         if (caps != null) {
             isMetered = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
@@ -315,7 +356,9 @@ object NetworkOptimizer {
             wifiLinkSpeedMbps = wifiLinkMbps,
             downstreamBandwidthKbps = stabilizedDownstream,
             isWeakWifiSignal = isWeakWifi,
-            isWeakCellularSignal = isWeakCellular
+            isWeakCellularSignal = isWeakCellular,
+            hasVpnTransport = hasVpn,
+            activeNetworkKey = activeNetworkKey
         )
 
         recomputeEffectiveProfile(config, candidateStatus)

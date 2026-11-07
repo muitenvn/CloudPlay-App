@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
 
+        com.example.data.AppLogger.init(applicationContext)
         com.example.data.AppLogger.installCrashHandler(applicationContext)
         VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
@@ -133,6 +134,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        VpnManager.onAppForeground()
     }
 
     override fun onDestroy() {
@@ -316,11 +322,7 @@ fun MainContent(
                     onLaunchUrl = { url ->
                         val config = SettingsRepository.config.value
                         if (config.smartVpnEnabled) {
-                            if (VpnManager.needsVpnToPlay()) {
-                                VpnManager.autoTurnOnForLaunch(context)
-                            } else {
-                                VpnManager.ensureDirectNetwork()
-                            }
+                            VpnManager.autoTurnOnForLaunch(context)
                         } else {
                             if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
                                 VpnManager.connect(context)

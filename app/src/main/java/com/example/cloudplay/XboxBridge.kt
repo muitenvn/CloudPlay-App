@@ -270,14 +270,11 @@ class XboxBridge(
                 put("shortcutVpadBtn", currentConfig.shortcutToggleVirtualPadButton)
                 put("shortcutRecBtn", currentConfig.shortcutToggleRecordingButton)
             }.toString()
-            val vpnStateNow = VpnManager.state.value
-            val shouldSpoofXff = VpnManager.needsVpnToPlay() &&
-                vpnStateNow.engine == com.example.vpn.VpnEngine.SMART_BYPASS
             return """
                 (function() {
                     window.__cloudPlayIsEnglishUi = $isEnglishUi;
                     if (window.__cloudPlayInjected) {
-                        if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale", spoofXff: $shouldSpoofXff });
+                        if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: "$targetCountry", ip: "$targetIp", locale: "$userLocale" });
                         if (window.__setClarityPreset) window.__setClarityPreset($clarityBoost ? "$clarityPreset" : "OFF");
                         if (window.__toggleClarityBoost) window.__toggleClarityBoost($clarityBoost);
                         if (window.__toggleXCloudTranslation) window.__toggleXCloudTranslation($xcloudTranslate);
@@ -399,13 +396,11 @@ class XboxBridge(
                     let targetCountry = "$targetCountry";
                     let bypassIp = "$targetIp";
                     let preferredLocale = "$userLocale";
-                    let shouldSpoofXff = $shouldSpoofXff;
 
                     window.__updateRegionAndLocale = function(conf) {
                         if (!conf) return;
                         if (conf.country) targetCountry = conf.country;
                         if (conf.ip) bypassIp = conf.ip;
-                        if (typeof conf.spoofXff === 'boolean') shouldSpoofXff = conf.spoofXff;
                         if (conf.locale) {
                             preferredLocale = conf.locale;
                             try {
@@ -420,68 +415,26 @@ class XboxBridge(
                     } catch(e) {}
 
                     // ==========================================
-                    // 1. Smart Region Header Interceptor (Compatible with new Xbox Cloud UI & CORS)
+                    // 1. Smart Region Header Interceptor
                     // ==========================================
                     try {
                         const NATIVE_FETCH = window.fetch;
                         window.fetch = async function(request, init) {
                             let url = typeof request === 'string' ? request : (request ? request.url : '');
-                            // Chỉ gắn X-Forwarded-For trên các endpoint xác thực/phiên GSSV (/v2/login/user, /sessions/cloud/play)
-                            // khi đang dùng chế độ giả lập header (shouldSpoofXff = true).
-                            // Tuyệt đối KHÔNG gắn X-Client-IP / X-Real-IP hoặc gắn lên emerald.xboxservices.com vì sẽ làm lỗi CORS preflight OPTIONS.
-                            let isGssvRegionEndpoint = (url.includes('/v2/login/user') || url.includes('/sessions/cloud/play')) &&
-                                !url.includes('xhome');
-
-                            if (isGssvRegionEndpoint) {
-                                const upgradeDeviceInfoHeader = function(hdrs) {
-                                    try {
-                                        const rawDevInfo = hdrs.get('x-ms-device-info');
-                                        if (rawDevInfo) {
-                                            const devObj = JSON.parse(rawDevInfo);
-                                            if (devObj && devObj.appInfo && devObj.appInfo.env) {
-                                                devObj.appInfo.env.clientAppType = 'browser';
-                                            }
-                                            if (devObj && devObj.dev) {
-                                                if (devObj.dev.os) {
-                                                    devObj.dev.os.name = 'windows';
-                                                    devObj.dev.os.ver = '22631.2715';
-                                                }
-                                                if (devObj.dev.hw) {
-                                                    devObj.dev.hw.formFactor = 'desktop';
-                                                }
-                                                if (devObj.dev.displayInfo && devObj.dev.displayInfo.dimensions) {
-                                                    devObj.dev.displayInfo.dimensions.widthInPixels = 1920;
-                                                    devObj.dev.displayInfo.dimensions.heightInPixels = 1080;
-                                                }
-                                            }
-                                            hdrs.set('x-ms-device-info', JSON.stringify(devObj));
-                                        }
-                                    } catch (e) {}
-                                };
-
+                            if (bypassIp && (url.includes('xboxlive.com') || url.includes('xboxservices.com') || url.includes('/v2/login/user') || url.includes('/sessions/cloud/play'))) {
                                 if (typeof request === 'string') {
                                     init = init || {};
-                                    let headers = new Headers(init.headers || {});
-                                    if (shouldSpoofXff && bypassIp) {
-                                        headers.set('X-Forwarded-For', bypassIp);
-                                    }
-                                    upgradeDeviceInfoHeader(headers);
-                                    init.headers = headers;
+                                    init.headers = Object.assign({}, init.headers, {
+                                        'X-Forwarded-For': bypassIp,
+                                        'X-Client-IP': bypassIp,
+                                        'X-Real-IP': bypassIp
+                                    });
                                 } else if (request instanceof Request) {
                                     try {
-                                        if (shouldSpoofXff && bypassIp) {
-                                            request.headers.set('X-Forwarded-For', bypassIp);
-                                        }
-                                        upgradeDeviceInfoHeader(request.headers);
-                                    } catch (hdrErr) {
-                                        init = init || {};
-                                        let headers = new Headers(init.headers || request.headers || {});
-                                        if (shouldSpoofXff && bypassIp) {
-                                            headers.set('X-Forwarded-For', bypassIp);
-                                        }
-                                        upgradeDeviceInfoHeader(headers);
-                                        init.headers = headers;
-                                    }
+                                        request.headers.set('X-Forwarded-For', bypassIp);
+                                        request.headers.set('X-Client-IP', bypassIp);
+                                        request.headers.set('X-Real-IP', bypassIp);
+                                    } catch (hdrErr) {}
                                 }
                             }
 
@@ -508,11 +461,6 @@ class XboxBridge(
                                             if (found) {
                                                 found.isDefault = true;
                                                 data.offeringSettings.regions.forEach(r => { if (r !== found) r.isDefault = false; });
-                                                // Đưa vùng được chọn lên đầu danh sách cho giao diện Xbox mới
-                                                data.offeringSettings.regions = [
-                                                    found,
-                                                    ...data.offeringSettings.regions.filter(r => r !== found)
-                                                ];
                                                 foundTargetRegion = true;
                                             } else if (data.offeringSettings.regions.length > 0) {
                                                 data.offeringSettings.regions[0].isDefault = true;
@@ -552,7 +500,7 @@ class XboxBridge(
                             return response;
                         };
 
-                        // Patch XMLHttpRequest for older components without breaking CORS
+                        // Patch XMLHttpRequest for older components
                         const origXhrOpen = XMLHttpRequest.prototype.open;
                         const origXhrSend = XMLHttpRequest.prototype.send;
                         XMLHttpRequest.prototype.open = function(method, url) {
@@ -560,11 +508,11 @@ class XboxBridge(
                             return origXhrOpen.apply(this, arguments);
                         };
                         XMLHttpRequest.prototype.send = function(data) {
-                            if (shouldSpoofXff && bypassIp && this._url &&
-                                (this._url.includes('/v2/login/user') || this._url.includes('/sessions/cloud/play'))
-                            ) {
+                            if (bypassIp && this._url && (this._url.includes('xboxlive.com') || this._url.includes('xboxservices.com') || this._url.includes('/v2/login/user') || this._url.includes('/sessions/cloud/play'))) {
                                 try {
                                     this.setRequestHeader('X-Forwarded-For', bypassIp);
+                                    this.setRequestHeader('X-Client-IP', bypassIp);
+                                    this.setRequestHeader('X-Real-IP', bypassIp);
                                 } catch(e) {}
                             }
                             return origXhrSend.apply(this, arguments);
@@ -1562,71 +1510,6 @@ class XboxBridge(
                         } catch(e) {}
                     }
 
-                    // Mở khóa các lớp phủ (backdrop/overlay) bị kẹt hoặc thuộc tính inert/pointer-events:none
-                    // khi chuyển qua lại giữa Giao diện mới và Giao diện cũ của Xbox (khiến trang chỉ vuốt được mà không bấm được nút).
-                    function ensureXboxWebClickable(tapX, tapY) {
-                        if (location.href.indexOf('/play/launch/') !== -1) return;
-                        try {
-                            const hasActiveVisibleDialogWithButtons = (function() {
-                                const dialogs = document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"]');
-                                for (let i = 0; i < dialogs.length; i++) {
-                                    const d = dialogs[i];
-                                    const st = window.getComputedStyle(d);
-                                    if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity) < 0.05) continue;
-                                    const r = d.getBoundingClientRect();
-                                    if (r.width > 40 && r.height > 40 && d.querySelector('button, a[href], input, [role="button"]')) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            })();
-
-                            if (!hasActiveVisibleDialogWithButtons) {
-                                const roots = [
-                                    document.documentElement,
-                                    document.body,
-                                    document.getElementById('root'),
-                                    document.getElementById('PageContent'),
-                                    document.querySelector('main')
-                                ];
-                                for (let i = 0; i < roots.length; i++) {
-                                    const r = roots[i];
-                                    if (!r) continue;
-                                    if (r.hasAttribute && r.hasAttribute('inert')) {
-                                        r.removeAttribute('inert');
-                                    }
-                                    if (r.style && r.style.pointerEvents === 'none') {
-                                        r.style.pointerEvents = 'auto';
-                                    }
-                                }
-                            }
-
-                            const vw = window.innerWidth || 0;
-                            const vh = window.innerHeight || 0;
-                            if (vw <= 0 || vh <= 0) return;
-                            const checkX = (typeof tapX === 'number') ? tapX : (vw * 0.5);
-                            const checkY = (typeof tapY === 'number') ? tapY : (vh * 0.5);
-                            const topEl = document.elementFromPoint(checkX, checkY);
-                            if (topEl && topEl !== document.body && topEl !== document.documentElement) {
-                                const tag = (topEl.tagName || '').toUpperCase();
-                                if (tag !== 'BUTTON' && tag !== 'A' && tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'IMG' &&
-                                    !topEl.closest('button, a, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="switch"], [role="option"], input, select, [data-cloudplay-ui="1"]')
-                                ) {
-                                    const rect = topEl.getBoundingClientRect();
-                                    const coversScreen = rect.width >= vw * 0.80 && rect.height >= vh * 0.80;
-                                    if (coversScreen) {
-                                        const st = window.getComputedStyle(topEl);
-                                        const isOverlayPos = st.position === 'fixed' || st.position === 'absolute';
-                                        const interactiveChildren = topEl.querySelectorAll('button, a[href], input, [role="button"], [role="link"]');
-                                        if (isOverlayPos && interactiveChildren.length === 0) {
-                                            topEl.style.setProperty('pointer-events', 'none', 'important');
-                                        }
-                                    }
-                                }
-                            }
-                        } catch(e) {}
-                    }
-
                     function tryAutoBypassFortniteControllerModal() {
                         if (!isFortniteSession() || location.href.indexOf('/launch/') === -1) return;
                         try {
@@ -1720,74 +1603,11 @@ class XboxBridge(
                             }
                         } else {
                             removeFortniteMultiTouchClawCss();
-                            ensureXboxWebClickable();
                             scanVisibleCatalogGameCards();
                         }
                     }, 2500);
 
-                    let lastNativeClickAt = 0;
-                    let touchTapStartInfo = null;
-
-                    document.addEventListener('touchstart', function(e) {
-                        if (location.href.indexOf('/play/launch/') !== -1) return;
-                        if (!e.touches || e.touches.length !== 1) {
-                            touchTapStartInfo = null;
-                            return;
-                        }
-                        const t = e.touches[0];
-                        ensureXboxWebClickable(t.clientX, t.clientY);
-                        touchTapStartInfo = {
-                            x: t.clientX,
-                            y: t.clientY,
-                            time: Date.now(),
-                            target: e.target
-                        };
-                    }, { capture: true, passive: true });
-
-                    document.addEventListener('touchmove', function(e) {
-                        if (!touchTapStartInfo || !e.touches || e.touches.length !== 1) return;
-                        const t = e.touches[0];
-                        if (Math.hypot(t.clientX - touchTapStartInfo.x, t.clientY - touchTapStartInfo.y) >= 14) {
-                            // Người dùng đang vuốt cuộn trang -> hủy trạng thái chạm đơn
-                            touchTapStartInfo = null;
-                        }
-                    }, { capture: true, passive: true });
-
-                    document.addEventListener('touchend', function(e) {
-                        if (location.href.indexOf('/play/launch/') !== -1 || !touchTapStartInfo) return;
-                        const info = touchTapStartInfo;
-                        touchTapStartInfo = null;
-                        const ch = (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0] : null;
-                        if (!ch) return;
-                        const dx = ch.clientX - info.x;
-                        const dy = ch.clientY - info.y;
-                        const dt = Date.now() - info.time;
-                        // Chỉ hỗ trợ khi là chạm nhẹ tại chỗ (< 14px, < 500ms), không can thiệp khi vuốt
-                        if (Math.hypot(dx, dy) < 14 && dt < 500) {
-                            const tapX = ch.clientX;
-                            const tapY = ch.clientY;
-                            const tapEndTs = Date.now();
-                            setTimeout(function() {
-                                // Nếu trình duyệt đã tự phát sự kiện click bình thường thì không làm gì cả
-                                if (lastNativeClickAt >= info.time - 20) return;
-                                try {
-                                    ensureXboxWebClickable(tapX, tapY);
-                                    const hitEl = document.elementFromPoint(tapX, tapY) || info.target;
-                                    if (!hitEl || !hitEl.closest) return;
-                                    const clickable = hitEl.closest(
-                                        'button, a[href], [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="switch"], [role="option"], input, select, summary'
-                                    );
-                                    if (clickable && typeof clickable.click === 'function' && lastNativeClickAt < tapEndTs) {
-                                        lastNativeClickAt = Date.now();
-                                        clickable.click();
-                                    }
-                                } catch(err) {}
-                            }, 65);
-                        }
-                    }, { capture: true, passive: true });
-
                     document.addEventListener('click', function(e) {
-                        lastNativeClickAt = Date.now();
                         const target = e.target;
                         if (target) {
                             const gameLink = target.closest('a[href*="/play/games/"], a[href*="/play/launch/"]');
@@ -2050,11 +1870,7 @@ class XboxBridge(
                                 }
                             }
                             window.__hasPhysicalGamepadConnected = !!physPad;
-                            const isInLaunchOrRecentlyPressed = location.href.indexOf('/play/launch/') !== -1 ||
-                                (Date.now() - (window.__lastUserControlPulseAt || 0) < 4000);
-                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) &&
-                                virtualGamepadState.connected &&
-                                isInLaunchOrRecentlyPressed;
+                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
                             if (!physPad) {
                                 physViewDownAt = 0;
                                 physShortcutLatched = {};

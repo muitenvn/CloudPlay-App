@@ -406,6 +406,18 @@ fun CloudBrowserScreen(
         )
     }
 
+    val activeBrowserPerfScenario = if (streamUiState.isStreamConnected) {
+        com.example.data.PerfScenario.STREAM_ACTIVE
+    } else {
+        com.example.data.PerfScenario.WEBVIEW_BROWSE
+    }
+    LaunchedEffect(activeBrowserPerfScenario) {
+        com.example.data.PerformanceMonitor.setScenario(activeBrowserPerfScenario)
+    }
+    androidx.compose.runtime.SideEffect {
+        com.example.data.PerformanceMonitor.recordRecomposition(activeBrowserPerfScenario)
+    }
+
     // 1. DỪNG BỘ DỊCH KHI ĐANG STREAM (hoặc khi bật Chế độ máy yếu / ngôn ngữ tiếng Anh), NỐI LẠI KHI NGẮT STREAM / THOÁT VỀ TRANG XBOX
     LaunchedEffect(streamUiState.isStreamConnected, streamUiState.isGameActive, currentMainFrameUrl, config.lowEndDeviceMode, effectiveTranslate) {
         val wv = webViewInstance ?: return@LaunchedEffect

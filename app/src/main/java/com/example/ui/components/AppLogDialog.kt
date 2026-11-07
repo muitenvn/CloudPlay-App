@@ -80,6 +80,7 @@ fun AppLogDialog(
             "PROBE" -> reversed.filter { it.tag == "PROBE" || it.tag == "PING" }
             "VPN" -> reversed.filter { it.tag == "VPN" || it.tag == "UNLOCK" }
             "STREAM" -> reversed.filter { it.tag == "STREAM" }
+            "PERF" -> reversed.filter { it.tag == "PERF" }
             else -> reversed
         }
     }
@@ -141,7 +142,8 @@ fun AppLogDialog(
                     "ALL" to if (isEn) "All (${logs.size})" else "Tất cả (${logs.size})",
                     "PROBE" to if (isEn) "Probe & Ping" else "Trạm đo & Ping",
                     "VPN" to if (isEn) "VPN & Unlock" else "VPN & Vùng",
-                    "STREAM" to "Stream"
+                    "STREAM" to "Stream",
+                    "PERF" to if (isEn) "Perf [PERF]" else "Hiệu năng [PERF]"
                 )
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(filters) { (key, label) ->
@@ -267,7 +269,12 @@ fun AppLogDialog(
                     OutlinedButton(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Log", AppLogger.exportAsText()))
+                            val exportedText = if (selectedFilter == "PERF") {
+                                com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
+                            } else {
+                                AppLogger.exportAsText() + "\n\n" + com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
+                            }
+                            clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Log", exportedText))
                             Toast.makeText(
                                 context,
                                 if (isEn) "Copied logs to clipboard" else "Đã sao chép nhật ký vào bộ nhớ tạm",

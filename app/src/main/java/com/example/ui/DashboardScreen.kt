@@ -552,6 +552,19 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            val activePerfScenario = when (currentTab) {
+                DashboardTab.HOME -> com.example.data.PerfScenario.HOME
+                DashboardTab.LIBRARY -> com.example.data.PerfScenario.LIBRARY
+                DashboardTab.SERVERS -> com.example.data.PerfScenario.SERVERS
+                DashboardTab.SETTINGS -> com.example.data.PerfScenario.SETTINGS
+            }
+            androidx.compose.runtime.LaunchedEffect(activePerfScenario) {
+                com.example.data.PerformanceMonitor.setScenario(activePerfScenario)
+            }
+            androidx.compose.runtime.SideEffect {
+                com.example.data.PerformanceMonitor.recordRecomposition(activePerfScenario)
+            }
+
             AnimatedContent(
                 targetState = currentTab,
                 transitionSpec = {

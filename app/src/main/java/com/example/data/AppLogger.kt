@@ -37,6 +37,7 @@ data class AppLogEntry(
 object AppLogger {
 
     const val MAX_LOGS = 500
+    const val MAX_PERF_LOGS = 40 // Giới hạn riêng cho tag [PERF] để không đẩy mất log mạng/VPN quan trọng
     const val MAX_TOTAL_BYTES = 256 * 1024 // 256 KB
     const val PERSISTENT_LOG_FILE_NAME = "cloudplay_activity_log.txt"
     const val MAX_PERSISTENT_FILE_BYTES = 256 * 1024 // 256 KB
@@ -123,7 +124,7 @@ object AppLogger {
                 val loadedEntries = loadEntriesFromDiskLocked(targetFile)
                 val earlyEntries = synchronized(_logs) {
                     val current = if (forceReinit) emptyList() else _logs.value
-                    val combined = (loadedEntries + current).takeLast(MAX_LOGS)
+                    val combined = capPerfEntries(loadedEntries + current).takeLast(MAX_LOGS)
                     trimEntriesByBytes(combined)
                 }
                 synchronized(_logs) {
@@ -256,6 +257,21 @@ object AppLogger {
         return trimmedByBytes.asReversed()
     }
 
+    private fun capPerfEntries(entries: List<AppLogEntry>): List<AppLogEntry> {
+        val perfCount = entries.count { it.tag == "PERF" }
+        if (perfCount <= MAX_PERF_LOGS) return entries
+        var toRemove = perfCount - MAX_PERF_LOGS
+        val result = ArrayList<AppLogEntry>(entries.size - toRemove)
+        for (entry in entries) {
+            if (entry.tag == "PERF" && toRemove > 0) {
+                toRemove--
+            } else {
+                result.add(entry)
+            }
+        }
+        return result
+    }
+
     fun flushDiskWritesForTest() {
         try {
             diskExecutor.submit {}.get(3, java.util.concurrent.TimeUnit.SECONDS)
@@ -355,7 +371,7 @@ object AppLogger {
             level = level
         )
         synchronized(_logs) {
-            val combined = (_logs.value + entry).takeLast(MAX_LOGS)
+            val combined = capPerfEntries(_logs.value + entry).takeLast(MAX_LOGS)
             _logs.value = trimEntriesByBytes(combined)
         }
         val targetFile = persistentLogFile

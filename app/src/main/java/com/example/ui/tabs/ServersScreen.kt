@@ -104,6 +104,17 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
+private val IDLE_STREAM_TELEMETRY_FLOW =
+    kotlinx.coroutines.flow.MutableStateFlow(com.example.cloudplay.StreamTelemetry())
+
+@androidx.compose.runtime.Immutable
+private data class ServerRowPrecomputed(
+    val basePing: Int,
+    val unlockStatus: RegionUnlockStatus,
+    val distanceKm: Int?,
+    val isTooFarForAutoSelect: Boolean
+)
+
 @OptIn(FlowPreview::class)
 @Composable
 fun ServersScreen(
@@ -114,7 +125,14 @@ fun ServersScreen(
     val context = LocalContext.current
     val vpnState by VpnManager.state.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
-    val streamTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
+    val activeTelemetryFlow = remember(networkStatus.isLowLatencyStreamActive) {
+        if (networkStatus.isLowLatencyStreamActive) {
+            com.example.cloudplay.NetworkOptimizer.telemetry
+        } else {
+            IDLE_STREAM_TELEMETRY_FLOW
+        }
+    }
+    val streamTelemetry by activeTelemetryFlow.collectAsState()
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val motionEnabled = rememberXboxMotionEnabled(
@@ -201,7 +219,24 @@ fun ServersScreen(
         )
     }
 
-    val allServersSnapshot = allServers.toList()
+    val allServersSnapshot = remember(allServers.size, vpnState.customServers, vpnState.liveVerifiedServers) {
+        allServers.toList()
+    }
+    val (jpServerCount, krServerCount, usServerCount, customServerCount) = remember(allServersSnapshot) {
+        var jp = 0
+        var kr = 0
+        var us = 0
+        var custom = 0
+        for (srv in allServersSnapshot) {
+            when (srv.countryCode) {
+                "JP" -> jp++
+                "KR" -> kr++
+                "US" -> us++
+            }
+            if (srv.isCustom) custom++
+        }
+        listOf(jp, kr, us, custom)
+    }
     val filteredServers = remember(
         selectedCategory,
         allServersSnapshot,
@@ -238,6 +273,64 @@ fun ServersScreen(
         )
     }
 
+    val precomputedServerMeta = remember(
+        filteredServers,
+        allServersSnapshot,
+        serverPings,
+        vpnState.unlockRecords,
+        vpnState.detectedGeoIp,
+        vpnState.engine,
+        recentSessions
+    ) {
+        val map = HashMap<String, ServerRowPrecomputed>(filteredServers.size)
+        for (server in filteredServers) {
+            val basePing = VpnManager.getEffectiveServerPing(
+                server = server,
+                engine = vpnState.engine,
+                pingMap = serverPings,
+                sessions = recentSessions
+            )
+            val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
+            val distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(
+                server = server,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
+            val isTooFar = !com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                server = server,
+                servers = allServersSnapshot,
+                geo = vpnState.detectedGeoIp,
+                allowTimezoneFallback = true
+            )
+            map[server.id] = ServerRowPrecomputed(
+                basePing = basePing,
+                unlockStatus = unlockStatus,
+                distanceKm = distanceKm,
+                isTooFarForAutoSelect = isTooFar
+            )
+        }
+        map
+    }
+
+    val recommendedServerId = remember(
+        filteredServers,
+        precomputedServerMeta,
+        serverPings,
+        serverMeasurements,
+        vpnState.unlockRecords,
+        selectedCategory
+    ) {
+        filteredServers.firstOrNull { server ->
+            val measuredPing = serverPings[server.id] ?: -1
+            val m = serverMeasurements[server.id]
+            val isPrimaryOk = m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
+            val meta = precomputedServerMeta[server.id]
+            val st = meta?.unlockStatus ?: VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
+            val withinDistLimit = selectedCategory != "ALL" || !(meta?.isTooFarForAutoSelect ?: false)
+            measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED && withinDistLimit
+        }?.id
+    }
+
     // A8: Đo lười (lazy viewport probing) khi người dùng cuộn danh sách với debounce 250ms
     LaunchedEffect(listState, filteredServers) {
         snapshotFlow {
@@ -247,6 +340,9 @@ fun ServersScreen(
             .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
             .debounce(250L)
             .collect { visibleServers ->
+                if (visibleServers.isNotEmpty()) {
+                    com.example.data.PerformanceMonitor.recordScrollActivity(com.example.data.PerfScenario.SERVERS)
+                }
                 if (visibleServers.isNotEmpty() && !vpnState.isTestingPings) {
                     VpnManager.probeVisibleServersLazily(visibleServers)
                 }
@@ -1021,11 +1117,11 @@ fun ServersScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val categories = listOf(
-                    "JP" to "🇯🇵 $jpLabel (${allServers.count { it.countryCode == "JP" }})",
-                    "KR" to "🇰🇷 $krLabel (${allServers.count { it.countryCode == "KR" }})",
-                    "US" to "🇺🇸 $usLabel (${allServers.count { it.countryCode == "US" }})",
-                    "CUSTOM" to "⚙️ ${config.tr("Tùy Chỉnh", "Custom")} (${allServers.count { it.isCustom }})",
-                    "ALL" to "🌐 $allLabel (${allServers.size})"
+                    "JP" to "🇯🇵 $jpLabel ($jpServerCount)",
+                    "KR" to "🇰🇷 $krLabel ($krServerCount)",
+                    "US" to "🇺🇸 $usLabel ($usServerCount)",
+                    "CUSTOM" to "⚙️ ${config.tr("Tùy Chỉnh", "Custom")} ($customServerCount)",
+                    "ALL" to "🌐 $allLabel (${allServersSnapshot.size})"
                 )
 
                 items(categories) { (code, title) ->
@@ -1178,20 +1274,6 @@ fun ServersScreen(
         }
 
         // Servers list: Huy hiệu "★ ĐỀ XUẤT" chỉ dành riêng cho máy chủ nằm trong giới hạn khoảng cách (<= 5.500 km), đã mở khóa thành công (UNLOCKED) và có ping thật trên cổng chính (MEASURED_PRIMARY)
-        val recommendedServerId = filteredServers.firstOrNull { server ->
-            val measuredPing = serverPings[server.id] ?: -1
-            val m = serverMeasurements[server.id]
-            val isPrimaryOk = m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
-            val st = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
-            val withinDistLimit = selectedCategory != "ALL" || com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
-                server = server,
-                servers = allServersSnapshot,
-                geo = vpnState.detectedGeoIp,
-                allowTimezoneFallback = true
-            )
-            measuredPing > 0 && isPrimaryOk && st == RegionUnlockStatus.UNLOCKED && withinDistLimit
-        }?.id
-
         items(
             items = filteredServers,
             key = { it.id },
@@ -1202,29 +1284,21 @@ fun ServersScreen(
                 vpnState.activeStreamServerId == server.id
             val measurement = serverMeasurements[server.id]
             val hasTriedPing = serverPings.containsKey(server.id)
+            val meta = precomputedServerMeta[server.id]
             val ping = if (isGameActiveOnThisServer) {
                 if (streamTelemetry.rttMs > 0) streamTelemetry.rttMs else -1
             } else {
-                VpnManager.getEffectiveServerPing(
+                meta?.basePing ?: VpnManager.getEffectiveServerPing(
                     server = server,
                     engine = vpnState.engine,
                     pingMap = serverPings,
                     sessions = recentSessions
                 )
             }
-            val unlockStatus = VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
+            val unlockStatus = meta?.unlockStatus ?: VpnManager.getServerUnlockStatus(server, vpnState.unlockRecords)
             val isRecommended = server.id == recommendedServerId
-            val distanceKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(
-                server = server,
-                geo = vpnState.detectedGeoIp,
-                allowTimezoneFallback = true
-            )
-            val isTooFarForAutoSelect = !com.example.vpn.RegionalProbeTester.isWithinAutoSelectDistanceLimit(
-                server = server,
-                servers = allServersSnapshot,
-                geo = vpnState.detectedGeoIp,
-                allowTimezoneFallback = true
-            )
+            val distanceKm = meta?.distanceKm
+            val isTooFarForAutoSelect = meta?.isTooFarForAutoSelect ?: false
 
             ServerCard(
                 server = server,

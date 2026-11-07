@@ -138,7 +138,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        com.example.data.PerformanceMonitor.onAppStart()
         VpnManager.onAppForeground()
+    }
+
+    override fun onStop() {
+        com.example.data.PerformanceMonitor.onAppStop()
+        super.onStop()
     }
 
     override fun onDestroy() {

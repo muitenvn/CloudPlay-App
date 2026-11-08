@@ -429,7 +429,46 @@ object AppLogger {
         val snapshot = _logs.value
         if (snapshot.isEmpty()) return "Chưa có dữ liệu nhật ký (No logs recorded)."
         return snapshot.joinToString(separator = "\n") { entry ->
-            "[${entry.timestamp}] [${entry.tag}] ${entry.message}"
+            "[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] ${entry.message}"
+        }
+    }
+
+    /**
+     * Chỉ giữ lại scheme + host + path của URL (tuyệt đối bỏ query string ?..., fragment #... và userinfo)
+     * để ghi nhật ký điều hướng WebView an toàn, không lộ mã xác thực.
+     */
+    fun safeUrlHostPath(rawUrl: String?): String {
+        if (rawUrl.isNullOrBlank()) return "(trống)"
+        val trimmed = rawUrl.trim()
+        return try {
+            val noQuery = trimmed.substringBefore('?').substringBefore('#')
+            val uri = java.net.URI(noQuery)
+            val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: "https"
+            val host = uri.host?.lowercase(Locale.ROOT)
+            val path = uri.path?.ifBlank { "/" } ?: "/"
+            if (!host.isNullOrBlank()) {
+                "$scheme://$host$path"
+            } else {
+                noQuery.replace(URL_USERINFO_REGEX, "$1[REDACTED]@").take(120)
+            }
+        } catch (_: Throwable) {
+            trimmed.substringBefore('?').substringBefore('#')
+                .replace(URL_USERINFO_REGEX, "$1[REDACTED]@")
+                .take(120)
+        }
+    }
+
+    /**
+     * Tóm tắt ngắn gọn tên lớp ngoại lệ + thông điệp (đã lọc dữ liệu nhạy cảm) cho khối catch.
+     */
+    fun shortThrowable(t: Throwable?): String {
+        if (t == null) return "UnknownError"
+        val cls = t.javaClass.simpleName.ifBlank { "Exception" }
+        val msg = t.message?.replace("\r\n", " ")?.replace('\n', ' ')?.trim().orEmpty()
+        return if (msg.isNotBlank()) {
+            "$cls: ${sanitizeMessage(msg).take(140)}"
+        } else {
+            cls
         }
     }
 

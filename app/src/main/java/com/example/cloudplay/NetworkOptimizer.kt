@@ -98,6 +98,7 @@ object NetworkOptimizer {
     private var streamSecondsTracked = 0.0
     private var totalDataSavedMegabytes = 0.0
     private var lastTelemetryTimestampMs = 0L
+    private var lastTelemetryErrorLoggedAtMs = 0L
 
     fun init(context: Context) {
         if (isInitialized) return
@@ -193,6 +194,10 @@ object NetworkOptimizer {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize NetworkOptimizer", e)
+            com.example.data.AppLogger.error(
+                "NET",
+                "Lỗi khởi tạo NetworkOptimizer (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -241,7 +246,11 @@ object NetworkOptimizer {
                 cm.bindProcessToNetwork(null)
                 currentBoundNetwork = null
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error(
+                "NET",
+                "Lỗi gắn kết mạng tiến trình (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -270,7 +279,11 @@ object NetworkOptimizer {
                 }
             }
             updateProcessNetworkBinding(null)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error(
+                "NET",
+                "Lỗi khóa Wi-Fi Low-Latency khi stream=$active (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -480,8 +493,19 @@ object NetworkOptimizer {
             summaryText = summary,
             profileBadge = badge
         )
-        if (_status.value != updatedStatus) {
+        val prevStatus = _status.value
+        if (prevStatus != updatedStatus) {
+            val typeChanged = prevStatus.physicalType != updatedStatus.physicalType
+            val vpnChanged = prevStatus.hasVpnTransport != updatedStatus.hasVpnTransport
+            val profileChanged = prevStatus.activeProfileName != updatedStatus.activeProfileName
             _status.value = updatedStatus
+            if (typeChanged || vpnChanged || profileChanged) {
+                val vpnBadge = if (updatedStatus.hasVpnTransport) "VPN=Bật" else "VPN=Tắt"
+                com.example.data.AppLogger.info(
+                    "NET",
+                    "Mạng/Hồ sơ đổi: ${prevStatus.physicalType.label} -> ${updatedStatus.physicalType.label} ($vpnBadge, ${updatedStatus.activeProfileName})"
+                )
+            }
             AdaptiveQualityManager.onNetworkStatusChanged(updatedStatus)
         }
     }
@@ -554,6 +578,14 @@ object NetworkOptimizer {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing telemetry: $telemetryJson", e)
+            val now = System.currentTimeMillis()
+            if (now - lastTelemetryErrorLoggedAtMs >= 15_000L) {
+                lastTelemetryErrorLoggedAtMs = now
+                com.example.data.AppLogger.error(
+                    "NET",
+                    "Lỗi phân tích gói telemetry WebRTC (${com.example.data.AppLogger.shortThrowable(e)})"
+                )
+            }
         }
     }
 }

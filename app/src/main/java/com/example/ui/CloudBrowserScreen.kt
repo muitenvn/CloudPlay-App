@@ -245,6 +245,11 @@ fun CloudBrowserScreen(
 
     val handleMainFrameNavigation: (String) -> Unit = { targetUrl ->
         val oldUrl = currentMainFrameUrl
+        val oldSafePath = com.example.data.AppLogger.safeUrlHostPath(oldUrl)
+        val newSafePath = com.example.data.AppLogger.safeUrlHostPath(targetUrl)
+        if (newSafePath.isNotBlank() && oldSafePath != newSafePath) {
+            com.example.data.AppLogger.info("WEBVIEW", "Chuyển trang: $oldSafePath -> $newSafePath")
+        }
         val oldUri = try { android.net.Uri.parse(oldUrl) } catch (_: Exception) { null }
         val newUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
         val oldHost = oldUri?.host?.lowercase()
@@ -619,12 +624,18 @@ fun CloudBrowserScreen(
                                 )
                             )
                             hasDocumentStartScript = true
+                            com.example.data.AppLogger.info("WEBVIEW", "Đăng ký script DOCUMENT_START cho tên miền Xbox")
                         } catch (e: Exception) {
                             android.util.Log.w("CloudBrowser", "Document start script not supported", e)
+                            com.example.data.AppLogger.warn(
+                                "WEBVIEW",
+                                "Thiết bị không hỗ trợ DOCUMENT_START_SCRIPT, dùng dự phòng tiêm ở onPageStarted (${com.example.data.AppLogger.shortThrowable(e)})"
+                            )
                         }
                     }
 
                     var injectedForCurrentPage = false
+                    var lastLoggedScriptInjectedHostPath = ""
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -639,6 +650,11 @@ fun CloudBrowserScreen(
                             if (XboxBridge.isTrustedHost(url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
+                                val safeHp = com.example.data.AppLogger.safeUrlHostPath(url)
+                                if (safeHp != lastLoggedScriptInjectedHostPath) {
+                                    lastLoggedScriptInjectedHostPath = safeHp
+                                    com.example.data.AppLogger.info("WEBVIEW", "Tiêm script tối ưu vào trang: $safeHp")
+                                }
                             }
                         }
 
@@ -646,6 +662,11 @@ fun CloudBrowserScreen(
                             if (!injectedForCurrentPage && XboxBridge.isTrustedHost(url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
+                                val safeHp = com.example.data.AppLogger.safeUrlHostPath(url)
+                                if (safeHp != lastLoggedScriptInjectedHostPath) {
+                                    lastLoggedScriptInjectedHostPath = safeHp
+                                    com.example.data.AppLogger.info("WEBVIEW", "Tiêm script tối ưu (onPageCommitVisible): $safeHp")
+                                }
                             }
                         }
 
@@ -659,6 +680,11 @@ fun CloudBrowserScreen(
                                 // Ensure hooks are active on finished page if not already injected at document start
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
+                                val safeHp = com.example.data.AppLogger.safeUrlHostPath(url)
+                                if (safeHp != lastLoggedScriptInjectedHostPath) {
+                                    lastLoggedScriptInjectedHostPath = safeHp
+                                    com.example.data.AppLogger.info("WEBVIEW", "Tiêm script tối ưu (onPageFinished): $safeHp")
+                                }
                             }
                         }
 
@@ -683,14 +709,47 @@ fun CloudBrowserScreen(
                         }
 
                         override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
-                            android.util.Log.w("CloudBrowser", "Render process fallback handled gracefully: didCrash=${detail?.didCrash()}")
+                            val didCrash = detail?.didCrash() == true
+                            android.util.Log.w("CloudBrowser", "Render process fallback handled gracefully: didCrash=$didCrash")
+                            com.example.data.AppLogger.error(
+                                "WEBVIEW",
+                                "Tiến trình dựng hình WebView bị dừng bất ngờ (didCrash=$didCrash)"
+                            )
                             return true
                         }
 
                         override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
                             super.onReceivedError(view, request, error)
                             if (request?.isForMainFrame == true) {
-                                android.util.Log.w("CloudBrowser", "Page error: ${error?.description}")
+                                val safeHp = com.example.data.AppLogger.safeUrlHostPath(request.url?.toString())
+                                val code = error?.errorCode ?: -1
+                                val desc = error?.description?.toString() ?: "Unknown"
+                                android.util.Log.w("CloudBrowser", "Page error: $desc")
+                                com.example.data.AppLogger.error(
+                                    "WEBVIEW",
+                                    "Lỗi tải trang chính ($safeHp): mã=$code, lý do=$desc"
+                                )
+                            }
+                        }
+
+                        override fun onReceivedHttpError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            errorResponse: android.webkit.WebResourceResponse?
+                        ) {
+                            super.onReceivedHttpError(view, request, errorResponse)
+                            val statusCode = errorResponse?.statusCode ?: return
+                            val isMainFrame = request?.isForMainFrame == true
+                            val reqUrl = request?.url?.toString() ?: ""
+                            val isCriticalApi = reqUrl.contains("/sessions/cloud/", ignoreCase = true) ||
+                                reqUrl.contains("xhome.gssv-play", ignoreCase = true) ||
+                                reqUrl.contains("uks.gssv-play", ignoreCase = true)
+                            if (statusCode >= 400 && (isMainFrame || isCriticalApi)) {
+                                val safeHp = com.example.data.AppLogger.safeUrlHostPath(reqUrl)
+                                com.example.data.AppLogger.error(
+                                    "WEBVIEW",
+                                    "Lỗi HTTP $statusCode khi tải ${if (isMainFrame) "trang chính" else "API phiên chơi"} ($safeHp)"
+                                )
                             }
                         }
                     }
@@ -984,10 +1043,14 @@ fun CloudBrowserScreen(
                 }
             },
             onOpenSettings = {
+                com.example.data.AppLogger.info("UI", "Mở bảng Tùy chỉnh nhanh Hiển thị & Điều khiển trong game")
                 showQuickSettingsDialog = true
             },
             onNavigateHome = onNavigateBackToDashboard,
-            onReloadPage = { webViewInstance?.reload() },
+            onReloadPage = {
+                com.example.data.AppLogger.info("UI", "Bấm Tải lại trang WebView từ HUD")
+                webViewInstance?.reload()
+            },
             onToggleClarityBoost = { enabled ->
                 SettingsRepository.updateClarityBoost(enabled)
                 webViewInstance?.evaluateJavascript("if (window.__toggleClarityBoost) window.__toggleClarityBoost($enabled);", null)
@@ -1022,9 +1085,11 @@ fun CloudBrowserScreen(
             onToggleWifiSpeedFirst = { enabled -> SettingsRepository.updateWifiSpeedFirstPriority(enabled) },
             gameProfile = gameProfile,
             onOpenTranslator = {
+                com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ HUD trong game")
                 showTranslatorDialog = true
             },
             onToggleOrientation = {
+                com.example.data.AppLogger.info("UI", "Bấm Xoay ngang/dọc màn hình từ HUD")
                 (activity as? com.example.MainActivity)?.toggleOrientation()
             },
             videoTopRatio = videoTopRatio,
@@ -1051,7 +1116,10 @@ fun CloudBrowserScreen(
             val isEn = config.isEnglishUI()
             val dialogScrollState = rememberScrollState()
             androidx.compose.ui.window.Dialog(
-                onDismissRequest = { showQuickSettingsDialog = false }
+                onDismissRequest = {
+                    com.example.data.AppLogger.info("UI", "Đóng bảng Tùy chỉnh nhanh Hiển thị & Điều khiển trong game")
+                    showQuickSettingsDialog = false
+                }
             ) {
                 Surface(
                     modifier = Modifier

@@ -97,7 +97,11 @@ fun SettingsScreen(
                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error(
+                "UI",
+                "Không mở được trình duyệt ngoài xem Điều khoản (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
             Toast.makeText(
                 context,
                 if (isEn) "Could not open browser: $termsWebUrl" else "Không mở được trình duyệt: $termsWebUrl",
@@ -501,14 +505,20 @@ fun SettingsScreen(
 
     if (showWebPortalDialog) {
         com.example.ui.components.WebDownloadPortalDialog(
-            onDismiss = { showWebPortalDialog = false }
+            onDismiss = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Mã QR & Chia sẻ (từ Cài đặt)")
+                showWebPortalDialog = false
+            }
         )
     }
 
     if (showAppLogDialog) {
         com.example.ui.components.AppLogDialog(
             isEn = isEn,
-            onDismiss = { showAppLogDialog = false }
+            onDismiss = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Nhật ký hệ thống")
+                showAppLogDialog = false
+            }
         )
     }
 
@@ -516,13 +526,19 @@ fun SettingsScreen(
         FullTermsInAppDialog(
             isEn = config.isEnglishUI(),
             onOpenExternalBrowser = { launchExternalBrowserTerms() },
-            onDismiss = { showFullTermsDialog = false }
+            onDismiss = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Điều khoản sử dụng")
+                showFullTermsDialog = false
+            }
         )
     }
 
     if (showResetGamepadConfirmDialog) {
         AlertDialog(
-            onDismissRequest = { showResetGamepadConfirmDialog = false },
+            onDismissRequest = {
+                com.example.data.AppLogger.info("UI", "Hủy hộp thoại Đặt lại bố cục tay cầm mặc định")
+                showResetGamepadConfirmDialog = false
+            },
             containerColor = XboxSurface,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary,

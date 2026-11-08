@@ -2648,7 +2648,9 @@ class XboxBridge(
     fun onGameLaunchInitiated(gameTitle: String?) {
         if (!isCallerTrusted()) return
         Log.d(TAG, "Game launch detected: $gameTitle")
-        controller.onGameLaunchInitiated(gameTitle ?: "Xbox Game")
+        val cleanTitle = gameTitle?.takeIf { it.isNotBlank() } ?: "Xbox Game"
+        com.example.data.AppLogger.info("STREAM", "Phát hiện bắt đầu vào game: $cleanTitle")
+        controller.onGameLaunchInitiated(cleanTitle)
     }
 
     @JavascriptInterface
@@ -2668,6 +2670,10 @@ class XboxBridge(
             )
         } catch (e: Exception) {
             Log.w(TAG, "Could not parse onWebGameDetected: ${e.message}")
+            com.example.data.AppLogger.error(
+                "BRIDGE",
+                "Lỗi đọc metadata game trên web (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -2686,7 +2692,11 @@ class XboxBridge(
             val avatarUrl = obj.optString("avatarUrl", "").takeIf { it.isNotBlank() }
             val tier = obj.optString("tier", "").takeIf { it.isNotBlank() }
             com.example.data.GameLibraryRepository.onXboxProfileSynced(gamertag, avatarUrl, tier)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error(
+                "BRIDGE",
+                "Lỗi đồng bộ hồ sơ Xbox (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -2700,6 +2710,10 @@ class XboxBridge(
     fun onStreamConnected(detail: String?) {
         if (!isCallerTrusted()) return
         Log.d(TAG, "Stream established: $detail — activating low-latency lock & pausing DOM translator")
+        com.example.data.AppLogger.success(
+            "STREAM",
+            "Kết nối luồng stream WebRTC thành công (${detail ?: "connected"})"
+        )
         NetworkOptimizer.setStreamActive(true)
         controller.onStreamConnected()
         scope.launch(Dispatchers.Main) {
@@ -2714,6 +2728,10 @@ class XboxBridge(
     fun onStreamDisconnected(detail: String?) {
         if (!isCallerTrusted()) return
         Log.d(TAG, "Stream ended: $detail — releasing low-latency lock & resuming DOM translator if allowed")
+        com.example.data.AppLogger.info(
+            "STREAM",
+            "Ngắt luồng stream WebRTC (${detail ?: "disconnected"})"
+        )
         NetworkOptimizer.setStreamActive(false)
         controller.onStreamDisconnected()
         scope.launch(Dispatchers.Main) {
@@ -2804,6 +2822,10 @@ class XboxBridge(
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not parse onWebViewIpDetected JSON: ${e.message}")
+            com.example.data.AppLogger.error(
+                "BRIDGE",
+                "Lỗi phân tích IP từ WebView (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -2818,6 +2840,12 @@ class XboxBridge(
         if (!isCallerTrusted()) return
         val currentCfg = com.example.data.SettingsRepository.config.value
         val wasActive = currentCfg.clarityBoostEnabled && currentCfg.clarityPreset != com.example.data.ClarityPreset.OFF
+        if (wasActive) {
+            com.example.data.AppLogger.warn(
+                "STREAM",
+                "Tự tắt bộ lọc làm nét do tải giải mã cao (${decodeTimeStr ?: ">12"} ms)"
+            )
+        }
         com.example.data.SettingsRepository.updateClarityPreset(com.example.data.ClarityPreset.OFF)
         com.example.data.SettingsRepository.updateClarityBoost(false)
         scope.launch(Dispatchers.Main) {
@@ -2886,6 +2914,10 @@ class XboxBridge(
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Error in requestBatchTranslate", e)
+                com.example.data.AppLogger.error(
+                    "BRIDGE",
+                    "Lỗi dịch hàng loạt giao diện Xbox (${com.example.data.AppLogger.shortThrowable(e)})"
+                )
             }
         }
     }

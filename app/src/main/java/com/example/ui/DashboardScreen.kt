@@ -156,6 +156,14 @@ fun DashboardScreen(
         prewarmedCloudPlayHero
     ) { true }
 
+    fun switchTab(newTab: DashboardTab, reason: String = "") {
+        if (currentTab != newTab) {
+            val suffix = if (reason.isNotBlank()) " ($reason)" else ""
+            com.example.data.AppLogger.info("UI", "Chuyển tab chính: ${currentTab.name} -> ${newTab.name}$suffix")
+            currentTab = newTab
+        }
+    }
+
     fun handleConnect() {
         VpnManager.connect(context)
     }
@@ -293,7 +301,7 @@ fun DashboardScreen(
                                         modifier = Modifier
                                             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                                            .clickable { currentTab = DashboardTab.SERVERS },
+                                            .clickable { switchTab(DashboardTab.SERVERS, "bấm pill Ping trên thanh đầu") },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Surface(
@@ -415,7 +423,10 @@ fun DashboardScreen(
                                         .size(48.dp)
                                         .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
                                         .clip(RoundedCornerShape(10.dp))
-                                        .clickable { showTranslatorDialog = true }
+                                        .clickable {
+                                            com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ thanh đầu")
+                                            showTranslatorDialog = true
+                                        }
                                         .testTag("topbar_translator_button"),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -496,6 +507,7 @@ fun DashboardScreen(
                                             },
                                             onClick = {
                                                 showOverflowMenu = false
+                                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Mã QR & Chia sẻ")
                                                 showWebPortalDialog = true
                                             },
                                             modifier = Modifier.testTag("topbar_web_portal_button")
@@ -521,6 +533,7 @@ fun DashboardScreen(
                                             onClick = {
                                                 showOverflowMenu = false
                                                 guideInitialSection = GuideSection.QUICK_START
+                                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${guideInitialSection.name})")
                                                 showGuideDialog = true
                                             },
                                             modifier = Modifier.testTag("topbar_guide_button")
@@ -543,7 +556,7 @@ fun DashboardScreen(
                 isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED,
                 settingsTabLabel = config.tr("Cài đặt", "Settings"),
                 motionEnabled = motionEnabled,
-                onSelectTab = { currentTab = it }
+                onSelectTab = { switchTab(it) }
             )
         }
     ) { innerPadding ->
@@ -588,14 +601,16 @@ fun DashboardScreen(
                             onSwitchEngine = { VpnManager.setEngine(it) },
                             onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
                             onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
-                            onNavigateToLibrary = { currentTab = DashboardTab.LIBRARY },
-                            onNavigateToServers = { currentTab = DashboardTab.SERVERS },
-                            onNavigateToSettings = { currentTab = DashboardTab.SETTINGS },
+                            onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
+                            onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
+                            onNavigateToSettings = { switchTab(DashboardTab.SETTINGS, "từ Trang chủ") },
                             onOpenGuide = { section ->
                                 guideInitialSection = section
+                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
                                 showGuideDialog = true
                             },
                             onOpenTranslator = {
+                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ Trang chủ")
                                 showTranslatorDialog = true
                             }
                         )
@@ -618,9 +633,11 @@ fun DashboardScreen(
                             vpnState = vpnState,
                             onOpenGuide = { section ->
                                 guideInitialSection = section
+                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
                                 showGuideDialog = true
                             },
                             onClearCookies = {
+                                com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 android.webkit.WebStorage.getInstance().deleteAllData()
                                 val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
@@ -636,19 +653,28 @@ fun DashboardScreen(
     if (showGuideDialog) {
         HowToUseGuideDialog(
             initialSection = guideInitialSection,
-            onDismiss = { showGuideDialog = false }
+            onDismiss = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Hướng dẫn sử dụng")
+                showGuideDialog = false
+            }
         )
     }
 
     if (showTranslatorDialog) {
         com.example.ui.components.SmartTranslatorDialog(
-            onDismissRequest = { showTranslatorDialog = false }
+            onDismissRequest = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Dịch tự động")
+                showTranslatorDialog = false
+            }
         )
     }
 
     if (showWebPortalDialog) {
         com.example.ui.components.WebDownloadPortalDialog(
-            onDismiss = { showWebPortalDialog = false }
+            onDismiss = {
+                com.example.data.AppLogger.info("UI", "Đóng hộp thoại Mã QR & Chia sẻ")
+                showWebPortalDialog = false
+            }
         )
     }
 }

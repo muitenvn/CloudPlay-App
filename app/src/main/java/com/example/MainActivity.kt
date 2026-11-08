@@ -138,11 +138,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        com.example.data.AppLogger.info("SYSTEM", "Ứng dụng vào tiền cảnh (Foreground)")
         com.example.data.PerformanceMonitor.onAppStart()
         VpnManager.onAppForeground()
     }
 
     override fun onStop() {
+        com.example.data.AppLogger.info("SYSTEM", "Ứng dụng vào nền (Background)")
         com.example.data.PerformanceMonitor.onAppStop()
         super.onStop()
     }
@@ -224,7 +226,11 @@ class MainActivity : ComponentActivity() {
                     window.attributes = lp
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error(
+                "SYSTEM",
+                "Lỗi khóa tần số quét màn hình (lock60Hz=$lock60Hz) (${com.example.data.AppLogger.shortThrowable(e)})"
+            )
         }
     }
 
@@ -336,6 +342,10 @@ fun MainContent(
                         }
                         val currentLocale = config.getEffectiveLocale()
                         val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
+                        com.example.data.AppLogger.info(
+                            "UI",
+                            "Bấm Chơi/Mở trình duyệt Xbox: ${com.example.data.AppLogger.safeUrlHostPath(finalUrl)}"
+                        )
                         currentScreen = AppScreen.Browser(finalUrl)
                     },
                     modifier = Modifier.fillMaxSize()
@@ -346,6 +356,7 @@ fun MainContent(
                     initialUrl = screen.url,
                     streamController = streamController,
                     onNavigateBackToDashboard = {
+                        com.example.data.AppLogger.info("UI", "Thoát trình duyệt game -> quay về Trang chủ")
                         currentScreen = AppScreen.Dashboard
                     },
                     modifier = Modifier.fillMaxSize()

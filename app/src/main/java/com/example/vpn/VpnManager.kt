@@ -97,6 +97,35 @@ object VpnManager {
     private var lastObservedNetworkKey: String = ""
     private var lastObservedHasVpnTransport: Boolean? = null
 
+    @Volatile
+    private var activeSingleServerPingJob: Job? = null
+
+    @Volatile
+    private var activeSinglePingServer: ServerLocation? = null
+
+    private fun logPingResult(server: ServerLocation, meas: EndpointPingMeasurement) {
+        when {
+            meas.isPrimaryPortAlive -> {
+                com.example.data.AppLogger.success(
+                    "PING",
+                    "Đo ping ${server.name} (${server.countryCode}): ${meas.rttMs} ms"
+                )
+            }
+            meas.isFallbackPortOnly -> {
+                com.example.data.AppLogger.warn(
+                    "PING",
+                    "Đo ping ${server.name} (${server.countryCode}): chỉ mở cổng phụ :${meas.measuredPort} (${meas.rttMs} ms), cổng chính :${server.port} đóng"
+                )
+            }
+            else -> {
+                com.example.data.AppLogger.error(
+                    "PING",
+                    "Đo ping ${server.name} (${server.ip}:${server.port}): không phản hồi"
+                )
+            }
+        }
+    }
+
     init {
         // Initial location check at launch
         checkCurrentIp(reason = "khởi động", force = true)
@@ -300,6 +329,10 @@ object VpnManager {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "autoSyncPublicProxiesIfNeeded failed", e)
+                com.example.data.AppLogger.error(
+                    "VPN_AUTO",
+                    "Đồng bộ máy chủ công cộng thất bại — ${com.example.data.AppLogger.shortThrowable(e)}"
+                )
                 _state.value = _state.value.copy(
                     isAutoSyncingLiveProxies = false,
                     lastAutoSyncTimestampMs = System.currentTimeMillis()
@@ -348,6 +381,10 @@ object VpnManager {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not load persisted unlock records", e)
+            com.example.data.AppLogger.error(
+                "VPN",
+                "Không đọc được lịch sử mở khóa vùng — ${com.example.data.AppLogger.shortThrowable(e)}"
+            )
         }
     }
 
@@ -372,6 +409,10 @@ object VpnManager {
             sp.edit().putString("unlock_records_json", array.toString()).apply()
         } catch (e: Exception) {
             Log.w(TAG, "Could not persist unlock records", e)
+            com.example.data.AppLogger.error(
+                "VPN",
+                "Không lưu được lịch sử mở khóa vùng — ${com.example.data.AppLogger.shortThrowable(e)}"
+            )
         }
     }
 
@@ -1365,7 +1406,15 @@ object VpnManager {
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "testAllServers interrupted", e)
+                if (e is kotlinx.coroutines.CancellationException) {
+                    com.example.data.AppLogger.warn("PING", "Đợt đo #$myGeneration đã dừng sớm (chuyển đợt mới hoặc vào game)")
+                } else {
+                    Log.w(TAG, "testAllServers interrupted", e)
+                    com.example.data.AppLogger.error(
+                        "PING",
+                        "Lỗi trong đợt đo #$myGeneration — ${com.example.data.AppLogger.shortThrowable(e)}"
+                    )
+                }
                 if (myGeneration == measurementGeneration.get()) {
                     _state.value = _state.value.copy(isTestingPings = false)
                 }
@@ -1437,12 +1486,15 @@ object VpnManager {
             val deferreds = targets.map { server ->
                 scope.async(Dispatchers.IO) {
                     if (generationId != measurementGeneration.get()) return@async
+                    com.example.data.AppLogger.info("PING", "Đo ping ${server.name} (${server.countryCode}): bắt đầu")
                     val meas = PingTester.measureServerEndpoint(
                         server = server,
                         timeoutMs = 850,
                         useCache = useCache
                     )
-                    recordMeasurementIfCurrentGeneration(generationId, server.id, meas)
+                    if (recordMeasurementIfCurrentGeneration(generationId, server.id, meas)) {
+                        logPingResult(server, meas)
+                    }
                 }
             }
             deferreds.awaitAll()
@@ -1456,6 +1508,10 @@ object VpnManager {
                     val cur = nextMeas[srv.id]
                     if (cur != null && cur.status == ServerPingStatus.TESTING) {
                         nextMeas.remove(srv.id)
+                        com.example.data.AppLogger.warn(
+                            "PING",
+                            "Đo ping ${srv.name} (${srv.countryCode}): hết thời hạn bước (${stepDeadlineMs}ms)"
+                        )
                     }
                 }
                 _state.value = _state.value.copy(
@@ -1860,6 +1916,10 @@ object VpnManager {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Could not load persisted servers", e)
+            com.example.data.AppLogger.error(
+                "VPN",
+                "Không đọc được danh sách máy chủ đã lưu — ${com.example.data.AppLogger.shortThrowable(e)}"
+            )
         }
     }
 
@@ -1894,6 +1954,10 @@ object VpnManager {
                 .apply()
         } catch (e: Exception) {
             Log.w(TAG, "Could not persist live verified servers", e)
+            com.example.data.AppLogger.error(
+                "VPN",
+                "Không lưu được danh sách máy chủ công cộng — ${com.example.data.AppLogger.shortThrowable(e)}"
+            )
         }
     }
 
@@ -1923,12 +1987,20 @@ object VpnManager {
                 .apply()
         } catch (e: Exception) {
             Log.w(TAG, "Could not persist servers", e)
+            com.example.data.AppLogger.error(
+                "VPN",
+                "Không lưu được máy chủ đã chọn — ${com.example.data.AppLogger.shortThrowable(e)}"
+            )
         }
     }
 
     fun setEngine(engine: VpnEngine, context: Context? = null) {
+        val oldEngine = _state.value.engine
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
         _state.value = _state.value.copy(engine = engine)
+        if (oldEngine != engine) {
+            com.example.data.AppLogger.info("UI", "Đổi chế độ VPN: ${oldEngine.name} -> ${engine.name}")
+        }
         if (engine == VpnEngine.PROXY_TUNNEL && _state.value.serverPings.isEmpty()) {
             testAllServers(autoPickBest = false, context = context ?: appContext)
         }
@@ -1945,6 +2017,7 @@ object VpnManager {
         isIpInvalidatedByNetworkChange = true
         lastRealGeoIp = null
         lastIpCheckTimestampMs = 0L
+        com.example.data.AppLogger.info("VPN", "Đánh dấu làm mới vị trí IP (lý do: $reason)")
         if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
             return
         }
@@ -2019,9 +2092,17 @@ object VpnManager {
                 isIpInvalidatedByNetworkChange = false
                 lastRealGeoIp = result
                 lastIpCheckTimestampMs = System.currentTimeMillis()
+                com.example.data.AppLogger.success(
+                    "VPN",
+                    "Kiểm tra IP xong: ${result.countryName} (${result.countryCode}) • hỗ trợ xCloud=${result.isXboxSupported}"
+                )
                 updateSmartDecision(result)
             } else {
                 isIpInvalidatedByNetworkChange = false
+                com.example.data.AppLogger.error(
+                    "VPN",
+                    "Kiểm tra IP thất bại (ngoại tuyến hoặc tất cả nguồn GeoIP không phản hồi)"
+                )
                 val offlineDecision = SmartVpnDecision(
                     checked = true,
                     needsVpn = false,
@@ -2227,9 +2308,17 @@ object VpnManager {
                     isIpInvalidatedByNetworkChange = false
                     lastRealGeoIp = freshGeo
                     lastIpCheckTimestampMs = System.currentTimeMillis()
+                    com.example.data.AppLogger.success(
+                        "VPN",
+                        "Kiểm tra IP trước khi vào game xong: ${freshGeo.countryName} (${freshGeo.countryCode}) • hỗ trợ xCloud=${freshGeo.isXboxSupported}"
+                    )
                     updateSmartDecision(freshGeo)
                 } else {
                     isIpInvalidatedByNetworkChange = false
+                    com.example.data.AppLogger.warn(
+                        "VPN",
+                        "Kiểm tra IP trước khi vào game quá thời hạn (${IP_PRE_LAUNCH_TIMEOUT_MS}ms) -> áp dụng quyết định dự phòng"
+                    )
                 }
                 applyLaunchNetworkDecision(appCtx)
             }
@@ -2327,6 +2416,10 @@ object VpnManager {
     fun connect(context: Context, server: ServerLocation = _state.value.currentServer) {
         preCheckProxyRegion(server)
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
+        com.example.data.AppLogger.info(
+            "VPN",
+            "Bật VPN (${_state.value.engine.name}): kết nối tới ${server.name} (${server.countryCode} • ${server.ip}:${server.port})"
+        )
         _state.value = _state.value.copy(
             isConnecting = true,
             currentServer = server,
@@ -2346,6 +2439,10 @@ object VpnManager {
 
                     if (!isAlive && !server.isCustom) {
                         Log.w(TAG, "Server ${server.name} unreachable, finding best working backup...")
+                        com.example.data.AppLogger.warn(
+                            "VPN",
+                            "Máy chủ ${server.name} (${server.ip}:${server.port}) không phản hồi, đang tìm máy chủ dự phòng..."
+                        )
                         _state.value = _state.value.copy(
                             statusMessage = if (isEnNow) "🔄 Checking proxy route..." else "🔄 Đang kiểm tra đường truyền proxy..."
                         )
@@ -2353,6 +2450,10 @@ object VpnManager {
                         val workingBackup = findFirstResponsiveServer(server.countryCode)
                         if (workingBackup != null) {
                             targetServer = workingBackup
+                            com.example.data.AppLogger.success(
+                                "VPN",
+                                "Đã chuyển sang máy chủ dự phòng: ${server.name} -> ${targetServer.name} (${targetServer.ip}:${targetServer.port})"
+                            )
                             _state.value = _state.value.copy(
                                 currentServer = targetServer,
                                 autoSwitchedBackupCount = _state.value.autoSwitchedBackupCount + 1,
@@ -2360,6 +2461,10 @@ object VpnManager {
                             )
                         } else {
                             Log.w(TAG, "Proxy ports blocked or unreachable. Auto-falling back to Smart Bypass mode.")
+                            com.example.data.AppLogger.warn(
+                                "VPN",
+                                "Tất cả cổng proxy vùng ${server.countryCode} không phản hồi -> tự chuyển sang chế độ SMART_BYPASS"
+                            )
                             _state.value = _state.value.copy(
                                 engine = VpnEngine.SMART_BYPASS,
                                 statusMessage = if (isEnNow) "⚡ Auto-switched to Smart Bypass (anti-throttle)" else "⚡ Tự động chuyển Smart Bypass (chống nghẽn mạng)"
@@ -2387,6 +2492,10 @@ object VpnManager {
                         detectedGeoIp = targetGeo,
                         statusMessage = if (isEnNow) "✅ Proxy Active: ${targetServer.name} (${targetServer.ip}:${targetServer.port})" else "✅ Đã kích hoạt Proxy: ${targetServer.name} (${targetServer.ip}:${targetServer.port})"
                     )
+                    com.example.data.AppLogger.success(
+                        "VPN",
+                        "Đã kích hoạt Proxy Tunnel: ${targetServer.name} (${targetServer.countryCode} • ${targetServer.ip}:${targetServer.port})"
+                    )
                 }
 
                 VpnEngine.SMART_BYPASS -> {
@@ -2412,6 +2521,10 @@ object VpnManager {
                         detectedGeoIp = targetGeo,
                         statusMessage = if (isEnNow) "✅ Smart Bypass Active • ${server.name} (${server.ip})" else "✅ Đã kích hoạt Smart Bypass • ${server.name} (${server.ip})"
                     )
+                    com.example.data.AppLogger.success(
+                        "VPN",
+                        "Đã kích hoạt Smart Bypass: ${server.name} (${server.countryCode})"
+                    )
                 }
 
                 VpnEngine.EXTERNAL_VPN -> {
@@ -2423,6 +2536,10 @@ object VpnManager {
                         autoBypassTriggered = false,
                         statusMessage = if (isEnNow) "External VPN mode: Ready to auto-switch on game start" else "Chế độ VPN ngoài: Sẵn sàng tự động chuyển mạng khi vào game"
                     )
+                    com.example.data.AppLogger.success(
+                        "VPN",
+                        "Đã bật chế độ EXTERNAL_VPN (sẵn sàng chuyển mạng khi vào game)"
+                    )
                     checkCurrentIp(reason = "VPN bật-tắt", force = true)
                 }
             }
@@ -2432,15 +2549,22 @@ object VpnManager {
     }
 
     fun disconnect(context: Context) {
+        val prevMode = _state.value.mode
+        val prevSrv = _state.value.currentServer
         clearWebViewProxy()
         XboxCloudVpnService.stopVpn(context)
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
+        val nextMode = if (needsVpnToPlay()) NetworkMode.DISCONNECTED else NetworkMode.DIRECT_NETWORK
         _state.value = _state.value.copy(
-            mode = if (needsVpnToPlay()) NetworkMode.DISCONNECTED else NetworkMode.DIRECT_NETWORK,
+            mode = nextMode,
             isConnecting = false,
             isBypassActiveInBrowser = false,
             smartVpnPhase = if (needsVpnToPlay()) SmartVpnPhase.IDLE else SmartVpnPhase.DIRECT_SUPPORTED_REGION,
             statusMessage = if (isEn) "Disconnected" else "Đã ngắt kết nối"
+        )
+        com.example.data.AppLogger.info(
+            "VPN",
+            "Tắt VPN (${prevSrv.name}): ${prevMode.name} -> ${nextMode.name}"
         )
         checkCurrentIp(reason = "VPN bật-tắt", force = true)
     }
@@ -2586,6 +2710,10 @@ object VpnManager {
                 "⚡ Smart VPN: Đã TỰ ĐỘNG TẮT VPN ($triggerSource)! Đang truyền trực tiếp qua mạng ISP (Ping thấp nhất)."
             }
         )
+        com.example.data.AppLogger.success(
+            "VPN",
+            "Tự động tắt VPN khi vào trận ($triggerSource) -> chuyển sang Mạng trực tiếp (Direct ISP)"
+        )
 
         scope.launch(Dispatchers.IO) {
             val directPing = PingTester.measureDirectLatency()
@@ -2601,6 +2729,18 @@ object VpnManager {
         context: Context? = null,
         isManualSelection: Boolean = true
     ) {
+        val oldServer = _state.value.currentServer
+        val prevPingServer = activeSinglePingServer
+        if (activeSingleServerPingJob?.isActive == true && prevPingServer != null && prevPingServer.id != server.id) {
+            activeSingleServerPingJob?.cancel()
+            activeSingleServerPingJob = null
+            activeSinglePingServer = null
+            com.example.data.AppLogger.warn(
+                "PING",
+                "Hủy đo ping ${prevPingServer.name} (${prevPingServer.countryCode}) (đã chuyển sang ${server.name})"
+            )
+        }
+
         val wasConnected = _state.value.mode == NetworkMode.VPN_JAPAN
         val cachedProbe = RegionalProbeTester.getCachedEstimateForServer(server)
         _state.value = _state.value.copy(
@@ -2614,21 +2754,42 @@ object VpnManager {
         } else {
             recordAutoSelectionMetadata(context ?: appContext)
         }
-        com.example.data.AppLogger.info(
-            "VPN",
-            "Chọn máy chủ (${if (isManualSelection) "Thủ công" else "Tự động"}): ${server.name} (${server.ip}:${server.port})"
-        )
+        val modeLabel = if (isManualSelection) "Thủ công" else "Tự động"
+        if (oldServer.id != server.id) {
+            com.example.data.AppLogger.info(
+                "UI",
+                "Chọn server ($modeLabel): ${oldServer.name} (${oldServer.countryCode}) -> ${server.name} (${server.countryCode} • ${server.ip}:${server.port})"
+            )
+        } else {
+            com.example.data.AppLogger.info(
+                "UI",
+                "Chọn lại server ($modeLabel): ${server.name} (${server.countryCode} • ${server.ip}:${server.port})"
+            )
+        }
         persistCustomServers(context, _state.value.customServers, server)
         preCheckProxyRegion(server)
         if (!isInGameStreamActive && !com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
             val gen = measurementGeneration.get()
-            scope.launch(Dispatchers.IO) {
-                val meas = PingTester.measureServerEndpoint(server, timeoutMs = 950, useCache = true)
-                recordMeasurementIfCurrentGeneration(gen, server.id, meas)
-                if (com.example.data.SettingsRepository.config.value.enableGlobalpingProbe) {
-                    val est = RegionalProbeTester.measureSelectedServerEstimateViaProbe(server)
-                    if (est != null && _state.value.currentServer.id == server.id) {
-                        _state.value = _state.value.copy(selectedServerProbeEstimate = est)
+            activeSinglePingServer = server
+            activeSingleServerPingJob = scope.launch(Dispatchers.IO) {
+                try {
+                    com.example.data.AppLogger.info(
+                        "PING",
+                        "Đo ping ${server.name} (${server.countryCode}): bắt đầu"
+                    )
+                    val meas = PingTester.measureServerEndpoint(server, timeoutMs = 950, useCache = true)
+                    if (recordMeasurementIfCurrentGeneration(gen, server.id, meas)) {
+                        logPingResult(server, meas)
+                    }
+                    if (com.example.data.SettingsRepository.config.value.enableGlobalpingProbe) {
+                        val est = RegionalProbeTester.measureSelectedServerEstimateViaProbe(server)
+                        if (est != null && _state.value.currentServer.id == server.id) {
+                            _state.value = _state.value.copy(selectedServerProbeEstimate = est)
+                        }
+                    }
+                } finally {
+                    if (activeSinglePingServer?.id == server.id) {
+                        activeSinglePingServer = null
                     }
                 }
             }
@@ -2639,7 +2800,10 @@ object VpnManager {
     }
 
     fun addCustomServer(server: ServerLocation) {
-        if (GeoIpDetector.isPrivateOrLoopbackIp(server.ip)) return
+        if (GeoIpDetector.isPrivateOrLoopbackIp(server.ip)) {
+            com.example.data.AppLogger.error("UI", "Từ chối thêm máy chủ có IP nội bộ/loopback: ${server.ip}:${server.port}")
+            return
+        }
         val resolvedCc = server.countryCode.trim().uppercase().ifBlank {
             GeoIpDetector.resolveIpCountryCode(server.ip, allowNetworkFallback = false)
         }
@@ -2651,10 +2815,12 @@ object VpnManager {
         val updated = _state.value.customServers + normalizedServer
         _state.value = _state.value.copy(customServers = updated, currentServer = normalizedServer, unlockFailPromptServer = null)
         persistCustomServers(appContext, updated, normalizedServer)
+        com.example.data.AppLogger.success("UI", "Thêm máy chủ cá nhân: ${normalizedServer.name} (${normalizedServer.countryCode} • ${normalizedServer.ip}:${normalizedServer.port})")
         preCheckProxyRegion(normalizedServer)
     }
 
     fun removeCustomServer(serverId: String) {
+        val removed = _state.value.customServers.firstOrNull { it.id == serverId }
         val updated = _state.value.customServers.filterNot { it.id == serverId }
         val newCurrent = if (_state.value.currentServer.id == serverId) {
             updated.firstOrNull() ?: DEFAULT_SERVERS[0]
@@ -2663,6 +2829,7 @@ object VpnManager {
         }
         _state.value = _state.value.copy(customServers = updated, currentServer = newCurrent)
         persistCustomServers(appContext, updated, newCurrent)
+        com.example.data.AppLogger.info("UI", "Xóa máy chủ cá nhân: ${removed?.name ?: serverId}")
     }
 
     fun getAllServers(): List<ServerLocation> {
@@ -2713,6 +2880,10 @@ object VpnManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to apply WebView proxy", e)
+                com.example.data.AppLogger.error(
+                    "VPN",
+                    "Không gắn được Proxy vào WebView (${primaryServer.ip}:${primaryServer.port}) — ${com.example.data.AppLogger.shortThrowable(e)}"
+                )
             }
         }
     }
@@ -2730,6 +2901,10 @@ object VpnManager {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to clear WebView proxy", e)
+                com.example.data.AppLogger.error(
+                    "VPN",
+                    "Không gỡ được Proxy khỏi WebView — ${com.example.data.AppLogger.shortThrowable(e)}"
+                )
             }
         }
     }
@@ -2741,6 +2916,7 @@ object VpnManager {
         if (_state.value.mode == NetworkMode.VPN_JAPAN && !isProxyPausedForExternal) {
             isProxyPausedForExternal = true
             clearWebViewProxy()
+            com.example.data.AppLogger.info("VPN", "Tạm ngắt Proxy cho trang xác thực ngoài (login/thanh toán)")
             Log.d(TAG, "Temporarily bypassed proxy for external navigation (direct ISP for banking/3DSecure/login)")
         }
     }
@@ -2750,6 +2926,7 @@ object VpnManager {
             isProxyPausedForExternal = false
             if (_state.value.mode == NetworkMode.VPN_JAPAN) {
                 applyMultiServerProxy(_state.value.currentServer)
+                com.example.data.AppLogger.info("VPN", "Khôi phục Proxy cho trang Xbox (${_state.value.currentServer.name})")
                 Log.d(TAG, "Restored proxy for Xbox Cloud gaming")
             }
         }

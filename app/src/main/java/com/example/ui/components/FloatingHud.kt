@@ -170,6 +170,14 @@ fun FloatingHud(
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var isInteracting by remember { mutableStateOf(true) }
+    var prevLoggedHudMode by remember { mutableStateOf(hudMode) }
+
+    LaunchedEffect(hudMode) {
+        if (prevLoggedHudMode != hudMode) {
+            com.example.data.AppLogger.info("UI", "Menu nhanh trong game (HUD): ${prevLoggedHudMode.name} -> ${hudMode.name}")
+            prevLoggedHudMode = hudMode
+        }
+    }
 
     // 2. THEO DÕI NHIỆT ĐỘ MÁY (API 29+, bỏ qua trên máy thấp hơn) & PIN
     val isThermalSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -200,7 +208,9 @@ fun FloatingHud(
                 thermalStatus = initialThermal
                 showThermalWarningBanner = initialThermal >= PowerManager.THERMAL_STATUS_MODERATE
                 powerManager.addThermalStatusListener(context.mainExecutor, thermalListener)
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                com.example.data.AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi nhiệt độ máy (${com.example.data.AppLogger.shortThrowable(e)})")
+            }
         }
 
         fun updateBatteryFromIntent(intent: Intent?) {
@@ -224,7 +234,9 @@ fun FloatingHud(
         try {
             val stickyIntent = context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             updateBatteryFromIntent(stickyIntent)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            com.example.data.AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi pin (${com.example.data.AppLogger.shortThrowable(e)})")
+        }
 
         onDispose {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null && thermalListener != null) {
@@ -1288,6 +1300,7 @@ fun FloatingHud(
                                     },
                                     onRequestExitHome = {
                                         markUserInteraction()
+                                        com.example.data.AppLogger.info("UI", "Mở hộp thoại xác nhận Thoát game từ HUD")
                                         showExitConfirmDialog = true
                                     }
                                 )
@@ -1329,7 +1342,10 @@ fun FloatingHud(
     // Exit Game Confirmation Dialog
     if (showExitConfirmDialog) {
         AlertDialog(
-            onDismissRequest = { showExitConfirmDialog = false },
+            onDismissRequest = {
+                com.example.data.AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                showExitConfirmDialog = false
+            },
             title = {
                 Text(text = stringResource(R.string.dialog_exit_title), color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             },
@@ -1343,6 +1359,7 @@ fun FloatingHud(
             confirmButton = {
                 Button(
                     onClick = {
+                        com.example.data.AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
                         showExitConfirmDialog = false
                         onNavigateHome()
                     },
@@ -1353,7 +1370,10 @@ fun FloatingHud(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitConfirmDialog = false }) {
+                TextButton(onClick = {
+                    com.example.data.AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                    showExitConfirmDialog = false
+                }) {
                     Text(stringResource(R.string.btn_cancel), color = TextSecondary, fontSize = 12.sp)
                 }
             },

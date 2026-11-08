@@ -74,11 +74,23 @@ fun AppLogDialog(
     val logs by AppLogger.logs.collectAsState()
     var selectedFilter by remember { mutableStateOf("ALL") }
 
+    val (errorCount, warnCount) = remember(logs) {
+        var errs = 0
+        var warns = 0
+        for (entry in logs) {
+            if (entry.level == AppLogLevel.ERROR) errs++
+            else if (entry.level == AppLogLevel.WARN) warns++
+        }
+        errs to warns
+    }
+
     val filteredLogs = remember(logs, selectedFilter) {
         val reversed = logs.asReversed()
         when (selectedFilter) {
+            "ERRORS" -> reversed.filter { it.level == AppLogLevel.ERROR || it.level == AppLogLevel.WARN }
+            "UI" -> reversed.filter { it.tag == "UI" || it.tag == "WEBVIEW" }
             "PROBE" -> reversed.filter { it.tag == "PROBE" || it.tag == "PING" }
-            "VPN" -> reversed.filter { it.tag == "VPN" || it.tag == "UNLOCK" }
+            "VPN" -> reversed.filter { it.tag == "VPN" || it.tag == "UNLOCK" || it.tag == "SMARTSELECT" }
             "STREAM" -> reversed.filter { it.tag == "STREAM" }
             "PERF" -> reversed.filter { it.tag == "PERF" }
             else -> reversed
@@ -100,18 +112,26 @@ fun AppLogDialog(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(XboxNeonGreen.copy(alpha = 0.16f))
-                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(9.dp)),
+                        .background(
+                            if (errorCount > 0) JapanRed.copy(alpha = 0.20f)
+                            else XboxNeonGreen.copy(alpha = 0.16f)
+                        )
+                        .border(
+                            1.dp,
+                            if (errorCount > 0) JapanRed.copy(alpha = 0.75f)
+                            else XboxNeonGreen.copy(alpha = 0.55f),
+                            RoundedCornerShape(9.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Terminal,
                         contentDescription = null,
-                        tint = XboxNeonGreen,
+                        tint = if (errorCount > 0) JapanRed else XboxNeonGreen,
                         modifier = Modifier.size(17.dp)
                     )
                 }
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = if (isEn) "System Activity Log" else "Nhật ký hệ thống (App Log)",
                         color = TextPrimary,
@@ -121,12 +141,17 @@ fun AppLogDialog(
                     )
                     Text(
                         text = if (isEn) {
-                            "${logs.size}/${AppLogger.MAX_LOGS} events • ${AppLogger.STORAGE_LOCATION_DESC_EN}"
+                            "${logs.size}/${AppLogger.MAX_LOGS} events • $errorCount errors, $warnCount warnings"
                         } else {
-                            "${logs.size}/${AppLogger.MAX_LOGS} bản ghi • ${AppLogger.STORAGE_LOCATION_DESC_VI}"
+                            "${logs.size}/${AppLogger.MAX_LOGS} bản ghi • $errorCount lỗi, $warnCount cảnh báo"
                         },
-                        color = TextSecondary,
-                        fontSize = 10.sp,
+                        color = when {
+                            errorCount > 0 -> JapanRed
+                            warnCount > 0 -> WarningAmber
+                            else -> TextSecondary
+                        },
+                        fontWeight = if (errorCount > 0 || warnCount > 0) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 10.5.sp,
                         lineHeight = 13.5.sp
                     )
                 }
@@ -138,8 +163,11 @@ fun AppLogDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Filter chips
+                val issueTotal = errorCount + warnCount
                 val filters = listOf(
                     "ALL" to if (isEn) "All (${logs.size})" else "Tất cả (${logs.size})",
+                    "ERRORS" to if (isEn) "Errors ($issueTotal)" else "Chỉ lỗi ($issueTotal)",
+                    "UI" to if (isEn) "Actions [UI]" else "Thao tác [UI]",
                     "PROBE" to if (isEn) "Probe & Ping" else "Trạm đo & Ping",
                     "VPN" to if (isEn) "VPN & Unlock" else "VPN & Vùng",
                     "STREAM" to "Stream",
@@ -148,23 +176,40 @@ fun AppLogDialog(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(filters) { (key, label) ->
                         val isSelected = selectedFilter == key
+                        val isErrorChip = key == "ERRORS"
+                        val chipActiveColor = if (isErrorChip && errorCount > 0) JapanRed else XboxNeonGreen
                         Surface(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .clickable { selectedFilter = key }
                                 .testTag("app_log_filter_$key"),
                             shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) XboxNeonGreen else XboxSurfaceVariant,
+                            color = when {
+                                isSelected -> chipActiveColor
+                                isErrorChip && errorCount > 0 -> Color(0xFF2B1115)
+                                isErrorChip && warnCount > 0 -> Color(0xFF261E0D)
+                                else -> XboxSurfaceVariant
+                            },
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
-                                if (isSelected) XboxNeonGreen else XboxCardBorder
+                                when {
+                                    isSelected -> chipActiveColor
+                                    isErrorChip && errorCount > 0 -> JapanRed.copy(alpha = 0.7f)
+                                    isErrorChip && warnCount > 0 -> WarningAmber.copy(alpha = 0.65f)
+                                    else -> XboxCardBorder
+                                }
                             )
                         ) {
                             Text(
                                 text = label,
-                                color = if (isSelected) Color.Black else TextSecondary,
+                                color = when {
+                                    isSelected -> if (isErrorChip && errorCount > 0) Color.White else Color.Black
+                                    isErrorChip && errorCount > 0 -> Color(0xFFFF8A80)
+                                    isErrorChip && warnCount > 0 -> WarningAmber
+                                    else -> TextSecondary
+                                },
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                fontWeight = if (isSelected || (isErrorChip && issueTotal > 0)) FontWeight.ExtraBold else FontWeight.SemiBold,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                             )
@@ -190,10 +235,12 @@ fun AppLogDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (isEn) {
-                                    "No log entries yet. Run 'Ping Test' in Servers tab to see probe activity."
+                                text = if (selectedFilter == "ERRORS") {
+                                    if (isEn) "No errors or warnings recorded." else "Không có lỗi hoặc cảnh báo nào."
+                                } else if (isEn) {
+                                    "No log entries in this filter yet."
                                 } else {
-                                    "Chưa có dòng nhật ký nào. Hãy bấm 'Đo ping' ở mục Máy chủ để xem quá trình chọn trạm đo."
+                                    "Chưa có dòng nhật ký nào trong mục lọc này."
                                 },
                                 color = TextSecondary,
                                 fontSize = 11.5.sp
@@ -207,54 +254,99 @@ fun AppLogDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             items(filteredLogs, key = { it.id }) { entry ->
+                                val isError = entry.level == AppLogLevel.ERROR
+                                val isWarn = entry.level == AppLogLevel.WARN
                                 val badgeColor = when (entry.level) {
                                     AppLogLevel.SUCCESS -> XboxNeonGreen
                                     AppLogLevel.WARN -> WarningAmber
                                     AppLogLevel.ERROR -> JapanRed
                                     AppLogLevel.INFO -> DirectCyan
                                 }
-                                Column(
+                                val rowBgColor = when (entry.level) {
+                                    AppLogLevel.ERROR -> Color(0xFF2B1115)
+                                    AppLogLevel.WARN -> Color(0xFF241C0C)
+                                    else -> Color(0xFF0E1712)
+                                }
+                                val rowBorderColor = when (entry.level) {
+                                    AppLogLevel.ERROR -> JapanRed.copy(alpha = 0.80f)
+                                    AppLogLevel.WARN -> WarningAmber.copy(alpha = 0.65f)
+                                    else -> Color.Transparent
+                                }
+                                val msgColor = when (entry.level) {
+                                    AppLogLevel.ERROR -> Color(0xFFFFB4AB)
+                                    AppLogLevel.WARN -> Color(0xFFFFE082)
+                                    else -> TextPrimary
+                                }
+                                val levelIcon = when (entry.level) {
+                                    AppLogLevel.ERROR -> "⛔ "
+                                    AppLogLevel.WARN -> "⚠️ "
+                                    AppLogLevel.SUCCESS -> "✓ "
+                                    AppLogLevel.INFO -> ""
+                                }
+
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFF0E1712))
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        .background(rowBgColor)
+                                        .then(
+                                            if (isError || isWarn) {
+                                                Modifier.border(0.9.dp, rowBorderColor, RoundedCornerShape(8.dp))
+                                            } else {
+                                                Modifier
+                                            }
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = entry.timestamp,
-                                            color = TextSecondary,
-                                            fontFamily = JetBrainsMonoFontFamily,
-                                            fontSize = 9.5.sp
+                                    if (isError || isWarn) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 4.dp, height = 42.dp)
+                                                .background(badgeColor)
                                         )
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = badgeColor.copy(alpha = 0.18f),
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                0.6.dp,
-                                                badgeColor.copy(alpha = 0.65f)
-                                            )
+                                    }
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
                                             Text(
-                                                text = entry.tag,
-                                                color = badgeColor,
+                                                text = entry.timestamp,
+                                                color = if (isError) Color(0xFFFF8A80) else TextSecondary,
                                                 fontFamily = JetBrainsMonoFontFamily,
-                                                fontSize = 8.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                fontSize = 9.5.sp
                                             )
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = badgeColor.copy(alpha = if (isError) 0.28f else 0.18f),
+                                                border = androidx.compose.foundation.BorderStroke(
+                                                    0.6.dp,
+                                                    badgeColor.copy(alpha = 0.75f)
+                                                )
+                                            ) {
+                                                Text(
+                                                    text = "${entry.tag}•${entry.level.name}",
+                                                    color = badgeColor,
+                                                    fontFamily = JetBrainsMonoFontFamily,
+                                                    fontSize = 8.5.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
                                         }
+                                        Text(
+                                            text = "$levelIcon${entry.message}",
+                                            color = msgColor,
+                                            fontFamily = JetBrainsMonoFontFamily,
+                                            fontWeight = if (isError) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 10.5.sp
+                                        )
                                     }
-                                    Text(
-                                        text = entry.message,
-                                        color = TextPrimary,
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 10.5.sp
-                                    )
                                 }
                             }
                         }

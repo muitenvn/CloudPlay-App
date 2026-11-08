@@ -1213,9 +1213,24 @@ object SettingsRepository {
         return formatXboxUrlWithLocale(url, effectiveLocale, _config.value.xboxWebUiMode)
     }
 
+    private val lastSliderLogTsBySetting = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    private fun logSettingChange(name: String, oldVal: Any?, newVal: Any?, throttleMs: Long = 0L) {
+        if (oldVal == newVal) return
+        if (throttleMs > 0L) {
+            val now = System.currentTimeMillis()
+            val prev = lastSliderLogTsBySetting[name] ?: 0L
+            if (now - prev < throttleMs) return
+            lastSliderLogTsBySetting[name] = now
+        }
+        AppLogger.info("UI", "Đổi cài đặt $name: $oldVal -> $newVal")
+    }
+
     fun updateXboxWebUiMode(mode: XboxWebUiMode) {
+        val old = _config.value.xboxWebUiMode
         _config.update { it.copy(xboxWebUiMode = mode) }
         persist(_config.value)
+        logSettingChange("Giao diện web Xbox", old.name, mode.name)
     }
 
     fun update(newConfig: AppConfig) {
@@ -1224,6 +1239,7 @@ object SettingsRepository {
     }
 
     fun updateAppLanguage(language: AppLanguage) {
+        val old = _config.value.appLanguage
         // Mục 7a: Không đụng tới thị trường Xbox (customLocale / useSystemLanguage) khi đổi ngôn ngữ giao diện app.
         _config.update {
             it.copy(
@@ -1231,21 +1247,26 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Ngôn ngữ ứng dụng", old.code, language.code)
     }
 
     fun updateTranslateLanguage(langCode: String) {
+        val old = _config.value.translateLanguage
         val normalized = langCode.trim().ifBlank { "OFF" }
         val isOff = normalized.equals("OFF", ignoreCase = true)
+        val nextVal = if (isOff) "OFF" else normalized
         _config.update {
             it.copy(
-                translateLanguage = if (isOff) "OFF" else normalized,
+                translateLanguage = nextVal,
                 xcloudTranslateEnabled = !isOff
             )
         }
         persist(_config.value)
+        logSettingChange("Ngôn ngữ dịch trang Xbox", old, nextVal)
     }
 
     fun resetXboxMarketToDefault() {
+        val old = _config.value.getEffectiveLocale()
         _config.update {
             it.copy(
                 customLocale = "en-US",
@@ -1253,14 +1274,18 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định thị trường Xbox: $old -> en-US")
     }
 
     fun updateUseSystemLanguage(useSystem: Boolean) {
+        val old = _config.value.useSystemLanguage
         _config.update { it.copy(useSystemLanguage = useSystem) }
         persist(_config.value)
+        logSettingChange("Dùng ngôn ngữ hệ thống cho Xbox", old, useSystem)
     }
 
     fun updateCustomLocale(locale: String) {
+        val old = _config.value.customLocale
         val parsed = parseLocaleFromInput(locale)
         _config.update {
             it.copy(
@@ -1269,29 +1294,39 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Thị trường Xbox (customLocale)", old, parsed)
     }
 
     fun updateSmartVpnEnabled(enabled: Boolean) {
+        val old = _config.value.smartVpnEnabled
         _config.update { it.copy(smartVpnEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Smart VPN tự bật khi mở game", old, enabled)
     }
 
     fun updateAutoBypass(enabled: Boolean) {
+        val old = _config.value.autoBypassEnabled
         _config.update { it.copy(autoBypassEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Tự động tắt VPN khi vào trận", old, enabled)
     }
 
     fun updateAutoBypassDelay(seconds: Int) {
+        val old = _config.value.autoBypassDelaySeconds
         _config.update { it.copy(autoBypassDelaySeconds = seconds) }
         persist(_config.value)
+        logSettingChange("Độ trễ tự tắt VPN", "${old}s", "${seconds}s")
     }
 
     fun updateDesktopUserAgent(enabled: Boolean) {
+        val old = _config.value.forceDesktopUserAgent
         _config.update { it.copy(forceDesktopUserAgent = enabled) }
         persist(_config.value)
+        logSettingChange("Giả lập trình duyệt máy tính (1080p UA)", old, enabled)
     }
 
     fun updateClarityBoost(enabled: Boolean) {
+        val old = _config.value.clarityBoostEnabled
         _config.update {
             it.copy(
                 clarityBoostEnabled = enabled,
@@ -1299,9 +1334,11 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Làm nét hình ảnh (Clarity Boost)", old, enabled)
     }
 
     fun updateClarityPreset(preset: ClarityPreset) {
+        val old = _config.value.clarityPreset
         _config.update {
             it.copy(
                 clarityPreset = preset,
@@ -1309,59 +1346,81 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Mức làm nét (Clarity Preset)", old.name, preset.name)
     }
 
     fun updateMaxBitrate(mbps: Int) {
+        val old = _config.value.maxBitrateMbps
         _config.update { it.copy(maxBitrateMbps = mbps) }
         persist(_config.value)
+        logSettingChange("Giới hạn Bitrate", "${old}Mbps", "${mbps}Mbps")
     }
 
     fun updateAntiAfk(enabled: Boolean) {
+        val old = _config.value.antiAfkKeepAlive
         _config.update { it.copy(antiAfkKeepAlive = enabled) }
         persist(_config.value)
+        logSettingChange("Chống văng AFK", old, enabled)
     }
 
     fun updateInputPollingBoost(enabled: Boolean) {
+        val old = _config.value.inputPollingBoost
         _config.update { it.copy(inputPollingBoost = enabled) }
         persist(_config.value)
+        logSettingChange("Tăng tốc độ đọc tay cầm (Polling Boost)", old, enabled)
     }
 
     fun updateShowVirtualController(enabled: Boolean) {
+        val old = _config.value.showVirtualController
         _config.update { it.copy(showVirtualController = enabled) }
         persist(_config.value)
+        logSettingChange("Tay cầm ảo trên màn hình", old, enabled)
     }
 
     fun updateSystemRevolution(enabled: Boolean) {
+        val old = _config.value.systemRevolutionEnabled
         _config.update { it.copy(systemRevolutionEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Tối ưu hóa hệ thống", old, enabled)
     }
 
     fun updateStealthHeaders(enabled: Boolean) {
+        val old = _config.value.stealthHeadersEnabled
         _config.update { it.copy(stealthHeadersEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Stealth Headers", old, enabled)
     }
 
     fun updateAutoHealingProxyMesh(enabled: Boolean) {
+        val old = _config.value.autoHealingProxyMesh
         _config.update { it.copy(autoHealingProxyMesh = enabled) }
         persist(_config.value)
+        logSettingChange("Tự chuyển máy chủ dự phòng", old, enabled)
     }
 
     fun updateSdpBitrateBoost(enabled: Boolean) {
+        val old = _config.value.sdpBitrateBoostEnabled
         _config.update { it.copy(sdpBitrateBoostEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Tối ưu SDP Bitrate", old, enabled)
     }
 
     fun updateZeroDelayDirectHandshake(enabled: Boolean) {
+        val old = _config.value.zeroDelayDirectHandshake
         _config.update { it.copy(zeroDelayDirectHandshake = enabled) }
         persist(_config.value)
+        logSettingChange("Bắt tay trực tiếp không trễ", old, enabled)
     }
 
     fun updateAntiJapaneseEnforcer(enabled: Boolean) {
+        val old = _config.value.antiJapaneseEnforcer
         _config.update { it.copy(antiJapaneseEnforcer = enabled) }
         persist(_config.value)
+        logSettingChange("Chống chuyển vùng tiếng Nhật", old, enabled)
     }
 
     fun updateXcloudTranslate(enabled: Boolean) {
+        val old = _config.value.xcloudTranslateEnabled
         _config.update {
             val nextLang = if (enabled && it.translateLanguage.equals("OFF", ignoreCase = true)) {
                 it.appLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
@@ -1374,29 +1433,39 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Dịch tự động giao diện Xbox", old, enabled)
     }
 
     fun updatePreserveGameTitles(enabled: Boolean) {
+        val old = _config.value.preserveGameTitles
         _config.update { it.copy(preserveGameTitles = enabled) }
         persist(_config.value)
+        logSettingChange("Giữ nguyên tên gốc của game", old, enabled)
     }
 
     fun updateBilingualMode(enabled: Boolean) {
+        val old = _config.value.bilingualMode
         _config.update { it.copy(bilingualMode = enabled) }
         persist(_config.value)
+        logSettingChange("Hiển thị song ngữ", old, enabled)
     }
 
     fun updateGithubDictionaryEnabled(enabled: Boolean) {
+        val old = _config.value.githubDictionaryEnabled
         _config.update { it.copy(githubDictionaryEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Từ điển thuật ngữ game", old, enabled)
     }
 
     fun updateHideStreamStatsOverlay(hide: Boolean) {
+        val old = _config.value.hideStreamStatsOverlay
         _config.update { it.copy(hideStreamStatsOverlay = hide) }
         persist(_config.value)
+        logSettingChange("Ẩn bảng thông số kỹ thuật Xbox", old, hide)
     }
 
     fun updateCellularMode(mode: CellularOptimizationMode) {
+        val old = _config.value.cellularMode
         _config.update {
             val nextLowEnd = if (mode != CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) false else it.lowEndDeviceMode
             it.copy(
@@ -1408,16 +1477,21 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Chế độ chất lượng đồ họa", old.name, mode.name)
     }
 
     fun updateNetworkTuningMode(mode: NetworkTuningMode) {
+        val old = _config.value.networkTuningMode
         _config.update { it.copy(networkTuningMode = mode) }
         persist(_config.value)
+        logSettingChange("Chế độ thích ứng mạng", old.name, mode.name)
     }
 
     fun updateWifiSpeedFirstPriority(enabled: Boolean) {
+        val old = _config.value.wifiSpeedFirstPriority
         _config.update { it.copy(wifiSpeedFirstPriority = enabled) }
         persist(_config.value)
+        logSettingChange("Ưu tiên độ trễ thấp trên Wi-Fi", old, enabled)
     }
 
     /**
@@ -1448,6 +1522,7 @@ object SettingsRepository {
         )
         _config.update { optimized }
         persist(optimized)
+        AppLogger.info("UI", "Bấm tối ưu hóa toàn diện hệ thống (1 chạm)")
     }
 
     fun updateTargetRegionUrl(url: String) {
@@ -1458,11 +1533,14 @@ object SettingsRepository {
     }
 
     fun updateUserAcceptedTerms(accepted: Boolean) {
+        val old = _config.value.userAcceptedTerms
         _config.update { it.copy(userAcceptedTerms = accepted) }
         persist(_config.value)
+        logSettingChange("Đồng ý Điều khoản sử dụng", old, accepted)
     }
 
     fun updateLowEndDeviceMode(enabled: Boolean) {
+        val old = _config.value.lowEndDeviceMode
         _config.update {
             it.copy(
                 lowEndDeviceMode = enabled,
@@ -1470,6 +1548,7 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Chế độ máy yếu (720p nhẹ)", old, enabled)
     }
 
     fun updateWebPortalSettings(
@@ -1491,24 +1570,34 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Cập nhật liên kết cổng tải xuống & kho mã nguồn: ${_config.value.githubRepoSlug}")
     }
 
     fun updateAutoHideVirtualOnPhysicalController(enabled: Boolean) {
+        val old = _config.value.autoHideVirtualOnPhysicalController
         _config.update { it.copy(autoHideVirtualOnPhysicalController = enabled) }
         persist(_config.value)
+        logSettingChange("Tự ẩn tay cầm ảo khi cắm tay cầm thật", old, enabled)
     }
 
     fun updateGamepadScale(scale: Float) {
-        _config.update { it.copy(gamepadScale = scale.coerceIn(0.75f, 1.35f)) }
+        val old = _config.value.gamepadScale
+        val next = scale.coerceIn(0.75f, 1.35f)
+        _config.update { it.copy(gamepadScale = next) }
         persist(_config.value)
+        logSettingChange("Kích thước nút tay cầm ảo", "${(old * 100).toInt()}%", "${(next * 100).toInt()}%", throttleMs = 400L)
     }
 
     fun updateGamepadOpacity(opacity: Float) {
-        _config.update { it.copy(gamepadOpacity = opacity.coerceIn(0.25f, 0.95f)) }
+        val old = _config.value.gamepadOpacity
+        val next = opacity.coerceIn(0.25f, 0.95f)
+        _config.update { it.copy(gamepadOpacity = next) }
         persist(_config.value)
+        logSettingChange("Độ đậm tay cầm ảo", "${(old * 100).toInt()}%", "${(next * 100).toInt()}%", throttleMs = 400L)
     }
 
     fun updateGamepadDeadzone(deadzone: Float) {
+        val old = _config.value.gamepadDeadzone
         val clamped = deadzone.coerceIn(0.02f, 0.25f)
         _config.update {
             it.copy(
@@ -1518,6 +1607,7 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange("Vùng chết cần analog ảo", "${(old * 100).toInt()}%", "${(clamped * 100).toInt()}%", throttleMs = 400L)
     }
 
     fun updateVirtualStickDeadzones(
@@ -1526,6 +1616,7 @@ object SettingsRepository {
         rightInner: Float = _config.value.rightStickInnerDeadzone,
         rightOuter: Float = _config.value.rightStickOuterDeadzone
     ) {
+        val prev = _config.value
         val li = leftInner.coerceIn(0.00f, 0.30f)
         val lo = leftOuter.coerceIn(0.70f, 1.00f)
         val ri = rightInner.coerceIn(0.00f, 0.30f)
@@ -1540,6 +1631,12 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        logSettingChange(
+            "Vùng chết cần ảo (L/R)",
+            "L(${(prev.leftStickInnerDeadzone * 100).toInt()}-${(prev.leftStickOuterDeadzone * 100).toInt()}%) R(${(prev.rightStickInnerDeadzone * 100).toInt()}-${(prev.rightStickOuterDeadzone * 100).toInt()}%)",
+            "L(${(li * 100).toInt()}-${(lo * 100).toInt()}%) R(${(ri * 100).toInt()}-${(ro * 100).toInt()}%)",
+            throttleMs = 400L
+        )
     }
 
     fun updatePhysicalStickDeadzones(
@@ -1548,44 +1645,67 @@ object SettingsRepository {
         rightInner: Float = _config.value.physRightStickInnerDeadzone,
         rightOuter: Float = _config.value.physRightStickOuterDeadzone
     ) {
+        val prev = _config.value
+        val li = leftInner.coerceIn(0.00f, 0.30f)
+        val lo = leftOuter.coerceIn(0.70f, 1.00f)
+        val ri = rightInner.coerceIn(0.00f, 0.30f)
+        val ro = rightOuter.coerceIn(0.70f, 1.00f)
         _config.update {
             it.copy(
-                physLeftStickInnerDeadzone = leftInner.coerceIn(0.00f, 0.30f),
-                physLeftStickOuterDeadzone = leftOuter.coerceIn(0.70f, 1.00f),
-                physRightStickInnerDeadzone = rightInner.coerceIn(0.00f, 0.30f),
-                physRightStickOuterDeadzone = rightOuter.coerceIn(0.70f, 1.00f)
+                physLeftStickInnerDeadzone = li,
+                physLeftStickOuterDeadzone = lo,
+                physRightStickInnerDeadzone = ri,
+                physRightStickOuterDeadzone = ro
             )
         }
         persist(_config.value)
+        logSettingChange(
+            "Vùng chết cần tay cầm thật (L/R)",
+            "L(${(prev.physLeftStickInnerDeadzone * 100).toInt()}-${(prev.physLeftStickOuterDeadzone * 100).toInt()}%) R(${(prev.physRightStickInnerDeadzone * 100).toInt()}-${(prev.physRightStickOuterDeadzone * 100).toInt()}%)",
+            "L(${(li * 100).toInt()}-${(lo * 100).toInt()}%) R(${(ri * 100).toInt()}-${(ro * 100).toInt()}%)",
+            throttleMs = 400L
+        )
     }
 
     fun resetPhysicalStickDeadzones() {
         updatePhysicalStickDeadzones(0.0f, 1.0f, 0.0f, 1.0f)
+        AppLogger.info("UI", "Khôi phục mặc định: Vùng chết cần tay cầm thật (0% - 100%)")
     }
 
     fun updateGamepadSensitivity(sensitivity: Float) {
-        _config.update { it.copy(gamepadSensitivity = sensitivity.coerceIn(0.60f, 1.60f)) }
+        val old = _config.value.gamepadSensitivity
+        val next = sensitivity.coerceIn(0.60f, 1.60f)
+        _config.update { it.copy(gamepadSensitivity = next) }
         persist(_config.value)
+        logSettingChange("Độ nhạy cần tay cầm ảo", "${(old * 100).toInt()}%", "${(next * 100).toInt()}%", throttleMs = 400L)
     }
 
     fun updateGamepadLayoutPreset(preset: GamepadLayoutPreset) {
+        val old = _config.value.gamepadLayoutPreset
         _config.update { it.copy(gamepadLayoutPreset = preset) }
         persist(_config.value)
+        logSettingChange("Bố cục tay cầm ảo", old.name, preset.name)
     }
 
     fun updateGamepadHapticLevel(level: GamepadHapticLevel) {
+        val old = _config.value.gamepadHapticLevel
         _config.update { it.copy(gamepadHapticLevel = level) }
         persist(_config.value)
+        logSettingChange("Độ rung khi chạm nút ảo", old.name, level.name)
     }
 
     fun updateGameRumbleLevel(level: GamepadHapticLevel) {
+        val old = _config.value.gameRumbleLevel
         _config.update { it.copy(gameRumbleLevel = level) }
         persist(_config.value)
+        logSettingChange("Độ rung phản hồi từ game", old.name, level.name)
     }
 
     fun updateGamepadSprintLockEnabled(enabled: Boolean) {
+        val old = _config.value.gamepadSprintLockEnabled
         _config.update { it.copy(gamepadSprintLockEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Khóa chạy nhanh cần trái (Sprint Lock)", old, enabled)
     }
 
     fun updateGamepadCustomOffsets(offsets: String, gameKey: String? = null) {
@@ -1599,10 +1719,13 @@ object SettingsRepository {
                 dpadSplit = _config.value.gamepadDpadSplitMode
             )
             savePerGameLayout(normKey, current.copy(offsets = offsets))
+            logSettingChange("Vị trí nút tay cầm ảo ($normKey)", current.offsets.length, offsets.length, throttleMs = 600L)
             return
         }
+        val old = _config.value.gamepadCustomOffsets
         _config.update { it.copy(gamepadCustomOffsets = offsets) }
         persist(_config.value)
+        logSettingChange("Vị trí nút tay cầm ảo", "${old.length} ký tự", "${offsets.length} ký tự", throttleMs = 600L)
     }
 
     fun updateGamepadButtonScales(scales: String, gameKey: String? = null) {
@@ -1616,10 +1739,13 @@ object SettingsRepository {
                 dpadSplit = _config.value.gamepadDpadSplitMode
             )
             savePerGameLayout(normKey, current.copy(scales = scales))
+            logSettingChange("Cỡ từng nút tay cầm ảo ($normKey)", current.scales, scales, throttleMs = 500L)
             return
         }
+        val old = _config.value.gamepadButtonScales
         _config.update { it.copy(gamepadButtonScales = scales) }
         persist(_config.value)
+        logSettingChange("Cỡ từng nút tay cầm ảo", old, scales, throttleMs = 500L)
     }
 
     fun updateGamepadHiddenButtons(hidden: String, gameKey: String? = null) {
@@ -1633,10 +1759,13 @@ object SettingsRepository {
                 dpadSplit = _config.value.gamepadDpadSplitMode
             )
             savePerGameLayout(normKey, current.copy(hiddenButtons = hidden))
+            logSettingChange("Nút ẩn tay cầm ảo ($normKey)", current.hiddenButtons.ifBlank { "không" }, hidden.ifBlank { "không" })
             return
         }
+        val old = _config.value.gamepadHiddenButtons
         _config.update { it.copy(gamepadHiddenButtons = hidden) }
         persist(_config.value)
+        logSettingChange("Nút ẩn tay cầm ảo", old.ifBlank { "không" }, hidden.ifBlank { "không" })
     }
 
     fun updateGamepadAbxySplitMode(split: Boolean, gameKey: String? = null) {
@@ -1650,10 +1779,13 @@ object SettingsRepository {
                 dpadSplit = _config.value.gamepadDpadSplitMode
             )
             savePerGameLayout(normKey, current.copy(abxySplit = split))
+            logSettingChange("Tách rời nút A/B/X/Y ($normKey)", current.abxySplit, split)
             return
         }
+        val old = _config.value.gamepadAbxySplitMode
         _config.update { it.copy(gamepadAbxySplitMode = split) }
         persist(_config.value)
+        logSettingChange("Tách rời nút A/B/X/Y", old, split)
     }
 
     fun updateGamepadDpadSplitMode(split: Boolean, gameKey: String? = null) {
@@ -1667,16 +1799,20 @@ object SettingsRepository {
                 dpadSplit = _config.value.gamepadDpadSplitMode
             )
             savePerGameLayout(normKey, current.copy(dpadSplit = split))
+            logSettingChange("Tách rời cụm phím D-Pad ($normKey)", current.dpadSplit, split)
             return
         }
+        val old = _config.value.gamepadDpadSplitMode
         _config.update { it.copy(gamepadDpadSplitMode = split) }
         persist(_config.value)
+        logSettingChange("Tách rời cụm phím D-Pad", old, split)
     }
 
     fun resetGamepadCustomOffsets(gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
             savePerGameLayout(normKey, PerGameGamepadLayout())
+            AppLogger.info("UI", "Khôi phục mặc định: Bố cục tay cầm ảo cho game $normKey")
             return
         }
         _config.update {
@@ -1689,11 +1825,14 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Bố cục và vị trí nút tay cầm ảo")
     }
 
     fun updateUsePerGameGamepadLayout(enabled: Boolean) {
+        val old = _config.value.usePerGameGamepadLayout
         _config.update { it.copy(usePerGameGamepadLayout = enabled) }
         persist(_config.value)
+        logSettingChange("Lưu bố cục tay cầm riêng theo từng game", old, enabled)
     }
 
     fun normalizeGameLayoutKey(rawKey: String?): String {
@@ -1716,7 +1855,8 @@ object SettingsRepository {
                 abxySplit = obj.optBoolean("abxySplit", false),
                 dpadSplit = obj.optBoolean("dpadSplit", false)
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            AppLogger.error("UI", "Lỗi đọc bố cục tay cầm riêng ($normKey) — ${AppLogger.shortThrowable(e)}")
             null
         }
     }
@@ -1741,7 +1881,9 @@ object SettingsRepository {
             val nextJson = root.toString()
             _config.update { it.copy(perGameLayoutsJson = nextJson) }
             persist(_config.value)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            AppLogger.error("UI", "Lỗi lưu bố cục tay cầm riêng ($normKey) — ${AppLogger.shortThrowable(e)}")
+        }
     }
 
     fun useGlobalLayoutForGame(gameKey: String?) {
@@ -1754,13 +1896,17 @@ object SettingsRepository {
                 val nextJson = root.toString()
                 _config.update { it.copy(perGameLayoutsJson = nextJson) }
                 persist(_config.value)
+                AppLogger.info("UI", "Chuyển game $normKey về dùng bố cục tay cầm chung")
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            AppLogger.error("UI", "Lỗi xóa bố cục riêng ($normKey) — ${AppLogger.shortThrowable(e)}")
+        }
     }
 
     fun resetAllPerGameLayouts() {
         _config.update { it.copy(perGameLayoutsJson = "{}") }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Xóa toàn bộ bố cục tay cầm riêng từng game")
     }
 
     fun parsePhysicalButtonMap(raw: String = _config.value.physicalGamepadButtonMap): Map<Int, Int> {
@@ -1789,6 +1935,7 @@ object SettingsRepository {
     fun updatePhysicalButtonMapping(sourceButton: Int, targetButton: Int) {
         if (sourceButton !in 0..16 || targetButton !in 0..16) return
         val current = parsePhysicalButtonMap().toMutableMap()
+        val prevTarget = current[sourceButton] ?: sourceButton
         if (sourceButton == targetButton) {
             current.remove(sourceButton)
         } else {
@@ -1797,16 +1944,24 @@ object SettingsRepository {
         val serialized = serializePhysicalButtonMap(current)
         _config.update { it.copy(physicalGamepadButtonMap = serialized) }
         persist(_config.value)
+        logSettingChange(
+            "Gán lại nút tay cầm thật (${getGamepadButtonShortLabel(sourceButton)})",
+            getGamepadButtonShortLabel(prevTarget),
+            getGamepadButtonShortLabel(targetButton)
+        )
     }
 
     fun resetPhysicalButtonMap() {
         _config.update { it.copy(physicalGamepadButtonMap = "") }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Sơ đồ nút tay cầm vật lý")
     }
 
     fun updateControllerShortcutsEnabled(enabled: Boolean) {
+        val old = _config.value.controllerShortcutsEnabled
         _config.update { it.copy(controllerShortcutsEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Phím tắt tay cầm vật lý (View + nút)", old, enabled)
     }
 
     fun updateControllerShortcutButtons(
@@ -1814,14 +1969,23 @@ object SettingsRepository {
         toggleVirtualPadBtn: Int = _config.value.shortcutToggleVirtualPadButton,
         toggleRecordingBtn: Int = _config.value.shortcutToggleRecordingButton
     ) {
+        val prev = _config.value
+        val sStats = toggleStatsBtn.coerceIn(-1, 16)
+        val sPad = toggleVirtualPadBtn.coerceIn(-1, 16)
+        val sRec = toggleRecordingBtn.coerceIn(-1, 16)
         _config.update {
             it.copy(
-                shortcutToggleStatsButton = toggleStatsBtn.coerceIn(-1, 16),
-                shortcutToggleVirtualPadButton = toggleVirtualPadBtn.coerceIn(-1, 16),
-                shortcutToggleRecordingButton = toggleRecordingBtn.coerceIn(-1, 16)
+                shortcutToggleStatsButton = sStats,
+                shortcutToggleVirtualPadButton = sPad,
+                shortcutToggleRecordingButton = sRec
             )
         }
         persist(_config.value)
+        logSettingChange(
+            "Tổ hợp phím tắt tay cầm",
+            "Stats=${prev.shortcutToggleStatsButton},Pad=${prev.shortcutToggleVirtualPadButton},Rec=${prev.shortcutToggleRecordingButton}",
+            "Stats=$sStats,Pad=$sPad,Rec=$sRec"
+        )
     }
 
     val STANDARD_GAMEPAD_BUTTONS: List<Triple<Int, String, String>> = listOf(
@@ -1870,6 +2034,7 @@ object SettingsRepository {
 
     fun resetVirtualStickDeadzones() {
         updateVirtualStickDeadzones(0.08f, 0.95f, 0.08f, 0.95f)
+        AppLogger.info("UI", "Khôi phục mặc định: Vùng chết cần ảo (8% - 95%)")
     }
 
     fun updatePhysLeftStickInnerDeadzone(value: Float) {
@@ -1905,7 +2070,9 @@ object SettingsRepository {
                     dpadSplit = obj.optBoolean("dpadSplit", false)
                 )
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            AppLogger.error("UI", "Lỗi đọc danh sách bố cục từng game — ${AppLogger.shortThrowable(e)}")
+        }
         return result
     }
 
@@ -1943,51 +2110,73 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Phím tắt tay cầm vật lý (View + Y/B/RB)")
     }
 
     fun updateStreamRenderScale(scale: StreamRenderScale) {
+        val old = _config.value.streamRenderScale
         _config.update { it.copy(streamRenderScale = scale) }
         persist(_config.value)
+        logSettingChange("Tỉ lệ dựng hình (Render Scale)", old.name, scale.name)
     }
 
     fun updateStreamFpsCap(cap: StreamFpsCap) {
+        val old = _config.value.streamFpsCap
         _config.update { it.copy(streamFpsCap = cap) }
         persist(_config.value)
+        logSettingChange("Giới hạn khung hình (FPS Cap)", "${old.fps} FPS", "${cap.fps} FPS")
     }
 
     fun updateGpuLoadReductionEnabled(enabled: Boolean) {
+        val old = _config.value.gpuLoadReductionEnabled
         _config.update { it.copy(gpuLoadReductionEnabled = enabled) }
         persist(_config.value)
+        logSettingChange("Giảm tải GPU", old, enabled)
     }
 
     fun updateScreenRecordQuality(quality: ScreenRecordQuality) {
+        val old = _config.value.screenRecordQuality
         _config.update { it.copy(screenRecordQuality = quality) }
         persist(_config.value)
+        logSettingChange("Chất lượng quay màn hình", old.name, quality.name)
     }
 
     fun updateAutoReduceLoadWhenRecording(enabled: Boolean) {
+        val old = _config.value.autoReduceLoadWhenRecording
         _config.update { it.copy(autoReduceLoadWhenRecording = enabled) }
         persist(_config.value)
+        logSettingChange("Tự giảm tải khi đang quay màn hình", old, enabled)
     }
 
     fun updateRecordingCaptureEngine(engine: RecordingCaptureEngine) {
+        val old = _config.value.recordingCaptureEngine
         _config.update { it.copy(recordingCaptureEngine = engine) }
         persist(_config.value)
+        logSettingChange("Công nghệ thu hình (Capture Engine)", old.name, engine.name)
     }
 
     fun updateVideoContrast(contrast: Int) {
-        _config.update { it.copy(videoContrast = contrast.coerceIn(80, 140)) }
+        val old = _config.value.videoContrast
+        val next = contrast.coerceIn(80, 140)
+        _config.update { it.copy(videoContrast = next) }
         persist(_config.value)
+        logSettingChange("Độ tương phản video", "${old}%", "${next}%", throttleMs = 400L)
     }
 
     fun updateVideoSaturation(saturation: Int) {
-        _config.update { it.copy(videoSaturation = saturation.coerceIn(80, 150)) }
+        val old = _config.value.videoSaturation
+        val next = saturation.coerceIn(80, 150)
+        _config.update { it.copy(videoSaturation = next) }
         persist(_config.value)
+        logSettingChange("Độ bão hòa màu video", "${old}%", "${next}%", throttleMs = 400L)
     }
 
     fun updateVideoBrightness(brightness: Int) {
-        _config.update { it.copy(videoBrightness = brightness.coerceIn(80, 130)) }
+        val old = _config.value.videoBrightness
+        val next = brightness.coerceIn(80, 130)
+        _config.update { it.copy(videoBrightness = next) }
         persist(_config.value)
+        logSettingChange("Độ sáng video", "${old}%", "${next}%", throttleMs = 400L)
     }
 
     fun resetVideoDisplayDefaults() {
@@ -1999,36 +2188,49 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Màu sắc & Độ sáng video (100%)")
     }
 
     fun updateAutoCheckUpdatesOnLaunch(enabled: Boolean) {
+        val old = _config.value.autoCheckUpdatesOnLaunch
         _config.update { it.copy(autoCheckUpdatesOnLaunch = enabled) }
         persist(_config.value)
+        logSettingChange("Tự kiểm tra cập nhật khi mở app", old, enabled)
     }
 
     fun updateEnableGlobalpingProbe(enabled: Boolean) {
+        val old = _config.value.enableGlobalpingProbe
         _config.update { it.copy(enableGlobalpingProbe = enabled) }
         persist(_config.value)
+        logSettingChange("Trạm đo tham khảo Globalping", old, enabled)
     }
 
     fun updateHideUnreachableDynamicServers(hide: Boolean) {
+        val old = _config.value.hideUnreachableDynamicServers
         _config.update { it.copy(hideUnreachableDynamicServers = hide) }
         persist(_config.value)
+        logSettingChange("Ẩn máy chủ công cộng không phản hồi", old, hide)
     }
 
     fun updateEnableGeoIpHttpsFallback(enabled: Boolean) {
+        val old = _config.value.enableGeoIpHttpsFallback
         _config.update { it.copy(enableGeoIpHttpsFallback = enabled) }
         persist(_config.value)
+        logSettingChange("Dự phòng kiểm tra IP qua HTTPS", old, enabled)
     }
 
     fun updateAllowDbIpCellularDownload(allowed: Boolean) {
+        val old = _config.value.allowDbIpCellularDownload
         _config.update { it.copy(allowDbIpCellularDownload = allowed) }
         persist(_config.value)
+        logSettingChange("Cho phép tải cơ sở dữ liệu IP trên 4G/5G", old, allowed)
     }
 
     fun updateAllowCellularLiveProxySync(allowed: Boolean) {
+        val old = _config.value.allowCellularLiveProxySync
         _config.update { it.copy(allowCellularLiveProxySync = allowed) }
         persist(_config.value)
+        logSettingChange("Cho phép đồng bộ máy chủ công cộng trên 4G/5G", old, allowed)
     }
 
     /**
@@ -2069,5 +2271,6 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
+        AppLogger.info("UI", "Khôi phục mặc định: Toàn bộ cài đặt Nâng cao")
     }
 }

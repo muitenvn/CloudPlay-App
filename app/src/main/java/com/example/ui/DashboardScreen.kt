@@ -116,7 +116,14 @@ fun DashboardScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val vpnState by VpnManager.state.collectAsState()
+    val initialVpnState = remember {
+        VpnManager.state.value.copy(
+            serverPings = emptyMap(),
+            serverMeasurements = emptyMap(),
+            isTestingPings = false
+        )
+    }
+    val vpnState by VpnManager.dashboardState.collectAsState(initial = initialVpnState)
     val config by SettingsRepository.config.collectAsState()
     val allGames by GameLibraryRepository.games.collectAsState()
 
@@ -158,6 +165,13 @@ fun DashboardScreen(
 
     fun switchTab(newTab: DashboardTab, reason: String = "") {
         if (currentTab != newTab) {
+            val nextScenario = when (newTab) {
+                DashboardTab.HOME -> com.example.data.PerfScenario.HOME
+                DashboardTab.LIBRARY -> com.example.data.PerfScenario.LIBRARY
+                DashboardTab.SERVERS -> com.example.data.PerfScenario.SERVERS
+                DashboardTab.SETTINGS -> com.example.data.PerfScenario.SETTINGS
+            }
+            com.example.data.PerformanceMonitor.setScenario(nextScenario)
             val suffix = if (reason.isNotBlank()) " ($reason)" else ""
             com.example.data.AppLogger.info("UI", "Chuyển tab chính: ${currentTab.name} -> ${newTab.name}$suffix")
             currentTab = newTab

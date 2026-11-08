@@ -159,6 +159,9 @@ object GameLibraryRepository {
     private val _isSyncingCatalog = MutableStateFlow(false)
     val isSyncingCatalog: StateFlow<Boolean> = _isSyncingCatalog.asStateFlow()
 
+    private val _isLoadingInitialCatalog = MutableStateFlow(false)
+    val isLoadingInitialCatalog: StateFlow<Boolean> = _isLoadingInitialCatalog.asStateFlow()
+
     private val _isSearchingLiveXbox = MutableStateFlow(false)
     val isSearchingLiveXbox: StateFlow<Boolean> = _isSearchingLiveXbox.asStateFlow()
 
@@ -177,10 +180,6 @@ object GameLibraryRepository {
             prefs = sharedPrefs
             recentPrefs = legacyRecentPrefs
 
-            val customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
-            val syncedList = loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
-            rebuildMergedGames(customList, syncedList)
-
             val savedFavs = sharedPrefs.getStringSet(KEY_FAVORITE_IDS, emptySet()) ?: emptySet()
             _favoriteIds.value = savedFavs.toSet()
 
@@ -194,7 +193,6 @@ object GameLibraryRepository {
             val savedTotalCloud = sharedPrefs.getInt(KEY_XBOX_TOTAL_CLOUD, 0)
             val savedJumpBackRaw = sharedPrefs.getString(KEY_XBOX_JUMP_BACK_IDS, "") ?: ""
             val savedJumpBack = savedJumpBackRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-
             val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
 
             _xboxStatus.value = XboxCloudSyncStatus(
@@ -208,15 +206,31 @@ object GameLibraryRepository {
                 lastSyncTimeMs = lastSyncMs
             )
 
-            val now = System.currentTimeMillis()
-            val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
-            val needsAutoFullScan = syncedList.isEmpty() ||
-                missingCoverArt ||
-                (savedTotalCloud > 0 && syncedList.size < (savedTotalCloud - 20)) ||
-                syncedList.size < 120 ||
-                (now - lastSyncMs) > 6 * 3600 * 1000L
-            if (needsAutoFullScan) {
-                syncLiveXboxCatalog(force = missingCoverArt)
+            _isLoadingInitialCatalog.value = true
+            ioScope.launch {
+                val customList: List<GameBookmark>
+                val syncedList: List<GameBookmark>
+                try {
+                    customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
+                    syncedList = loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
+                    rebuildMergedGames(customList, syncedList)
+                } finally {
+                    _isLoadingInitialCatalog.value = false
+                }
+
+                val now = System.currentTimeMillis()
+                val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
+                val needsAutoFullScan = syncedList.isEmpty() ||
+                    missingCoverArt ||
+                    (savedTotalCloud > 0 && syncedList.size < (savedTotalCloud - 20)) ||
+                    syncedList.size < 120 ||
+                    (now - lastSyncMs) > 6 * 3600 * 1000L
+                if (needsAutoFullScan) {
+                    kotlinx.coroutines.delay(3_500L)
+                    if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
+                        syncLiveXboxCatalog(force = missingCoverArt)
+                    }
+                }
             }
         }
     }

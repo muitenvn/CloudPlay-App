@@ -11,9 +11,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,6 +27,20 @@ object VpnManager {
     private const val TAG = "VpnManager"
     private val _state = MutableStateFlow(VpnConnectionState())
     val state: StateFlow<VpnConnectionState> = _state.asStateFlow()
+
+    /**
+     * Luồng trạng thái đã tách bỏ cập nhật từng máy chủ của `serverPings`, `serverMeasurements`, `isTestingPings`
+     * để DashboardScreen / HomeScreen / SettingsScreen không bị vẽ lại 35+ lần khi đang quét ping ở nền.
+     */
+    val dashboardState: Flow<VpnConnectionState> = _state
+        .map { st ->
+            st.copy(
+                serverPings = emptyMap(),
+                serverMeasurements = emptyMap(),
+                isTestingPings = false
+            )
+        }
+        .distinctUntilChanged()
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var pingJob: Job? = null
@@ -103,13 +120,27 @@ object VpnManager {
     @Volatile
     private var activeSinglePingServer: ServerLocation? = null
 
-    private fun logPingResult(server: ServerLocation, meas: EndpointPingMeasurement) {
+    @Volatile
+    private var lastStartupMaintenanceAtMs: Long = 0L
+
+    fun wasStartupMaintenanceRecentlyTriggered(nowMs: Long = System.currentTimeMillis()): Boolean {
+        val last = lastStartupMaintenanceAtMs
+        return last > 0L && (nowMs - last) < 15_000L
+    }
+
+    private fun logPingResult(
+        server: ServerLocation,
+        meas: EndpointPingMeasurement,
+        logSuccess: Boolean = true
+    ) {
         when {
             meas.isPrimaryPortAlive -> {
-                com.example.data.AppLogger.success(
-                    "PING",
-                    "Đo ping ${server.name} (${server.countryCode}): ${meas.rttMs} ms"
-                )
+                if (logSuccess) {
+                    com.example.data.AppLogger.success(
+                        "PING",
+                        "Đo ping ${server.name} (${server.countryCode}): ${meas.rttMs} ms"
+                    )
+                }
             }
             meas.isFallbackPortOnly -> {
                 com.example.data.AppLogger.warn(
@@ -134,24 +165,28 @@ object VpnManager {
     fun init(context: Context) {
         val appCtx = context.applicationContext
         appContext = appCtx
-        scope.launch(Dispatchers.IO) {
-            GeoIpDetector.downloadDbIpLiteIfPermitted(appCtx, isCellularConfirmedByUser = false)
-        }
-        loadPersistedServers(appCtx)
-        loadPersistedUnlockRecords(appCtx)
         lastObservedTransportTag = resolveCurrentNetworkTransportTag(appCtx)
         val initialNetStatus = com.example.cloudplay.NetworkOptimizer.status.value
         lastObservedNetworkKey = initialNetStatus.activeNetworkKey
         lastObservedHasVpnTransport = initialNetStatus.hasVpnTransport
+        lastStartupMaintenanceAtMs = System.currentTimeMillis()
 
-        // Khi mở app lần đầu, khi vị trí GeoIP thay đổi hoặc khi kết quả tự chọn đã quá 6 giờ: đo probe ngắn và chọn theo điểm số
+        // Nạp JSON danh sách máy chủ & lịch sử mở khóa trên Dispatchers.IO, sau đó đo chọn máy chủ và hoãn đồng bộ công cộng 3.5 giây
         scope.launch(Dispatchers.IO) {
+            loadPersistedServers(appCtx)
+            loadPersistedUnlockRecords(appCtx)
+            launch {
+                GeoIpDetector.downloadDbIpLiteIfPermitted(appCtx, isCellularConfirmedByUser = false)
+            }
             ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = false)
             if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
                 testAllServers(autoPickBest = false, context = appCtx, forceRefresh = false)
             }
+            delay(3_500L)
+            if (!isInGameStreamActive) {
+                autoSyncPublicProxiesIfNeeded(context = appCtx, force = false)
+            }
         }
-        autoSyncPublicProxiesIfNeeded(context = appCtx, force = false)
 
         // Theo dõi sự kiện đổi mạng mặc định hoặc bật/tắt cờ TRANSPORT_VPN từ NetworkOptimizer
         if (networkChangeMonitorJob == null) {
@@ -937,49 +972,90 @@ object VpnManager {
             .groupBy { it.countryCode.trim().uppercase() }
             .mapValues { (_, list) -> list.map { it.name }.toSet() }
 
-        val regionStatsByServerId = servers.associate { srv ->
-            val cc = srv.countryCode.trim().uppercase()
-            val stats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
-                serverName = srv.name,
+        val userCoordsStrict = RegionalProbeTester.resolveUserCoordinatesOrNull(currentGeo)
+        val minCountryDistStrict = if (userCoordsStrict != null) {
+            RegionalProbeTester.computeMinSupportedCountryDistanceKm(userCoordsStrict.first, userCoordsStrict.second, servers)
+        } else {
+            null
+        }
+
+        val regionStatsByCountry = namesByCountry.keys.associateWith { cc ->
+            com.example.data.SessionHistoryRepository.getRegionSessionStats(
+                serverName = "",
                 countryCode = cc,
                 sameCountryServerNames = namesByCountry[cc] ?: emptySet(),
                 maxRecentSessions = 5,
                 sessionsList = sessions
             )
-            srv.id to stats
         }
 
-        val scoreByServerId = servers.associate { srv ->
+        val tierByServerId = HashMap<String, Int>(servers.size)
+        val withinDistByServerId = HashMap<String, Boolean>(servers.size)
+        val scoreByServerId = HashMap<String, Double>(servers.size)
+        val exactDistRankByCountry = HashMap<String, Int>(4)
+        val countryTierByCountry = HashMap<String, Int>(4)
+
+        for (cc in namesByCountry.keys) {
+            exactDistRankByCountry[cc] = RegionalProbeTester.getExactCountryDistanceRank(
+                serverCountryCode = cc,
+                servers = servers,
+                geo = currentGeo,
+                allowTimezoneFallback = false
+            )
+            countryTierByCountry[cc] = RegionalProbeTester.getNearestSupportedCountryTier(
+                serverCountryCode = cc,
+                servers = servers,
+                geo = currentGeo,
+                precomputedUserCoords = userCoordsStrict,
+                precomputedMinCountryDistKm = minCountryDistStrict
+            )
+        }
+
+        for (srv in servers) {
+            val cc = srv.countryCode.trim().uppercase()
             val unlockStatus = getServerUnlockStatus(srv, records)
+            tierByServerId[srv.id] = unlockEligibilityTier(unlockStatus)
+            withinDistByServerId[srv.id] = RegionalProbeTester.isWithinAutoSelectDistanceLimit(
+                server = srv,
+                servers = servers,
+                geo = currentGeo,
+                allowTimezoneFallback = false,
+                precomputedUserCoords = userCoordsStrict,
+                precomputedMinCountryDistKm = minCountryDistStrict
+            )
             val meas = measurementsMap[srv.id]
             val fallbackPing = pingMap[srv.id]
             val distKm = RegionalProbeTester.getServerDistanceKm(srv, currentGeo, allowTimezoneFallback = false)
                 ?: RegionalProbeTester.getServerDistanceKm(srv, currentGeo, allowTimezoneFallback = true)
-            val score = calculateServerSelectionScore(
+            val serverSpecificStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+                serverName = srv.name,
+                countryCode = cc,
+                sameCountryServerNames = namesByCountry[cc] ?: emptySet(),
+                maxRecentSessions = 5,
+                sessionsList = sessions
+            ) ?: regionStatsByCountry[cc]
+            scoreByServerId[srv.id] = calculateServerSelectionScore(
                 server = srv,
                 measurement = meas,
                 fallbackPingMs = fallbackPing,
                 unlockStatus = unlockStatus,
-                sessionStats = regionStatsByServerId[srv.id],
+                sessionStats = serverSpecificStats,
                 autoBypassEnabled = prioritizeDistanceForAutoBypass,
                 distanceKm = distKm
             )
-            srv.id to score
         }
 
         return servers.sortedWith(
             Comparator { a, b ->
-                val statusA = getServerUnlockStatus(a, records)
-                val statusB = getServerUnlockStatus(b, records)
-                val tierA = unlockEligibilityTier(statusA)
-                val tierB = unlockEligibilityTier(statusB)
+                val tierA = tierByServerId[a.id] ?: 0
+                val tierB = tierByServerId[b.id] ?: 0
                 if (tierA != tierB) {
                     return@Comparator tierA.compareTo(tierB)
                 }
 
                 // Không để máy chủ quá xa (> 5.500 km như Mỹ từ Châu Á) vượt lên trên máy chủ trong phạm vi hợp lệ (KR/JP)
-                val withinDistA = RegionalProbeTester.isWithinAutoSelectDistanceLimit(a, servers, currentGeo, allowTimezoneFallback = false)
-                val withinDistB = RegionalProbeTester.isWithinAutoSelectDistanceLimit(b, servers, currentGeo, allowTimezoneFallback = false)
+                val withinDistA = withinDistByServerId[a.id] ?: true
+                val withinDistB = withinDistByServerId[b.id] ?: true
                 if (withinDistA != withinDistB) {
                     return@Comparator if (withinDistA) -1 else 1
                 }
@@ -991,14 +1067,16 @@ object VpnManager {
                     return@Comparator scoreCmp
                 }
 
-                val exactDistRankA = RegionalProbeTester.getExactCountryDistanceRank(a.countryCode, servers, currentGeo, allowTimezoneFallback = false)
-                val exactDistRankB = RegionalProbeTester.getExactCountryDistanceRank(b.countryCode, servers, currentGeo, allowTimezoneFallback = false)
+                val ccA = a.countryCode.trim().uppercase()
+                val ccB = b.countryCode.trim().uppercase()
+                val exactDistRankA = exactDistRankByCountry[ccA] ?: 99
+                val exactDistRankB = exactDistRankByCountry[ccB] ?: 99
                 if (exactDistRankA != exactDistRankB) {
                     return@Comparator exactDistRankA.compareTo(exactDistRankB)
                 }
 
-                val countryTierA = RegionalProbeTester.getNearestSupportedCountryTier(a.countryCode, servers, currentGeo)
-                val countryTierB = RegionalProbeTester.getNearestSupportedCountryTier(b.countryCode, servers, currentGeo)
+                val countryTierA = countryTierByCountry[ccA] ?: 3
+                val countryTierB = countryTierByCountry[ccB] ?: 3
                 countryTierA.compareTo(countryTierB)
             }
         )
@@ -1486,14 +1564,13 @@ object VpnManager {
             val deferreds = targets.map { server ->
                 scope.async(Dispatchers.IO) {
                     if (generationId != measurementGeneration.get()) return@async
-                    com.example.data.AppLogger.info("PING", "Đo ping ${server.name} (${server.countryCode}): bắt đầu")
                     val meas = PingTester.measureServerEndpoint(
                         server = server,
                         timeoutMs = 850,
                         useCache = useCache
                     )
                     if (recordMeasurementIfCurrentGeneration(generationId, server.id, meas)) {
-                        logPingResult(server, meas)
+                        logPingResult(server, meas, logSuccess = false)
                     }
                 }
             }
@@ -2054,6 +2131,10 @@ object VpnManager {
 
     fun onAppForeground() {
         if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) {
+            return
+        }
+        // Nếu đợt kiểm tra IP lúc khởi động vẫn đang chạy và mạng chưa bị đánh dấu thay đổi, không hủy để gọi lặp lần 2
+        if (!isIpInvalidatedByNetworkChange && ipCheckJob?.isActive == true) {
             return
         }
         val now = System.currentTimeMillis()

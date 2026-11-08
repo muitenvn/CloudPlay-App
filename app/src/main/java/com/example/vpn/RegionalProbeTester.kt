@@ -348,34 +348,65 @@ object RegionalProbeTester {
      * - Khi có vùng hỗ trợ Xbox trong bán kính <= 5.500 km (ví dụ người dùng ở Việt Nam có Hàn Quốc ~2.700-3.600km và Nhật Bản ~3.700-4.350km),
      *   chặn hoàn toàn các máy chủ vượt quá 5.500 km hoặc xa hơn vùng gần nhất quá 2.500 km (như máy chủ Mỹ ~11.500-14.200km).
      */
+    /**
+     * Tính khoảng cách ngắn nhất (km) từ tọa độ người dùng tới vùng quốc gia hỗ trợ Xbox gần nhất (JP, KR, US)
+     * mà không cấp phát lại danh sách máy chủ trung gian.
+     */
+    fun computeMinSupportedCountryDistanceKm(
+        userLat: Double,
+        userLon: Double,
+        servers: List<ServerLocation> = DEFAULT_SERVERS
+    ): Double {
+        var minDist = Double.MAX_VALUE
+        if (servers === DEFAULT_SERVERS || servers.size >= 2 || servers.isEmpty()) {
+            for (c in GeoIpDetector.SUPPORTED_COUNTRIES) {
+                val coords = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+                val d = haversineDistanceKm(userLat, userLon, coords.first, coords.second)
+                if (d < minDist) minDist = d
+            }
+        } else {
+            var matchedAny = false
+            for (srv in servers) {
+                val c = srv.countryCode.trim().uppercase()
+                if (GeoIpDetector.SUPPORTED_COUNTRIES.contains(c)) {
+                    matchedAny = true
+                    val coords = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+                    val d = haversineDistanceKm(userLat, userLon, coords.first, coords.second)
+                    if (d < minDist) minDist = d
+                }
+            }
+            if (!matchedAny) {
+                for (c in GeoIpDetector.SUPPORTED_COUNTRIES) {
+                    val coords = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+                    val d = haversineDistanceKm(userLat, userLon, coords.first, coords.second)
+                    if (d < minDist) minDist = d
+                }
+            }
+        }
+        return if (minDist == Double.MAX_VALUE) 0.0 else minDist
+    }
+
     fun isWithinAutoSelectDistanceLimit(
         server: ServerLocation,
         servers: List<ServerLocation> = DEFAULT_SERVERS,
         geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
-        allowTimezoneFallback: Boolean = false
+        allowTimezoneFallback: Boolean = false,
+        precomputedUserCoords: Pair<Double, Double>? = null,
+        precomputedMinCountryDistKm: Double? = null
     ): Boolean {
         if (server.isCustom) return true
         val code = server.countryCode.trim().uppercase()
         if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) return false
 
-        val userCoords = if (allowTimezoneFallback) {
+        val userCoords = precomputedUserCoords ?: if (allowTimezoneFallback) {
             resolveUserCoordinatesWithTimezoneFallback(geo)
         } else {
             resolveUserCoordinatesOrNull(geo)
         } ?: return true
 
         val (userLat, userLon) = userCoords
-        val referencePool = if (servers.size >= 2) (servers + DEFAULT_SERVERS) else DEFAULT_SERVERS
-        val supportedCodes = referencePool
-            .map { it.countryCode.trim().uppercase() }
-            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
-            .distinct()
-            .ifEmpty { listOf("JP", "KR", "US") }
-
-        val minCountryDistKm = supportedCodes.minOfOrNull { c ->
-            val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
-            haversineDistanceKm(userLat, userLon, lat, lon)
-        } ?: 0.0
+        val minCountryDistKm = precomputedMinCountryDistKm
+            ?: computeMinSupportedCountryDistanceKm(userLat, userLon, servers)
 
         val (srvLat, srvLon) = resolveServerCoordinates(server)
         val srvDistKm = haversineDistanceKm(userLat, userLon, srvLat, srvLon)
@@ -414,24 +445,17 @@ object RegionalProbeTester {
     fun getNearestSupportedCountryTier(
         serverCountryCode: String,
         servers: List<ServerLocation> = DEFAULT_SERVERS,
-        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp
+        geo: GeoIpResult? = VpnManager.state.value.detectedGeoIp,
+        precomputedUserCoords: Pair<Double, Double>? = null,
+        precomputedMinCountryDistKm: Double? = null
     ): Int {
         val code = serverCountryCode.trim().uppercase()
         if (!GeoIpDetector.SUPPORTED_COUNTRIES.contains(code)) return 3
 
-        val userCoords = resolveUserCoordinatesOrNull(geo) ?: return 0
+        val userCoords = precomputedUserCoords ?: resolveUserCoordinatesOrNull(geo) ?: return 0
         val (userLat, userLon) = userCoords
-
-        val supportedCodes = servers
-            .map { it.countryCode.trim().uppercase() }
-            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
-            .distinct()
-            .ifEmpty { listOf("JP", "KR", "US") }
-
-        val minCountryDistKm = supportedCodes.minOfOrNull { c ->
-            val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
-            haversineDistanceKm(userLat, userLon, lat, lon)
-        } ?: 0.0
+        val minCountryDistKm = precomputedMinCountryDistKm
+            ?: computeMinSupportedCountryDistanceKm(userLat, userLon, servers)
 
         val (targetLat, targetLon) = COUNTRY_REFERENCE_COORDS[code] ?: Pair(35.6762, 139.6503)
         val targetDistKm = haversineDistanceKm(userLat, userLon, targetLat, targetLon)
@@ -464,19 +488,18 @@ object RegionalProbeTester {
         } ?: return 0
 
         val (userLat, userLon) = userCoords
-        val referencePool = if (servers.size >= 2) (servers + DEFAULT_SERVERS) else DEFAULT_SERVERS
-        val orderedCodes = referencePool
-            .map { it.countryCode.trim().uppercase() }
-            .filter { GeoIpDetector.SUPPORTED_COUNTRIES.contains(it) }
-            .distinct()
-            .ifEmpty { listOf("KR", "JP", "US") }
-            .sortedBy { c ->
-                val (lat, lon) = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
-                haversineDistanceKm(userLat, userLon, lat, lon)
+        val targetCoords = COUNTRY_REFERENCE_COORDS[code] ?: Pair(35.6762, 139.6503)
+        val targetDist = haversineDistanceKm(userLat, userLon, targetCoords.first, targetCoords.second)
+        var closerCount = 0
+        for (c in GeoIpDetector.SUPPORTED_COUNTRIES) {
+            if (c == code) continue
+            val coords = COUNTRY_REFERENCE_COORDS[c] ?: Pair(35.6762, 139.6503)
+            val d = haversineDistanceKm(userLat, userLon, coords.first, coords.second)
+            if (d < targetDist || (d == targetDist && c < code)) {
+                closerCount++
             }
-
-        val idx = orderedCodes.indexOf(code)
-        return if (idx >= 0) idx else 99
+        }
+        return closerCount
     }
 
     /**

@@ -703,7 +703,7 @@ data class AppConfig(
     val controllerShortcutsEnabled: Boolean = true,
     val shortcutToggleStatsButton: Int = 3, // Y
     val shortcutToggleVirtualPadButton: Int = 1, // B
-    val shortcutToggleRecordingButton: Int = 0, // A
+    val shortcutToggleRecordingButton: Int = 5, // RB
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
@@ -941,7 +941,7 @@ object SettingsRepository {
             controllerShortcutsEnabled = sp.getBoolean("controller_shortcuts_enabled", true),
             shortcutToggleStatsButton = sp.getInt("shortcut_toggle_stats_btn", 3).coerceIn(-1, 16),
             shortcutToggleVirtualPadButton = sp.getInt("shortcut_toggle_vpad_btn", 1).coerceIn(-1, 16),
-            shortcutToggleRecordingButton = sp.getInt("shortcut_toggle_rec_btn", 0).coerceIn(-1, 16),
+            shortcutToggleRecordingButton = sp.getInt("shortcut_toggle_rec_btn", 5).coerceIn(-1, 16),
             systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
             stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
             autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),

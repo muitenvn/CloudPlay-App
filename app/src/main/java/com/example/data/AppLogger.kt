@@ -45,10 +45,39 @@ object AppLogger {
     const val STORAGE_LOCATION_DESC_VI = "Lưu bền vững trong bộ nhớ nội bộ ứng dụng (filesDir, tối đa 256 KB, giữ qua các lần mở lại app, tự xóa khi bấm Xóa log, không ghi cookie/token/tài khoản)"
     const val STORAGE_LOCATION_DESC_EN = "Persisted in internal app storage (filesDir, max 256 KB, retained across app restarts, deleted on Clear Log, no cookies/tokens/account data)"
 
+    private const val BATCH_FLUSH_INTERVAL_MS = 250L
+
+    private class RawLogRecord(
+        val id: Long,
+        val timestamp: String,
+        val tag: String,
+        val rawMessage: String?,
+        val lazyMessage: (() -> String)?,
+        val level: AppLogLevel
+    )
+
     private val idGenerator = AtomicLong(1L)
     private val timeFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private val fullDateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     private val fileLock = Any()
+    private val bufferLock = Any()
+
+    private val pendingQueue = java.util.concurrent.ConcurrentLinkedQueue<RawLogRecord>()
+    private val ringBuffer = java.util.ArrayDeque<AppLogEntry>(MAX_LOGS + 16)
+    private var ringBufferBytes: Int = 0
+    private var ringBufferPerfCount: Int = 0
+    private val pendingDiskEntries = java.util.ArrayList<AppLogEntry>(64)
+    private val workerScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val delayedFlushScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    @Volatile
+    private var lastUiPublishAtMs: Long = 0L
+
+    @Volatile
+    private var lastDiskFlushAtMs: Long = 0L
+
+    @Volatile
+    private var unPublishedUiChanges: Boolean = false
 
     @Volatile
     private var persistentLogFile: java.io.File? = null
@@ -56,12 +85,13 @@ object AppLogger {
     @Volatile
     private var processInitialized = false
 
-    private val diskExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "CloudPlay-AppLogger-IO").apply {
-            isDaemon = true
-            priority = Thread.NORM_PRIORITY - 1
+    private val diskExecutor: java.util.concurrent.ScheduledExecutorService =
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "CloudPlay-AppLogger-IO").apply {
+                isDaemon = true
+                priority = Thread.NORM_PRIORITY - 1
+            }
         }
-    }
 
     private val PERSISTED_LINE_REGEX = Regex("^\\[([^\\]]+)]\\s+\\[([^\\]]+)](?:\\s+\\[(INFO|SUCCESS|WARN|ERROR)])?\\s+(.*)$")
 
@@ -84,7 +114,73 @@ object AppLogger {
     private val JWT_REGEX = Regex("\\beyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b")
 
     private val _logs = MutableStateFlow<List<AppLogEntry>>(emptyList())
-    val logs: StateFlow<List<AppLogEntry>> = _logs.asStateFlow()
+    val logs: StateFlow<List<AppLogEntry>>
+        get() {
+            if (pendingQueue.isNotEmpty() || unPublishedUiChanges) {
+                processPendingLogsLocked(publishUiNow = true, flushDiskNow = false)
+            }
+            return _logs.asStateFlow()
+        }
+
+    private fun entryByteCost(item: AppLogEntry): Int {
+        return (item.timestamp.length + item.tag.length + item.message.length + 16) * 2
+    }
+
+    private fun rebuildRingBufferFromListLocked(entries: List<AppLogEntry>) {
+        ringBuffer.clear()
+        ringBufferBytes = 0
+        ringBufferPerfCount = 0
+        val cappedPerf = capPerfEntries(entries).takeLast(MAX_LOGS)
+        val trimmed = trimEntriesByBytes(cappedPerf)
+        for (e in trimmed) {
+            ringBuffer.addLast(e)
+            ringBufferBytes += entryByteCost(e)
+            if (e.tag == "PERF") ringBufferPerfCount++
+        }
+    }
+
+    private fun appendToRingBufferLocked(entry: AppLogEntry) {
+        if (entry.tag == "PERF") {
+            while (ringBufferPerfCount >= MAX_PERF_LOGS) {
+                val iter = ringBuffer.iterator()
+                var removed = false
+                while (iter.hasNext()) {
+                    val old = iter.next()
+                    if (old.tag == "PERF") {
+                        iter.remove()
+                        ringBufferBytes = (ringBufferBytes - entryByteCost(old)).coerceAtLeast(0)
+                        ringBufferPerfCount = (ringBufferPerfCount - 1).coerceAtLeast(0)
+                        removed = true
+                        break
+                    }
+                }
+                if (!removed) break
+            }
+        }
+
+        while (ringBuffer.size >= MAX_LOGS && ringBuffer.isNotEmpty()) {
+            val removed = ringBuffer.removeFirst()
+            ringBufferBytes = (ringBufferBytes - entryByteCost(removed)).coerceAtLeast(0)
+            if (removed.tag == "PERF") {
+                ringBufferPerfCount = (ringBufferPerfCount - 1).coerceAtLeast(0)
+            }
+        }
+
+        val cost = entryByteCost(entry)
+        ringBuffer.addLast(entry)
+        ringBufferBytes += cost
+        if (entry.tag == "PERF") {
+            ringBufferPerfCount++
+        }
+
+        while (ringBufferBytes > MAX_TOTAL_BYTES && ringBuffer.size > 1) {
+            val removed = ringBuffer.removeFirst()
+            ringBufferBytes = (ringBufferBytes - entryByteCost(removed)).coerceAtLeast(0)
+            if (removed.tag == "PERF") {
+                ringBufferPerfCount = (ringBufferPerfCount - 1).coerceAtLeast(0)
+            }
+        }
+    }
 
     private fun nowString(): String {
         return synchronized(timeFormat) {
@@ -112,6 +208,7 @@ object AppLogger {
         forceReinit: Boolean = false
     ) {
         if (processInitialized && !forceReinit) return
+        processPendingLogsLocked(publishUiNow = true, flushDiskNow = false)
         synchronized(fileLock) {
             if (processInitialized && !forceReinit) return
             try {
@@ -122,23 +219,27 @@ object AppLogger {
                 persistentLogFile = targetFile
 
                 val loadedEntries = loadEntriesFromDiskLocked(targetFile)
-                val earlyEntries = synchronized(_logs) {
-                    val current = if (forceReinit) emptyList() else _logs.value
-                    val combined = capPerfEntries(loadedEntries + current).takeLast(MAX_LOGS)
-                    trimEntriesByBytes(combined)
-                }
-                synchronized(_logs) {
-                    _logs.value = earlyEntries
+                var unsavedEarly: List<AppLogEntry> = emptyList()
+                synchronized(bufferLock) {
+                    val current = if (forceReinit) emptyList() else ringBuffer.toList()
+                    if (forceReinit) {
+                        pendingDiskEntries.clear()
+                    }
+                    rebuildRingBufferFromListLocked(loadedEntries + current)
+                    val snapshot = ArrayList(ringBuffer)
+                    _logs.value = snapshot
+                    unPublishedUiChanges = false
+                    lastUiPublishAtMs = System.currentTimeMillis()
+                    if (!forceReinit) {
+                        val maxLoadedId = loadedEntries.lastOrNull()?.id ?: 0L
+                        unsavedEarly = snapshot.filter { it.id > maxLoadedId }
+                        pendingDiskEntries.clear()
+                    }
                 }
 
                 // Nếu có các dòng log phát sinh sớm trước khi init() được gọi, ghi bù xuống file
-                if (!forceReinit) {
-                    val unsavedEarly = synchronized(_logs) {
-                        _logs.value.filter { it.id > (loadedEntries.lastOrNull()?.id ?: 0L) }
-                    }
-                    for (entry in unsavedEarly) {
-                        writeEntryToFileLocked(targetFile, entry)
-                    }
+                if (!forceReinit && unsavedEarly.isNotEmpty()) {
+                    writeEntriesToFileLocked(targetFile, unsavedEarly)
                 }
             } catch (_: Throwable) {
             }
@@ -200,19 +301,27 @@ object AppLogger {
         }
     }
 
+    /**
+     * `entry.message` đã được làm sạch (`sanitizeMessage`) đúng 1 lần khi tạo `AppLogEntry`,
+     * không gọi lại `sanitizeMessage` lần thứ 2 khi ghi đĩa.
+     */
     private fun formatEntryForDisk(entry: AppLogEntry): String {
-        val singleLineMsg = sanitizeMessage(entry.message)
+        val singleLineMsg = entry.message
             .replace("\r\n", " ⏎ ")
             .replace('\n', ' ')
         return "[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] $singleLineMsg\n"
     }
 
-    private fun writeEntryToFileLocked(file: java.io.File, entry: AppLogEntry) {
+    private fun writeEntriesToFileLocked(file: java.io.File, entries: List<AppLogEntry>) {
+        if (entries.isEmpty()) return
         synchronized(fileLock) {
             try {
-                // Nếu file đã bị thay đổi sang file khác hoặc chưa bật lưu đĩa thì bỏ qua
                 if (persistentLogFile != file) return
-                val lineBytes = formatEntryForDisk(entry).toByteArray(Charsets.UTF_8)
+                val sb = StringBuilder(entries.size * 96)
+                for (entry in entries) {
+                    sb.append(formatEntryForDisk(entry))
+                }
+                val lineBytes = sb.toString().toByteArray(Charsets.UTF_8)
                 java.io.FileOutputStream(file, true).use { fos ->
                     fos.write(lineBytes)
                 }
@@ -247,7 +356,7 @@ object AppLogger {
         var runningBytes = 0
         for (i in entries.indices.reversed()) {
             val item = entries[i]
-            val itemBytes = (item.timestamp.length + item.tag.length + item.message.length + 16) * 2
+            val itemBytes = entryByteCost(item)
             if (runningBytes + itemBytes > MAX_TOTAL_BYTES && trimmedByBytes.isNotEmpty()) {
                 break
             }
@@ -272,9 +381,136 @@ object AppLogger {
         return result
     }
 
+    private fun scheduleWorkerDrain(flushImmediately: Boolean) {
+        if (flushImmediately) {
+            try {
+                diskExecutor.execute {
+                    processPendingLogsLocked(publishUiNow = true, flushDiskNow = true)
+                }
+            } catch (_: Throwable) {
+            }
+            return
+        }
+        if (workerScheduled.compareAndSet(false, true)) {
+            try {
+                diskExecutor.execute {
+                    try {
+                        processPendingLogsLocked(publishUiNow = false, flushDiskNow = false)
+                    } finally {
+                        workerScheduled.set(false)
+                        if (pendingQueue.isNotEmpty()) {
+                            scheduleWorkerDrain(flushImmediately = false)
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+                workerScheduled.set(false)
+            }
+        }
+    }
+
+    private fun scheduleDelayedBatchFlushIfNeeded() {
+        if (delayedFlushScheduled.compareAndSet(false, true)) {
+            try {
+                diskExecutor.schedule(
+                    {
+                        try {
+                            processPendingLogsLocked(publishUiNow = true, flushDiskNow = true)
+                        } finally {
+                            delayedFlushScheduled.set(false)
+                        }
+                    },
+                    BATCH_FLUSH_INTERVAL_MS,
+                    java.util.concurrent.TimeUnit.MILLISECONDS
+                )
+            } catch (_: Throwable) {
+                delayedFlushScheduled.set(false)
+            }
+        }
+    }
+
+    private fun processPendingLogsLocked(publishUiNow: Boolean, flushDiskNow: Boolean) {
+        var diskBatchToWrite: List<AppLogEntry>? = null
+        var targetFile: java.io.File? = null
+        var needsDelayedFlush = false
+
+        synchronized(bufferLock) {
+            var hasError = false
+            var drainedAny = false
+            while (true) {
+                val record = pendingQueue.poll() ?: break
+                drainedAny = true
+                val rawMsg = record.rawMessage
+                    ?: runCatching { record.lazyMessage?.invoke().orEmpty() }.getOrDefault("")
+                val safeMessage = sanitizeMessage(rawMsg)
+                val entry = AppLogEntry(
+                    id = record.id,
+                    timestamp = record.timestamp,
+                    tag = record.tag,
+                    message = safeMessage,
+                    level = record.level
+                )
+                appendToRingBufferLocked(entry)
+                unPublishedUiChanges = true
+                if (persistentLogFile != null) {
+                    pendingDiskEntries.add(entry)
+                }
+                if (record.level == AppLogLevel.ERROR) {
+                    hasError = true
+                }
+                try {
+                    when (record.level) {
+                        AppLogLevel.ERROR -> Log.e("CloudPlay-${record.tag}", safeMessage)
+                        AppLogLevel.WARN -> Log.w("CloudPlay-${record.tag}", safeMessage)
+                        else -> Log.d("CloudPlay-${record.tag}", safeMessage)
+                    }
+                } catch (_: Exception) {
+                    // Ignore android.util.Log exceptions in pure unit test environments
+                }
+            }
+
+            val nowMs = System.currentTimeMillis()
+            val shouldPublishUi = unPublishedUiChanges &&
+                (publishUiNow || hasError || (nowMs - lastUiPublishAtMs) >= BATCH_FLUSH_INTERVAL_MS)
+            if (shouldPublishUi) {
+                _logs.value = ArrayList(ringBuffer)
+                unPublishedUiChanges = false
+                lastUiPublishAtMs = nowMs
+            }
+
+            val shouldFlushDisk = pendingDiskEntries.isNotEmpty() &&
+                (flushDiskNow || hasError || (nowMs - lastDiskFlushAtMs) >= BATCH_FLUSH_INTERVAL_MS)
+            if (shouldFlushDisk) {
+                targetFile = persistentLogFile
+                if (targetFile != null) {
+                    diskBatchToWrite = ArrayList(pendingDiskEntries)
+                }
+                pendingDiskEntries.clear()
+                lastDiskFlushAtMs = nowMs
+            }
+
+            if (unPublishedUiChanges || pendingDiskEntries.isNotEmpty()) {
+                needsDelayedFlush = true
+            }
+            if (!drainedAny && !shouldPublishUi && !shouldFlushDisk) {
+                return
+            }
+        }
+
+        if (diskBatchToWrite != null && targetFile != null) {
+            writeEntriesToFileLocked(targetFile!!, diskBatchToWrite!!)
+        }
+        if (needsDelayedFlush) {
+            scheduleDelayedBatchFlushIfNeeded()
+        }
+    }
+
     fun flushDiskWritesForTest() {
+        processPendingLogsLocked(publishUiNow = true, flushDiskNow = true)
         try {
-            diskExecutor.submit {}.get(3, java.util.concurrent.TimeUnit.SECONDS)
+            diskExecutor.submit {
+                processPendingLogsLocked(publishUiNow = true, flushDiskNow = true)
+            }.get(3, java.util.concurrent.TimeUnit.SECONDS)
         } catch (_: Throwable) {
         }
     }
@@ -360,38 +596,37 @@ object AppLogger {
         }
     }
 
+    /**
+     * Đẩy bản ghi thô vào hàng đợi không khóa (lock-free queue) và trả về ngay lập tức trên luồng gọi.
+     * Việc lọc nhạy cảm (`sanitizeMessage`), cắt giới hạn vòng đệm 500 dòng / 256 KB / 40 dòng [PERF],
+     * phát `_logs.value` (~4 lần/giây) và gom ghi đĩa được thực hiện trên luồng nền `CloudPlay-AppLogger-IO`.
+     */
     fun log(tag: String, message: String, level: AppLogLevel = AppLogLevel.INFO) {
         val cleanTag = tag.trim().uppercase(Locale.ROOT)
-        val safeMessage = sanitizeMessage(message)
-        val entry = AppLogEntry(
+        val record = RawLogRecord(
             id = idGenerator.getAndIncrement(),
             timestamp = nowString(),
             tag = cleanTag,
-            message = safeMessage,
+            rawMessage = message,
+            lazyMessage = null,
             level = level
         )
-        synchronized(_logs) {
-            val combined = capPerfEntries(_logs.value + entry).takeLast(MAX_LOGS)
-            _logs.value = trimEntriesByBytes(combined)
-        }
-        val targetFile = persistentLogFile
-        if (targetFile != null) {
-            try {
-                diskExecutor.execute {
-                    writeEntryToFileLocked(targetFile, entry)
-                }
-            } catch (_: Throwable) {
-            }
-        }
-        try {
-            when (level) {
-                AppLogLevel.ERROR -> Log.e("CloudPlay-$cleanTag", safeMessage)
-                AppLogLevel.WARN -> Log.w("CloudPlay-$cleanTag", safeMessage)
-                else -> Log.d("CloudPlay-$cleanTag", safeMessage)
-            }
-        } catch (_: Exception) {
-            // Ignore android.util.Log exceptions in pure unit test environments
-        }
+        pendingQueue.offer(record)
+        scheduleWorkerDrain(flushImmediately = (level == AppLogLevel.ERROR))
+    }
+
+    fun logLazy(tag: String, level: AppLogLevel = AppLogLevel.INFO, messageBuilder: () -> String) {
+        val cleanTag = tag.trim().uppercase(Locale.ROOT)
+        val record = RawLogRecord(
+            id = idGenerator.getAndIncrement(),
+            timestamp = nowString(),
+            tag = cleanTag,
+            rawMessage = null,
+            lazyMessage = messageBuilder,
+            level = level
+        )
+        pendingQueue.offer(record)
+        scheduleWorkerDrain(flushImmediately = (level == AppLogLevel.ERROR))
     }
 
     fun info(tag: String, message: String) = log(tag, message, AppLogLevel.INFO)
@@ -403,7 +638,13 @@ object AppLogger {
     fun error(tag: String, message: String) = log(tag, message, AppLogLevel.ERROR)
 
     fun clear() {
-        synchronized(_logs) {
+        synchronized(bufferLock) {
+            pendingQueue.clear()
+            ringBuffer.clear()
+            ringBufferBytes = 0
+            ringBufferPerfCount = 0
+            pendingDiskEntries.clear()
+            unPublishedUiChanges = false
             _logs.value = emptyList()
         }
         synchronized(fileLock) {
@@ -426,6 +667,7 @@ object AppLogger {
     }
 
     fun exportAsText(): String {
+        processPendingLogsLocked(publishUiNow = true, flushDiskNow = false)
         val snapshot = _logs.value
         if (snapshot.isEmpty()) return "Chưa có dữ liệu nhật ký (No logs recorded)."
         return snapshot.joinToString(separator = "\n") { entry ->
@@ -506,6 +748,7 @@ object AppLogger {
         throwable: Throwable
     ) {
         try {
+            processPendingLogsLocked(publishUiNow = true, flushDiskNow = true)
             val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             val rawTrace = android.util.Log.getStackTraceString(throwable).ifBlank {
                 "${throwable.javaClass.name}: ${throwable.message.orEmpty()}"

@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
@@ -56,14 +57,26 @@ object SessionHistoryRepository {
 
     private var prefs: SharedPreferences? = null
 
+    private val ioScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
     private val _sessions = MutableStateFlow<List<PlaySessionRecord>>(emptyList())
     val sessions: StateFlow<List<PlaySessionRecord>> = _sessions.asStateFlow()
+
+    private val _isLoadingSessions = MutableStateFlow(false)
+    val isLoadingSessions: StateFlow<Boolean> = _isLoadingSessions.asStateFlow()
 
     fun init(context: Context) {
         if (prefs != null) return
         val sharedPrefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs = sharedPrefs
-        loadFromPrefs(sharedPrefs)
+        _isLoadingSessions.value = true
+        ioScope.launch {
+            try {
+                loadFromPrefs(sharedPrefs)
+            } finally {
+                _isLoadingSessions.value = false
+            }
+        }
     }
 
     fun deserializeSessionsJson(raw: String): List<PlaySessionRecord> {

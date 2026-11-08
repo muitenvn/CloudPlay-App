@@ -129,55 +129,80 @@ fun GameLibraryScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedDetailGame by remember { mutableStateOf<GameBookmark?>(null) }
 
-    val filteredGames = remember(games, selectedTab, selectedGenre, searchQuery, favoriteIds) {
-        games.filter { game ->
-            val matchesTab = when (selectedTab) {
-                GameFilterTab.ALL -> true
-                GameFilterTab.FAVORITES -> game.id in favoriteIds
-                GameFilterTab.POPULAR -> game.isPopular || game.rating >= "4.9"
-                GameFilterTab.RECENTLY_ADDED -> game.isRecentlyAdded
-                GameFilterTab.FREE_TO_PLAY -> game.freeToPlay
-                GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
-                GameFilterTab.GAME_PASS -> !game.freeToPlay
+    val computedLibraryState by androidx.compose.runtime.produceState(
+        initialValue = Pair(games, intArrayOf(0, 0, 0, 0, 0)),
+        games,
+        selectedTab,
+        selectedGenre,
+        searchQuery,
+        favoriteIds
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val filtered = games.filter { game ->
+                val matchesTab = when (selectedTab) {
+                    GameFilterTab.ALL -> true
+                    GameFilterTab.FAVORITES -> game.id in favoriteIds
+                    GameFilterTab.POPULAR -> game.isPopular || game.rating >= "4.9"
+                    GameFilterTab.RECENTLY_ADDED -> game.isRecentlyAdded
+                    GameFilterTab.FREE_TO_PLAY -> game.freeToPlay
+                    GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
+                    GameFilterTab.GAME_PASS -> !game.freeToPlay
+                }
+                val matchesGenre = when (selectedGenre) {
+                    "ALL" -> true
+                    "SHOOTER" -> game.category.contains("Bắn súng", ignoreCase = true) ||
+                        game.categoryEn.contains("Shooter", ignoreCase = true) ||
+                        game.categoryEn.contains("Battle Royale", ignoreCase = true)
+                    "ACTION" -> game.category.contains("Hành động", ignoreCase = true) ||
+                        game.category.contains("Phiêu lưu", ignoreCase = true) ||
+                        game.categoryEn.contains("Action", ignoreCase = true) ||
+                        game.categoryEn.contains("Adventure", ignoreCase = true)
+                    "RACING" -> game.category.contains("Đua xe", ignoreCase = true) ||
+                        game.category.contains("Lái", ignoreCase = true) ||
+                        game.categoryEn.contains("Racing", ignoreCase = true) ||
+                        game.categoryEn.contains("Simulation", ignoreCase = true)
+                    "RPG" -> game.category.contains("Nhập vai", ignoreCase = true) ||
+                        game.category.contains("Sinh tồn", ignoreCase = true) ||
+                        game.categoryEn.contains("RPG", ignoreCase = true) ||
+                        game.categoryEn.contains("Survival", ignoreCase = true)
+                    "SPORTS" -> game.category.contains("Thể thao", ignoreCase = true) ||
+                        game.category.contains("Đối kháng", ignoreCase = true) ||
+                        game.categoryEn.contains("Sports", ignoreCase = true) ||
+                        game.categoryEn.contains("Fighting", ignoreCase = true)
+                    else -> true
+                }
+                val matchesSearch = if (searchQuery.isBlank()) true else {
+                    game.title.contains(searchQuery, ignoreCase = true) ||
+                        game.category.contains(searchQuery, ignoreCase = true) ||
+                        game.categoryEn.contains(searchQuery, ignoreCase = true) ||
+                        (game.publisher?.contains(searchQuery, ignoreCase = true) == true)
+                }
+                matchesTab && matchesGenre && matchesSearch
+            }.sortedByDescending { it.id in favoriteIds }
+
+            var fav = 0
+            var pop = 0
+            var rec = 0
+            var free = 0
+            var touch = 0
+            for (g in games) {
+                if (g.id in favoriteIds) fav++
+                if (g.isPopular || g.rating >= "4.9") pop++
+                if (g.isRecentlyAdded) rec++
+                if (g.freeToPlay) free++
+                if (g.supportsTouch) touch++
             }
-            val matchesGenre = when (selectedGenre) {
-                "ALL" -> true
-                "SHOOTER" -> game.category.contains("Bắn súng", ignoreCase = true) ||
-                    game.categoryEn.contains("Shooter", ignoreCase = true) ||
-                    game.categoryEn.contains("Battle Royale", ignoreCase = true)
-                "ACTION" -> game.category.contains("Hành động", ignoreCase = true) ||
-                    game.category.contains("Phiêu lưu", ignoreCase = true) ||
-                    game.categoryEn.contains("Action", ignoreCase = true) ||
-                    game.categoryEn.contains("Adventure", ignoreCase = true)
-                "RACING" -> game.category.contains("Đua xe", ignoreCase = true) ||
-                    game.category.contains("Lái", ignoreCase = true) ||
-                    game.categoryEn.contains("Racing", ignoreCase = true) ||
-                    game.categoryEn.contains("Simulation", ignoreCase = true)
-                "RPG" -> game.category.contains("Nhập vai", ignoreCase = true) ||
-                    game.category.contains("Sinh tồn", ignoreCase = true) ||
-                    game.categoryEn.contains("RPG", ignoreCase = true) ||
-                    game.categoryEn.contains("Survival", ignoreCase = true)
-                "SPORTS" -> game.category.contains("Thể thao", ignoreCase = true) ||
-                    game.category.contains("Đối kháng", ignoreCase = true) ||
-                    game.categoryEn.contains("Sports", ignoreCase = true) ||
-                    game.categoryEn.contains("Fighting", ignoreCase = true)
-                else -> true
-            }
-            val matchesSearch = if (searchQuery.isBlank()) true else {
-                game.title.contains(searchQuery, ignoreCase = true) ||
-                    game.category.contains(searchQuery, ignoreCase = true) ||
-                    game.categoryEn.contains(searchQuery, ignoreCase = true) ||
-                    (game.publisher?.contains(searchQuery, ignoreCase = true) == true)
-            }
-            matchesTab && matchesGenre && matchesSearch
-        }.sortedByDescending { it.id in favoriteIds }
+            Pair(filtered, intArrayOf(fav, pop, rec, free, touch))
+        }
     }
 
-    val favCount = remember(games, favoriteIds) { games.count { it.id in favoriteIds } }
-    val popCount = remember(games) { games.count { it.isPopular || it.rating >= "4.9" } }
-    val recentCount = remember(games) { games.count { it.isRecentlyAdded } }
-    val freeCount = remember(games) { games.count { it.freeToPlay } }
-    val touchCount = remember(games) { games.count { it.supportsTouch } }
+    val filteredGames = computedLibraryState.first
+    val counts = computedLibraryState.second
+    val favCount = counts[0]
+    val popCount = counts[1]
+    val recentCount = counts[2]
+    val freeCount = counts[3]
+    val touchCount = counts[4]
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(

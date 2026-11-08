@@ -77,11 +77,11 @@ class MainActivity : ComponentActivity() {
 
         com.example.data.AppLogger.init(applicationContext)
         com.example.data.AppLogger.installCrashHandler(applicationContext)
-        VpnManager.init(applicationContext)
         SettingsRepository.init(applicationContext)
+        com.example.cloudplay.NetworkOptimizer.init(applicationContext)
+        VpnManager.init(applicationContext)
         GameLibraryRepository.init(applicationContext)
         com.example.data.SessionHistoryRepository.init(applicationContext)
-        com.example.cloudplay.NetworkOptimizer.init(applicationContext)
         streamController = StreamController(applicationContext)
         lockDisplayRefreshRateTo60Hz(false)
 

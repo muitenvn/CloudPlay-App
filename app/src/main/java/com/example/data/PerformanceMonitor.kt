@@ -88,21 +88,20 @@ object PerformanceMonitor {
                         if (nowMs - lastFrozenLogElapsedMs >= FROZEN_LOG_COOLDOWN_MS) {
                             lastFrozenLogElapsedMs = nowMs
                             val frameMs = deltaNs / 1_000_000.0
-                            val scen = currentScenario
-                            val recomp = activeWindowRecompositions[scen]?.get() ?: 0
-                            val (usedMb, maxMb) = readHeapMb()
-                            AppLogger.warn(
-                                "PERF",
+                            val scenCode = currentScenario.code
+                            val recomp = activeWindowRecompositions[currentScenario]?.get() ?: 0
+                            AppLogger.logLazy("PERF", AppLogLevel.WARN) {
+                                val (usedMb, maxMb) = readHeapMb()
                                 String.format(
                                     Locale.US,
                                     "Khựng luồng chính tại [%s]: %.1f ms (>100ms) | vẽ lại=%d | RAM=%d/%d MB",
-                                    scen.code,
+                                    scenCode,
                                     frameMs,
                                     recomp,
                                     usedMb,
                                     maxMb
                                 )
-                            )
+                            }
                         }
                     }
                 }

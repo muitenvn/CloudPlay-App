@@ -460,8 +460,7 @@ object AppLogger {
                 }
                 try {
                     when (record.level) {
-                        AppLogLevel.ERROR -> Log.e("CloudPlay-${record.tag}", safeMessage)
-                        AppLogLevel.WARN -> Log.w("CloudPlay-${record.tag}", safeMessage)
+                        AppLogLevel.ERROR, AppLogLevel.WARN -> Log.w("CloudPlay-${record.tag}", safeMessage)
                         else -> Log.d("CloudPlay-${record.tag}", safeMessage)
                     }
                 } catch (_: Exception) {

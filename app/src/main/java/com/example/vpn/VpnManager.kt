@@ -149,7 +149,7 @@ object VpnManager {
                 )
             }
             else -> {
-                com.example.data.AppLogger.error(
+                com.example.data.AppLogger.warn(
                     "PING",
                     "Đo ping ${server.name} (${server.ip}:${server.port}): không phản hồi"
                 )

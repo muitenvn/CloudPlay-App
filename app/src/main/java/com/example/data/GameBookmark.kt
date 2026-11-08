@@ -111,6 +111,7 @@ object GameLibraryRepository {
     private const val RECENT_PREFS_NAME = "cloudplay_recent_game_prefs"
     private const val KEY_CUSTOM_GAMES_JSON = "custom_games_json"
     private const val KEY_SYNCED_GAMES_JSON = "synced_xbox_games_json_v4"
+    private const val SYNCED_GAMES_CACHE_FILE_NAME = "xbox_synced_games_v4.json"
     private const val KEY_LAST_CATALOG_SYNC_MS = "last_catalog_sync_ms"
     private const val KEY_FAVORITE_IDS = "favorite_game_ids"
     private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
@@ -136,6 +137,8 @@ object GameLibraryRepository {
 
     private var prefs: SharedPreferences? = null
     private var recentPrefs: SharedPreferences? = null
+    @Volatile
+    private var syncedGamesCacheFile: java.io.File? = null
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
@@ -179,15 +182,22 @@ object GameLibraryRepository {
         if (!initStarted) {
             initStarted = true
             val appCtx = context.applicationContext
+            syncedGamesCacheFile = java.io.File(appCtx.filesDir, SYNCED_GAMES_CACHE_FILE_NAME)
             _isLoadingInitialCatalog.value = true
             ioScope.launch {
+                // Khởi tạo sẵn Coil ImageLoader trên luồng IO để lần gọi AsyncImage đầu tiên trên UI không bị chặn
+                try {
+                    coil.Coil.imageLoader(appCtx)
+                } catch (_: Throwable) {
+                }
+
                 val t0 = android.os.SystemClock.elapsedRealtime()
                 val sharedPrefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 val legacyRecentPrefs = appCtx.getSharedPreferences(RECENT_PREFS_NAME, Context.MODE_PRIVATE)
                 prefs = sharedPrefs
                 recentPrefs = legacyRecentPrefs
 
-                // Chờ SharedPreferencesImpl nạp xong file XML trên luồng IO thay vì chặn luồng chính (trước đây tốn ~1458ms trong onCreate)
+                // Chờ SharedPreferencesImpl nạp xong file XML trên luồng IO thay vì chặn luồng chính
                 val savedFavs = sharedPrefs.getStringSet(KEY_FAVORITE_IDS, emptySet()) ?: emptySet()
                 val tAfterPrefsAwait = android.os.SystemClock.elapsedRealtime()
                 _favoriteIds.value = savedFavs.toSet()
@@ -220,7 +230,7 @@ object GameLibraryRepository {
                 try {
                     val tParseStart = android.os.SystemClock.elapsedRealtime()
                     customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
-                    syncedList = loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
+                    syncedList = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
                     val tParseEnd = android.os.SystemClock.elapsedRealtime()
                     rebuildMergedGames(customList, syncedList)
                     val tMergeEnd = android.os.SystemClock.elapsedRealtime()
@@ -253,8 +263,8 @@ object GameLibraryRepository {
         customList: List<GameBookmark>,
         syncedList: List<GameBookmark>
     ) {
-        val existingIds = HashSet<String>()
-        val existingProductIds = HashSet<String>()
+        val existingIds = HashSet<String>((customList.size + syncedList.size) * 2)
+        val existingProductIds = HashSet<String>((customList.size + syncedList.size) * 2)
         val merged = ArrayList<GameBookmark>(customList.size + syncedList.size)
 
         fun addUnique(item: GameBookmark) {
@@ -265,10 +275,12 @@ object GameLibraryRepository {
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
-            val finalItem = if (isFortnite) {
+            val finalItem = if (isFortnite && (item.id != "fortnite" || item.drawableResId != null)) {
                 item.copy(id = "fortnite", drawableResId = null)
-            } else {
+            } else if (item.drawableResId != null) {
                 item.copy(drawableResId = null)
+            } else {
+                item
             }
             merged.add(finalItem)
         }
@@ -703,7 +715,7 @@ object GameLibraryRepository {
                     _games.value.filter { it.id.startsWith("custom_") }
                 }
                 val existingSynced = if (sharedPrefs != null) {
-                    loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
+                    loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
                 } else emptyList()
 
                 val existingWithImages = existingSynced.filter { !it.imageUrl.isNullOrBlank() }
@@ -1145,8 +1157,47 @@ object GameLibraryRepository {
     }
 
     private fun loadGamesArrayFromPrefs(sharedPrefs: SharedPreferences, key: String): List<GameBookmark> {
+        val rawJson = try {
+            sharedPrefs.getString(key, null)
+        } catch (_: Exception) {
+            null
+        } ?: return emptyList()
+        return parseGamesJsonArray(rawJson)
+    }
+
+    private fun loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs: SharedPreferences): List<GameBookmark> {
+        val cacheFile = syncedGamesCacheFile
+        if (cacheFile != null && cacheFile.exists() && cacheFile.length() > 2L) {
+            val fileJson = try {
+                cacheFile.readText(Charsets.UTF_8)
+            } catch (_: Exception) {
+                null
+            }
+            if (!fileJson.isNullOrBlank()) {
+                if (sharedPrefs.contains(KEY_SYNCED_GAMES_JSON)) {
+                    sharedPrefs.edit().remove(KEY_SYNCED_GAMES_JSON).apply()
+                }
+                return parseGamesJsonArray(fileJson)
+            }
+        }
+        val legacyJson = try {
+            sharedPrefs.getString(KEY_SYNCED_GAMES_JSON, null)
+        } catch (_: Exception) {
+            null
+        }
+        if (!legacyJson.isNullOrBlank()) {
+            try {
+                cacheFile?.writeText(legacyJson, Charsets.UTF_8)
+                sharedPrefs.edit().remove(KEY_SYNCED_GAMES_JSON).apply()
+            } catch (_: Exception) {
+            }
+            return parseGamesJsonArray(legacyJson)
+        }
+        return emptyList()
+    }
+
+    private fun parseGamesJsonArray(rawJson: String): List<GameBookmark> {
         return try {
-            val rawJson = sharedPrefs.getString(key, null) ?: return emptyList()
             val arr = JSONArray(rawJson)
             val list = ArrayList<GameBookmark>(arr.length())
             for (i in 0 until arr.length()) {
@@ -1155,7 +1206,7 @@ object GameLibraryRepository {
                 val playUrl = obj.optString("playUrl", "").trim()
                 if (title.isBlank() || playUrl.isBlank()) continue
                 val id = obj.optString("id", "custom_$i")
-                val isFortnite = id == "fortnite" || extractProductId(playUrl).equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+                val isFortnite = id == "fortnite" || playUrl.contains(FORTNITE_PRODUCT_ID, ignoreCase = true)
                 val cat = obj.optString("category", "Xbox Cloud Game Pass")
                 val rawBadge = obj.optString("badge", "").takeIf { it.isNotBlank() }
                 val badge = rawBadge?.let { b ->
@@ -1203,15 +1254,35 @@ object GameLibraryRepository {
     }
 
     private fun saveSyncedGames(allGames: List<GameBookmark>) {
-        val sharedPrefs = prefs ?: return
         val syncedGames = allGames
             .filter { !it.id.startsWith("custom_") && !it.imageUrl.isNullOrBlank() }
             .take(550)
-        saveGamesListToPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON, syncedGames)
+        ioScope.launch {
+            val jsonStr = serializeGamesListToJson(syncedGames) ?: return@launch
+            val cacheFile = syncedGamesCacheFile
+            if (cacheFile != null) {
+                try {
+                    cacheFile.writeText(jsonStr, Charsets.UTF_8)
+                    prefs?.let { sp ->
+                        if (sp.contains(KEY_SYNCED_GAMES_JSON)) {
+                            sp.edit().remove(KEY_SYNCED_GAMES_JSON).apply()
+                        }
+                    }
+                    return@launch
+                } catch (_: Exception) {
+                }
+            }
+            prefs?.edit()?.putString(KEY_SYNCED_GAMES_JSON, jsonStr)?.apply()
+        }
     }
 
     private fun saveGamesListToPrefs(sharedPrefs: SharedPreferences, key: String, gamesList: List<GameBookmark>) {
-        try {
+        val jsonStr = serializeGamesListToJson(gamesList) ?: return
+        sharedPrefs.edit().putString(key, jsonStr).apply()
+    }
+
+    private fun serializeGamesListToJson(gamesList: List<GameBookmark>): String? {
+        return try {
             val arr = JSONArray()
             for (game in gamesList) {
                 val obj = JSONObject().apply {
@@ -1235,8 +1306,9 @@ object GameLibraryRepository {
                 }
                 arr.put(obj)
             }
-            sharedPrefs.edit().putString(key, arr.toString()).apply()
+            arr.toString()
         } catch (_: Exception) {
+            null
         }
     }
 

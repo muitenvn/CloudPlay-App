@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -137,6 +138,18 @@ fun DashboardScreen(
     }
 
     var currentTab by rememberSaveable { mutableStateOf(DashboardTab.HOME) }
+    val visitedTabs = remember { androidx.compose.runtime.mutableStateListOf(currentTab) }
+    if (currentTab !in visitedTabs) {
+        visitedTabs.add(currentTab)
+    }
+    val topBarLogoRequest = remember(context) {
+        coil.request.ImageRequest.Builder(context)
+            .data(R.drawable.cloudplay_launcher_icon_1791392788421)
+            .size(96, 96)
+            .allowRgb565(true)
+            .crossfade(false)
+            .build()
+    }
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(GuideSection.QUICK_START) }
     var showTranslatorDialog by remember { mutableStateOf(false) }
@@ -161,6 +174,9 @@ fun DashboardScreen(
             com.example.data.PerformanceMonitor.setScenario(nextScenario)
             val suffix = if (reason.isNotBlank()) " ($reason)" else ""
             com.example.data.AppLogger.info("UI", "Chuyển tab chính: ${currentTab.name} -> ${newTab.name}$suffix")
+            if (newTab !in visitedTabs) {
+                visitedTabs.add(newTab)
+            }
             currentTab = newTab
         }
     }
@@ -218,8 +234,8 @@ fun DashboardScreen(
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.cloudplay_launcher_icon_1791392788421),
+                                    coil.compose.AsyncImage(
+                                        model = topBarLogoRequest,
                                         contentDescription = "CloudPlay Logo",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
@@ -579,73 +595,84 @@ fun DashboardScreen(
                 com.example.data.PerformanceMonitor.recordRecomposition(activePerfScenario)
             }
 
-            AnimatedContent(
-                targetState = currentTab,
-                transitionSpec = {
-                    if (reduceMotion) {
-                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
-                    } else {
-                        val direction = targetState.ordinal.compareTo(initialState.ordinal)
-                        xboxTabEnterTransition(direction) togetherWith xboxTabExitTransition(direction)
-                    }
-                },
-                label = "tab_animation"
-            ) { tab ->
-                TrackFirstTabComposition(tab) {
-                    when (tab) {
-                        DashboardTab.HOME -> {
-                            HomeScreen(
-                                vpnState = vpnState,
-                                gamepadStatus = gamepadStatus,
-                                featuredGames = allGames,
-                                onConnectVpn = { handleConnect() },
-                                onDisconnectVpn = { VpnManager.disconnect(context) },
-                                onSwitchEngine = { VpnManager.setEngine(it) },
-                                onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
-                                onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
-                                onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
-                                onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
-                                onNavigateToSettings = { switchTab(DashboardTab.SETTINGS, "từ Trang chủ") },
-                                onOpenGuide = { section ->
-                                    guideInitialSection = section
-                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
-                                    showGuideDialog = true
-                                },
-                                onOpenTranslator = {
-                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ Trang chủ")
-                                    showTranslatorDialog = true
+            // Lazy-Mount + Keep-Alive Tab Host:
+            // - Lúc mới mở app chỉ dựng HOME.
+            // - Tab nào người dùng bấm vào lần đầu mới dựng và giữ sống cây LayoutNode + LazyListState.
+            // - Khi chuyển qua lại giữa các tab đã mở, chỉ bật/tắt placeable ở pha Placement (0 Compose, 0 Measure/SubcomposeLayout).
+            Box(modifier = Modifier.fillMaxSize()) {
+                visitedTabs.forEach { tab ->
+                    androidx.compose.runtime.key(tab) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    layout(placeable.width, placeable.height) {
+                                        if (currentTab == tab) {
+                                            placeable.placeRelative(0, 0)
+                                        }
+                                    }
                                 }
-                            )
-                        }
-                        DashboardTab.LIBRARY -> {
-                            GameLibraryScreen(
-                                games = allGames,
-                                onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) }
-                            )
-                        }
-                        DashboardTab.SERVERS -> {
-                            ServersScreen(
-                                currentServer = vpnState.currentServer,
-                                onSelectServer = { VpnManager.selectServer(it, context) }
-                            )
-                        }
-                        DashboardTab.SETTINGS -> {
-                            SettingsScreen(
-                                config = config,
-                                vpnState = vpnState,
-                                onOpenGuide = { section ->
-                                    guideInitialSection = section
-                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
-                                    showGuideDialog = true
-                                },
-                                onClearCookies = {
-                                    com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
-                                    android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                                    android.webkit.WebStorage.getInstance().deleteAllData()
-                                    val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
-                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                        ) {
+                            TrackFirstTabComposition(tab) {
+                                when (tab) {
+                                    DashboardTab.HOME -> {
+                                        HomeScreen(
+                                            vpnState = vpnState,
+                                            gamepadStatus = gamepadStatus,
+                                            featuredGames = allGames,
+                                            onConnectVpn = { handleConnect() },
+                                            onDisconnectVpn = { VpnManager.disconnect(context) },
+                                            onSwitchEngine = { VpnManager.setEngine(it) },
+                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
+                                            onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
+                                            onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
+                                            onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
+                                            onNavigateToSettings = { switchTab(DashboardTab.SETTINGS, "từ Trang chủ") },
+                                            onOpenGuide = { section ->
+                                                guideInitialSection = section
+                                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
+                                                showGuideDialog = true
+                                            },
+                                            onOpenTranslator = {
+                                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ Trang chủ")
+                                                showTranslatorDialog = true
+                                            }
+                                        )
+                                    }
+                                    DashboardTab.LIBRARY -> {
+                                        GameLibraryScreen(
+                                            games = allGames,
+                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) }
+                                        )
+                                    }
+                                    DashboardTab.SERVERS -> {
+                                        ServersScreen(
+                                            currentServer = vpnState.currentServer,
+                                            onSelectServer = { VpnManager.selectServer(it, context) },
+                                            isTabActive = (currentTab == DashboardTab.SERVERS)
+                                        )
+                                    }
+                                    DashboardTab.SETTINGS -> {
+                                        SettingsScreen(
+                                            config = config,
+                                            vpnState = vpnState,
+                                            onOpenGuide = { section ->
+                                                guideInitialSection = section
+                                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
+                                                showGuideDialog = true
+                                            },
+                                            onClearCookies = {
+                                                com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
+                                                android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                                                android.webkit.WebStorage.getInstance().deleteAllData()
+                                                val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
+                                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    }
                                 }
-                            )
+                            }
                         }
                     }
                 }

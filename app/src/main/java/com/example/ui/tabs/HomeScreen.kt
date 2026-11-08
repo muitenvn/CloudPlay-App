@@ -140,46 +140,76 @@ fun HomeScreen(
         onLaunchGame(game.playUrl)
     }
 
-    val sortedFeaturedGames = remember(featuredGames, favoriteIds) {
-        featuredGames.sortedByDescending { it.id in favoriteIds }.take(18)
+    val initialHomeGames = remember {
+        Triple(
+            featuredGames.take(18),
+            null as GameBookmark?,
+            emptyList<GameBookmark>()
+        )
     }
-
-    val lastPlayedGame = remember(effectiveLastPlayedId, featuredGames, recentSessions) {
-        val byId = effectiveLastPlayedId?.let { id ->
-            featuredGames.find { it.id.equals(id, ignoreCase = true) }
-        }
-        if (byId != null) {
-            byId
-        } else {
-            val latestTitle = recentSessions.firstOrNull()?.gameTitle?.trim()
-            if (!latestTitle.isNullOrBlank()) {
-                featuredGames.firstOrNull {
-                    it.title.equals(latestTitle, ignoreCase = true) ||
-                        it.title.contains(latestTitle, ignoreCase = true) ||
-                        latestTitle.contains(it.title, ignoreCase = true)
-                }
-            } else null
-        }
-    }
-
-    val recentQuickGames = remember(lastPlayedGame, featuredGames, recentSessions) {
-        buildList {
-            if (lastPlayedGame != null) add(lastPlayedGame)
-            recentSessions.forEach { session ->
-                val title = session.gameTitle.trim()
-                if (title.isNotBlank()) {
-                    val matched = featuredGames.firstOrNull {
-                        it.title.equals(title, ignoreCase = true) ||
-                            it.title.contains(title, ignoreCase = true) ||
-                            title.contains(it.title, ignoreCase = true)
+    val computedHomeGames by androidx.compose.runtime.produceState(
+        initialValue = initialHomeGames,
+        featuredGames,
+        favoriteIds,
+        effectiveLastPlayedId,
+        recentSessions
+    ) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val topFeatured = if (favoriteIds.isEmpty()) {
+                featuredGames.take(18)
+            } else {
+                val favs = ArrayList<GameBookmark>(18)
+                val nonFavs = ArrayList<GameBookmark>(18)
+                for (g in featuredGames) {
+                    if (g.id in favoriteIds) {
+                        favs.add(g)
+                        if (favs.size >= 18) break
+                    } else if (nonFavs.size < 18) {
+                        nonFavs.add(g)
                     }
-                    if (matched != null && none { it.id == matched.id }) {
-                        add(matched)
+                }
+                if (favs.size >= 18) favs else (favs + nonFavs).take(18)
+            }
+
+            val byId = effectiveLastPlayedId?.let { id ->
+                featuredGames.find { it.id.equals(id, ignoreCase = true) }
+            }
+            val lastGame = if (byId != null) {
+                byId
+            } else {
+                val latestTitle = recentSessions.firstOrNull()?.gameTitle?.trim()
+                if (!latestTitle.isNullOrBlank()) {
+                    featuredGames.firstOrNull {
+                        it.title.equals(latestTitle, ignoreCase = true) ||
+                            it.title.contains(latestTitle, ignoreCase = true) ||
+                            latestTitle.contains(it.title, ignoreCase = true)
+                    }
+                } else null
+            }
+
+            val quickGames = buildList {
+                if (lastGame != null) add(lastGame)
+                for (session in recentSessions) {
+                    if (size >= 4) break
+                    val title = session.gameTitle.trim()
+                    if (title.isNotBlank()) {
+                        val matched = featuredGames.firstOrNull {
+                            it.title.equals(title, ignoreCase = true) ||
+                                it.title.contains(title, ignoreCase = true) ||
+                                title.contains(it.title, ignoreCase = true)
+                        }
+                        if (matched != null && none { it.id == matched.id }) {
+                            add(matched)
+                        }
                     }
                 }
             }
-        }.take(4)
+            Triple(topFeatured, lastGame, quickGames)
+        }
     }
+    val sortedFeaturedGames = computedHomeGames.first
+    val lastPlayedGame = computedHomeGames.second
+    val recentQuickGames = computedHomeGames.third
 
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()

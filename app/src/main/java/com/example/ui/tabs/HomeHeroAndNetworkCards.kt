@@ -112,6 +112,16 @@ internal fun HeroConsolePlayDeck(
         )
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val heroBannerRequest = remember(context) {
+        coil.request.ImageRequest.Builder(context)
+            .data(R.drawable.gamepass_hub_banner_1791394609676)
+            .size(640, 360)
+            .allowRgb565(true)
+            .crossfade(false)
+            .build()
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -123,8 +133,8 @@ internal fun HeroConsolePlayDeck(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            Image(
-                painter = painterResource(id = R.drawable.gamepass_hub_banner_1791394609676),
+            coil.compose.AsyncImage(
+                model = heroBannerRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 alpha = 0.55f,

@@ -128,10 +128,14 @@ private data class ComputedServersUiModel(
 fun ServersScreen(
     currentServer: ServerLocation,
     onSelectServer: (ServerLocation) -> Unit,
+    isTabActive: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val vpnState by VpnManager.state.collectAsState()
+    val activeVpnStateFlow = remember(isTabActive) {
+        if (isTabActive) VpnManager.state else VpnManager.dashboardState
+    }
+    val vpnState by activeVpnStateFlow.collectAsState(initial = VpnManager.state.value)
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
     val activeTelemetryFlow = remember(networkStatus.isLowLatencyStreamActive) {
         if (networkStatus.isLowLatencyStreamActive) {

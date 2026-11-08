@@ -60,10 +60,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -147,21 +149,6 @@ fun DashboardScreen(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
     val reduceMotion = !motionEnabled
-
-    // Giữ các ảnh bìa nội bộ trong bộ nhớ đệm của DashboardScreen để khi chuyển qua lại giữa các tab
-    // (Trang chủ ⇄ Game ⇄ Máy chủ ⇄ Cài đặt) luồng UI chính không phải giải mã lại Bitmap gây khựng.
-    val prewarmedHeroBanner = painterResource(id = R.drawable.gamepass_hub_banner_1791394609676)
-    val prewarmedFortnitePoster = painterResource(id = R.drawable.fortnite_cloud_poster_1791719536404)
-    val prewarmedForzaCover = painterResource(id = R.drawable.forza_cover_art_1791438033687)
-    val prewarmedCyberBanner = painterResource(id = R.drawable.cyber_gaming_banner_1791438050320)
-    val prewarmedCloudPlayHero = painterResource(id = R.drawable.cloudplay_hero_banner_1791392804712)
-    remember(
-        prewarmedHeroBanner,
-        prewarmedFortnitePoster,
-        prewarmedForzaCover,
-        prewarmedCyberBanner,
-        prewarmedCloudPlayHero
-    ) { true }
 
     fun switchTab(newTab: DashboardTab, reason: String = "") {
         if (currentTab != newTab) {
@@ -604,61 +591,62 @@ fun DashboardScreen(
                 },
                 label = "tab_animation"
             ) { tab ->
-                TrackFirstTabComposition(tab)
-                when (tab) {
-                    DashboardTab.HOME -> {
-                        HomeScreen(
-                            vpnState = vpnState,
-                            gamepadStatus = gamepadStatus,
-                            featuredGames = allGames,
-                            onConnectVpn = { handleConnect() },
-                            onDisconnectVpn = { VpnManager.disconnect(context) },
-                            onSwitchEngine = { VpnManager.setEngine(it) },
-                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
-                            onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
-                            onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
-                            onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
-                            onNavigateToSettings = { switchTab(DashboardTab.SETTINGS, "từ Trang chủ") },
-                            onOpenGuide = { section ->
-                                guideInitialSection = section
-                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
-                                showGuideDialog = true
-                            },
-                            onOpenTranslator = {
-                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ Trang chủ")
-                                showTranslatorDialog = true
-                            }
-                        )
-                    }
-                    DashboardTab.LIBRARY -> {
-                        GameLibraryScreen(
-                            games = allGames,
-                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) }
-                        )
-                    }
-                    DashboardTab.SERVERS -> {
-                        ServersScreen(
-                            currentServer = vpnState.currentServer,
-                            onSelectServer = { VpnManager.selectServer(it, context) }
-                        )
-                    }
-                    DashboardTab.SETTINGS -> {
-                        SettingsScreen(
-                            config = config,
-                            vpnState = vpnState,
-                            onOpenGuide = { section ->
-                                guideInitialSection = section
-                                com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
-                                showGuideDialog = true
-                            },
-                            onClearCookies = {
-                                com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
-                                android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                                android.webkit.WebStorage.getInstance().deleteAllData()
-                                val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
-                                android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        )
+                TrackFirstTabComposition(tab) {
+                    when (tab) {
+                        DashboardTab.HOME -> {
+                            HomeScreen(
+                                vpnState = vpnState,
+                                gamepadStatus = gamepadStatus,
+                                featuredGames = allGames,
+                                onConnectVpn = { handleConnect() },
+                                onDisconnectVpn = { VpnManager.disconnect(context) },
+                                onSwitchEngine = { VpnManager.setEngine(it) },
+                                onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
+                                onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
+                                onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
+                                onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
+                                onNavigateToSettings = { switchTab(DashboardTab.SETTINGS, "từ Trang chủ") },
+                                onOpenGuide = { section ->
+                                    guideInitialSection = section
+                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
+                                    showGuideDialog = true
+                                },
+                                onOpenTranslator = {
+                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ Trang chủ")
+                                    showTranslatorDialog = true
+                                }
+                            )
+                        }
+                        DashboardTab.LIBRARY -> {
+                            GameLibraryScreen(
+                                games = allGames,
+                                onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) }
+                            )
+                        }
+                        DashboardTab.SERVERS -> {
+                            ServersScreen(
+                                currentServer = vpnState.currentServer,
+                                onSelectServer = { VpnManager.selectServer(it, context) }
+                            )
+                        }
+                        DashboardTab.SETTINGS -> {
+                            SettingsScreen(
+                                config = config,
+                                vpnState = vpnState,
+                                onOpenGuide = { section ->
+                                    guideInitialSection = section
+                                    com.example.data.AppLogger.info("UI", "Mở hộp thoại Hướng dẫn sử dụng (${section.name})")
+                                    showGuideDialog = true
+                                },
+                                onClearCookies = {
+                                    com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
+                                    android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                                    android.webkit.WebStorage.getInstance().deleteAllData()
+                                    val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"
+                                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1012,7 +1000,10 @@ private fun ConsoleFloatingNavigationDock(
  * maximum-performance gameplay experience.
  */
 @Composable
-private fun TrackFirstTabComposition(tab: DashboardTab) {
+private fun TrackFirstTabComposition(
+    tab: DashboardTab,
+    content: @Composable () -> Unit
+) {
     val scenario = remember(tab) {
         when (tab) {
             DashboardTab.HOME -> com.example.data.PerfScenario.HOME
@@ -1022,23 +1013,50 @@ private fun TrackFirstTabComposition(tab: DashboardTab) {
         }
     }
     val composeStartMs = remember(tab) { android.os.SystemClock.elapsedRealtime() }
-    val commitDurationMsRef = remember(tab) { longArrayOf(-1L) }
+    // [0] = commitMs (SideEffect), [1] = layoutDoneMs (onGloballyPositioned), [2] = drawDoneMs (drawWithContent)
+    val phaseTimingsRef = remember(tab) { longArrayOf(-1L, -1L, -1L) }
     androidx.compose.runtime.SideEffect {
-        if (commitDurationMsRef[0] < 0L) {
-            commitDurationMsRef[0] =
+        if (phaseTimingsRef[0] < 0L) {
+            phaseTimingsRef[0] =
                 (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
         }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned {
+                if (phaseTimingsRef[1] < 0L) {
+                    phaseTimingsRef[1] =
+                        (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
+                }
+            }
+            .drawWithContent {
+                drawContent()
+                if (phaseTimingsRef[2] < 0L) {
+                    phaseTimingsRef[2] =
+                        (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
+                }
+            }
+    ) {
+        content()
     }
     androidx.compose.runtime.LaunchedEffect(tab) {
         androidx.compose.runtime.withFrameNanos { }
         val firstFrameMs =
             (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
         val commitMs =
-            if (commitDurationMsRef[0] >= 0L) commitDurationMsRef[0] else firstFrameMs
+            if (phaseTimingsRef[0] >= 0L) phaseTimingsRef[0] else firstFrameMs
+        val layoutMs =
+            if (phaseTimingsRef[1] >= 0L) phaseTimingsRef[1] else commitMs
+        val drawMs =
+            if (phaseTimingsRef[2] >= 0L) phaseTimingsRef[2] else layoutMs
         com.example.data.PerformanceMonitor.recordFirstTabCompositionIfNeeded(
             scenario = scenario,
             composeCommitMs = commitMs,
+            layoutDoneMs = layoutMs,
+            drawDoneMs = drawMs,
             firstFrameMs = firstFrameMs
         )
     }
 }
+

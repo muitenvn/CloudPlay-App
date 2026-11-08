@@ -100,17 +100,26 @@ object PerformanceMonitor {
 
     /**
      * Ghi nhận 1 lần duy nhất cho mỗi tab trong suốt vòng đời tiến trình:
-     * thời gian từ lúc bắt đầu dựng (composition) lần đầu tới khi commit (SideEffect) và vẽ xong khung đầu tiên.
+     * bóc tách rõ 4 giai đoạn: commit (outer composition), subcompose+layout (LazyColumn/Grid/BoxWithConstraints measure+layout),
+     * draw (ghi RenderNode/Canvas), và khung đầu (withFrameNanos kế tiếp).
      */
     fun recordFirstTabCompositionIfNeeded(
         scenario: PerfScenario,
         composeCommitMs: Long,
+        layoutDoneMs: Long,
+        drawDoneMs: Long,
         firstFrameMs: Long
     ) {
         if (loggedFirstTabCompositions.add(scenario)) {
+            val (usedMb, maxMb) = readHeapMb()
+            val effLayoutMs = if (layoutDoneMs >= composeCommitMs) layoutDoneMs else composeCommitMs
+            val effDrawMs = if (drawDoneMs >= effLayoutMs) drawDoneMs else effLayoutMs
+            val subcomposeLayoutPhaseMs = (effLayoutMs - composeCommitMs).coerceAtLeast(0L)
+            val drawPhaseMs = (effDrawMs - effLayoutMs).coerceAtLeast(0L)
+            val renderSyncWaitMs = (firstFrameMs - effDrawMs).coerceAtLeast(0L)
             AppLogger.info(
                 "PERF-INIT",
-                "Dựng lần đầu [${scenario.code}]: commit=${composeCommitMs}ms, khung đầu=${firstFrameMs}ms"
+                "Dựng lần đầu [${scenario.code}]: commit=${composeCommitMs}ms, subcompose+layout=+${subcomposeLayoutPhaseMs}ms (tổng ${effLayoutMs}ms), draw=+${drawPhaseMs}ms (tổng ${effDrawMs}ms), đồng bộ GPU/khung kế=+${renderSyncWaitMs}ms -> khung đầu=${firstFrameMs}ms | RAM=${usedMb}/${maxMb}MB"
             )
         }
     }
@@ -189,7 +198,7 @@ object PerformanceMonitor {
         synchronized(lock) {
             if (isForegroundActive) return
             isForegroundActive = true
-            resetWindowLocked(nowElapsedMs())
+            resetWindowLocked(nowElapsedMs(), preserveFrameAnchor = false)
         }
         try {
             Choreographer.getInstance().postFrameCallback(frameCallback)
@@ -222,7 +231,7 @@ object PerformanceMonitor {
                 summaryLine = flushCurrentWindowLocked(nowMs, reason = "chuyển sang ${nextScenario.code}")
             }
             currentScenario = nextScenario
-            resetWindowLocked(nowMs)
+            resetWindowLocked(nowMs, preserveFrameAnchor = isForegroundActive)
         }
         if (summaryLine != null) {
             AppLogger.info("PERF", summaryLine!!)
@@ -237,9 +246,9 @@ object PerformanceMonitor {
         activeWindowScrollEvents[scenario]?.incrementAndGet()
     }
 
-    private fun resetWindowLocked(nowMs: Long) {
+    private fun resetWindowLocked(nowMs: Long, preserveFrameAnchor: Boolean) {
         windowStartElapsedMs = nowMs
-        lastFrameTimeNanos = 0L
+        lastFrameTimeNanos = if (preserveFrameAnchor) System.nanoTime() else 0L
         windowFrames = 0L
         windowJankFrames = 0L
         windowSlowFrames = 0L

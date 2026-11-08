@@ -172,48 +172,62 @@ object GameLibraryRepository {
      * Initializes persistent storage for custom user-added games, auto-synced Xbox Cloud catalog games,
      * favorites, Xbox profile status, and last played game via SharedPreferences.
      */
+    @Volatile
+    private var initStarted = false
+
     fun init(context: Context) {
-        if (prefs == null) {
+        if (!initStarted) {
+            initStarted = true
             val appCtx = context.applicationContext
-            val sharedPrefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            val legacyRecentPrefs = appCtx.getSharedPreferences(RECENT_PREFS_NAME, Context.MODE_PRIVATE)
-            prefs = sharedPrefs
-            recentPrefs = legacyRecentPrefs
-
-            val savedFavs = sharedPrefs.getStringSet(KEY_FAVORITE_IDS, emptySet()) ?: emptySet()
-            _favoriteIds.value = savedFavs.toSet()
-
-            val savedLast = sharedPrefs.getString(KEY_LAST_PLAYED_ID, null)
-                ?: legacyRecentPrefs.getString(KEY_LAST_PLAYED_ID, null)
-            _lastPlayedId.value = savedLast
-
-            val lastSyncMs = sharedPrefs.getLong(KEY_LAST_CATALOG_SYNC_MS, 0L)
-            val savedGamertag = sharedPrefs.getString(KEY_XBOX_GAMERTAG, null)?.takeIf { it.isNotBlank() }
-            val savedTier = sharedPrefs.getString(KEY_XBOX_SUB_TIER, null)?.takeIf { it.isNotBlank() }
-            val savedTotalCloud = sharedPrefs.getInt(KEY_XBOX_TOTAL_CLOUD, 0)
-            val savedJumpBackRaw = sharedPrefs.getString(KEY_XBOX_JUMP_BACK_IDS, "") ?: ""
-            val savedJumpBack = savedJumpBackRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
-
-            _xboxStatus.value = XboxCloudSyncStatus(
-                gamertag = savedGamertag,
-                avatarUrl = savedAvatar,
-                subscriptionTier = savedTier,
-                cloudServiceOnline = true,
-                totalCloudCatalogCount = savedTotalCloud.coerceAtLeast(_games.value.size),
-                syncedCatalogCount = _games.value.size,
-                jumpBackInIds = savedJumpBack,
-                lastSyncTimeMs = lastSyncMs
-            )
-
             _isLoadingInitialCatalog.value = true
             ioScope.launch {
+                val t0 = android.os.SystemClock.elapsedRealtime()
+                val sharedPrefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val legacyRecentPrefs = appCtx.getSharedPreferences(RECENT_PREFS_NAME, Context.MODE_PRIVATE)
+                prefs = sharedPrefs
+                recentPrefs = legacyRecentPrefs
+
+                // Chờ SharedPreferencesImpl nạp xong file XML trên luồng IO thay vì chặn luồng chính (trước đây tốn ~1458ms trong onCreate)
+                val savedFavs = sharedPrefs.getStringSet(KEY_FAVORITE_IDS, emptySet()) ?: emptySet()
+                val tAfterPrefsAwait = android.os.SystemClock.elapsedRealtime()
+                _favoriteIds.value = savedFavs.toSet()
+
+                val savedLast = sharedPrefs.getString(KEY_LAST_PLAYED_ID, null)
+                    ?: legacyRecentPrefs.getString(KEY_LAST_PLAYED_ID, null)
+                _lastPlayedId.value = savedLast
+
+                val lastSyncMs = sharedPrefs.getLong(KEY_LAST_CATALOG_SYNC_MS, 0L)
+                val savedGamertag = sharedPrefs.getString(KEY_XBOX_GAMERTAG, null)?.takeIf { it.isNotBlank() }
+                val savedTier = sharedPrefs.getString(KEY_XBOX_SUB_TIER, null)?.takeIf { it.isNotBlank() }
+                val savedTotalCloud = sharedPrefs.getInt(KEY_XBOX_TOTAL_CLOUD, 0)
+                val savedJumpBackRaw = sharedPrefs.getString(KEY_XBOX_JUMP_BACK_IDS, "") ?: ""
+                val savedJumpBack = savedJumpBackRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                val savedAvatar = sharedPrefs.getString(KEY_XBOX_AVATAR_URL, null)?.takeIf { it.isNotBlank() }
+
+                _xboxStatus.value = XboxCloudSyncStatus(
+                    gamertag = savedGamertag,
+                    avatarUrl = savedAvatar,
+                    subscriptionTier = savedTier,
+                    cloudServiceOnline = true,
+                    totalCloudCatalogCount = savedTotalCloud.coerceAtLeast(_games.value.size),
+                    syncedCatalogCount = _games.value.size,
+                    jumpBackInIds = savedJumpBack,
+                    lastSyncTimeMs = lastSyncMs
+                )
+
                 val customList: List<GameBookmark>
                 val syncedList: List<GameBookmark>
                 try {
+                    val tParseStart = android.os.SystemClock.elapsedRealtime()
                     customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
                     syncedList = loadGamesArrayFromPrefs(sharedPrefs, KEY_SYNCED_GAMES_JSON)
+                    val tParseEnd = android.os.SystemClock.elapsedRealtime()
                     rebuildMergedGames(customList, syncedList)
+                    val tMergeEnd = android.os.SystemClock.elapsedRealtime()
+                    AppLogger.info(
+                        "PERF-INIT",
+                        "GameLibraryRepository (IO): xmlLoad=${tAfterPrefsAwait - t0}ms, jsonParse=${tParseEnd - tParseStart}ms, merge=${tMergeEnd - tParseEnd}ms (tổng=${_games.value.size} game)"
+                    )
                 } finally {
                     _isLoadingInitialCatalog.value = false
                 }

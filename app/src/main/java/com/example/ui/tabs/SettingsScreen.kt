@@ -334,7 +334,10 @@ fun SettingsScreen(
                 }
 
                 OutlinedButton(
-                    onClick = { showAppLogDialog = true },
+                    onClick = {
+                        com.example.data.AppLogger.info("UI", "Mở hộp thoại Nhật ký hệ thống")
+                        showAppLogDialog = true
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics {

@@ -47,6 +47,10 @@ object PerformanceMonitor {
     private val aggregates = PerfScenario.entries.associateWith { ScenarioAggregate() }
     private val activeWindowRecompositions = PerfScenario.entries.associateWith { AtomicInteger(0) }
     private val activeWindowScrollEvents = PerfScenario.entries.associateWith { AtomicInteger(0) }
+    private val loggedFirstTabCompositions = java.util.concurrent.ConcurrentHashMap.newKeySet<PerfScenario>()
+
+    @Volatile
+    private var firstFrameLogged = false
 
     @Volatile
     private var isForegroundActive = false
@@ -62,6 +66,54 @@ object PerformanceMonitor {
     private var windowFrozenFrames: Long = 0L
     private var windowMaxFrameNanos: Long = 0L
     private var lastFrozenLogElapsedMs: Long = 0L
+
+    /**
+     * Ghi nhận 1 dòng duy nhất [PERF-INIT] cho thời gian chạy MainActivity.onCreate
+     * và 1 dòng cho thời điểm khung hình đầu tiên (First Frame) được vẽ xong.
+     */
+    fun recordStartupInitSummary(
+        totalOnCreateMs: Long,
+        breakdown: String,
+        onCreateStartElapsedMs: Long
+    ) {
+        AppLogger.info(
+            "PERF-INIT",
+            "MainActivity.onCreate: tổng=${totalOnCreateMs}ms ($breakdown)"
+        )
+        if (!firstFrameLogged) {
+            try {
+                Choreographer.getInstance().postFrameCallback {
+                    if (!firstFrameLogged) {
+                        firstFrameLogged = true
+                        val firstFrameElapsed =
+                            (nowElapsedMs() - onCreateStartElapsedMs).coerceAtLeast(0L)
+                        AppLogger.info(
+                            "PERF-INIT",
+                            "Khung hình đầu tiên (First Frame): +${firstFrameElapsed}ms từ đầu onCreate"
+                        )
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /**
+     * Ghi nhận 1 lần duy nhất cho mỗi tab trong suốt vòng đời tiến trình:
+     * thời gian từ lúc bắt đầu dựng (composition) lần đầu tới khi commit (SideEffect) và vẽ xong khung đầu tiên.
+     */
+    fun recordFirstTabCompositionIfNeeded(
+        scenario: PerfScenario,
+        composeCommitMs: Long,
+        firstFrameMs: Long
+    ) {
+        if (loggedFirstTabCompositions.add(scenario)) {
+            AppLogger.info(
+                "PERF-INIT",
+                "Dựng lần đầu [${scenario.code}]: commit=${composeCommitMs}ms, khung đầu=${firstFrameMs}ms"
+            )
+        }
+    }
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
@@ -207,8 +259,9 @@ object PerformanceMonitor {
         val maxFrameMs = windowMaxFrameNanos / 1_000_000.0
         val recomp = activeWindowRecompositions[scen]?.getAndSet(0) ?: 0
         val scrolls = activeWindowScrollEvents[scen]?.getAndSet(0) ?: 0
+        val isTabTransition = reason.startsWith("chuyển sang ")
 
-        if (frames < MIN_WINDOW_FRAMES && durationMs < MIN_WINDOW_DURATION_MS && frozen == 0L) {
+        if (!isTabTransition && frames < MIN_WINDOW_FRAMES && durationMs < MIN_WINDOW_DURATION_MS && frozen == 0L) {
             return null
         }
 
@@ -303,9 +356,9 @@ object PerformanceMonitor {
             }
         }
 
-        val perfLogs = AppLogger.logs.value.filter { it.tag == "PERF" }
+        val perfLogs = AppLogger.logs.value.filter { it.tag == "PERF" || it.tag == "PERF-INIT" }
         if (perfLogs.isNotEmpty()) {
-            sb.appendLine(if (isEn) "--- Recent [PERF] Events (${perfLogs.size}/${AppLogger.MAX_PERF_LOGS}) ---" else "--- Dòng nhật ký [PERF] gần đây (${perfLogs.size}/${AppLogger.MAX_PERF_LOGS}) ---")
+            sb.appendLine(if (isEn) "--- Recent [PERF] & [PERF-INIT] Events (${perfLogs.size}) ---" else "--- Dòng nhật ký [PERF] & [PERF-INIT] gần đây (${perfLogs.size}) ---")
             for (entry in perfLogs) {
                 sb.appendLine("[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] ${entry.message}")
             }

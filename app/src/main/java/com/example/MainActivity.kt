@@ -65,8 +65,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var streamController: StreamController
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val onCreateStartMs = android.os.SystemClock.elapsedRealtime()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val afterSuperAndEdgeMs = android.os.SystemClock.elapsedRealtime()
 
         // Keep screen awake while streaming Xbox games
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -75,15 +77,24 @@ class MainActivity : ComponentActivity() {
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
         )
 
+        val t0 = android.os.SystemClock.elapsedRealtime()
         com.example.data.AppLogger.init(applicationContext)
         com.example.data.AppLogger.installCrashHandler(applicationContext)
+        val t1 = android.os.SystemClock.elapsedRealtime()
         SettingsRepository.init(applicationContext)
+        val t2 = android.os.SystemClock.elapsedRealtime()
         com.example.cloudplay.NetworkOptimizer.init(applicationContext)
+        val t3 = android.os.SystemClock.elapsedRealtime()
         VpnManager.init(applicationContext)
+        val t4 = android.os.SystemClock.elapsedRealtime()
         GameLibraryRepository.init(applicationContext)
+        val t5 = android.os.SystemClock.elapsedRealtime()
         com.example.data.SessionHistoryRepository.init(applicationContext)
+        val t6 = android.os.SystemClock.elapsedRealtime()
         streamController = StreamController(applicationContext)
+        val t7 = android.os.SystemClock.elapsedRealtime()
         lockDisplayRefreshRateTo60Hz(false)
+        val t8 = android.os.SystemClock.elapsedRealtime()
 
         setContent {
             val config by SettingsRepository.config.collectAsState()
@@ -134,6 +145,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        val t9 = android.os.SystemClock.elapsedRealtime()
+        val totalOnCreateMs = (t9 - onCreateStartMs).coerceAtLeast(0L)
+        val breakdown = "super+edge=${afterSuperAndEdgeMs - onCreateStartMs}ms, " +
+            "AppLogger=${t1 - t0}ms, Settings=${t2 - t1}ms, NetOpt=${t3 - t2}ms, " +
+            "Vpn=${t4 - t3}ms, GameLib=${t5 - t4}ms, History=${t6 - t5}ms, " +
+            "StreamCtrl=${t7 - t6}ms, RefreshRate=${t8 - t7}ms, setContent=${t9 - t8}ms"
+        com.example.data.PerformanceMonitor.recordStartupInitSummary(
+            totalOnCreateMs = totalOnCreateMs,
+            breakdown = breakdown,
+            onCreateStartElapsedMs = onCreateStartMs
+        )
     }
 
     override fun onStart() {

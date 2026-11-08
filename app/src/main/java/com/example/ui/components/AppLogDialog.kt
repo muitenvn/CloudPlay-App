@@ -437,7 +437,10 @@ fun AppLogDialog(
         },
         dismissButton = {
             TextButton(
-                onClick = { VpnManager.testAllServers(autoPickBest = false, context = context) },
+                onClick = {
+                    AppLogger.info("UI", "Bấm nút Đo ping lại (trong Nhật ký hệ thống)")
+                    VpnManager.testAllServers(autoPickBest = false, context = context)
+                },
                 modifier = Modifier.testTag("retest_ping_from_log_btn")
             ) {
                 Text(

@@ -585,7 +585,7 @@ fun DashboardScreen(
                 DashboardTab.SERVERS -> com.example.data.PerfScenario.SERVERS
                 DashboardTab.SETTINGS -> com.example.data.PerfScenario.SETTINGS
             }
-            androidx.compose.runtime.LaunchedEffect(activePerfScenario) {
+            androidx.compose.runtime.LaunchedEffect(Unit) {
                 com.example.data.PerformanceMonitor.setScenario(activePerfScenario)
             }
             androidx.compose.runtime.SideEffect {
@@ -604,6 +604,7 @@ fun DashboardScreen(
                 },
                 label = "tab_animation"
             ) { tab ->
+                TrackFirstTabComposition(tab)
                 when (tab) {
                     DashboardTab.HOME -> {
                         HomeScreen(
@@ -1010,5 +1011,34 @@ private fun ConsoleFloatingNavigationDock(
  * own dedicated, secondary section in Settings (Nhóm 5: Tính năng phụ) to guarantee a zero-distraction,
  * maximum-performance gameplay experience.
  */
-
-
+@Composable
+private fun TrackFirstTabComposition(tab: DashboardTab) {
+    val scenario = remember(tab) {
+        when (tab) {
+            DashboardTab.HOME -> com.example.data.PerfScenario.HOME
+            DashboardTab.LIBRARY -> com.example.data.PerfScenario.LIBRARY
+            DashboardTab.SERVERS -> com.example.data.PerfScenario.SERVERS
+            DashboardTab.SETTINGS -> com.example.data.PerfScenario.SETTINGS
+        }
+    }
+    val composeStartMs = remember(tab) { android.os.SystemClock.elapsedRealtime() }
+    val commitDurationMsRef = remember(tab) { longArrayOf(-1L) }
+    androidx.compose.runtime.SideEffect {
+        if (commitDurationMsRef[0] < 0L) {
+            commitDurationMsRef[0] =
+                (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(tab) {
+        androidx.compose.runtime.withFrameNanos { }
+        val firstFrameMs =
+            (android.os.SystemClock.elapsedRealtime() - composeStartMs).coerceAtLeast(0L)
+        val commitMs =
+            if (commitDurationMsRef[0] >= 0L) commitDurationMsRef[0] else firstFrameMs
+        com.example.data.PerformanceMonitor.recordFirstTabCompositionIfNeeded(
+            scenario = scenario,
+            composeCommitMs = commitMs,
+            firstFrameMs = firstFrameMs
+        )
+    }
+}

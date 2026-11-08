@@ -201,16 +201,8 @@ fun HomeScreen(
                             .clip(RoundedCornerShape(10.dp))
                             .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
                             .clickable {
-                                try {
-                                    val intent = android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(availableUpdate.releaseUrl)
-                                    ).apply {
-                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {
-                                }
+                                com.example.data.AppLogger.info("UI", "Bấm thanh thông báo bản cập nhật mới từ Trang chủ")
+                                com.example.data.UpdateChecker.openUpdateDialog()
                             }
                             .testTag("home_update_available_banner"),
                         color = XboxNeonGreen.copy(alpha = 0.12f)
@@ -224,9 +216,9 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = if (isEn) {
-                                    "New version ${availableUpdate.latestVersion} available · View"
+                                    "New version ${availableUpdate.latestVersion} available · Tap to update"
                                 } else {
-                                    "Có bản mới ${availableUpdate.latestVersion} · Xem"
+                                    "Có bản mới ${availableUpdate.latestVersion} · Bấm để tải cập nhật"
                                 },
                                 color = XboxNeonGreen,
                                 fontSize = 12.sp,

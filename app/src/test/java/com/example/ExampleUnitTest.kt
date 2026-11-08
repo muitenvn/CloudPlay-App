@@ -98,5 +98,47 @@ class ExampleUnitTest {
     assertNotNull(state.qualityGrade)
     assertTrue(state.qualityNotice.isNotBlank())
   }
+
+  @Test
+  fun updateChecker_mirrorFailoverChainAndRedirectValidation() {
+    val directUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v1.3.0/CloudPlay-Xbox-v1.3.0.apk"
+    val totalNodes = com.example.data.UpdateChecker.FAST_MIRROR_NODES.size
+    assertEquals(11, totalNodes)
+
+    // 1. Auto mirror chain puts gh_proxy_com first and github_direct last
+    val autoChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
+      directGitHubUrl = directUrl,
+      preferredMirrorId = "auto",
+      lastWorkingMirrorId = ""
+    )
+    assertEquals(11, autoChain.size)
+    assertEquals("gh_proxy_com", autoChain.first().first.id)
+    assertEquals("github_direct", autoChain.last().first.id)
+
+    // 2. Normal direct download puts github_direct first and retains all 10 mirrors as fallback
+    val normalChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
+      directGitHubUrl = directUrl,
+      preferredMirrorId = "github_direct",
+      lastWorkingMirrorId = "gh_llkk_cc"
+    )
+    assertEquals(11, normalChain.size)
+    assertEquals("github_direct", normalChain[0].first.id)
+    assertEquals(directUrl, normalChain[0].second)
+    assertEquals("gh_llkk_cc", normalChain[1].first.id)
+
+    // 3. AWS S3 and Cloudflare R2 redirect URLs from GitHub/mirrors are allowed during download
+    assertTrue(
+      com.example.data.UpdateChecker.isAllowedHttpsUrl(
+        java.net.URL("https://github-production-release-asset-2e65be.s3.amazonaws.com/12345"),
+        allowGhFast = false
+      )
+    )
+    assertTrue(
+      com.example.data.UpdateChecker.isAllowedHttpsUrl(
+        java.net.URL("https://cdn.gh-proxy.com/release.apk"),
+        allowGhFast = true
+      )
+    )
+  }
 }
 

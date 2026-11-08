@@ -71,8 +71,11 @@ fun UpdateAvailableDialog(
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val context = LocalContext.current
     val notesScrollState = rememberScrollState()
+    val mirrorChipsScrollState = rememberScrollState()
     val downloadState by UpdateChecker.downloadState.collectAsState()
     val githubReleasesUrl = UpdateChecker.FALLBACK_RELEASES_URL
+    var selectedMirrorId by remember { mutableStateOf("auto") }
+    val mirrorNodes = remember { UpdateChecker.FAST_MIRROR_NODES.filter { !it.isDirectGitHub } }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -136,7 +139,7 @@ fun UpdateAvailableDialog(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 190.dp)
+                            .heightIn(max = 160.dp)
                             .testTag("update_dialog_whats_new_section")
                     ) {
                         Column(
@@ -162,11 +165,14 @@ fun UpdateAvailableDialog(
                     }
                 }
 
-                // Hiển thị tiến độ tải / kiểm tra SHA-256 / thông báo lỗi xác thực
+                // Hiển thị tiến độ tải / trạng thái chuyển máy chủ phụ / kiểm tra SHA-256 / thông báo lỗi
                 when (val dl = downloadState) {
                     is ApkDownloadState.Downloading -> {
                         val mbDone = dl.downloadedBytes / (1024f * 1024f)
                         val mbTotal = if (dl.totalBytes > 0) dl.totalBytes / (1024f * 1024f) else -1f
+                        val activeNodeLabel = dl.activeMirrorName.ifBlank {
+                            if (dl.usingFallbackGitHub) "GitHub Direct" else "Mirror"
+                        }
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -181,10 +187,18 @@ fun UpdateAvailableDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isEn) {
-                                        "⚡ Downloading via mirror..."
+                                    text = if (dl.usingFallbackGitHub) {
+                                        if (isEn) {
+                                            "📥 Direct GitHub (${dl.mirrorIndex}/${dl.totalMirrors})"
+                                        } else {
+                                            "📥 Đang tải thường: GitHub gốc (${dl.mirrorIndex}/${dl.totalMirrors})"
+                                        }
                                     } else {
-                                        "⚡ Đang tải nhanh qua máy chủ phụ..."
+                                        if (isEn) {
+                                            "⚡ Mirror: $activeNodeLabel (${dl.mirrorIndex}/${dl.totalMirrors})"
+                                        } else {
+                                            "⚡ Máy chủ phụ: $activeNodeLabel (${dl.mirrorIndex}/${dl.totalMirrors})"
+                                        }
                                     },
                                     color = DirectCyan,
                                     fontSize = 11.sp,
@@ -217,20 +231,57 @@ fun UpdateAvailableDialog(
                                     trackColor = XboxCardBorder
                                 )
                             }
-                            OutlinedButton(
-                                onClick = { UpdateChecker.cancelApkDownload() },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("update_dialog_cancel_download_btn"),
-                                shape = RoundedCornerShape(10.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.7f))
-                            ) {
+                            if (dl.failedMirrors.isNotEmpty()) {
                                 Text(
-                                    text = if (isEn) "Cancel Download" else "Hủy tải",
+                                    text = if (isEn) {
+                                        "🔄 Auto-switched mirror (skipped: ${dl.failedMirrors.takeLast(3).joinToString(", ")})"
+                                    } else {
+                                        "🔄 Đã tự chuyển máy chủ (bỏ qua: ${dl.failedMirrors.takeLast(3).joinToString(", ")})"
+                                    },
                                     color = WarningAmber,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.testTag("update_dialog_failover_notice")
                                 )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (dl.mirrorIndex < dl.totalMirrors) {
+                                    OutlinedButton(
+                                        onClick = { UpdateChecker.skipToNextMirror() },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("update_dialog_skip_mirror_btn"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.75f))
+                                    ) {
+                                        Text(
+                                            text = if (isEn) "⏭ Next Mirror" else "⏭ Đổi máy chủ khác",
+                                            color = DirectCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = { UpdateChecker.cancelApkDownload() },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("update_dialog_cancel_download_btn"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.7f))
+                                ) {
+                                    Text(
+                                        text = if (isEn) "Cancel" else "Hủy tải",
+                                        color = WarningAmber,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -245,7 +296,7 @@ fun UpdateAvailableDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = if (isEn) "Verifying official SHA-256 signature..." else "Đang kiểm tra mã SHA-256 chính thức...",
+                                text = if (isEn) "Verifying APK & official SHA-256 signature..." else "Đang kiểm tra gói APK & mã SHA-256...",
                                 color = XboxNeonGreen,
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
@@ -304,7 +355,7 @@ fun UpdateAvailableDialog(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = if (isEn) "✓ SHA-256 Verified · Install Update" else "✓ Đã xác thực SHA-256 · Mở trình cài đặt",
+                                text = if (isEn) "✓ Verified · Install Update" else "✓ Đã xác thực · Mở trình cài đặt",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
@@ -315,14 +366,86 @@ fun UpdateAvailableDialog(
                     ApkDownloadState.Idle -> {}
                 }
 
-                // Nút tải nhanh có tự động chuyển đổi cổng dự phòng ngầm và kiểm tra SHA-256 trước khi cài
+                // Bộ chọn máy chủ phụ + 2 nút tải trong app: (1) Tải qua máy chủ phụ & (2) Tải thường trực tiếp GitHub
                 if (downloadState !is ApkDownloadState.Downloading && downloadState !is ApkDownloadState.Verifying) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "Select mirror server (${mirrorNodes.size} backup mirrors, auto-switches on error):"
+                            } else {
+                                "Chọn máy chủ phụ (${mirrorNodes.size} cổng dự phòng, tự đổi khi lỗi):"
+                            },
+                            color = TextSecondary,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(mirrorChipsScrollState),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val isAutoSelected = selectedMirrorId == "auto"
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { selectedMirrorId = "auto" }
+                                    .testTag("update_mirror_chip_auto"),
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isAutoSelected) XboxNeonGreen.copy(alpha = 0.20f) else XboxSurfaceVariant,
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isAutoSelected) XboxNeonGreen else XboxCardBorder
+                                )
+                            ) {
+                                Text(
+                                    text = if (isEn) "⚡ Auto (${mirrorNodes.size})" else "⚡ Tự động (${mirrorNodes.size})",
+                                    color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (isAutoSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                                )
+                            }
+
+                            mirrorNodes.forEachIndexed { idx, node ->
+                                val isSelected = selectedMirrorId == node.id
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { selectedMirrorId = node.id }
+                                        .testTag("update_mirror_chip_${node.id}"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) DirectCyan.copy(alpha = 0.20f) else XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) DirectCyan else XboxCardBorder
+                                    )
+                                ) {
+                                    Text(
+                                        text = "#${idx + 1} ${node.name}",
+                                        color = if (isSelected) DirectCyan else TextSecondary,
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Nút 1: Tải nhanh qua máy chủ phụ (tự động chuyển sang máy chủ phụ tiếp theo nếu lỗi)
+                    val selectedNodeName = mirrorNodes.firstOrNull { it.id == selectedMirrorId }?.name
                     Button(
                         onClick = {
                             UpdateChecker.startVerifiedApkDownload(
                                 context = context,
                                 updateInfo = updateInfo,
-                                preferredMirrorId = "auto"
+                                preferredMirrorId = selectedMirrorId
                             )
                         },
                         modifier = Modifier
@@ -332,12 +455,39 @@ fun UpdateAvailableDialog(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (isEn) {
-                                "⚡ Fast download via mirror"
+                            text = if (selectedNodeName != null) {
+                                if (isEn) "⚡ Download via $selectedNodeName (Auto-failover)" else "⚡ Tải qua máy chủ phụ: $selectedNodeName"
                             } else {
-                                "⚡ Tải nhanh qua máy chủ phụ"
+                                if (isEn) "⚡ Fast download via mirror (Auto-failover)" else "⚡ Tải nhanh qua máy chủ phụ (Tự đổi khi lỗi)"
                             },
                             color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Nút 2: Tải thường trực tiếp từ GitHub ngay trong ứng dụng (nếu GitHub lỗi vẫn có máy chủ phụ đỡ)
+                    OutlinedButton(
+                        onClick = {
+                            UpdateChecker.startVerifiedApkDownload(
+                                context = context,
+                                updateInfo = updateInfo,
+                                preferredMirrorId = "github_direct"
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("update_dialog_normal_direct_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.2.dp, DirectCyan)
+                    ) {
+                        Text(
+                            text = if (isEn) {
+                                "📥 Normal Download (Direct from GitHub)"
+                            } else {
+                                "📥 Tải thường (Trực tiếp từ GitHub gốc)"
+                            },
+                            color = DirectCyan,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -346,7 +496,7 @@ fun UpdateAvailableDialog(
 
                 Spacer(modifier = Modifier.height(1.dp))
 
-                // Hàng nút phụ: "Để sau" và luôn có nút "Tải từ GitHub"
+                // Hàng nút phụ: "Để sau" và "Mở trang GitHub"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -362,7 +512,7 @@ fun UpdateAvailableDialog(
                         Text(
                             text = if (isEn) "Later" else "Để sau",
                             color = TextSecondary,
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -373,18 +523,23 @@ fun UpdateAvailableDialog(
                                 val targetUrl = updateInfo.releaseUrl.takeIf {
                                     it.startsWith("https://github.com/muitenvn/CloudPlay-App/releases")
                                 } ?: githubReleasesUrl
+                                com.example.data.AppLogger.info("UI", "Mở trang bản phát hành GitHub trên trình duyệt ngoài")
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
                                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                                 context.startActivity(intent)
-                            } catch (_: Exception) {
+                            } catch (e: Exception) {
+                                com.example.data.AppLogger.error(
+                                    "UI",
+                                    "Lỗi mở trình duyệt tới trang GitHub Releases (${com.example.data.AppLogger.shortThrowable(e)})"
+                                )
                             }
                         },
                         modifier = Modifier
                             .weight(1.35f)
                             .testTag("update_dialog_open_browser_btn"),
                         shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.75f))
+                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f))
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -397,9 +552,9 @@ fun UpdateAvailableDialog(
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = if (isEn) "Download from GitHub" else "Tải từ GitHub",
+                                text = if (isEn) "Open GitHub Web" else "Mở web GitHub",
                                 color = DirectCyan,
-                                fontSize = 11.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }

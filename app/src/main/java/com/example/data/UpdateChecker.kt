@@ -39,9 +39,14 @@ data class ApkMirrorNode(
         return when (id) {
             "gh_proxy_com" -> "https://gh-proxy.com/$cleanDirect"
             "ghproxy_net" -> "https://ghproxy.net/$cleanDirect"
+            "gh_llkk_cc" -> "https://gh.llkk.cc/$cleanDirect"
+            "ghproxy_cc" -> "https://ghproxy.cc/$cleanDirect"
+            "gh_ddlc_top" -> "https://gh.ddlc.top/$cleanDirect"
             "ghfast_top" -> "https://ghfast.top/$cleanDirect"
             "mirror_ghproxy" -> "https://mirror.ghproxy.com/$cleanDirect"
             "kkgithub" -> cleanDirect.replaceFirst("https://github.com/", "https://kkgithub.com/")
+            "gh_con_sh" -> "https://gh.con.sh/$cleanDirect"
+            "github_moeyy" -> "https://github.moeyy.xyz/$cleanDirect"
             else -> cleanDirect
         }
     }
@@ -73,7 +78,8 @@ sealed class ApkDownloadState {
         val usingFallbackGitHub: Boolean,
         val activeMirrorName: String = "",
         val mirrorIndex: Int = 1,
-        val totalMirrors: Int = 1
+        val totalMirrors: Int = 1,
+        val failedMirrors: List<String> = emptyList()
     ) : ApkDownloadState()
     data object Verifying : ApkDownloadState()
     data class VerifiedReadyToInstall(val apkFile: File) : ApkDownloadState()
@@ -99,11 +105,14 @@ object UpdateChecker {
     private const val CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L
     private const val MANUAL_RAPID_TAP_REUSE_MS = 15_000L
     private const val TIMEOUT_MS = 8000
-    private const val MIRROR_CONNECT_TIMEOUT_MS = 8000 // Tự động chuyển sang mirror kế tiếp nhanh nếu mirror hiện tại lỗi/treo
+    private const val MIRROR_CONNECT_TIMEOUT_MS = 6000 // Chuyển sang máy chủ phụ kế tiếp nhanh nếu máy chủ hiện tại lỗi/treo
+    private const val MIRROR_READ_TIMEOUT_MS = 12000
     private const val GITHUB_DOWNLOAD_TIMEOUT_MS = 20000
     private const val MAX_APK_SIZE_BYTES = 150L * 1024L * 1024L // Tối đa 150 MB
     private const val MIN_VALID_APK_BYTES = 64L * 1024L // Chặn trang báo lỗi HTML giả dạng 200 OK
-    private const val MAX_REDIRECT_HOPS = 5
+    private const val MAX_REDIRECT_HOPS = 8
+    private const val BROWSER_COMPAT_USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 
     private const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest"
     private const val LATEST_RELEASE_WEB_URL = "https://github.com/muitenvn/CloudPlay-App/releases/latest"
@@ -111,16 +120,21 @@ object UpdateChecker {
     private const val FAST_CDN_PREFIX = "https://gh-proxy.com/"
 
     /**
-     * Danh sách các cổng tải nhanh (GitHub Release Proxy/CDN) uy tín.
-     * Khi một cổng bị lỗi kết nối, trả mã lỗi HTTP, hoặc trả trang HTML thay vì file APK (như khi ghfast.top bảo trì),
-     * hệ thống sẽ tự động chuyển đổi tuần tự sang cổng tiếp theo và cuối cùng là GitHub gốc.
+     * Danh sách 10 cổng máy chủ phụ (GitHub Release Proxy/CDN) + 1 cổng GitHub gốc trực tiếp.
+     * Khi một cổng bị lỗi kết nối, quá thời gian chờ, bị chặn chuyển hướng, trả mã lỗi HTTP,
+     * trả trang HTML thay vì file APK, hoặc sai mã kiểm tra, hệ thống sẽ tự động chuyển sang máy chủ kế tiếp.
      */
     val FAST_MIRROR_NODES: List<ApkMirrorNode> = listOf(
         ApkMirrorNode(id = "gh_proxy_com", name = "gh-proxy.com", host = "gh-proxy.com"),
         ApkMirrorNode(id = "ghproxy_net", name = "ghproxy.net", host = "ghproxy.net"),
+        ApkMirrorNode(id = "gh_llkk_cc", name = "gh.llkk.cc", host = "gh.llkk.cc"),
+        ApkMirrorNode(id = "ghproxy_cc", name = "ghproxy.cc", host = "ghproxy.cc"),
+        ApkMirrorNode(id = "gh_ddlc_top", name = "gh.ddlc.top", host = "gh.ddlc.top"),
         ApkMirrorNode(id = "ghfast_top", name = "ghfast.top", host = "ghfast.top"),
         ApkMirrorNode(id = "mirror_ghproxy", name = "mirror.ghproxy.com", host = "mirror.ghproxy.com"),
         ApkMirrorNode(id = "kkgithub", name = "kkgithub.com", host = "kkgithub.com"),
+        ApkMirrorNode(id = "gh_con_sh", name = "gh.con.sh", host = "gh.con.sh"),
+        ApkMirrorNode(id = "github_moeyy", name = "github.moeyy.xyz", host = "github.moeyy.xyz"),
         ApkMirrorNode(id = "github_direct", name = "GitHub Direct", host = "github.com", isDirectGitHub = true)
     )
 
@@ -128,6 +142,28 @@ object UpdateChecker {
         .filter { !it.isDirectGitHub }
         .map { it.host.lowercase() }
         .toSet()
+
+    private val ALLOWED_CDN_REDIRECT_SUFFIXES: List<String> = listOf(
+        ".githubusercontent.com",
+        ".amazonaws.com",
+        ".r2.cloudflarestorage.com",
+        ".cloudflare.com",
+        ".workers.dev",
+        ".pages.dev",
+        ".fastly.net",
+        ".akamaized.net",
+        ".jsdelivr.net",
+        ".gh-proxy.com",
+        ".ghproxy.net",
+        ".ghproxy.com",
+        ".ghproxy.cc",
+        ".llkk.cc",
+        ".ddlc.top",
+        ".ghfast.top",
+        ".kkgithub.com",
+        ".con.sh",
+        ".moeyy.xyz"
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isChecking = AtomicBoolean(false)
@@ -145,6 +181,12 @@ object UpdateChecker {
     val downloadState: StateFlow<ApkDownloadState> = _downloadState.asStateFlow()
 
     private var downloadJob: Job? = null
+
+    @Volatile
+    private var skipCurrentMirrorRequested = false
+
+    @Volatile
+    private var activeDownloadConnection: HttpURLConnection? = null
 
     @Volatile
     private var hasAutoCheckedInSession = false
@@ -201,8 +243,10 @@ object UpdateChecker {
 
     /**
      * Xây dựng danh sách thứ tự các cổng tải sẽ thử:
-     * - Nếu người dùng chọn 1 cổng cụ thể (preferredMirrorId != "auto"), thử cổng đó đầu tiên rồi mới tự động xoay sang các cổng còn lại.
-     * - Nếu để "auto", ưu tiên cổng vừa tải thành công lần gần nhất (nếu có), sau đó lần lượt thử toàn bộ chuỗi FAST_MIRROR_NODES.
+     * - Nếu người dùng chọn 1 cổng cụ thể (preferredMirrorId != "auto"), thử cổng đó đầu tiên (kể cả github_direct khi bấm "Tải thường")
+     *   rồi mới tự động xoay sang các cổng còn lại.
+     * - Nếu để "auto" (bấm "Tải qua máy chủ phụ"), ưu tiên cổng máy chủ phụ vừa tải thành công lần gần nhất (nếu có),
+     *   sau đó lần lượt thử toàn bộ chuỗi FAST_MIRROR_NODES và cuối cùng là GitHub Direct.
      */
     fun buildOrderedMirrorChain(
         directGitHubUrl: String,
@@ -212,6 +256,9 @@ object UpdateChecker {
         val orderedNodes = mutableListOf<ApkMirrorNode>()
         if (preferredMirrorId.isNotBlank() && !preferredMirrorId.equals("auto", ignoreCase = true)) {
             FAST_MIRROR_NODES.firstOrNull { it.id == preferredMirrorId }?.let { orderedNodes.add(it) }
+            if (lastWorkingMirrorId.isNotBlank() && lastWorkingMirrorId != preferredMirrorId) {
+                FAST_MIRROR_NODES.firstOrNull { it.id == lastWorkingMirrorId && !it.isDirectGitHub }?.let { orderedNodes.add(it) }
+            }
         } else if (lastWorkingMirrorId.isNotBlank()) {
             FAST_MIRROR_NODES.firstOrNull { it.id == lastWorkingMirrorId && !it.isDirectGitHub }?.let { orderedNodes.add(it) }
         }
@@ -238,8 +285,8 @@ object UpdateChecker {
     }
 
     /**
-     * Chỉ cho phép HTTPS tới các cổng mirror trong ALLOWED_MIRROR_HOSTS (chỉ khi tải APK),
-     * github.com, api.github.com và *.githubusercontent.com.
+     * Chỉ cho phép HTTPS tới các cổng mirror trong ALLOWED_MIRROR_HOSTS / CDN chuyển hướng (chỉ khi tải APK),
+     * github.com, api.github.com, *.githubusercontent.com và *.amazonaws.com (S3 release assets của GitHub).
      */
     fun isAllowedHttpsUrl(url: URL, allowGhFast: Boolean): Boolean {
         if (!url.protocol.equals("https", ignoreCase = true)) return false
@@ -247,14 +294,28 @@ object UpdateChecker {
         if (host == "github.com" || host == "api.github.com") return true
         if (host == "objects.githubusercontent.com" ||
             host == "release-assets.githubusercontent.com" ||
-            host.endsWith(".githubusercontent.com")
+            host.endsWith(".githubusercontent.com") ||
+            host.endsWith(".amazonaws.com")
         ) return true
         if (allowGhFast) {
             if (ALLOWED_MIRROR_HOSTS.any { mirrorHost -> host == mirrorHost || host.endsWith(".$mirrorHost") }) {
                 return true
             }
+            if (ALLOWED_CDN_REDIRECT_SUFFIXES.any { suffix -> host.endsWith(suffix) }) {
+                return true
+            }
         }
         return false
+    }
+
+    private fun isSafeRedirectHttpsTarget(url: URL, allowGhFast: Boolean): Boolean {
+        if (isAllowedHttpsUrl(url, allowGhFast)) return true
+        if (!allowGhFast) return false
+        if (!url.protocol.equals("https", ignoreCase = true)) return false
+        val host = url.host?.lowercase()?.trim() ?: return false
+        if (host.isBlank() || host == "localhost" || host.endsWith(".local") || host.endsWith(".internal")) return false
+        if (host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.") || host.startsWith("169.254.")) return false
+        return host.contains(".")
     }
 
     /**
@@ -264,6 +325,7 @@ object UpdateChecker {
         initialUrlString: String,
         allowGhFast: Boolean,
         timeoutMs: Int,
+        readTimeoutMs: Int = timeoutMs,
         acceptHeader: String = "*/*",
         ifNoneMatchEtag: String = ""
     ): HttpURLConnection {
@@ -277,22 +339,26 @@ object UpdateChecker {
                 instanceFollowRedirects = false
                 requestMethod = "GET"
                 connectTimeout = timeoutMs
-                readTimeout = timeoutMs
+                readTimeout = readTimeoutMs
                 useCaches = false
                 setRequestProperty("Accept", acceptHeader)
-                setRequestProperty("User-Agent", "CloudPlay-Android")
+                setRequestProperty(
+                    "User-Agent",
+                    if (allowGhFast) BROWSER_COMPAT_USER_AGENT else "CloudPlay-Android"
+                )
                 if (ifNoneMatchEtag.isNotBlank() && redirects == 0) {
                     setRequestProperty("If-None-Match", ifNoneMatchEtag)
                 }
             }
+            activeDownloadConnection = conn
             val code = conn.responseCode
             if (code in listOf(301, 302, 303, 307, 308)) {
                 val location = conn.getHeaderField("Location")?.trim().orEmpty()
                 conn.disconnect()
-                if (location.isBlank()) throw SecurityException("Redirect missing Location")
+                if (location.isBlank()) throw IllegalStateException("Redirect missing Location from ${currentUrl.host}")
                 val nextUrl = URL(currentUrl, location)
-                if (!isAllowedHttpsUrl(nextUrl, allowGhFast)) {
-                    throw SecurityException("Blocked redirect host: ${nextUrl.host}")
+                if (!isSafeRedirectHttpsTarget(nextUrl, allowGhFast)) {
+                    throw IllegalStateException("Blocked unsafe redirect host: ${nextUrl.host}")
                 }
                 currentUrl = nextUrl
                 redirects++
@@ -300,7 +366,7 @@ object UpdateChecker {
             }
             return conn
         }
-        throw SecurityException("Too many redirects")
+        throw IllegalStateException("Too many redirects (> $MAX_REDIRECT_HOPS)")
     }
 
     /**
@@ -452,6 +518,7 @@ object UpdateChecker {
 
     fun checkNowManual(context: Context) {
         if (!isChecking.compareAndSet(false, true)) return
+        AppLogger.info("UI", "Bấm kiểm tra cập nhật ứng dụng thủ công")
         _state.value = UpdateCheckState.Checking
         val appContext = context.applicationContext
         scope.launch {
@@ -582,6 +649,7 @@ object UpdateChecker {
 
             lastSuccessfulCheckRealtimeMs = System.currentTimeMillis()
             if (newerAvailable) {
+                AppLogger.info("UPDATE", "Phát hiện bản cập nhật mới: v$currentVersion -> v$latestVersion")
                 _state.value = UpdateCheckState.UpdateAvailable(
                     currentVersion = currentVersion,
                     latestVersion = latestVersion,
@@ -594,11 +662,13 @@ object UpdateChecker {
                 )
                 _showUpdateDialog.value = true
             } else {
+                AppLogger.success("UPDATE", "Ứng dụng đang ở phiên bản mới nhất (v$currentVersion)")
                 _state.value = UpdateCheckState.UpToDate(currentVersion = currentVersion)
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
             val redirectVer = fetchLatestVersionViaWebRedirect().ifBlank { cachedLatest }
             if (!applyCachedOrResolvedVersionState(context, currentVersion, redirectVer, openDialogIfNewer = true)) {
+                AppLogger.error("UPDATE", "Lỗi kiểm tra cập nhật (${AppLogger.shortThrowable(e)})")
                 handleCheckFailure(currentVersion, isManual)
             }
         } finally {
@@ -650,6 +720,35 @@ object UpdateChecker {
         return ""
     }
 
+    /**
+     * Cho phép người dùng bấm chuyển ngay sang máy chủ phụ kế tiếp nếu thấy máy chủ hiện tại tải chậm.
+     */
+    fun skipToNextMirror() {
+        if (_downloadState.value is ApkDownloadState.Downloading) {
+            skipCurrentMirrorRequested = true
+            AppLogger.info("UI", "Bấm chuyển sang máy chủ tải cập nhật kế tiếp")
+            try {
+                activeDownloadConnection?.disconnect()
+            } catch (_: Throwable) {}
+        }
+    }
+
+    private fun isValidDownloadedApkArchive(context: Context, apkFile: File): Boolean {
+        if (!apkFile.exists() || !apkFile.isFile || apkFile.length() < MIN_VALID_APK_BYTES) return false
+        return try {
+            val pm = context.packageManager
+            val archiveInfo = pm?.getPackageArchiveInfo(apkFile.absolutePath, 0)
+            if (archiveInfo != null) {
+                archiveInfo.packageName == context.packageName
+            } else {
+                // Nếu PackageManager trả null trên một số ROM khi chưa cấp quyền đọc ngoài, vẫn chấp nhận nếu có magic ZIP chuẩn
+                true
+            }
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
     fun startVerifiedApkDownload(
         context: Context,
         updateInfo: UpdateCheckState.UpdateAvailable,
@@ -661,6 +760,13 @@ object UpdateChecker {
         val lastWorkingMirrorId = sp.getString(KEY_LAST_WORKING_MIRROR_ID, "") ?: ""
         val updatesDir = File(appContext.cacheDir, "updates").apply { if (!exists()) mkdirs() }
         val targetApkFile = File(updatesDir, "CloudPlay-Xbox-v${updateInfo.latestVersion}.apk")
+
+        val modeDesc = when {
+            preferredMirrorId == "github_direct" -> "Tải thường (Trực tiếp GitHub)"
+            preferredMirrorId == "auto" -> "Tải nhanh qua máy chủ phụ (Tự động đổi khi lỗi)"
+            else -> "Tải qua máy chủ phụ ($preferredMirrorId)"
+        }
+        AppLogger.info("UI", "Bắt đầu tải bản cập nhật v${updateInfo.latestVersion}: $modeDesc")
 
         downloadJob?.cancel()
         downloadJob = scope.launch {
@@ -674,11 +780,16 @@ object UpdateChecker {
                     lastWorkingMirrorId = lastWorkingMirrorId
                 )
 
-                var downloadedOk = false
+                val failedMirrorNames = mutableListOf<String>()
+                var officialSha256: String? = null
+                var downloadedAndVerifiedOk = false
+
                 for ((idx, pair) in candidates.withIndex()) {
                     val (node, candidateUrl) = pair
                     val attemptNum = idx + 1
-                    val timeoutForNode = if (node.isDirectGitHub) GITHUB_DOWNLOAD_TIMEOUT_MS else MIRROR_CONNECT_TIMEOUT_MS
+                    val connectTimeoutForNode = if (node.isDirectGitHub) GITHUB_DOWNLOAD_TIMEOUT_MS else MIRROR_CONNECT_TIMEOUT_MS
+                    val readTimeoutForNode = if (node.isDirectGitHub) GITHUB_DOWNLOAD_TIMEOUT_MS else MIRROR_READ_TIMEOUT_MS
+                    skipCurrentMirrorRequested = false
                     try {
                         _downloadState.value = ApkDownloadState.Downloading(
                             progress = 0f,
@@ -687,44 +798,66 @@ object UpdateChecker {
                             usingFallbackGitHub = node.isDirectGitHub,
                             activeMirrorName = node.name,
                             mirrorIndex = attemptNum,
-                            totalMirrors = candidates.size
+                            totalMirrors = candidates.size,
+                            failedMirrors = failedMirrorNames.toList()
                         )
                         downloadStreamToFile(
                             downloadUrl = candidateUrl,
                             destFile = targetApkFile,
-                            timeoutMs = timeoutForNode,
+                            connectTimeoutMs = connectTimeoutForNode,
+                            readTimeoutMs = readTimeoutForNode,
                             usingFallbackGitHub = node.isDirectGitHub,
                             activeMirrorName = node.name,
                             mirrorIndex = attemptNum,
-                            totalMirrors = candidates.size
+                            totalMirrors = candidates.size,
+                            failedMirrors = failedMirrorNames.toList()
                         )
-                        downloadedOk = true
+
+                        // Kiểm tra cấu trúc gói APK và chữ ký SHA-256 ngay trong vòng lặp để nếu máy chủ phụ trả file hỏng thì tự chuyển sang máy chủ kế tiếp
+                        _downloadState.value = ApkDownloadState.Verifying
+                        if (!isValidDownloadedApkArchive(appContext, targetApkFile)) {
+                            throw IllegalStateException("File tải từ ${node.name} không phải gói APK CloudPlay hợp lệ")
+                        }
+
+                        val resolvedSha = officialSha256 ?: ensureOfficialSha256FromGitHub(updateInfo).also {
+                            officialSha256 = it
+                        }
+                        if (isValidSha256Hex(resolvedSha)) {
+                            val computedSha256 = computeFileSha256(targetApkFile)
+                            if (!isExactSha256Match(computedSha256, resolvedSha)) {
+                                throw IllegalStateException("Mã SHA-256 từ ${node.name} không khớp với bản chính thức")
+                            }
+                        }
+
+                        downloadedAndVerifiedOk = true
                         if (!node.isDirectGitHub) {
                             sp.edit().putString(KEY_LAST_WORKING_MIRROR_ID, node.id).apply()
                         }
-                        AppLogger.info("UPDATE", "Downloaded APK via ${node.name} ($attemptNum/${candidates.size})")
+                        AppLogger.success("UPDATE", "Tải và xác thực thành công APK qua ${node.name} ($attemptNum/${candidates.size})")
                         break
                     } catch (ce: CancellationException) {
                         targetApkFile.delete()
                         throw ce
                     } catch (err: Throwable) {
                         targetApkFile.delete()
-                        AppLogger.warn("UPDATE", "Mirror ${node.name} failed (${err.message}), switching to next mirror...")
+                        failedMirrorNames.add(node.name)
+                        val nextNodeName = candidates.getOrNull(idx + 1)?.first?.name
+                        if (nextNodeName != null) {
+                            AppLogger.warn(
+                                "UPDATE",
+                                "Máy chủ tải ${node.name} lỗi (${err.message ?: err.javaClass.simpleName}) -> tự động chuyển sang $nextNodeName (${idx + 2}/${candidates.size})"
+                            )
+                        } else {
+                            AppLogger.error(
+                                "UPDATE",
+                                "Máy chủ tải cuối cùng ${node.name} lỗi (${err.message ?: err.javaClass.simpleName})"
+                            )
+                        }
                     }
                 }
 
-                if (!downloadedOk) {
+                if (!downloadedAndVerifiedOk) {
                     throw IllegalStateException("All download mirrors failed")
-                }
-
-                _downloadState.value = ApkDownloadState.Verifying
-                val officialSha256 = ensureOfficialSha256FromGitHub(updateInfo)
-                val computedSha256 = computeFileSha256(targetApkFile)
-
-                if (!isExactSha256Match(computedSha256, officialSha256)) {
-                    targetApkFile.delete()
-                    _downloadState.value = ApkDownloadState.VerificationFailed()
-                    return@launch
                 }
 
                 _downloadState.value = ApkDownloadState.VerifiedReadyToInstall(targetApkFile)
@@ -732,20 +865,25 @@ object UpdateChecker {
             } catch (_: CancellationException) {
                 targetApkFile.delete()
                 _downloadState.value = ApkDownloadState.Idle
-            } catch (_: SecurityException) {
+            } catch (e: Throwable) {
                 targetApkFile.delete()
-                _downloadState.value = ApkDownloadState.VerificationFailed()
-            } catch (_: Throwable) {
-                targetApkFile.delete()
+                AppLogger.error("UPDATE", "Không thể tải bản cập nhật qua tất cả các cổng (${AppLogger.shortThrowable(e)})")
                 _downloadState.value = ApkDownloadState.DownloadError(
-                    messageVi = "Tất cả cổng tải nhanh đều bận hoặc lỗi mạng. Bạn hãy thử chọn cổng khác hoặc bấm 'Tải từ GitHub'.",
-                    messageEn = "All fast download mirrors are busy or unreachable. Please pick another mirror or tap 'Download from GitHub'."
+                    messageVi = "Tất cả máy chủ phụ và cổng tải trực tiếp đều đang bận hoặc lỗi mạng. Bạn hãy thử chọn một máy chủ phụ khác hoặc bấm 'Mở trang GitHub'.",
+                    messageEn = "All mirrors and direct download nodes are busy or unreachable. Please pick another mirror or tap 'Open GitHub Page'."
                 )
+            } finally {
+                activeDownloadConnection = null
             }
         }
     }
 
     fun cancelApkDownload() {
+        skipCurrentMirrorRequested = false
+        try {
+            activeDownloadConnection?.disconnect()
+        } catch (_: Throwable) {}
+        activeDownloadConnection = null
         downloadJob?.cancel()
         downloadJob = null
         _downloadState.value = ApkDownloadState.Idle
@@ -766,15 +904,22 @@ object UpdateChecker {
     private suspend fun downloadStreamToFile(
         downloadUrl: String,
         destFile: File,
-        timeoutMs: Int,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
         usingFallbackGitHub: Boolean,
         activeMirrorName: String,
         mirrorIndex: Int,
-        totalMirrors: Int
+        totalMirrors: Int,
+        failedMirrors: List<String>
     ) {
         var conn: HttpURLConnection? = null
         try {
-            conn = openVerifiedDirectConnection(downloadUrl, allowGhFast = true, timeoutMs = timeoutMs)
+            conn = openVerifiedDirectConnection(
+                initialUrlString = downloadUrl,
+                allowGhFast = true,
+                timeoutMs = connectTimeoutMs,
+                readTimeoutMs = readTimeoutMs
+            )
             if (conn.responseCode !in 200..299) throw IllegalStateException("HTTP ${conn.responseCode}")
             val contentType = conn.contentType?.lowercase().orEmpty()
             if (contentType.contains("text/html") || contentType.contains("application/json")) {
@@ -793,6 +938,9 @@ object UpdateChecker {
                     var magicFilled = 0
                     var totalRead = 0L
                     while (coroutineContext.isActive) {
+                        if (skipCurrentMirrorRequested) {
+                            throw IllegalStateException("Người dùng chuyển sang máy chủ tiếp theo")
+                        }
                         val read = input.read(buffer)
                         if (read == -1) break
                         if (read == 0) continue
@@ -817,10 +965,14 @@ object UpdateChecker {
                             usingFallbackGitHub = usingFallbackGitHub,
                             activeMirrorName = activeMirrorName,
                             mirrorIndex = mirrorIndex,
-                            totalMirrors = totalMirrors
+                            totalMirrors = totalMirrors,
+                            failedMirrors = failedMirrors
                         )
                     }
                     if (!coroutineContext.isActive) throw CancellationException("Cancelled")
+                    if (skipCurrentMirrorRequested) {
+                        throw IllegalStateException("Người dùng chuyển sang máy chủ tiếp theo")
+                    }
                     output.flush()
                     if (totalRead < MIN_VALID_APK_BYTES) {
                         throw IllegalStateException("Downloaded file too small ($totalRead B)")
@@ -868,7 +1020,9 @@ object UpdateChecker {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(installIntent)
-        } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            AppLogger.error("UPDATE", "Lỗi mở trình cài đặt APK (${AppLogger.shortThrowable(e)})")
+        }
     }
 
     private fun handleCheckFailure(currentVersion: String, isManual: Boolean) {

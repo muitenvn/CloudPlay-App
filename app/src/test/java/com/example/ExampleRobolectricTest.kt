@@ -1029,14 +1029,16 @@ class ExampleRobolectricTest {
     @Test
     fun testMultiMirrorFailoverChainAndApkValidation() {
         val directUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v1.0.5/CloudPlay-v1.0.5.apk"
+        val expectedNodeCount = com.example.data.UpdateChecker.FAST_MIRROR_NODES.size
 
-        // 1. Auto mode puts gh-proxy.com first (since ghfast.top has downtime) and includes all 6 mirrors
+        // 1. Auto mode puts gh-proxy.com first and includes all 11 mirror/direct nodes
         val defaultChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
             directGitHubUrl = directUrl,
             preferredMirrorId = "auto",
             lastWorkingMirrorId = ""
         )
-        assertEquals(6, defaultChain.size)
+        assertEquals(expectedNodeCount, defaultChain.size)
+        assertTrue(expectedNodeCount >= 11)
         assertEquals("gh_proxy_com", defaultChain[0].first.id)
         assertEquals("https://gh-proxy.com/$directUrl", defaultChain[0].second)
         assertEquals("github_direct", defaultChain.last().first.id)
@@ -1049,7 +1051,17 @@ class ExampleRobolectricTest {
             lastWorkingMirrorId = "ghproxy_net"
         )
         assertEquals("ghproxy_net", rememberedChain[0].first.id)
-        assertEquals(6, rememberedChain.map { it.first.id }.distinct().size)
+        assertEquals(expectedNodeCount, rememberedChain.map { it.first.id }.distinct().size)
+
+        // 2b. Normal direct GitHub mode puts github_direct first and keeps all backup mirrors after it
+        val directFirstChain = com.example.data.UpdateChecker.buildOrderedMirrorChain(
+            directGitHubUrl = directUrl,
+            preferredMirrorId = "github_direct",
+            lastWorkingMirrorId = "gh_llkk_cc"
+        )
+        assertEquals("github_direct", directFirstChain[0].first.id)
+        assertEquals("gh_llkk_cc", directFirstChain[1].first.id)
+        assertEquals(expectedNodeCount, directFirstChain.map { it.first.id }.distinct().size)
 
         // 3. All mirror URLs are allowed only when allowGhFast=true, and blocked when allowGhFast=false (e.g. SHA-256 check)
         for ((node, candidateUrl) in defaultChain) {

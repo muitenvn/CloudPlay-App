@@ -159,7 +159,18 @@ object AppLogger {
         }
 
         while (ringBuffer.size >= MAX_LOGS && ringBuffer.isNotEmpty()) {
-            val removed = ringBuffer.removeFirst()
+            // Giữ lại các dòng [PERF-INIT] (chỉ sinh tối đa ~10 dòng mỗi tiến trình) khỏi bị đẩy mất khi log chung đầy 500 dòng
+            val iter = ringBuffer.iterator()
+            var removedEntry: AppLogEntry? = null
+            while (iter.hasNext()) {
+                val candidate = iter.next()
+                if (candidate.tag != "PERF-INIT") {
+                    iter.remove()
+                    removedEntry = candidate
+                    break
+                }
+            }
+            val removed = removedEntry ?: ringBuffer.removeFirst()
             ringBufferBytes = (ringBufferBytes - entryByteCost(removed)).coerceAtLeast(0)
             if (removed.tag == "PERF") {
                 ringBufferPerfCount = (ringBufferPerfCount - 1).coerceAtLeast(0)
@@ -174,7 +185,17 @@ object AppLogger {
         }
 
         while (ringBufferBytes > MAX_TOTAL_BYTES && ringBuffer.size > 1) {
-            val removed = ringBuffer.removeFirst()
+            val iter = ringBuffer.iterator()
+            var removedEntry: AppLogEntry? = null
+            while (iter.hasNext()) {
+                val candidate = iter.next()
+                if (candidate.tag != "PERF-INIT") {
+                    iter.remove()
+                    removedEntry = candidate
+                    break
+                }
+            }
+            val removed = removedEntry ?: ringBuffer.removeFirst()
             ringBufferBytes = (ringBufferBytes - entryByteCost(removed)).coerceAtLeast(0)
             if (removed.tag == "PERF") {
                 ringBufferPerfCount = (ringBufferPerfCount - 1).coerceAtLeast(0)

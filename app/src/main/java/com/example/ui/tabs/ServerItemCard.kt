@@ -60,6 +60,12 @@ import com.example.vpn.RegionUnlockStatus
 import com.example.vpn.ServerLocation
 import com.example.vpn.ServerPingStatus
 
+private val SELECTED_CARD_BORDER_BRUSH = Brush.horizontalGradient(listOf(XboxNeonGreen, DirectCyan))
+private val DEFAULT_CARD_BORDER_BRUSH = Brush.horizontalGradient(listOf(XboxCardBorder, XboxCardBorder))
+private val SELECTED_CARD_BG = XboxSurfaceVariant.copy(alpha = 0.96f)
+private val DEFAULT_CARD_BG = XboxSurface.copy(alpha = 0.94f)
+private val UNTESTED_BADGE_COLOR = Color(0xFF9CA3AF)
+
 @Composable
 internal fun ServerCard(
     server: ServerLocation,
@@ -74,40 +80,23 @@ internal fun ServerCard(
     unlockStatus: RegionUnlockStatus,
     distanceKm: Int? = null,
     isTooFarForAutoSelect: Boolean = false,
+    precomputedSubtitle: String? = null,
     isEn: Boolean = false,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
-    val config by SettingsRepository.config.collectAsState()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
-    val animatedPingMs by animateXboxIntAsState(
-        targetValue = if (pingMs > 0) pingMs else 0,
-        motionEnabled = motionEnabled,
-        label = "server_ping_${server.id}"
-    )
+    val displayPingMs = if (pingMs > 0) pingMs else 0
     val isFallbackPortOnly = measurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY
     val isServerCurrentlyTesting = measurement?.status == ServerPingStatus.TESTING
     val isUnstablePing = measurement?.isUnstable == true || pingMs >= 1000
-    val targetPingColor = when {
+    val pingColor = when {
         pingMs <= 0 -> Color.Gray
         isFallbackPortOnly || isUnstablePing -> WarningAmber
         pingMs <= 80 -> XboxNeonGreen
         pingMs <= 120 -> WarningAmber
         else -> JapanRed
     }
-    val pingColor by animateColorAsState(
-        targetValue = targetPingColor,
-        animationSpec = tween(durationMillis = if (motionEnabled) 170 else 0),
-        label = "server_ping_color"
-    )
-    val cardContainerColor by animateColorAsState(
-        targetValue = if (isSelected) XboxSurfaceVariant.copy(alpha = 0.96f) else XboxSurface.copy(alpha = 0.94f),
-        animationSpec = tween(durationMillis = if (motionEnabled) 170 else 0),
-        label = "server_card_bg"
-    )
+    val cardContainerColor = if (isSelected) SELECTED_CARD_BG else DEFAULT_CARD_BG
 
     val activeBars = when {
         pingMs <= 0 -> 0
@@ -120,38 +109,33 @@ internal fun ServerCard(
 
     // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử mở khóa" (xám), "Sai vùng" (vàng)
     val unlockLabel = when (unlockStatus) {
-        RegionUnlockStatus.UNLOCKED -> config.tr("Đã mở khóa", "Unlocked")
-        RegionUnlockStatus.FAILED -> config.tr("Không mở khóa", "Unlock Failed")
-        RegionUnlockStatus.UNTESTED -> config.tr("Chưa thử mở khóa", "Untested unlock")
-        RegionUnlockStatus.WRONG_REGION -> config.tr("Sai vùng", "Wrong Region")
+        RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
+        RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
+        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested unlock" else "Chưa thử mở khóa"
+        RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
     }
     val unlockBadgeColor = when (unlockStatus) {
         RegionUnlockStatus.UNLOCKED -> XboxNeonGreen
         RegionUnlockStatus.FAILED -> JapanRed
-        RegionUnlockStatus.UNTESTED -> Color(0xFF9CA3AF)
+        RegionUnlockStatus.UNTESTED -> UNTESTED_BADGE_COLOR
         RegionUnlockStatus.WRONG_REGION -> WarningAmber
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(18.dp))
             .border(
                 width = if (isSelected) 1.6.dp else 1.dp,
-                brush = if (isSelected) {
-                    Brush.horizontalGradient(listOf(XboxNeonGreen, DirectCyan))
-                } else {
-                    Brush.horizontalGradient(listOf(XboxCardBorder, XboxCardBorder))
-                },
+                brush = if (isSelected) SELECTED_CARD_BORDER_BRUSH else DEFAULT_CARD_BORDER_BRUSH,
                 shape = RoundedCornerShape(18.dp)
             )
-            .clickable { onClick() }
+            .clickable(onClick = onClick)
             .testTag("server_card_${server.id}"),
         colors = CardDefaults.cardColors(
             containerColor = cardContainerColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -208,7 +192,7 @@ internal fun ServerCard(
                                 border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.65f))
                             ) {
                                 Text(
-                                    text = config.tr("★ ĐỀ XUẤT", "★ BEST"),
+                                    text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 8.sp,
@@ -261,7 +245,7 @@ internal fun ServerCard(
                                 border = androidx.compose.foundation.BorderStroke(0.7.dp, WarningAmber.copy(alpha = 0.65f))
                             ) {
                                 Text(
-                                    text = config.tr("Quá xa", "Too far"),
+                                    text = if (isEn) "Too far" else "Quá xa",
                                     color = WarningAmber,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 8.sp,
@@ -274,26 +258,13 @@ internal fun ServerCard(
                         }
                     }
 
-                    val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
-                    val recentSessionsForCard by com.example.data.SessionHistoryRepository.sessions.collectAsState()
-                    val regionSessionStats = remember(server.name, server.countryCode, recentSessionsForCard) {
-                        com.example.data.SessionHistoryRepository.getRegionSessionStats(
-                            serverName = server.name,
-                            countryCode = server.countryCode,
-                            sessionsList = recentSessionsForCard
-                        )
-                    }
-                    val directPingNote = if (regionSessionStats != null && regionSessionStats.sampleCount > 0) {
-                        if (isEn) {
-                            " • ~${regionSessionStats.avgRttMs}ms • last ${regionSessionStats.sampleCount} sessions"
-                        } else {
-                            " • ~${regionSessionStats.avgRttMs}ms • ${regionSessionStats.sampleCount} phiên gần nhất"
-                        }
-                    } else {
-                        if (isEn) " • No data yet" else " • Chưa có dữ liệu"
+                    val subtitleText = precomputedSubtitle ?: remember(server.id, distanceKm, isEn) {
+                        val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
+                        val directPingNote = if (isEn) " • No data yet" else " • Chưa có dữ liệu"
+                        "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}"
                     }
                     Text(
-                        text = "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}",
+                        text = subtitleText,
                         color = TextSecondary,
                         fontSize = 11.sp,
                         maxLines = 1,
@@ -337,14 +308,14 @@ internal fun ServerCard(
                         }
 
                         val mainPingValueText = when {
-                            isGameActiveNow && pingMs > 0 -> "${animatedPingMs}ms"
+                            isGameActiveNow && pingMs > 0 -> "${displayPingMs}ms"
                             isGameActiveNow -> "--"
                             isServerCurrentlyTesting -> "..."
-                            isFallbackPortOnly && pingMs > 0 -> "${animatedPingMs}ms"
-                            pingMs > 0 && isUnstablePing -> "${animatedPingMs}ms • ${config.tr("Mạng chập chờn", "Unstable")}"
-                            pingMs > 0 -> "${animatedPingMs}ms"
-                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> config.tr("Không đo được", "Unreachable")
-                            else -> config.tr("Chưa đo", "Not tested")
+                            isFallbackPortOnly && pingMs > 0 -> "${displayPingMs}ms"
+                            pingMs > 0 && isUnstablePing -> "${displayPingMs}ms • ${if (isEn) "Unstable" else "Mạng chập chờn"}"
+                            pingMs > 0 -> "${displayPingMs}ms"
+                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
+                            else -> if (isEn) "Not tested" else "Chưa đo"
                         }
 
                         Text(
@@ -358,22 +329,22 @@ internal fun ServerCard(
 
                     val metricLabelText = when {
                         isGameActiveNow -> "RTT WebRTC"
-                        isServerCurrentlyTesting -> config.tr("Đang đo...", "Testing...")
+                        isServerCurrentlyTesting -> if (isEn) "Testing..." else "Đang đo..."
                         isFallbackPortOnly -> {
-                            config.tr("Cổng phụ • Cổng chính đóng", "Fallback port • Primary closed")
+                            if (isEn) "Fallback port • Primary closed" else "Cổng phụ • Cổng chính đóng"
                         }
                         measurement?.status == ServerPingStatus.MEASURED_PRIMARY && pingMs > 0 -> {
                             when {
-                                isUnstablePing -> config.tr("Độ trễ mạng (Mạng chập chờn)", "Latency (Unstable)")
-                                pingMs <= 80 -> config.tr("Độ trễ mạng (Tốt)", "Latency (Good)")
-                                pingMs <= 120 -> config.tr("Độ trễ mạng (Trung bình)", "Latency (Fair)")
-                                else -> config.tr("Độ trễ mạng (Cao)", "Latency (High)")
+                                isUnstablePing -> if (isEn) "Latency (Unstable)" else "Độ trễ mạng (Mạng chập chờn)"
+                                pingMs <= 80 -> if (isEn) "Latency (Good)" else "Độ trễ mạng (Tốt)"
+                                pingMs <= 120 -> if (isEn) "Latency (Fair)" else "Độ trễ mạng (Trung bình)"
+                                else -> if (isEn) "Latency (High)" else "Độ trễ mạng (Cao)"
                             }
                         }
-                        hasTriedPing && pingMs > 0 -> config.tr("Độ trễ mạng", "Network latency")
-                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> config.tr("Không đo được", "Unreachable")
-                        isSmartBypass && pingMs > 0 -> config.tr("Độ trễ phiên gần nhất", "Last session latency")
-                        else -> config.tr("Chưa đo", "Not tested")
+                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency" else "Độ trễ mạng"
+                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
+                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session latency" else "Độ trễ phiên gần nhất"
+                        else -> if (isEn) "Not tested" else "Chưa đo"
                     }
 
                     if (isSelected) {

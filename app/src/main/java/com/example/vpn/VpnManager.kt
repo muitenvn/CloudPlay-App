@@ -94,6 +94,61 @@ object VpnManager {
         return true
     }
 
+    @Synchronized
+    fun recordBatchMeasurementsIfCurrentGeneration(
+        generationId: Long,
+        batchMeasurements: Map<String, EndpointPingMeasurement>,
+        clearStaleTestingIds: Iterable<String> = emptyList()
+    ): Boolean {
+        if (generationId != measurementGeneration.get()) {
+            return false
+        }
+        val nextMeas = _state.value.serverMeasurements.toMutableMap()
+        val nextPings = _state.value.serverPings.toMutableMap()
+        var changed = false
+
+        for ((serverId, measurement) in batchMeasurements) {
+            if (nextMeas[serverId] != measurement) {
+                nextMeas[serverId] = measurement
+                changed = true
+            }
+            when (measurement.status) {
+                ServerPingStatus.MEASURED_PRIMARY -> {
+                    if (nextPings[serverId] != measurement.rttMs) {
+                        nextPings[serverId] = measurement.rttMs
+                        changed = true
+                    }
+                }
+                ServerPingStatus.MEASURED_FALLBACK_ONLY, ServerPingStatus.UNREACHABLE -> {
+                    if (nextPings[serverId] != -1) {
+                        nextPings[serverId] = -1
+                        changed = true
+                    }
+                }
+                ServerPingStatus.UNTESTED, ServerPingStatus.TESTING, ServerPingStatus.EXPIRED -> {
+                    if (nextPings.remove(serverId) != null) {
+                        changed = true
+                    }
+                }
+            }
+        }
+
+        for (id in clearStaleTestingIds) {
+            if (id !in batchMeasurements && nextMeas[id]?.status == ServerPingStatus.TESTING) {
+                nextMeas.remove(id)
+                changed = true
+            }
+        }
+
+        if (changed) {
+            _state.value = _state.value.copy(
+                serverMeasurements = nextMeas,
+                serverPings = nextPings
+            )
+        }
+        return true
+    }
+
     const val IP_FOREGROUND_COOLDOWN_MS = 10_000L
     const val IP_NETWORK_CHANGE_DEBOUNCE_MS = 1_500L
     const val IP_PRE_LAUNCH_MAX_AGE_MS = 60_000L
@@ -180,7 +235,12 @@ object VpnManager {
             }
             ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = false)
             if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
-                testAllServers(autoPickBest = false, context = appCtx, forceRefresh = false)
+                testAllServers(
+                    autoPickBest = false,
+                    context = appCtx,
+                    forceRefresh = false,
+                    reason = "khởi động VpnManager.init"
+                )
             }
             delay(3_500L)
             if (!isInGameStreamActive) {
@@ -1141,64 +1201,112 @@ object VpnManager {
         customProbeExecutor: (suspend (String, Int, Int) -> Pair<Int, String>)? = null
     ) {
         if (visibleServers.isEmpty() || (isInGameStreamActive && customProbeExecutor == null)) return
+        if (_state.value.isTestingPings && customProbeExecutor == null) return
+
         val currentGen = measurementGeneration.get()
-        val now = System.currentTimeMillis()
-        val currentMeas = _state.value.serverMeasurements.toMutableMap()
-        val currentPings = _state.value.serverPings.toMutableMap()
-        val needNetworkProbe = mutableListOf<ServerLocation>()
+        // Nếu có customProbeExecutor (trong unit test chạy đồng bộ), giữ khả năng cập nhật nhanh
+        if (customProbeExecutor != null) {
+            val now = System.currentTimeMillis()
+            val currentMeas = _state.value.serverMeasurements.toMutableMap()
+            val currentPings = _state.value.serverPings.toMutableMap()
+            val needNetworkProbe = mutableListOf<ServerLocation>()
+            var cacheChanged = false
 
-        for (srv in visibleServers) {
-            val existing = currentMeas[srv.id]
-            if (existing != null && !existing.isExpired(now) &&
-                existing.status != ServerPingStatus.UNTESTED &&
-                existing.status != ServerPingStatus.EXPIRED
-            ) {
-                continue
-            }
-            val cached = PingTester.getCachedMeasurement(srv, now)
-            if (cached != null && cached.status != ServerPingStatus.EXPIRED) {
-                currentMeas[srv.id] = cached
-                if (cached.isPrimaryPortAlive) {
-                    currentPings[srv.id] = cached.rttMs
-                } else if (cached.status == ServerPingStatus.UNREACHABLE || cached.isFallbackPortOnly) {
-                    currentPings[srv.id] = -1
+            for (srv in visibleServers) {
+                val existing = currentMeas[srv.id]
+                if (existing != null && !existing.isExpired(now) &&
+                    existing.status != ServerPingStatus.UNTESTED &&
+                    existing.status != ServerPingStatus.EXPIRED
+                ) {
+                    continue
                 }
-            } else {
-                needNetworkProbe.add(srv)
+                val cached = PingTester.getCachedMeasurement(srv, now)
+                if (cached != null && cached.status != ServerPingStatus.EXPIRED) {
+                    currentMeas[srv.id] = cached
+                    cacheChanged = true
+                    if (cached.isPrimaryPortAlive) {
+                        currentPings[srv.id] = cached.rttMs
+                    } else if (cached.status == ServerPingStatus.UNREACHABLE || cached.isFallbackPortOnly) {
+                        currentPings[srv.id] = -1
+                    }
+                } else {
+                    needNetworkProbe.add(srv)
+                }
             }
+            if (cacheChanged) {
+                _state.value = _state.value.copy(
+                    serverMeasurements = currentMeas,
+                    serverPings = currentPings
+                )
+            }
+            if (needNetworkProbe.isEmpty() || _state.value.isTestingPings) return
+            lazyPingJob?.cancel()
+            lazyPingJob = scope.launch(Dispatchers.IO) {
+                val batch = needNetworkProbe.take(8)
+                val collected = java.util.concurrent.ConcurrentHashMap<String, EndpointPingMeasurement>()
+                kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                    val jobs = batch.map { server ->
+                        async {
+                            val meas = PingTester.measureServerEndpoint(
+                                server = server,
+                                timeoutMs = 850,
+                                useCache = true,
+                                customProbeExecutor = customProbeExecutor
+                            )
+                            collected[server.id] = meas
+                        }
+                    }
+                    jobs.awaitAll()
+                }
+                if (collected.isNotEmpty()) {
+                    recordBatchMeasurementsIfCurrentGeneration(
+                        generationId = currentGen,
+                        batchMeasurements = collected,
+                        clearStaleTestingIds = batch.map { it.id }
+                    )
+                }
+            }
+            return
         }
-
-        _state.value = _state.value.copy(
-            serverMeasurements = currentMeas,
-            serverPings = currentPings
-        )
-
-        if (needNetworkProbe.isEmpty() || _state.value.isTestingPings) return
 
         lazyPingJob?.cancel()
         lazyPingJob = scope.launch(Dispatchers.IO) {
-            val batch = needNetworkProbe.take(8)
-            // Đánh dấu trạng thái TESTING cho các mục đang hiển thị sắp đo
-            synchronized(this@VpnManager) {
-                if (currentGen == measurementGeneration.get()) {
-                    val markTesting = _state.value.serverMeasurements.toMutableMap()
-                    for (srv in batch) {
-                        if (markTesting[srv.id] == null || markTesting[srv.id]?.status == ServerPingStatus.UNTESTED) {
-                            markTesting[srv.id] = EndpointPingMeasurement(
-                                rttMs = -1,
-                                configuredPort = srv.port,
-                                measuredPort = srv.port,
-                                resolvedIp = srv.ip,
-                                measurementType = PingMeasurementType.NONE,
-                                status = ServerPingStatus.TESTING
-                            )
-                        }
-                    }
-                    _state.value = _state.value.copy(serverMeasurements = markTesting)
+            if (isInGameStreamActive || _state.value.isTestingPings) return@launch
+            val now = System.currentTimeMillis()
+            val snapMeas = _state.value.serverMeasurements
+            val needNetworkProbe = mutableListOf<ServerLocation>()
+            val cachedUpdates = LinkedHashMap<String, EndpointPingMeasurement>()
+
+            for (srv in visibleServers) {
+                val existing = snapMeas[srv.id]
+                if (existing != null && !existing.isExpired(now) &&
+                    existing.status != ServerPingStatus.UNTESTED &&
+                    existing.status != ServerPingStatus.EXPIRED
+                ) {
+                    continue
+                }
+                val cached = PingTester.getCachedMeasurement(srv, now)
+                if (cached != null && cached.status != ServerPingStatus.EXPIRED) {
+                    cachedUpdates[srv.id] = cached
+                } else {
+                    needNetworkProbe.add(srv)
                 }
             }
 
-            // Thời hạn cho một bước đo lười <= 5 giây (giới hạn timeout socket được quản lý bên trong Semaphore của PingTester)
+            if (cachedUpdates.isNotEmpty()) {
+                recordBatchMeasurementsIfCurrentGeneration(
+                    generationId = currentGen,
+                    batchMeasurements = cachedUpdates
+                )
+            }
+
+            if (needNetworkProbe.isEmpty() || _state.value.isTestingPings || isInGameStreamActive) return@launch
+
+            val batch = needNetworkProbe.take(6)
+            val collected = java.util.concurrent.ConcurrentHashMap<String, EndpointPingMeasurement>()
+
+            // Thời hạn cho một bước đo lười <= 5 giây; gom toàn bộ kết quả trong batch thành 1 lần phát StateFlow duy nhất
+            // để tránh giật và nhảy thứ tự danh sách khi người dùng đang cuộn.
             kotlinx.coroutines.withTimeoutOrNull(5000L) {
                 val jobs = batch.map { server ->
                     async {
@@ -1206,25 +1314,20 @@ object VpnManager {
                             server = server,
                             timeoutMs = 850,
                             useCache = true,
-                            customProbeExecutor = customProbeExecutor
+                            customProbeExecutor = null
                         )
-                        recordMeasurementIfCurrentGeneration(currentGen, server.id, meas)
+                        collected[server.id] = meas
                     }
                 }
                 jobs.awaitAll()
             }
 
-            // Bất kỳ mục nào trong batch hết hạn 5s mà chưa tới lượt lấy giấy phép Semaphore (vẫn TESTING) -> trả về trạng thái Chưa đo (UNTESTED) để đo lại khi cuộn
-            synchronized(this@VpnManager) {
-                if (currentGen == measurementGeneration.get()) {
-                    val cleanup = _state.value.serverMeasurements.toMutableMap()
-                    for (srv in batch) {
-                        if (cleanup[srv.id]?.status == ServerPingStatus.TESTING) {
-                            cleanup.remove(srv.id)
-                        }
-                    }
-                    _state.value = _state.value.copy(serverMeasurements = cleanup)
-                }
+            if (collected.isNotEmpty()) {
+                recordBatchMeasurementsIfCurrentGeneration(
+                    generationId = currentGen,
+                    batchMeasurements = collected,
+                    clearStaleTestingIds = batch.map { it.id }
+                )
             }
         }
     }
@@ -1241,6 +1344,7 @@ object VpnManager {
         context: Context? = null,
         forceRefresh: Boolean = true,
         visibleServerIds: Set<String> = emptySet(),
+        reason: String = "thủ công",
         onPickedBest: ((ServerLocation, Int) -> Unit)? = null
     ) {
         if (isInGameStreamActive || com.example.cloudplay.NetworkOptimizer.status.value.isLowLatencyStreamActive) return
@@ -1283,7 +1387,7 @@ object VpnManager {
 
                 com.example.data.AppLogger.info(
                     "PING",
-                    "Đợt đo #$myGeneration • Bước 1: Thăm dò ${step1Targets.size}/${allServers.size} đại diện vùng (thời hạn ≤5s, tối đa ${PingTester.MAX_CONCURRENT_SOCKETS} socket mở đồng thời)"
+                    "Đợt đo #$myGeneration (lý do: $reason) • Bước 1: Thăm dò ${step1Targets.size}/${allServers.size} đại diện vùng (thời hạn ≤5s, tối đa ${PingTester.MAX_CONCURRENT_SOCKETS} socket mở đồng thời)"
                 )
 
                 runMeasurementStepWithDeadline(
@@ -1560,6 +1664,9 @@ object VpnManager {
             }
         }
 
+        val stepCollected = java.util.concurrent.ConcurrentHashMap<String, EndpointPingMeasurement>()
+        val lastFlushElapsedMs = java.util.concurrent.atomic.AtomicLong(android.os.SystemClock.elapsedRealtime())
+
         kotlinx.coroutines.withTimeoutOrNull(stepDeadlineMs) {
             val deferreds = targets.map { server ->
                 scope.async(Dispatchers.IO) {
@@ -1569,30 +1676,42 @@ object VpnManager {
                         timeoutMs = 850,
                         useCache = useCache
                     )
-                    if (recordMeasurementIfCurrentGeneration(generationId, server.id, meas)) {
+                    if (generationId == measurementGeneration.get()) {
+                        stepCollected[server.id] = meas
                         logPingResult(server, meas, logSuccess = false)
+                        // Gom các kết quả hoàn thành sát nhau trong cửa sổ 400ms thành 1 lần phát StateFlow duy nhất
+                        // để tránh làm ServersScreen vẽ lại 8-10 lần liên tiếp trong cùng 100-200ms.
+                        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+                        val prevFlush = lastFlushElapsedMs.get()
+                        if (nowElapsed - prevFlush >= 400L &&
+                            lastFlushElapsedMs.compareAndSet(prevFlush, nowElapsed)
+                        ) {
+                            recordBatchMeasurementsIfCurrentGeneration(
+                                generationId = generationId,
+                                batchMeasurements = HashMap(stepCollected)
+                            )
+                        }
                     }
                 }
             }
             deferreds.awaitAll()
         }
 
-        // Bất kỳ mục nào trong bước này chưa tới lượt chạy xong khi hết hạn stepDeadlineMs -> trả về UNTESTED để đo lười khi cuộn
+        // Phát toàn bộ kết quả của bước và dọn các mục hết hạn stepDeadlineMs trong đúng 1 lần cập nhật StateFlow
         synchronized(this) {
             if (generationId == measurementGeneration.get()) {
-                val nextMeas = _state.value.serverMeasurements.toMutableMap()
                 for (srv in targets) {
-                    val cur = nextMeas[srv.id]
-                    if (cur != null && cur.status == ServerPingStatus.TESTING) {
-                        nextMeas.remove(srv.id)
+                    if (!stepCollected.containsKey(srv.id)) {
                         com.example.data.AppLogger.warn(
                             "PING",
                             "Đo ping ${srv.name} (${srv.countryCode}): hết thời hạn bước (${stepDeadlineMs}ms)"
                         )
                     }
                 }
-                _state.value = _state.value.copy(
-                    serverMeasurements = nextMeas
+                recordBatchMeasurementsIfCurrentGeneration(
+                    generationId = generationId,
+                    batchMeasurements = stepCollected,
+                    clearStaleTestingIds = targets.map { it.id }
                 )
             }
         }
@@ -2079,7 +2198,11 @@ object VpnManager {
             com.example.data.AppLogger.info("UI", "Đổi chế độ VPN: ${oldEngine.name} -> ${engine.name}")
         }
         if (engine == VpnEngine.PROXY_TUNNEL && _state.value.serverPings.isEmpty()) {
-            testAllServers(autoPickBest = false, context = context ?: appContext)
+            testAllServers(
+                autoPickBest = false,
+                context = context ?: appContext,
+                reason = "đổi sang chế độ Proxy Tunnel"
+            )
         }
         if (wasConnected && context != null) {
             connect(context, _state.value.currentServer)

@@ -112,7 +112,8 @@ private data class ServerRowPrecomputed(
     val basePing: Int,
     val unlockStatus: RegionUnlockStatus,
     val distanceKm: Int?,
-    val isTooFarForAutoSelect: Boolean
+    val isTooFarForAutoSelect: Boolean,
+    val subtitleText: String
 )
 
 @androidx.compose.runtime.Immutable
@@ -183,11 +184,21 @@ fun ServersScreen(
         if (!VpnManager.wasStartupMaintenanceRecentlyTriggered()) {
             VpnManager.ensureInitialOrGeoUpdatedOptimalServer(context = context, force = false)
             if (serverPings.isEmpty() && !isTestingAll) {
-                VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
+                VpnManager.testAllServers(
+                    autoPickBest = false,
+                    context = context,
+                    forceRefresh = false,
+                    reason = "mở tab Máy chủ (chưa có dữ liệu ping)"
+                )
             }
             VpnManager.autoSyncPublicProxiesIfNeeded(context = context, countryFilter = "ALL", force = false)
         } else if (serverPings.isEmpty() && !isTestingAll) {
-            VpnManager.testAllServers(autoPickBest = false, context = context, forceRefresh = false)
+            VpnManager.testAllServers(
+                autoPickBest = false,
+                context = context,
+                forceRefresh = false,
+                reason = "mở tab Máy chủ (bổ sung khi rỗng)"
+            )
         }
     }
 
@@ -197,11 +208,16 @@ fun ServersScreen(
         else vpnState.selectedServerProbeEstimate ?: com.example.vpn.RegionalProbeTester.getCachedEstimateForServer(currentServer)
     }
 
-    fun testAllServers(autoPickBest: Boolean = false, forceRefresh: Boolean = true) {
+    fun testAllServers(
+        autoPickBest: Boolean = false,
+        forceRefresh: Boolean = true,
+        reason: String = "thủ công trên tab Máy chủ"
+    ) {
         VpnManager.testAllServers(
             autoPickBest = autoPickBest,
             context = context,
             forceRefresh = forceRefresh,
+            reason = reason,
             onPickedBest = { best, bestPing ->
                 val distKm = com.example.vpn.RegionalProbeTester.getServerDistanceKm(
                     server = best,
@@ -262,6 +278,10 @@ fun ServersScreen(
         ComputedServersUiModel(filteredServers = quickList)
     }
 
+    val stableOrderCache = remember {
+        java.util.concurrent.atomic.AtomicReference<Pair<String, List<String>>?>(null)
+    }
+
     val computedUiModel by androidx.compose.runtime.produceState(
         initialValue = initialServersModel,
         selectedCategory,
@@ -276,8 +296,11 @@ fun ServersScreen(
         config.autoBypassEnabled,
         currentServer,
         isTestingAll,
-        userNeedsVpn
+        userNeedsVpn,
+        isEn
     ) {
+        val isScrolledDown = listState.isScrollInProgress || listState.firstVisibleItemIndex > 1
+        val sortEpochKey = "$selectedCategory|${allServersSnapshot.size}|${vpnState.engine}|${config.hideUnreachableDynamicServers}|${config.autoBypassEnabled}|${VpnManager.getCurrentMeasurementGeneration()}"
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val rawFiltered = when (selectedCategory) {
                 "ALL" -> allServersSnapshot
@@ -293,7 +316,7 @@ fun ServersScreen(
                 }
             }
 
-            val sortedFiltered = VpnManager.sortServersByUnlockAndPing(
+            val fullSorted = VpnManager.sortServersByUnlockAndPing(
                 servers = rawFiltered,
                 pingMap = serverPings,
                 records = vpnState.unlockRecords,
@@ -303,6 +326,32 @@ fun ServersScreen(
                 prioritizeDistanceForAutoBypass = config.autoBypassEnabled,
                 geo = vpnState.detectedGeoIp
             )
+
+            // Khi người dùng đang cuộn ở giữa danh sách và chỉ có kết quả đo lười (lazy probe) mới về,
+            // giữ nguyên thứ tự các dòng hiện tại để danh sách không bị nhảy dưới ngón tay.
+            val prevOrderPair = stableOrderCache.get()
+            val sortedFiltered = if (isScrolledDown && !isTestingAll && prevOrderPair != null && prevOrderPair.first == sortEpochKey) {
+                val byId = rawFiltered.associateBy { it.id }
+                val preserved = ArrayList<ServerLocation>(rawFiltered.size)
+                val seen = HashSet<String>(rawFiltered.size * 2)
+                for (id in prevOrderPair.second) {
+                    val item = byId[id]
+                    if (item != null && seen.add(id)) {
+                        preserved.add(item)
+                    }
+                }
+                for (item in fullSorted) {
+                    if (seen.add(item.id)) {
+                        preserved.add(item)
+                    }
+                }
+                preserved
+            } else {
+                if (!isTestingAll || prevOrderPair == null || prevOrderPair.first != sortEpochKey) {
+                    stableOrderCache.set(sortEpochKey to fullSorted.map { it.id })
+                }
+                fullSorted
+            }
 
             val userCoordsFallback = com.example.vpn.RegionalProbeTester.resolveUserCoordinatesWithTimezoneFallback(vpnState.detectedGeoIp)
             val minCountryDistFallback = if (userCoordsFallback != null) {
@@ -337,15 +386,33 @@ fun ServersScreen(
                     precomputedUserCoords = userCoordsFallback,
                     precomputedMinCountryDistKm = minCountryDistFallback
                 )
+                val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
+                val regionSessionStats = com.example.data.SessionHistoryRepository.getRegionSessionStats(
+                    serverName = server.name,
+                    countryCode = server.countryCode,
+                    sessionsList = recentSessions
+                )
+                val directPingNote = if (regionSessionStats != null && regionSessionStats.sampleCount > 0) {
+                    if (isEn) {
+                        " • ~${regionSessionStats.avgRttMs}ms • last ${regionSessionStats.sampleCount} sessions"
+                    } else {
+                        " • ~${regionSessionStats.avgRttMs}ms • ${regionSessionStats.sampleCount} phiên gần nhất"
+                    }
+                } else {
+                    if (isEn) " • No data yet" else " • Chưa có dữ liệu"
+                }
+                val subtitleText = "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}"
+
                 metaMap[server.id] = ServerRowPrecomputed(
                     basePing = basePing,
                     unlockStatus = unlockStatus,
                     distanceKm = distanceKm,
-                    isTooFarForAutoSelect = isTooFar
+                    isTooFarForAutoSelect = isTooFar,
+                    subtitleText = subtitleText
                 )
             }
 
-            val recId = sortedFiltered.firstOrNull { server ->
+            val recId = fullSorted.firstOrNull { server ->
                 val measuredPing = serverPings[server.id] ?: -1
                 val m = serverMeasurements[server.id]
                 val isPrimaryOk = m == null || m.status == ServerPingStatus.MEASURED_PRIMARY
@@ -434,20 +501,32 @@ fun ServersScreen(
     val recommendedServerId = computedUiModel.recommendedServerId
     val fasterServerSuggestion = computedUiModel.fasterServerSuggestion
 
-    // A8: Đo lười (lazy viewport probing) khi người dùng cuộn danh sách với debounce 250ms
-    LaunchedEffect(listState, filteredServers) {
+    // A8: Đo lười (lazy viewport probing) chỉ kích hoạt sau khi người dùng dừng thao tác cuộn 300ms,
+    // không đọc visibleItemsInfo hay lọc 105 máy chủ trên mỗi pixel cuộn để giữ 60-120fps mượt mà.
+    LaunchedEffect(listState, filteredServers, isTabActive) {
+        if (!isTabActive) return@LaunchedEffect
+        var lastRecordedScrollIndex = -1
         snapshotFlow {
-            val visibleKeys = listState.layoutInfo.visibleItemsInfo.mapNotNull { it.key as? String }.toSet()
-            filteredServers.filter { it.id in visibleKeys }
+            listState.isScrollInProgress to listState.firstVisibleItemIndex
         }
-            .distinctUntilChanged { old, new -> old.map { it.id } == new.map { it.id } }
-            .debounce(250L)
-            .collect { visibleServers ->
-                if (visibleServers.isNotEmpty()) {
-                    com.example.data.PerformanceMonitor.recordScrollActivity(com.example.data.PerfScenario.SERVERS)
-                }
-                if (visibleServers.isNotEmpty() && !vpnState.isTestingPings) {
-                    VpnManager.probeVisibleServersLazily(visibleServers)
+            .distinctUntilChanged()
+            .debounce { (scrolling, _) -> if (scrolling) 0L else 320L }
+            .collect { (scrolling, firstIndex) ->
+                if (scrolling) {
+                    if (firstIndex != lastRecordedScrollIndex) {
+                        lastRecordedScrollIndex = firstIndex
+                        com.example.data.PerformanceMonitor.recordScrollActivity(com.example.data.PerfScenario.SERVERS)
+                    }
+                } else if (!vpnState.isTestingPings && filteredServers.isNotEmpty()) {
+                    val visibleKeys = listState.layoutInfo.visibleItemsInfo
+                        .mapNotNull { it.key as? String }
+                        .toSet()
+                    if (visibleKeys.isNotEmpty()) {
+                        val visibleServers = filteredServers.filter { it.id in visibleKeys }
+                        if (visibleServers.isNotEmpty()) {
+                            VpnManager.probeVisibleServersLazily(visibleServers)
+                        }
+                    }
                 }
             }
     }
@@ -874,12 +953,17 @@ fun ServersScreen(
                                     .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable(enabled = !isTestingAll) {
+                                        com.example.data.AppLogger.info("UI", "Bấm nút Chọn tối ưu (trên tab Máy chủ)")
                                         android.widget.Toast.makeText(
                                             context,
                                             config.tr("⚡ Đang đo ping và chọn máy chủ tối ưu...", "⚡ Measuring ping & selecting best server..."),
                                             android.widget.Toast.LENGTH_SHORT
                                         ).show()
-                                        testAllServers(autoPickBest = true, forceRefresh = true)
+                                        testAllServers(
+                                            autoPickBest = true,
+                                            forceRefresh = true,
+                                            reason = "bấm nút Chọn tối ưu (trên tab Máy chủ)"
+                                        )
                                     }
                                     .testTag("auto_pick_best_server_button")
                             ) {
@@ -1079,7 +1163,14 @@ fun ServersScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
-                            onClick = { testAllServers(autoPickBest = false, forceRefresh = true) },
+                            onClick = {
+                                com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
+                                testAllServers(
+                                    autoPickBest = false,
+                                    forceRefresh = true,
+                                    reason = "bấm nút Đo ping (trên tab Máy chủ)"
+                                )
+                            },
                             enabled = !isTestingAll,
                             modifier = Modifier
                                 .weight(1f)
@@ -1233,6 +1324,7 @@ fun ServersScreen(
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
                             .clip(RoundedCornerShape(14.dp))
                             .clickable(enabled = !vpnState.isAutoSyncingLiveProxies) {
+                                com.example.data.AppLogger.info("UI", "Bấm nút Cập nhật danh sách proxy công cộng (trên tab Máy chủ)")
                                 android.widget.Toast.makeText(
                                     context,
                                     config.tr("Đang cập nhật danh sách proxy công cộng...", "Refreshing public proxy list..."),
@@ -1342,6 +1434,7 @@ fun ServersScreen(
                 unlockStatus = unlockStatus,
                 distanceKm = distanceKm,
                 isTooFarForAutoSelect = isTooFarForAutoSelect,
+                precomputedSubtitle = meta?.subtitleText,
                 isEn = isEn,
                 onClick = { onSelectServer(server) },
                 onDelete = if (server.isCustom) {

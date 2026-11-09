@@ -439,7 +439,11 @@ fun AppLogDialog(
             TextButton(
                 onClick = {
                     AppLogger.info("UI", "Bấm nút Đo ping lại (trong Nhật ký hệ thống)")
-                    VpnManager.testAllServers(autoPickBest = false, context = context)
+                    VpnManager.testAllServers(
+                        autoPickBest = false,
+                        context = context,
+                        reason = "bấm nút Đo ping lại (trong Nhật ký hệ thống)"
+                    )
                 },
                 modifier = Modifier.testTag("retest_ping_from_log_btn")
             ) {

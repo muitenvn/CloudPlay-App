@@ -663,7 +663,10 @@ fun DashboardScreen(
                                                 showGuideDialog = true
                                             },
                                             onClearCookies = {
-                                                com.example.data.AppLogger.info("UI", "Bấm làm mới dữ liệu đăng nhập & xóa Cookie WebView")
+                                                com.example.data.AppLogger.info(
+                                                    "RESET",
+                                                    "Xóa toàn bộ Cookie & WebStorage của WebView (lý do: người dùng bấm 'Làm mới dữ liệu đăng nhập' trong Cài đặt | chế độ=${config.xboxWebUiMode.name} | lưu ý: xóa cookie sẽ làm mất trạng thái opt-out preview lưu trên trình duyệt)"
+                                                )
                                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                                 android.webkit.WebStorage.getInstance().deleteAllData()
                                                 val msg = if (config.isSettingsEnglishUI()) "Cleared saved login & web data!" else "Đã làm mới dữ liệu đăng nhập Xbox!"

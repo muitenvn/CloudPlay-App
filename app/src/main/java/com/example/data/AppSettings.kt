@@ -1026,6 +1026,10 @@ object SettingsRepository {
             forceDesktopUserAgent = loaded.cellularMode.request1080p
         )
         _config.value = synced
+        AppLogger.info(
+            "WEB-UI",
+            "Khởi tạo cấu hình giao diện Xbox: chế độ=${synced.xboxWebUiMode.name}, thị trường=${synced.getEffectiveLocale()}, urlMặcĐịnh=${AppLogger.safeUrlHostPath(synced.targetRegionUrl)}"
+        )
     }
 
     private fun persist(c: AppConfig) {
@@ -1228,9 +1232,20 @@ object SettingsRepository {
 
     fun updateXboxWebUiMode(mode: XboxWebUiMode) {
         val old = _config.value.xboxWebUiMode
+        if (old == mode) {
+            AppLogger.info(
+                "WEB-UI",
+                "Người dùng bấm chọn lại Giao diện web Xbox đang bật: ${mode.name} (giữ nguyên cài đặt)"
+            )
+            return
+        }
         _config.update { it.copy(xboxWebUiMode = mode) }
         persist(_config.value)
         logSettingChange("Giao diện web Xbox", old.name, mode.name)
+        AppLogger.info(
+            "WEB-UI",
+            "Đổi chế độ Giao diện web Xbox: ${old.name} -> ${mode.name} (nguồn: cài đặt người dùng)"
+        )
     }
 
     fun update(newConfig: AppConfig) {
@@ -2271,6 +2286,9 @@ object SettingsRepository {
             )
         }
         persist(_config.value)
-        AppLogger.info("UI", "Khôi phục mặc định: Toàn bộ cài đặt Nâng cao")
+        AppLogger.info(
+            "RESET",
+            "Khôi phục mặc định: Toàn bộ cài đặt Nâng cao (lý do: người dùng bấm trong Cài đặt | xboxWebUiMode hiện tại=${_config.value.xboxWebUiMode.name}, thị trường=${_config.value.getEffectiveLocale()})"
+        )
     }
 }

@@ -51,6 +51,11 @@ sealed class AppScreen {
             restore = { saved ->
                 if (saved.startsWith("BROWSER|")) {
                     val url = saved.removePrefix("BROWSER|").ifBlank { "https://www.xbox.com/en-US/play" }
+                    val mode = SettingsRepository.config.value.xboxWebUiMode
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Khôi phục màn hình Browser từ trạng thái đã lưu: url=${com.example.data.AppLogger.safeUrlHostPath(url)} | chế độ=${mode.name} | nguồn=AppScreen.Saver"
+                    )
                     Browser(url)
                 } else {
                     Dashboard
@@ -365,8 +370,8 @@ fun MainContent(
                         val currentLocale = config.getEffectiveLocale()
                         val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
                         com.example.data.AppLogger.info(
-                            "UI",
-                            "Bấm Chơi/Mở trình duyệt Xbox: ${com.example.data.AppLogger.safeUrlHostPath(finalUrl)}"
+                            "WEB-UI",
+                            "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
                         )
                         currentScreen = AppScreen.Browser(finalUrl)
                     },

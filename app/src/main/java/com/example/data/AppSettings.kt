@@ -742,7 +742,8 @@ data class AppConfig(
     val enableGeoIpHttpsFallback: Boolean = true,
     val allowDbIpCellularDownload: Boolean = false,
     val allowCellularLiveProxySync: Boolean = false,
-    val xboxWebUiMode: XboxWebUiMode = XboxWebUiMode.CLASSIC
+    val xboxWebUiMode: XboxWebUiMode = XboxWebUiMode.CLASSIC,
+    val autoExitPreviewHandlerEnabled: Boolean = true
 ) {
     val targetRegionUrl: String
         get() = if (xboxWebUiMode == XboxWebUiMode.NEW_UI) {
@@ -1018,7 +1019,8 @@ object SettingsRepository {
                     sp.getString("xbox_web_ui_mode", XboxWebUiMode.CLASSIC.name)
                         ?: XboxWebUiMode.CLASSIC.name
                 )
-            } catch (_: Exception) { XboxWebUiMode.CLASSIC }
+            } catch (_: Exception) { XboxWebUiMode.CLASSIC },
+            autoExitPreviewHandlerEnabled = sp.getBoolean("auto_exit_preview_handler_enabled", true)
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn; luôn giữ Desktop UA để Xbox không ép chuyển sang play.xbox.com
         val synced = loaded.copy(
@@ -1118,6 +1120,7 @@ object SettingsRepository {
             putBoolean("allow_dbip_cellular_download", c.allowDbIpCellularDownload)
             putBoolean("allow_cellular_live_proxy_sync", c.allowCellularLiveProxySync)
             putString("xbox_web_ui_mode", c.xboxWebUiMode.name)
+            putBoolean("auto_exit_preview_handler_enabled", c.autoExitPreviewHandlerEnabled)
             apply()
         }
     }
@@ -1270,6 +1273,18 @@ object SettingsRepository {
         AppLogger.info(
             "WEB-UI",
             "Đổi chế độ Giao diện web Xbox: ${old.name} -> ${mode.name} | ua=$uaMode (nguồn: cài đặt người dùng)"
+        )
+    }
+
+    fun updateAutoExitPreviewHandlerEnabled(enabled: Boolean) {
+        val old = _config.value.autoExitPreviewHandlerEnabled
+        if (old == enabled) return
+        _config.update { it.copy(autoExitPreviewHandlerEnabled = enabled) }
+        persist(_config.value)
+        logSettingChange("Tự động xử lý thoát Giao diện mới", old, enabled)
+        AppLogger.info(
+            "WEB-UI",
+            "Đổi cài đặt Bộ xử lý tự động thoát Giao diện mới: $old -> $enabled"
         )
     }
 

@@ -311,16 +311,28 @@ internal fun SettingsGraphicsFpsSection(
                 }
             }
 
+            SettingToggleRow(
+                title = if (isEn) "Auto-Exit New UI Handler" else "Tự động xử lý thoát Giao diện mới",
+                subtitle = if (isEn) {
+                    "Auto-clicks Cancel on the feedback dialog, waits for Xbox opt-out spinner to finish (~3.5s), then switches straight to Classic UI"
+                } else {
+                    "Tự động bấm Hủy hộp thoại phản hồi, đợi vòng xoay Xbox lưu xong (~3.5 giây) rồi chuyển thẳng về Giao diện cũ"
+                },
+                checked = config.autoExitPreviewHandlerEnabled,
+                onCheckedChange = { SettingsRepository.updateAutoExitPreviewHandlerEnabled(it) },
+                switchTestTag = "settings_switch_auto_exit_preview"
+            )
+
             Text(
                 text = if (isEn) {
-                    "Tip: If your Xbox account is in New UI, simply tap your Xbox avatar → Exit preview; the app will automatically dismiss the prompt and switch straight to Classic UI."
+                    "Tip: When enabled, open any game on play.xbox.com → tap your Xbox avatar → tap Exit preview. The app will automatically handle the rest."
                 } else {
-                    "Lưu ý: Nếu tài khoản đang ở Giao diện mới, bạn chỉ cần bấm ảnh đại diện Xbox → chọn Thoát xem trước (Exit preview), ứng dụng sẽ tự động đóng hộp thoại và chuyển thẳng về Giao diện cũ."
+                    "Lưu ý: Khi bật mục này, nếu bị kẹt ở Giao diện mới, bạn chỉ cần vào trang một game bất kỳ → bấm ảnh đại diện Xbox → gạt Thoát xem trước (Exit preview), ứng dụng sẽ tự động xử lý toàn bộ các bước còn lại."
                 },
                 color = TextSecondary,
                 fontSize = 9.5.sp,
                 lineHeight = 13.sp,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }

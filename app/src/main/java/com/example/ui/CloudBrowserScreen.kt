@@ -139,6 +139,7 @@ fun CloudBrowserScreen(
     var activeSessionInitialUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var exitPreviewArmedAtMs by remember { mutableStateOf(0L) }
     var exitPreviewOptOutStartedAtMs by remember { mutableStateOf(0L) }
+    var exitPreviewSavedGameUrl by remember { mutableStateOf("") }
     var suppressLoadingOverlayAfterExitPreview by remember { mutableStateOf(false) }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -362,6 +363,11 @@ fun CloudBrowserScreen(
     var lastAppliedUiMode by remember { mutableStateOf(config.xboxWebUiMode) }
 
     val commitExitPreviewToClassicUi: (String) -> Unit = commit@{ triggerReason ->
+        if (!config.autoExitPreviewHandlerEnabled) {
+            exitPreviewArmedAtMs = 0L
+            exitPreviewOptOutStartedAtMs = 0L
+            return@commit
+        }
         if (exitPreviewArmedAtMs == 0L && exitPreviewOptOutStartedAtMs == 0L) return@commit
         exitPreviewArmedAtMs = 0L
         exitPreviewOptOutStartedAtMs = 0L
@@ -376,6 +382,11 @@ fun CloudBrowserScreen(
         }
 
         val curUrl = webViewInstance?.url ?: currentMainFrameUrl
+        val convertedFromSaved = SettingsRepository.formatXboxUrlWithLocale(
+            exitPreviewSavedGameUrl,
+            effectiveLocale,
+            com.example.data.XboxWebUiMode.CLASSIC
+        )
         val convertedFromCur = SettingsRepository.formatXboxUrlWithLocale(
             curUrl,
             effectiveLocale,
@@ -394,11 +405,13 @@ fun CloudBrowserScreen(
         // Mở thẳng trang chi tiết game (/play/games/...) ở Giao diện cũ sau khi opt-out
         // để giữ vững Classic UI không bị router Xbox đẩy ngược về play.xbox.com
         val targetClassicUrl = when {
+            convertedFromSaved.contains("/play/games/", ignoreCase = true) -> convertedFromSaved
             convertedFromCur.contains("/play/games/", ignoreCase = true) -> convertedFromCur
             convertedFromLast.contains("/play/games/", ignoreCase = true) -> convertedFromLast
             convertedFromInit.contains("/play/games/", ignoreCase = true) -> convertedFromInit
             else -> "https://www.xbox.com/$effectiveLocale/play/games/fortnite/BT5P2X999VH2"
         }
+        exitPreviewSavedGameUrl = ""
 
         com.example.data.AppLogger.info(
             "WEB-UI",
@@ -490,7 +503,8 @@ fun CloudBrowserScreen(
         config.controllerShortcutsEnabled,
         config.shortcutToggleStatsButton,
         config.shortcutToggleVirtualPadButton,
-        config.shortcutToggleRecordingButton
+        config.shortcutToggleRecordingButton,
+        config.autoExitPreviewHandlerEnabled
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -649,6 +663,18 @@ fun CloudBrowserScreen(
         }
         webViewInstance?.evaluateJavascript(
             "if (window.__setClarityPreset) window.__setClarityPreset('$presetName'); if (window.__toggleClarityBoost) window.__toggleClarityBoost(${config.clarityBoostEnabled});",
+            null
+        )
+    }
+
+    // Đồng bộ tức thì trạng thái Bộ xử lý tự động thoát Giao diện mới (Exit preview) với WebView đang chạy
+    LaunchedEffect(config.autoExitPreviewHandlerEnabled, webViewInstance) {
+        if (!config.autoExitPreviewHandlerEnabled) {
+            exitPreviewArmedAtMs = 0L
+            exitPreviewOptOutStartedAtMs = 0L
+        }
+        webViewInstance?.evaluateJavascript(
+            "if (window.__setAutoExitPreviewEnabled) window.__setAutoExitPreviewEnabled(${config.autoExitPreviewHandlerEnabled});",
             null
         )
     }
@@ -821,26 +847,40 @@ fun CloudBrowserScreen(
                     val bridge = XboxBridge(streamController)
                     bridge.setWebView(this)
                     bridge.setExitPreviewSignalListener { sig ->
+                        if (!SettingsRepository.config.value.autoExitPreviewHandlerEnabled) return@setExitPreviewSignalListener
                         val nowElapsed = android.os.SystemClock.elapsedRealtime()
+                        val curWebUrl = this.url ?: currentMainFrameUrl
                         when (sig) {
                             "EXIT_PREVIEW_ARMED" -> {
                                 exitPreviewArmedAtMs = nowElapsed
                                 exitPreviewOptOutStartedAtMs = 0L
+                                if (curWebUrl.contains("/products/", ignoreCase = true) || curWebUrl.contains("/play/games/", ignoreCase = true)) {
+                                    exitPreviewSavedGameUrl = curWebUrl
+                                } else if (lastXboxUrl.contains("/products/", ignoreCase = true) || lastXboxUrl.contains("/play/games/", ignoreCase = true)) {
+                                    exitPreviewSavedGameUrl = lastXboxUrl
+                                }
                                 com.example.data.AppLogger.info(
                                     "WEB-UI",
-                                    "Người dùng bấm Thoát xem trước (Exit preview) trên play.xbox.com -> chờ đóng hộp thoại & hoàn tất opt-out"
+                                    "Người dùng bấm Thoát xem trước (Exit preview) trên play.xbox.com -> chờ đóng hộp thoại & hoàn tất opt-out (savedGame=${com.example.data.AppLogger.safeUrlHostPath(exitPreviewSavedGameUrl)})"
                                 )
                             }
                             "EXIT_PREVIEW_OPT_OUT_STARTED" -> {
                                 if (exitPreviewArmedAtMs == 0L) exitPreviewArmedAtMs = nowElapsed
                                 exitPreviewOptOutStartedAtMs = nowElapsed
+                                if (exitPreviewSavedGameUrl.isBlank()) {
+                                    if (curWebUrl.contains("/products/", ignoreCase = true) || curWebUrl.contains("/play/games/", ignoreCase = true)) {
+                                        exitPreviewSavedGameUrl = curWebUrl
+                                    } else if (lastXboxUrl.contains("/products/", ignoreCase = true) || lastXboxUrl.contains("/play/games/", ignoreCase = true)) {
+                                        exitPreviewSavedGameUrl = lastXboxUrl
+                                    }
+                                }
                                 com.example.data.AppLogger.info(
                                     "WEB-UI",
-                                    "Đã xác nhận hộp thoại Thoát xem trước -> đang chờ máy chủ Xbox lưu trạng thái opt-out"
+                                    "Đã xác nhận hộp thoại Thoát xem trước -> đang chờ vòng xoay Xbox lưu xong trạng thái opt-out (~3.6s)"
                                 )
                             }
                             "EXIT_PREVIEW_COMMIT" -> {
-                                commitExitPreviewToClassicUi("EXIT_PREVIEW_COMMIT từ XboxBridge")
+                                commitExitPreviewToClassicUi("EXIT_PREVIEW_COMMIT từ XboxBridge (Giai đoạn 2 Skeleton)")
                             }
                         }
                     }
@@ -880,10 +920,11 @@ fun CloudBrowserScreen(
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                            if (url != null && exitPreviewOptOutStartedAtMs > 0L && config.autoExitPreviewHandlerEnabled) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
-                                if (optElapsed in 500L..16000L && !isMigrateStep) {
+                                // Chỉ cho phép cắt dự phòng sau >= 3800ms để không làm đứt Giai đoạn 1 (vòng xoay lưu opt-out ~3.2s)
+                                if (optElapsed in 3800L..16000L && !isMigrateStep) {
                                     commitExitPreviewToClassicUi("onPageStarted sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(url)})")
                                     return
                                 }
@@ -945,10 +986,10 @@ fun CloudBrowserScreen(
                             val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
-                                if (exitPreviewOptOutStartedAtMs > 0L) {
+                                if (exitPreviewOptOutStartedAtMs > 0L && config.autoExitPreviewHandlerEnabled) {
                                     val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                     val isMigrateStep = targetUrl.contains("/migrate", ignoreCase = true)
-                                    if (optElapsed in 500L..16000L && !isMigrateStep) {
+                                    if (optElapsed in 3800L..16000L && !isMigrateStep) {
                                         commitExitPreviewToClassicUi("shouldOverride sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(targetUrl)})")
                                         return true
                                     }
@@ -967,10 +1008,10 @@ fun CloudBrowserScreen(
 
                         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                             super.doUpdateVisitedHistory(view, url, isReload)
-                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                            if (url != null && exitPreviewOptOutStartedAtMs > 0L && config.autoExitPreviewHandlerEnabled) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
-                                if (optElapsed in 600L..16000L && !isMigrateStep) {
+                                if (optElapsed in 3800L..16000L && !isMigrateStep) {
                                     commitExitPreviewToClassicUi("historyUpdate sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(url)})")
                                     return
                                 }

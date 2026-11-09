@@ -306,14 +306,16 @@ fun CloudBrowserScreen(
         // Chỉ lưu URL có host thuộc xbox.com (bỏ login.live.com, microsoftonline.com...)
         if (XboxBridge.isXboxHost(targetUrl)) {
             val prevLastSafe = com.example.data.AppLogger.safeUrlHostPath(lastXboxUrl)
-            lastXboxUrl = targetUrl
-            if (prevLastSafe != newSafePath && newHost == "play.xbox.com" &&
-                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
-            ) {
+            val isUnwantedPreviewRedirect = newHost == "play.xbox.com" &&
+                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                !targetUrl.contains("/launch/")
+            if (!isUnwantedPreviewRedirect) {
+                lastXboxUrl = targetUrl
+            } else if (prevLastSafe != newSafePath) {
                 val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-                com.example.data.AppLogger.warn(
+                com.example.data.AppLogger.info(
                     "WEB-UI",
-                    "lastXboxUrl đã bị ghi đè sang giao diện mới: $newSafePath (khi cài đặt vẫn là CLASSIC | ua=$uaMode)"
+                    "Giữ nguyên lastXboxUrl ở CLASSIC ($prevLastSafe), bỏ qua ghi đè từ redirect giao diện mới: $newSafePath (ua=$uaMode)"
                 )
             }
             if (targetUrl.contains("/play/games/") || targetUrl.contains("/play/launch/")) {

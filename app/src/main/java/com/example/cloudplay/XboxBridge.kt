@@ -420,7 +420,7 @@ class XboxBridge(
                     try {
                         const NATIVE_FETCH = window.fetch;
                         window.fetch = async function(request, init) {
-                            let url = typeof request === 'string' ? request : (request ? request.url : '');
+                            let url = typeof request === 'string' ? request : String((request && (request.url || request.href)) || '');
                             if (bypassIp && (url.includes('/v2/login/user') || url.includes('/sessions/cloud/play'))) {
                                 if (typeof request === 'string') {
                                     init = init || {};
@@ -504,7 +504,7 @@ class XboxBridge(
                         const origXhrOpen = XMLHttpRequest.prototype.open;
                         const origXhrSend = XMLHttpRequest.prototype.send;
                         XMLHttpRequest.prototype.open = function(method, url) {
-                            this._url = url;
+                            this._url = typeof url === 'string' ? url : String((url && url.href) || url || '');
                             return origXhrOpen.apply(this, arguments);
                         };
                         XMLHttpRequest.prototype.send = function(data) {
@@ -1981,10 +1981,48 @@ class XboxBridge(
                     } catch(e) {}
 
                     // ==========================================
-                    // 7. Dynamic Clarity Boost Ultra Controller (Zero-Lag GPU Color Matrix, No Drop-Shadow Blur Pass)
+                    // 7. Dynamic Clarity Boost Ultra Controller (Zero-DOM adoptedStyleSheets to prevent React #418 Hydration mismatch)
                     // ==========================================
-                    let clarityStyleEl = null;
-                    let lastAppliedClarityCss = null;
+                    window.__cpAdoptedSheets = window.__cpAdoptedSheets || Object.create(null);
+                    window.__cpPendingCss = window.__cpPendingCss || Object.create(null);
+
+                    window.__cpSetDynamicCss = function(key, cssText) {
+                        try {
+                            const nextCss = (cssText || '').trim();
+                            if (!nextCss && !window.__cpAdoptedSheets[key] && !window.__cpPendingCss[key]) {
+                                return;
+                            }
+                            window.__cpPendingCss[key] = nextCss;
+                            if (typeof CSSStyleSheet !== 'undefined' && document && Array.isArray(document.adoptedStyleSheets)) {
+                                let entry = window.__cpAdoptedSheets[key];
+                                if (!entry) {
+                                    if (!nextCss) return;
+                                    const sheet = new CSSStyleSheet();
+                                    entry = { sheet: sheet, lastCss: null };
+                                    window.__cpAdoptedSheets[key] = entry;
+                                    if (document.adoptedStyleSheets.indexOf(sheet) === -1) {
+                                        document.adoptedStyleSheets = document.adoptedStyleSheets.concat([sheet]);
+                                    }
+                                }
+                                if (entry.lastCss !== nextCss && typeof entry.sheet.replaceSync === 'function') {
+                                    entry.sheet.replaceSync(nextCss);
+                                    entry.lastCss = nextCss;
+                                }
+                                return;
+                            }
+                        } catch (e) {}
+                    };
+
+                    document.addEventListener('DOMContentLoaded', function() {
+                        try {
+                            const pending = window.__cpPendingCss || {};
+                            for (const k in pending) {
+                                if (pending[k]) window.__cpSetDynamicCss(k, pending[k]);
+                            }
+                        } catch (e) {}
+                    }, { once: true });
+
+                    let lastAppliedClarityCss = '';
                     function getPresetCss(preset) {
                         switch(preset) {
                             case 'ULTRA_SHARP':
@@ -2001,26 +2039,23 @@ class XboxBridge(
 
                     window.__currentClarityPreset = "$clarityPreset";
                     window.__setClarityPreset = function(preset) {
-                        if (preset && preset !== 'OFF') {
-                            window.__currentClarityPreset = preset;
-                        } else if (preset === 'OFF') {
-                            window.__clarityBoostActive = false;
-                        }
-                        if (!clarityStyleEl) {
-                            clarityStyleEl = document.createElement('style');
-                            clarityStyleEl.id = 'cloudplay-clarity-boost';
-                            (document.head || document.documentElement).appendChild(clarityStyleEl);
-                        }
-                        const css = getPresetCss(preset);
-                        const nextBlock = css ? (`
-                            video#stream-video, video[data-testid="stream-video"], #segmented-video video {
-                                ` + css + `
+                        try {
+                            if (preset && preset !== 'OFF') {
+                                window.__currentClarityPreset = preset;
+                            } else if (preset === 'OFF') {
+                                window.__clarityBoostActive = false;
                             }
-                        `) : '';
-                        if (nextBlock !== lastAppliedClarityCss) {
-                            clarityStyleEl.textContent = nextBlock;
-                            lastAppliedClarityCss = nextBlock;
-                        }
+                            const css = getPresetCss(preset);
+                            const nextBlock = css ? (`
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video {
+                                    ` + css + `
+                                }
+                            `) : '';
+                            if (nextBlock !== lastAppliedClarityCss) {
+                                lastAppliedClarityCss = nextBlock;
+                                window.__cpSetDynamicCss('clarity-boost', nextBlock);
+                            }
+                        } catch (e) {}
                     };
 
                     window.__toggleClarityBoost = function(active) {
@@ -2039,18 +2074,11 @@ class XboxBridge(
                     // ==========================================
                     // 7B. Graphics Render Scale, Color Filter & Direct Stream Recorder
                     // ==========================================
-                    let gpuLoadStyleEl = null;
-                    let videoAspectStyleEl = null;
-                    let lastAppliedVideoAspectCss = null;
-                    let lastAppliedGpuCss = null;
+                    let lastAppliedVideoAspectCss = '';
+                    let lastAppliedGpuCss = '';
 
                     window.__applyVideoAspectAndColorCss = function() {
                         try {
-                            if (!videoAspectStyleEl) {
-                                videoAspectStyleEl = document.createElement('style');
-                                videoAspectStyleEl.id = 'cloudplay-video-color-controller';
-                                (document.head || document.documentElement).appendChild(videoAspectStyleEl);
-                            }
                             const gt = window.__graphicsTuning || {};
                             const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
                             const vc = window.__videoDisplayConfig || {};
@@ -2065,8 +2093,8 @@ class XboxBridge(
                             // Preserve Android zero-copy SurfaceControl Hardware Overlay by keeping <video> free of CSS filters by default or in Low-End mode
                             if (isDefaultColor || isLowEnd) {
                                 if (lastAppliedVideoAspectCss !== '') {
-                                    videoAspectStyleEl.textContent = '';
                                     lastAppliedVideoAspectCss = '';
+                                    window.__cpSetDynamicCss('video-color', '');
                                 }
                                 return;
                             }
@@ -2077,8 +2105,8 @@ class XboxBridge(
                                 }
                             `;
                             if (nextCss !== lastAppliedVideoAspectCss) {
-                                videoAspectStyleEl.textContent = nextCss;
                                 lastAppliedVideoAspectCss = nextCss;
+                                window.__cpSetDynamicCss('video-color', nextCss);
                             }
                         } catch (e) {}
                     };
@@ -2091,21 +2119,14 @@ class XboxBridge(
 
                     window.__applyGpuAndRenderScaleCss = function() {
                         try {
-                            if (!gpuLoadStyleEl) {
-                                gpuLoadStyleEl = document.createElement('style');
-                                gpuLoadStyleEl.id = 'cloudplay-gpu-load-optimizer';
-                                (document.head || document.documentElement).appendChild(gpuLoadStyleEl);
-                            }
                             const gt = window.__graphicsTuning || {};
                             const isLowEnd = !!(gt.lowEndDeviceMode || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
                             const reduceGpu = !!(gt.gpuLoadReduction || isLowEnd);
-                            const scale = parseFloat(gt.renderScale) || 1.0;
 
                             let cssRules = '';
                             if (reduceGpu) {
                                 // Chỉ tắt hiệu ứng làm mờ nặng (backdrop-filter / box-shadow) để nhẹ GPU;
-                                // KHÔNG tắt transition/animation trên [class*="background"] hay [class*="blur"]
-                                // vì sẽ làm kẹt sự kiện onTransitionEnd của hộp thoại/menu Xbox khiến lớp phủ vô hình chặn bấm nút!
+                                // Dùng adoptedStyleSheets để không chèn thẻ <style> vào <head> gây lỗi React #418 trên play.xbox.com
                                 cssRules += `
                                     [class*="background" i], [class*="ambient" i], [class*="blur" i], [class*="shimmer" i] {
                                         backdrop-filter: none !important;
@@ -2114,11 +2135,9 @@ class XboxBridge(
                                     }
                                 `;
                             }
-                            // Bảo toàn tuyệt đối lớp phủ phần cứng SurfaceControl zero-copy cho <video>:
-                            // Không gắn thuộc tính image-rendering lên thẻ <video> khi giảm renderScale để tránh ép GPU phải vẽ lại qua shader.
                             if (cssRules !== lastAppliedGpuCss) {
-                                gpuLoadStyleEl.textContent = cssRules;
                                 lastAppliedGpuCss = cssRules;
+                                window.__cpSetDynamicCss('gpu-load', cssRules);
                             }
                         } catch (e) {}
                     };

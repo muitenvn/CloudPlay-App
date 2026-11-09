@@ -190,7 +190,7 @@ enum class CellularOptimizationMode(
         resolutionBadgeEn = "720p • Low",
         deviceLoadBadgeEn = "❄️ 720p Cool & Light",
         descriptionEn = "Best for weak 4G signal, saving mobile data, and keeping your phone cool.",
-        request1080p = false
+        request1080p = true
     ),
     MEDIUM(
         id = "medium",
@@ -746,7 +746,7 @@ data class AppConfig(
 ) {
     val targetRegionUrl: String
         get() = if (xboxWebUiMode == XboxWebUiMode.NEW_UI) {
-            "https://play.xbox.com/${getEffectiveLocale()}"
+            "https://play.xbox.com/"
         } else {
             "https://www.xbox.com/${getEffectiveLocale()}/play"
         }
@@ -1020,10 +1020,10 @@ object SettingsRepository {
                 )
             } catch (_: Exception) { XboxWebUiMode.CLASSIC }
         )
-        // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn
+        // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn; luôn giữ Desktop UA để Xbox không ép chuyển sang play.xbox.com
         val synced = loaded.copy(
             streamRenderScale = if (loaded.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else loaded.cellularMode.autoRenderScale,
-            forceDesktopUserAgent = loaded.cellularMode.request1080p
+            forceDesktopUserAgent = true
         )
         _config.value = synced
         AppLogger.info(
@@ -1179,7 +1179,8 @@ object SettingsRepository {
                 }
                 "https://www.xbox.com/$targetLocale$normalizedPath"
             } else {
-                "https://play.xbox.com/$targetLocale$rawRest"
+                val cleanRest = if (rawRest.isBlank() || rawRest == "/") "/" else rawRest
+                "https://play.xbox.com$cleanRest"
             }
         }
 
@@ -1189,7 +1190,7 @@ object SettingsRepository {
             val domain = match.groupValues[1]
             val rest = match.groupValues[3] ?: ""
             if (uiMode == XboxWebUiMode.NEW_UI && (rest.isBlank() || rest == "/play" || rest == "/play/")) {
-                return "https://play.xbox.com/$targetLocale"
+                return "https://play.xbox.com/"
             }
             return "$domain/$targetLocale$rest"
         }
@@ -1200,7 +1201,7 @@ object SettingsRepository {
             val domain = noLocaleMatch.groupValues[1]
             val rest = noLocaleMatch.groupValues[2] ?: "/play"
             if (uiMode == XboxWebUiMode.NEW_UI && (rest == "/play" || rest == "/play/")) {
-                return "https://play.xbox.com/$targetLocale"
+                return "https://play.xbox.com/"
             }
             return "$domain/$targetLocale$rest"
         }
@@ -1497,7 +1498,7 @@ object SettingsRepository {
                 cellularMode = mode,
                 lowEndDeviceMode = nextLowEnd,
                 streamRenderScale = if (nextLowEnd) StreamRenderScale.PERFORMANCE_75 else mode.autoRenderScale,
-                forceDesktopUserAgent = mode.request1080p,
+                forceDesktopUserAgent = true,
                 maxBitrateMbps = mode.bitrateMbps
             )
         }

@@ -557,16 +557,12 @@ object XboxTranslator {
                 // Ẩn lớp phủ thông số luồng & biểu tượng cảnh báo Decode/Network gốc của trang web Xbox khi người dùng bật công tắc "Ẩn thông số luồng trên màn hình"
                 function updateStatsScrubber(hide) {
                     try {
-                        const existing = document.getElementById('cloudplay-stats-scrubber-style');
-                        if (!hide) {
-                            if (existing) existing.remove();
-                            return;
+                        const css = hide
+                            ? '[class*="StreamStats" i], [class*="NetworkQualityIndicator" i], [data-testid*="stream-stats" i], [data-testid*="network-quality" i], [data-testid*="NetworkQuality" i], [class*="MediaStats" i] { display: none !important; opacity: 0 !important; pointer-events: none !important; }'
+                            : '';
+                        if (typeof window.__cpSetDynamicCss === 'function') {
+                            window.__cpSetDynamicCss('stats-scrubber', css);
                         }
-                        if (existing) return;
-                        const style = document.createElement('style');
-                        style.id = 'cloudplay-stats-scrubber-style';
-                        style.textContent = '[class*="StreamStats" i], [class*="NetworkQualityIndicator" i], [data-testid*="stream-stats" i], [data-testid*="network-quality" i], [data-testid*="NetworkQuality" i], [class*="MediaStats" i] { display: none !important; opacity: 0 !important; pointer-events: none !important; }';
-                        (document.head || document.documentElement).appendChild(style);
                     } catch (e) {}
                 }
 
@@ -574,7 +570,7 @@ object XboxTranslator {
                     try {
                         let el = node.nodeType === 3 ? node.parentElement : node;
                         while (el && el !== document.body) {
-                            if (el.tagName === 'VIDEO' || el.tagName === 'CANVAS') return true;
+                            if (el.tagName === 'VIDEO' || el.tagName === 'CANVAS' || el.tagName === 'UHF-HEADER') return true;
                             if (el.id === 'stream-video' || el.getAttribute('data-testid') === 'stream-video') return true;
                             if (el.id === '__cloudplay_unlock_fail_banner' || el.getAttribute('data-cloudplay-ui') === '1') return true;
                             if (el.getAttribute('translate') === 'no' || (el.classList && el.classList.contains('notranslate'))) return true;
@@ -910,8 +906,11 @@ object XboxTranslator {
                     }
                 }
 
+                const isNewPlayXboxHost = (location.hostname || '').toLowerCase() === 'play.xbox.com';
+                let isHydrationReady = !isNewPlayXboxHost;
+
                 function attachMutationObserver() {
-                    if (isObserverAttached || isTranslatorPausedForStream) return;
+                    if (!isHydrationReady || isObserverAttached || isTranslatorPausedForStream) return;
                     const target = document.body || document.documentElement;
                     if (target) {
                         observer.observe(target, {
@@ -943,7 +942,7 @@ object XboxTranslator {
                 window.__resumeTranslator = function() {
                     isTranslatorPausedForStream = false;
                     updateStatsScrubber(hideStreamStats);
-                    if (!isTranslationEnabled) return;
+                    if (!isTranslationEnabled || !isHydrationReady) return;
                     attachMutationObserver();
                     const target = document.body || document.documentElement;
                     if (target) {
@@ -951,7 +950,7 @@ object XboxTranslator {
                         if (resumeScanTimer !== null) clearTimeout(resumeScanTimer);
                         resumeScanTimer = setTimeout(function() {
                             resumeScanTimer = null;
-                            if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                            if (!isTranslatorPausedForStream && isTranslationEnabled && isHydrationReady) {
                                 runTreeWalkerPass(document.body || document.documentElement, false);
                             }
                         }, 450);
@@ -960,7 +959,7 @@ object XboxTranslator {
 
                 function processBatchedNodes() {
                     rafId = null;
-                    if (isTranslatorPausedForStream || !isTranslationEnabled || pendingNodes.size === 0) {
+                    if (!isHydrationReady || isTranslatorPausedForStream || !isTranslationEnabled || pendingNodes.size === 0) {
                         pendingNodes.clear();
                         return;
                     }
@@ -977,7 +976,7 @@ object XboxTranslator {
                 }
 
                 const observer = new MutationObserver(function(mutations) {
-                    if (isTranslatorPausedForStream) return;
+                    if (!isHydrationReady || isTranslatorPausedForStream) return;
                     if (!isTranslationEnabled && !hideStreamStats) return;
 
                     for (let i = 0; i < mutations.length; i++) {
@@ -997,7 +996,41 @@ object XboxTranslator {
                     }
                 });
 
+                function runWhenHydrated() {
+                    isHydrationReady = true;
+                    attachMutationObserver();
+                    if (!isTranslatorPausedForStream && isTranslationEnabled && document.body) {
+                        runTreeWalkerPass(document.body, false);
+                    }
+                }
+
                 function start() {
+                    updateStatsScrubber(hideStreamStats);
+                    if (isNewPlayXboxHost) {
+                        // Trên play.xbox.com (Remix + React 18 SSR), phải đợi trang tải xong và React hoàn tất hydrateRoot(document)
+                        // trước khi đổi textNode, tránh lỗi Minified React error #418 làm sập nút Avatar & uhf-header!
+                        const schedulePostHydration = function() {
+                            if (startupTimer1 !== null) clearTimeout(startupTimer1);
+                            startupTimer1 = setTimeout(function() {
+                                startupTimer1 = null;
+                                runWhenHydrated();
+                            }, 2400);
+                            if (startupTimer2 !== null) clearTimeout(startupTimer2);
+                            startupTimer2 = setTimeout(function() {
+                                startupTimer2 = null;
+                                if (!isTranslatorPausedForStream && isTranslationEnabled && document.body) {
+                                    runTreeWalkerPass(document.body, false);
+                                }
+                            }, 4500);
+                        };
+                        if (document.readyState === 'complete') {
+                            schedulePostHydration();
+                        } else {
+                            window.addEventListener('load', schedulePostHydration, { once: true });
+                        }
+                        return;
+                    }
+
                     const target = document.body || document.documentElement;
                     if (target) {
                         attachMutationObserver();
@@ -1012,21 +1045,21 @@ object XboxTranslator {
                             }
                         });
                     }
+                    startupTimer1 = setTimeout(function() {
+                        startupTimer1 = null;
+                        if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                            runTreeWalkerPass(document.body, false);
+                        }
+                    }, 800);
+                    startupTimer2 = setTimeout(function() {
+                        startupTimer2 = null;
+                        if (!isTranslatorPausedForStream && isTranslationEnabled) {
+                            runTreeWalkerPass(document.body, false);
+                        }
+                    }, 2500);
                 }
 
                 start();
-                startupTimer1 = setTimeout(function() {
-                    startupTimer1 = null;
-                    if (!isTranslatorPausedForStream && isTranslationEnabled) {
-                        runTreeWalkerPass(document.body, false);
-                    }
-                }, 800);
-                startupTimer2 = setTimeout(function() {
-                    startupTimer2 = null;
-                    if (!isTranslatorPausedForStream && isTranslationEnabled) {
-                        runTreeWalkerPass(document.body, false);
-                    }
-                }, 2500);
             })();
         """.trimIndent()
     }

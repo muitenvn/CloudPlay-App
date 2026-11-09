@@ -51,10 +51,12 @@ sealed class AppScreen {
             restore = { saved ->
                 if (saved.startsWith("BROWSER|")) {
                     val url = saved.removePrefix("BROWSER|").ifBlank { "https://www.xbox.com/en-US/play" }
-                    val mode = SettingsRepository.config.value.xboxWebUiMode
+                    val cfg = SettingsRepository.config.value
+                    val mode = cfg.xboxWebUiMode
+                    val uaMode = if (cfg.forceDesktopUserAgent) "desktop" else "mobile"
                     com.example.data.AppLogger.info(
                         "WEB-UI",
-                        "Khôi phục màn hình Browser từ trạng thái đã lưu: url=${com.example.data.AppLogger.safeUrlHostPath(url)} | chế độ=${mode.name} | nguồn=AppScreen.Saver"
+                        "Khôi phục màn hình Browser từ trạng thái đã lưu: url=${com.example.data.AppLogger.safeUrlHostPath(url)} | chế độ=${mode.name} | ua=$uaMode | nguồn=AppScreen.Saver"
                     )
                     Browser(url)
                 } else {
@@ -369,9 +371,10 @@ fun MainContent(
                         }
                         val currentLocale = config.getEffectiveLocale()
                         val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
+                        val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
                         com.example.data.AppLogger.info(
                             "WEB-UI",
-                            "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
+                            "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$uaMode | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
                         )
                         currentScreen = AppScreen.Browser(finalUrl)
                     },

@@ -1028,7 +1028,7 @@ object SettingsRepository {
         _config.value = synced
         AppLogger.info(
             "WEB-UI",
-            "Khởi tạo cấu hình giao diện Xbox: chế độ=${synced.xboxWebUiMode.name}, thị trường=${synced.getEffectiveLocale()}, urlMặcĐịnh=${AppLogger.safeUrlHostPath(synced.targetRegionUrl)}"
+            "Khởi tạo cấu hình giao diện Xbox: chế độ=${synced.xboxWebUiMode.name}, ua=${if (synced.forceDesktopUserAgent) "desktop" else "mobile"}, thị trường=${synced.getEffectiveLocale()}, urlMặcĐịnh=${AppLogger.safeUrlHostPath(synced.targetRegionUrl)}"
         )
     }
 
@@ -1231,11 +1231,13 @@ object SettingsRepository {
     }
 
     fun updateXboxWebUiMode(mode: XboxWebUiMode) {
-        val old = _config.value.xboxWebUiMode
+        val cur = _config.value
+        val old = cur.xboxWebUiMode
+        val uaMode = if (cur.forceDesktopUserAgent) "desktop" else "mobile"
         if (old == mode) {
             AppLogger.info(
                 "WEB-UI",
-                "Người dùng bấm chọn lại Giao diện web Xbox đang bật: ${mode.name} (giữ nguyên cài đặt)"
+                "Người dùng bấm chọn lại Giao diện web Xbox đang bật: ${mode.name} | ua=$uaMode (giữ nguyên cài đặt)"
             )
             return
         }
@@ -1244,7 +1246,7 @@ object SettingsRepository {
         logSettingChange("Giao diện web Xbox", old.name, mode.name)
         AppLogger.info(
             "WEB-UI",
-            "Đổi chế độ Giao diện web Xbox: ${old.name} -> ${mode.name} (nguồn: cài đặt người dùng)"
+            "Đổi chế độ Giao diện web Xbox: ${old.name} -> ${mode.name} | ua=$uaMode (nguồn: cài đặt người dùng)"
         )
     }
 
@@ -1338,6 +1340,12 @@ object SettingsRepository {
         _config.update { it.copy(forceDesktopUserAgent = enabled) }
         persist(_config.value)
         logSettingChange("Giả lập trình duyệt máy tính (1080p UA)", old, enabled)
+        if (old != enabled) {
+            AppLogger.info(
+                "WEB-UI",
+                "Đổi kiểu User-Agent trực tiếp: ${if (old) "desktop" else "mobile"} -> ${if (enabled) "desktop" else "mobile"} | chế độ=${_config.value.xboxWebUiMode.name}"
+            )
+        }
     }
 
     fun updateClarityBoost(enabled: Boolean) {
@@ -1480,7 +1488,9 @@ object SettingsRepository {
     }
 
     fun updateCellularMode(mode: CellularOptimizationMode) {
-        val old = _config.value.cellularMode
+        val prev = _config.value
+        val old = prev.cellularMode
+        val oldUa = prev.forceDesktopUserAgent
         _config.update {
             val nextLowEnd = if (mode != CellularOptimizationMode.DATA_SAVER_HIGH_SPEED) false else it.lowEndDeviceMode
             it.copy(
@@ -1493,6 +1503,13 @@ object SettingsRepository {
         }
         persist(_config.value)
         logSettingChange("Chế độ chất lượng đồ họa", old.name, mode.name)
+        val newUa = _config.value.forceDesktopUserAgent
+        if (old != mode || oldUa != newUa) {
+            AppLogger.info(
+                "WEB-UI",
+                "Đổi chế độ chất lượng ${old.name} -> ${mode.name}: ua=${if (oldUa) "desktop" else "mobile"} -> ${if (newUa) "desktop" else "mobile"} (request1080p=${mode.request1080p})"
+            )
+        }
     }
 
     fun updateNetworkTuningMode(mode: NetworkTuningMode) {

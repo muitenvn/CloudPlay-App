@@ -272,6 +272,7 @@ fun CloudBrowserScreen(
                 "www.xbox.com", "xbox.com" -> "CLASSIC (www.xbox.com)"
                 else -> "OTHER (${newHost ?: "unknown"})"
             }
+            val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
             val appReason = pendingAppNavReason
             val decisionSource = when {
                 oldHost in listOf("www.xbox.com", "xbox.com") && newHost == "play.xbox.com" &&
@@ -291,7 +292,7 @@ fun CloudBrowserScreen(
             pendingAppNavReason = null
             com.example.data.AppLogger.info(
                 "WEB-UI",
-                "Điều hướng chính: ${oldSafePath.ifBlank { "(khởi tạo)" }} -> $newSafePath | cài đặt=${config.xboxWebUiMode.name} | thực tế=$actualSurface | nguồn=$decisionSource"
+                "Điều hướng chính: ${oldSafePath.ifBlank { "(khởi tạo)" }} -> $newSafePath | cài đặt=${config.xboxWebUiMode.name} | ua=$uaMode | thực tế=$actualSurface | nguồn=$decisionSource"
             )
         }
 
@@ -309,9 +310,10 @@ fun CloudBrowserScreen(
             if (prevLastSafe != newSafePath && newHost == "play.xbox.com" &&
                 config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
             ) {
+                val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
                 com.example.data.AppLogger.warn(
                     "WEB-UI",
-                    "lastXboxUrl đã bị ghi đè sang giao diện mới: $newSafePath (khi cài đặt vẫn là CLASSIC)"
+                    "lastXboxUrl đã bị ghi đè sang giao diện mới: $newSafePath (khi cài đặt vẫn là CLASSIC | ua=$uaMode)"
                 )
             }
             if (targetUrl.contains("/play/games/") || targetUrl.contains("/play/launch/")) {
@@ -358,11 +360,12 @@ fun CloudBrowserScreen(
         lastAppliedUiMode = config.xboxWebUiMode
         val wv = webViewInstance ?: return@LaunchedEffect
         val curUrl = wv.url ?: currentMainFrameUrl
+        val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
         if (!streamUiState.isStreamConnected && !curUrl.contains("/launch/") && XboxBridge.isXboxHost(curUrl)) {
             val adapted = SettingsRepository.formatXboxUrlWithLocale(curUrl, effectiveLocale, config.xboxWebUiMode)
             com.example.data.AppLogger.info(
                 "WEB-UI",
-                "LaunchedEffect(xboxWebUiMode): ${prevMode.name} -> ${config.xboxWebUiMode.name} | cur=${com.example.data.AppLogger.safeUrlHostPath(curUrl)} -> adapted=${com.example.data.AppLogger.safeUrlHostPath(adapted)}"
+                "LaunchedEffect(xboxWebUiMode): ${prevMode.name} -> ${config.xboxWebUiMode.name} | ua=$uaMode | cur=${com.example.data.AppLogger.safeUrlHostPath(curUrl)} -> adapted=${com.example.data.AppLogger.safeUrlHostPath(adapted)}"
             )
             if (adapted.isNotBlank() && !adapted.equals(curUrl, ignoreCase = true)) {
                 pendingAppNavReason = "LaunchedEffect đổi cài đặt giao diện (${prevMode.name} -> ${config.xboxWebUiMode.name})"
@@ -600,6 +603,94 @@ fun CloudBrowserScreen(
             factory = { ctx ->
                 object : WebView(ctx) {
                     private var lastUnbufferedMotionDeviceId = -1
+                    private var lastHeaderTouchLogElapsedMs = 0L
+
+                    override fun dispatchTouchEvent(event: android.view.MotionEvent?): Boolean {
+                        val handled = super.dispatchTouchEvent(event)
+                        if (event != null &&
+                            event.actionMasked == android.view.MotionEvent.ACTION_UP &&
+                            !streamController.uiState.value.isStreamConnected
+                        ) {
+                            val w = width.coerceAtLeast(1)
+                            val h = height.coerceAtLeast(1)
+                            val pxX = event.x.toInt()
+                            val pxY = event.y.toInt()
+                            val isHeaderOrTopRightZone = (pxY <= (h * 0.22f).toInt()) ||
+                                (pxX >= (w * 0.65f).toInt() && pxY <= (h * 0.32f).toInt())
+                            val nowElapsed = android.os.SystemClock.elapsedRealtime()
+                            if (isHeaderOrTopRightZone && nowElapsed - lastHeaderTouchLogElapsedMs >= 250L) {
+                                lastHeaderTouchLogElapsedMs = nowElapsed
+                                val curUrlSafe = com.example.data.AppLogger.safeUrlHostPath(this.url ?: currentMainFrameUrl)
+                                val isDesktopUa = (this.getTag(com.example.R.id.webview_desktop_ua_tag) as? Boolean)
+                                    ?: SettingsRepository.config.value.forceDesktopUserAgent
+                                val uaLabel = if (isDesktopUa) "desktop" else "mobile"
+                                com.example.data.AppLogger.info(
+                                    "TOUCH",
+                                    "WebView nhận chạm vùng đầu trang: px=($pxX,$pxY)/${w}x${h} | handled=$handled | ua=$uaLabel | url=$curUrlSafe"
+                                )
+                                val relX = (event.x / w.toFloat()).coerceIn(0f, 1f)
+                                val relY = (event.y / h.toFloat()).coerceIn(0f, 1f)
+                                this.postDelayed({
+                                    try {
+                                        val probeJs = """
+                                            (function(){
+                                                try {
+                                                    var vw = window.innerWidth || 1;
+                                                    var vh = window.innerHeight || 1;
+                                                    var cx = Math.round($relX * vw);
+                                                    var cy = Math.round($relY * vh);
+                                                    var hit = document.elementFromPoint(cx, cy);
+                                                    function safeDesc(el) {
+                                                        if (!el || !el.tagName) return 'null';
+                                                        var tag = el.tagName.toLowerCase();
+                                                        var role = el.getAttribute('role') || '';
+                                                        var tid = el.getAttribute('data-testid') || '';
+                                                        var exp = el.getAttribute('aria-expanded') || '';
+                                                        var pop = el.getAttribute('aria-haspopup') || '';
+                                                        var dis = el.disabled || el.getAttribute('aria-disabled') || '';
+                                                        var rawAria = (el.getAttribute('aria-label') || '').toLowerCase();
+                                                        var ariaKind = '';
+                                                        if (rawAria.indexOf('profile') !== -1 || rawAria.indexOf('hồ sơ') !== -1 || rawAria.indexOf('account') !== -1 || rawAria.indexOf('tài khoản') !== -1) ariaKind = 'profile';
+                                                        else if (rawAria.indexOf('setting') !== -1 || rawAria.indexOf('cài đặt') !== -1) ariaKind = 'settings';
+                                                        else if (rawAria.indexOf('preview') !== -1 || rawAria.indexOf('xem trước') !== -1) ariaKind = 'preview';
+                                                        else if (rawAria.indexOf('menu') !== -1 || rawAria.indexOf('guide') !== -1) ariaKind = 'menu';
+                                                        else if (rawAria.length > 0) ariaKind = 'other(' + rawAria.length + ')';
+                                                        var hasGamerpic = !!(el.querySelector && el.querySelector('img[src*="xboxlive.com"], img[src*="ssl-images-microsoft.com"], img[alt*="gamerpic" i], [data-testid*="gamerpic" i]'));
+                                                        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+                                                        var pe = cs ? cs.pointerEvents : '';
+                                                        var r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+                                                        var rectStr = r ? (Math.round(r.left) + ',' + Math.round(r.top) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)) : '';
+                                                        return tag + (tid ? '#' + tid : '') + (role ? '[role=' + role + ']' : '') + (ariaKind ? '[aria=' + ariaKind + ']' : '') + (exp ? '[expanded=' + exp + ']' : '') + (pop ? '[haspopup=' + pop + ']' : '') + (dis ? '[disabled=' + dis + ']' : '') + (hasGamerpic ? '[hasGamerpic=true]' : '') + (pe && pe !== 'auto' ? '[pe=' + pe + ']' : '') + (rectStr ? '@(' + rectStr + ')' : '');
+                                                    }
+                                                    var btn = hit && hit.closest ? hit.closest('button, a, [role="button"], [role="menuitem"], [data-testid]') : null;
+                                                    var menus = document.querySelectorAll('[role="menu"], [role="dialog"], [aria-modal="true"], [popover], [data-state="open"], [class*="Menu" i], [class*="Drawer" i], [class*="Popover" i], [class*="Sheet" i]');
+                                                    var openList = [];
+                                                    for (var i = 0; i < menus.length && openList.length < 4; i++) {
+                                                        var m = menus[i];
+                                                        var mcs = window.getComputedStyle ? window.getComputedStyle(m) : null;
+                                                        if (mcs && mcs.display !== 'none' && mcs.visibility !== 'hidden' && parseFloat(mcs.opacity || '1') > 0.01) {
+                                                            var mr = m.getBoundingClientRect ? m.getBoundingClientRect() : null;
+                                                            if (mr && mr.width > 20 && mr.height > 20) {
+                                                                openList.push((m.tagName || '').toLowerCase() + '[role=' + (m.getAttribute('role') || '') + ',tid=' + (m.getAttribute('data-testid') || '') + ']@(' + Math.round(mr.left) + ',' + Math.round(mr.top) + ' ' + Math.round(mr.width) + 'x' + Math.round(mr.height) + ',z=' + (mcs.zIndex || '') + ')');
+                                                            }
+                                                        }
+                                                    }
+                                                    return 'css=(' + cx + ',' + cy + ')/' + vw + 'x' + vh + ' | hit=' + safeDesc(hit) + ' | interactive=' + safeDesc(btn) + ' | openPopups=' + (openList.length > 0 ? openList.join(';') : 'none');
+                                                } catch (e) {
+                                                    return 'err=' + (e && e.message ? e.message : String(e));
+                                                }
+                                            })()
+                                        """.trimIndent()
+                                        this.evaluateJavascript(probeJs) { jsRes ->
+                                            val cleanRes = jsRes?.trim()?.removeSurrounding("\"")?.replace("\\\"", "\"") ?: "null"
+                                            com.example.data.AppLogger.info("TOUCH", "Kiểm tra DOM vùng chạm (+180ms): $cleanRes")
+                                        }
+                                    } catch (_: Exception) {}
+                                }, 180L)
+                            }
+                        }
+                        return handled
+                    }
 
                     override fun onGenericMotionEvent(event: android.view.MotionEvent?): Boolean {
                         if (event != null &&
@@ -815,12 +906,34 @@ fun CloudBrowserScreen(
                     }
 
                     webChromeClient = object : WebChromeClient() {
+                        private var lastConsoleErrLogMs = 0L
+
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
                             pageLoadingProgress = newProgress / 100f
                             if (!injectedForCurrentPage && newProgress >= 30 && XboxBridge.isTrustedHost(view?.url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
                             }
+                        }
+
+                        override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                            if (consoleMessage != null &&
+                                consoleMessage.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR &&
+                                !streamController.uiState.value.isStreamConnected
+                            ) {
+                                val nowMs = android.os.SystemClock.elapsedRealtime()
+                                if (nowMs - lastConsoleErrLogMs >= 400L) {
+                                    lastConsoleErrLogMs = nowMs
+                                    val srcSafe = com.example.data.AppLogger.safeUrlHostPath(consoleMessage.sourceId())
+                                    val rawMsg = consoleMessage.message() ?: ""
+                                    val cleanMsg = com.example.data.AppLogger.sanitizeMessage(rawMsg).take(220)
+                                    com.example.data.AppLogger.warn(
+                                        "WEB-UI",
+                                        "Lỗi JS trên trang ($srcSafe:${consoleMessage.lineNumber()}): $cleanMsg"
+                                    )
+                                }
+                            }
+                            return super.onConsoleMessage(consoleMessage)
                         }
 
                         override fun onPermissionRequest(request: PermissionRequest?) {
@@ -846,10 +959,11 @@ fun CloudBrowserScreen(
                         "Accept-Language" to "$effectiveLocale,en;q=0.9",
                         "X-Edge-Shopping-Flag" to "0"
                     )
-                    pendingAppNavReason = "khởi tạo WebView (initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)}, chế độ=${config.xboxWebUiMode.name})"
+                    val initUaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
+                    pendingAppNavReason = "khởi tạo WebView (initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)}, chế độ=${config.xboxWebUiMode.name}, ua=$initUaMode)"
                     com.example.data.AppLogger.info(
                         "WEB-UI",
-                        "Khởi tạo WebView: initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)} -> formatted=${com.example.data.AppLogger.safeUrlHostPath(formattedInitialUrl)} | chế độ=${config.xboxWebUiMode.name} | thị trường=$effectiveLocale"
+                        "Khởi tạo WebView: initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)} -> formatted=${com.example.data.AppLogger.safeUrlHostPath(formattedInitialUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$initUaMode | thị trường=$effectiveLocale"
                     )
                     loadUrl(formattedInitialUrl, customHeaders)
                     webViewInstance = this
@@ -865,6 +979,10 @@ fun CloudBrowserScreen(
                     val desiredUa = if (wantDesktopUa) EDGE_DESKTOP_UA else WebSettings.getDefaultUserAgent(context)
                     if (view.settings.userAgentString != desiredUa) {
                         view.settings.userAgentString = desiredUa
+                        com.example.data.AppLogger.info(
+                            "WEB-UI",
+                            "Cập nhật User-Agent của WebView đang chạy: ua=${if (wantDesktopUa) "desktop" else "mobile"} | chế độ=${config.xboxWebUiMode.name}"
+                        )
                     }
                 }
             }

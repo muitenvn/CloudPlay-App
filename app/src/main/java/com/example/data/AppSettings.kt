@@ -1172,7 +1172,13 @@ object SettingsRepository {
         if (playSubMatch != null) {
             val rawRest = playSubMatch.groupValues[2].ifBlank { "" }
             return if (uiMode == XboxWebUiMode.CLASSIC) {
+                val productRouteMatch = Regex("""^/products/([^/?#]+)(?:/([^/?#]+))?""", RegexOption.IGNORE_CASE).find(rawRest)
                 val normalizedPath = when {
+                    productRouteMatch != null -> {
+                        val productId = productRouteMatch.groupValues[1]
+                        val slug = productRouteMatch.groupValues[2]
+                        if (slug.isNotBlank()) "/play/games/$slug/$productId" else "/play/games/$productId"
+                    }
                     rawRest.isBlank() || rawRest == "/" -> "/play"
                     rawRest.startsWith("/play") -> rawRest
                     else -> "/play$rawRest"
@@ -1189,8 +1195,16 @@ object SettingsRepository {
         if (match != null) {
             val domain = match.groupValues[1]
             val rest = match.groupValues[3] ?: ""
-            if (uiMode == XboxWebUiMode.NEW_UI && (rest.isBlank() || rest == "/play" || rest == "/play/")) {
-                return "https://play.xbox.com/"
+            if (uiMode == XboxWebUiMode.NEW_UI) {
+                if (rest.isBlank() || rest == "/play" || rest == "/play/") {
+                    return "https://play.xbox.com/"
+                }
+                val classicGameMatch = Regex("""^/play/games/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
+                if (classicGameMatch != null) {
+                    val slug = classicGameMatch.groupValues[1]
+                    val productId = classicGameMatch.groupValues[2]
+                    return "https://play.xbox.com/products/$productId/$slug"
+                }
             }
             return "$domain/$targetLocale$rest"
         }
@@ -1200,8 +1214,16 @@ object SettingsRepository {
         if (noLocaleMatch != null) {
             val domain = noLocaleMatch.groupValues[1]
             val rest = noLocaleMatch.groupValues[2] ?: "/play"
-            if (uiMode == XboxWebUiMode.NEW_UI && (rest == "/play" || rest == "/play/")) {
-                return "https://play.xbox.com/"
+            if (uiMode == XboxWebUiMode.NEW_UI) {
+                if (rest == "/play" || rest == "/play/") {
+                    return "https://play.xbox.com/"
+                }
+                val classicGameMatch = Regex("""^/play/games/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
+                if (classicGameMatch != null) {
+                    val slug = classicGameMatch.groupValues[1]
+                    val productId = classicGameMatch.groupValues[2]
+                    return "https://play.xbox.com/products/$productId/$slug"
+                }
             }
             return "$domain/$targetLocale$rest"
         }

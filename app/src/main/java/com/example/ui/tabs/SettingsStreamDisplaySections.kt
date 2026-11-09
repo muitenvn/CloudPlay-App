@@ -313,9 +313,9 @@ internal fun SettingsGraphicsFpsSection(
 
             Text(
                 text = if (isEn) {
-                    "Tip: If you enabled Preview on Xbox earlier, tap your Xbox avatar → Exit preview → tap Submit in the feedback box (do not tap Cancel/X) to return to Classic UI."
+                    "Tip: If your Xbox account is in New UI, simply tap your Xbox avatar → Exit preview; the app will automatically dismiss the prompt and switch straight to Classic UI."
                 } else {
-                    "Lưu ý: Nếu trước đó bạn đã bật thử Giao diện mới trên Xbox, hãy bấm ảnh đại diện Xbox → chọn Exit preview → bấm nút Submit ở hộp thoại hiện ra (đừng bấm X/Cancel) thì mới thoát hẳn về Giao diện cũ."
+                    "Lưu ý: Nếu tài khoản đang ở Giao diện mới, bạn chỉ cần bấm ảnh đại diện Xbox → chọn Thoát xem trước (Exit preview), ứng dụng sẽ tự động đóng hộp thoại và chuyển thẳng về Giao diện cũ."
                 },
                 color = TextSecondary,
                 fontSize = 9.5.sp,

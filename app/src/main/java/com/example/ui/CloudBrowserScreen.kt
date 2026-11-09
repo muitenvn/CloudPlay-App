@@ -135,6 +135,11 @@ fun CloudBrowserScreen(
     var lastXboxUrl by remember { mutableStateOf(initialUrl) }
     var currentMainFrameUrl by remember { mutableStateOf(initialUrl) }
     var showReturnButton by remember { mutableStateOf(false) }
+    var webViewSessionKey by remember { mutableStateOf(0) }
+    var activeSessionInitialUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
+    var exitPreviewArmedAtMs by remember { mutableStateOf(0L) }
+    var exitPreviewOptOutStartedAtMs by remember { mutableStateOf(0L) }
+    var suppressLoadingOverlayAfterExitPreview by remember { mutableStateOf(false) }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewInstance, context) {
@@ -355,6 +360,69 @@ fun CloudBrowserScreen(
     val effectiveLocale = config.getEffectiveLocale()
     val effectiveTranslate = config.isEffectiveTranslateEnabled()
     var lastAppliedUiMode by remember { mutableStateOf(config.xboxWebUiMode) }
+
+    val commitExitPreviewToClassicUi: (String) -> Unit = commit@{ triggerReason ->
+        if (exitPreviewArmedAtMs == 0L && exitPreviewOptOutStartedAtMs == 0L) return@commit
+        exitPreviewArmedAtMs = 0L
+        exitPreviewOptOutStartedAtMs = 0L
+
+        try {
+            CookieManager.getInstance().flush()
+        } catch (_: Exception) {}
+
+        if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+            lastAppliedUiMode = com.example.data.XboxWebUiMode.CLASSIC
+            SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
+        }
+
+        val curUrl = webViewInstance?.url ?: currentMainFrameUrl
+        val convertedFromCur = SettingsRepository.formatXboxUrlWithLocale(
+            curUrl,
+            effectiveLocale,
+            com.example.data.XboxWebUiMode.CLASSIC
+        )
+        val convertedFromLast = SettingsRepository.formatXboxUrlWithLocale(
+            lastXboxUrl,
+            effectiveLocale,
+            com.example.data.XboxWebUiMode.CLASSIC
+        )
+        val convertedFromInit = SettingsRepository.formatXboxUrlWithLocale(
+            initialUrl,
+            effectiveLocale,
+            com.example.data.XboxWebUiMode.CLASSIC
+        )
+        // Mở thẳng trang chi tiết game (/play/games/...) ở Giao diện cũ sau khi opt-out
+        // để giữ vững Classic UI không bị router Xbox đẩy ngược về play.xbox.com
+        val targetClassicUrl = when {
+            convertedFromCur.contains("/play/games/", ignoreCase = true) -> convertedFromCur
+            convertedFromLast.contains("/play/games/", ignoreCase = true) -> convertedFromLast
+            convertedFromInit.contains("/play/games/", ignoreCase = true) -> convertedFromInit
+            else -> "https://www.xbox.com/$effectiveLocale/play/games/fortnite/BT5P2X999VH2"
+        }
+
+        com.example.data.AppLogger.info(
+            "WEB-UI",
+            "Tự động cắt phiên play.xbox.com & chuyển sang Giao diện cũ: đích=${com.example.data.AppLogger.safeUrlHostPath(targetClassicUrl)} | nguồn=$triggerReason"
+        )
+
+        try {
+            bridgeInstance?.release()
+            bridgeInstance = null
+            com.example.cloudplay.QualityAdapter.setWebView(null)
+            webViewInstance?.apply {
+                stopLoading()
+                destroy()
+            }
+            webViewInstance = null
+        } catch (_: Exception) {}
+
+        lastXboxUrl = targetClassicUrl
+        currentMainFrameUrl = targetClassicUrl
+        activeSessionInitialUrl = targetClassicUrl
+        suppressLoadingOverlayAfterExitPreview = true
+        pendingAppNavReason = "tự động chuyển sang Giao diện cũ sau Exit preview ($triggerReason)"
+        webViewSessionKey += 1
+    }
 
     LaunchedEffect(config.xboxWebUiMode) {
         if (config.xboxWebUiMode == lastAppliedUiMode) return@LaunchedEffect
@@ -600,6 +668,7 @@ fun CloudBrowserScreen(
             .testTag("cloud_browser_screen")
     ) {
         // Main Web View
+        androidx.compose.runtime.key(webViewSessionKey) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -751,9 +820,33 @@ fun CloudBrowserScreen(
                     // Add JavaScript bridge for stream / launch detection & smart translation
                     val bridge = XboxBridge(streamController)
                     bridge.setWebView(this)
+                    bridge.setExitPreviewSignalListener { sig ->
+                        val nowElapsed = android.os.SystemClock.elapsedRealtime()
+                        when (sig) {
+                            "EXIT_PREVIEW_ARMED" -> {
+                                exitPreviewArmedAtMs = nowElapsed
+                                exitPreviewOptOutStartedAtMs = 0L
+                                com.example.data.AppLogger.info(
+                                    "WEB-UI",
+                                    "Người dùng bấm Thoát xem trước (Exit preview) trên play.xbox.com -> chờ đóng hộp thoại & hoàn tất opt-out"
+                                )
+                            }
+                            "EXIT_PREVIEW_OPT_OUT_STARTED" -> {
+                                if (exitPreviewArmedAtMs == 0L) exitPreviewArmedAtMs = nowElapsed
+                                exitPreviewOptOutStartedAtMs = nowElapsed
+                                com.example.data.AppLogger.info(
+                                    "WEB-UI",
+                                    "Đã xác nhận hộp thoại Thoát xem trước -> đang chờ máy chủ Xbox lưu trạng thái opt-out"
+                                )
+                            }
+                            "EXIT_PREVIEW_COMMIT" -> {
+                                commitExitPreviewToClassicUi("EXIT_PREVIEW_COMMIT từ XboxBridge")
+                            }
+                        }
+                    }
                     bridgeInstance = bridge
                     com.example.cloudplay.QualityAdapter.setWebView(this)
-                    bridge.updateCurrentUrl(initialUrl)
+                    bridge.updateCurrentUrl(activeSessionInitialUrl)
                     addJavascriptInterface(bridge, "CloudPlayBridge")
 
                     var hasDocumentStartScript = false
@@ -787,6 +880,14 @@ fun CloudBrowserScreen(
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                                val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
+                                val isMigrateStep = url.contains("/migrate", ignoreCase = true)
+                                if (optElapsed in 500L..16000L && !isMigrateStep) {
+                                    commitExitPreviewToClassicUi("onPageStarted sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(url)})")
+                                    return
+                                }
+                            }
                             isPageLoading = true
                             injectedForCurrentPage = hasDocumentStartScript
                             bridge.updateCurrentUrl(url)
@@ -807,6 +908,9 @@ fun CloudBrowserScreen(
                         }
 
                         override fun onPageCommitVisible(view: WebView?, url: String?) {
+                            if (suppressLoadingOverlayAfterExitPreview) {
+                                isPageLoading = false
+                            }
                             if (!injectedForCurrentPage && XboxBridge.isTrustedHost(url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
@@ -820,6 +924,7 @@ fun CloudBrowserScreen(
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             isPageLoading = false
+                            suppressLoadingOverlayAfterExitPreview = false
                             bridge.updateCurrentUrl(url)
                             url?.let {
                                 handleMainFrameNavigation(it, "onPageFinished")
@@ -840,6 +945,14 @@ fun CloudBrowserScreen(
                             val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
+                                if (exitPreviewOptOutStartedAtMs > 0L) {
+                                    val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
+                                    val isMigrateStep = targetUrl.contains("/migrate", ignoreCase = true)
+                                    if (optElapsed in 500L..16000L && !isMigrateStep) {
+                                        commitExitPreviewToClassicUi("shouldOverride sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(targetUrl)})")
+                                        return true
+                                    }
+                                }
                                 val isRedirect = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                                     request.isRedirect
                                 } else {
@@ -854,6 +967,14 @@ fun CloudBrowserScreen(
 
                         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                             super.doUpdateVisitedHistory(view, url, isReload)
+                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                                val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
+                                val isMigrateStep = url.contains("/migrate", ignoreCase = true)
+                                if (optElapsed in 600L..16000L && !isMigrateStep) {
+                                    commitExitPreviewToClassicUi("historyUpdate sau opt-out (${com.example.data.AppLogger.safeUrlHostPath(url)})")
+                                    return
+                                }
+                            }
                             bridge.updateCurrentUrl(url)
                             url?.let {
                                 streamController.onUrlChanged(it)
@@ -956,16 +1077,28 @@ fun CloudBrowserScreen(
                         }
                     }
 
-                    val formattedInitialUrl = SettingsRepository.formatXboxUrlWithLocale(initialUrl, effectiveLocale)
-                    val customHeaders = mapOf(
-                        "Accept-Language" to "$effectiveLocale,en;q=0.9",
-                        "X-Edge-Shopping-Flag" to "0"
-                    )
+                    val formattedInitialUrl = SettingsRepository.formatXboxUrlWithLocale(activeSessionInitialUrl, effectiveLocale)
+                    val customHeaders = if (config.forceDesktopUserAgent) {
+                        mapOf(
+                            "Accept-Language" to "$effectiveLocale,en;q=0.9",
+                            "X-Edge-Shopping-Flag" to "0",
+                            "Sec-CH-UA" to "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
+                            "Sec-CH-UA-Mobile" to "?0",
+                            "Sec-CH-UA-Platform" to "\"Windows\""
+                        )
+                    } else {
+                        mapOf(
+                            "Accept-Language" to "$effectiveLocale,en;q=0.9",
+                            "X-Edge-Shopping-Flag" to "0"
+                        )
+                    }
                     val initUaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-                    pendingAppNavReason = "khởi tạo WebView (initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)}, chế độ=${config.xboxWebUiMode.name}, ua=$initUaMode)"
+                    if (pendingAppNavReason == null) {
+                        pendingAppNavReason = "khởi tạo WebView (initialUrl=${com.example.data.AppLogger.safeUrlHostPath(activeSessionInitialUrl)}, chế độ=${config.xboxWebUiMode.name}, ua=$initUaMode)"
+                    }
                     com.example.data.AppLogger.info(
                         "WEB-UI",
-                        "Khởi tạo WebView: initialUrl=${com.example.data.AppLogger.safeUrlHostPath(initialUrl)} -> formatted=${com.example.data.AppLogger.safeUrlHostPath(formattedInitialUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$initUaMode | thị trường=$effectiveLocale"
+                        "Khởi tạo WebView (phiên #$webViewSessionKey): initialUrl=${com.example.data.AppLogger.safeUrlHostPath(activeSessionInitialUrl)} -> formatted=${com.example.data.AppLogger.safeUrlHostPath(formattedInitialUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$initUaMode | thị trường=$effectiveLocale"
                     )
                     loadUrl(formattedInitialUrl, customHeaders)
                     webViewInstance = this
@@ -989,11 +1122,12 @@ fun CloudBrowserScreen(
                 }
             }
         )
+        }
 
-        val gameProfile = remember(initialUrl, currentMainFrameUrl) {
+        val gameProfile = remember(activeSessionInitialUrl, currentMainFrameUrl) {
             val currentProfile = com.example.data.GameOptimizationRepository.getProfileForUrl(currentMainFrameUrl)
             if (currentProfile.gameId != "generic") currentProfile
-            else com.example.data.GameOptimizationRepository.getProfileForUrl(initialUrl)
+            else com.example.data.GameOptimizationRepository.getProfileForUrl(activeSessionInitialUrl)
         }
 
         // Kích hoạt chế độ Fortnite Arena (tự động chọn bố cục FPS Pro khi bật tay cầm ảo lần đầu trong Fortnite, không ép bộ đệm 8ms gây sụt frame)
@@ -1011,7 +1145,7 @@ fun CloudBrowserScreen(
 
         // Dedicated Game Loading Screen (Optimized for Portrait & Landscape, isolated state collection)
         IsolatedInGameLoadingOverlay(
-            isLoading = isPageLoading && pageLoadingProgress < 0.80f,
+            isLoading = !suppressLoadingOverlayAfterExitPreview && isPageLoading && pageLoadingProgress < 0.80f,
             progress = pageLoadingProgress,
             hasGamepad = gamepadStatus.hasPhysicalController,
             gameProfile = gameProfile,
@@ -1513,9 +1647,9 @@ fun CloudBrowserScreen(
                                 }
                                 Text(
                                     text = if (isEn) {
-                                        "Tip: If Xbox stays in Preview UI, tap your Xbox avatar → Exit preview → tap Submit (do not tap Cancel/X)."
+                                        "Tip: If your Xbox account is in New UI, tap your Xbox avatar → Exit preview; the app will auto-close the prompt and switch straight to Classic UI."
                                     } else {
-                                        "Mẹo: Nếu trang Xbox vẫn ở Giao diện mới, hãy bấm ảnh đại diện Xbox → Exit preview → bấm nút Submit trong hộp thoại (đừng bấm X/Cancel)."
+                                        "Mẹo: Nếu tài khoản đang ở Giao diện mới, chỉ cần bấm ảnh đại diện Xbox → Thoát xem trước (Exit preview), ứng dụng sẽ tự đóng hộp thoại và chuyển thẳng về Giao diện cũ."
                                     },
                                     color = TextSecondary,
                                     fontSize = 8.5.sp,

@@ -37,8 +37,15 @@ class XboxBridge(
     @Volatile
     private var currentNavigatedUrl: String? = null
 
+    @Volatile
+    private var exitPreviewSignalListener: ((String) -> Unit)? = null
+
     fun setWebView(webView: android.webkit.WebView) {
         webViewRef = WeakReference(webView)
+    }
+
+    fun setExitPreviewSignalListener(listener: ((String) -> Unit)?) {
+        exitPreviewSignalListener = listener
     }
 
     fun updateCurrentUrl(url: String?) {
@@ -51,6 +58,7 @@ class XboxBridge(
      * Cancels the CoroutineScope and clears WebView reference when WebView or Activity is destroyed.
      */
     fun release() {
+        exitPreviewSignalListener = null
         webViewRef?.clear()
         webViewRef = null
         scope.cancel()
@@ -296,6 +304,60 @@ class XboxBridge(
                         window.__physControllerConfig = Object.assign(window.__physControllerConfig || {}, conf);
                     };
 
+                    // Đồng bộ navigator.platform và navigator.userAgentData khớp hoàn toàn với EDGE_DESKTOP_UA (Windows 10/11 64-bit)
+                    // để play.xbox.com và www.xbox.com không nhận diện nhầm là trình duyệt di động Android (mobile=true).
+                    // Vẫn giữ nguyên navigator.maxTouchPoints thực của máy để hỗ trợ điều khiển Cảm ứng gốc (Native Touch).
+                    try {
+                        Object.defineProperty(navigator, 'platform', {
+                            get: function() { return 'Win32'; },
+                            configurable: true
+                        });
+                        const desktopBrands = [
+                            { brand: 'Microsoft Edge', version: '135' },
+                            { brand: 'Not-A.Brand', version: '8' },
+                            { brand: 'Chromium', version: '135' }
+                        ];
+                        const desktopFullVersionList = [
+                            { brand: 'Microsoft Edge', version: '135.0.0.0' },
+                            { brand: 'Not-A.Brand', version: '8.0.0.0' },
+                            { brand: 'Chromium', version: '135.0.0.0' }
+                        ];
+                        const fakeUaData = {
+                            brands: desktopBrands,
+                            mobile: false,
+                            platform: 'Windows',
+                            getHighEntropyValues: function() {
+                                return Promise.resolve({
+                                    architecture: 'x86',
+                                    bitness: '64',
+                                    brands: desktopBrands,
+                                    fullVersionList: desktopFullVersionList,
+                                    mobile: false,
+                                    model: '',
+                                    platform: 'Windows',
+                                    platformVersion: '15.0.0',
+                                    uaFullVersion: '135.0.0.0',
+                                    wow64: false
+                                });
+                            },
+                            toJSON: function() {
+                                return {
+                                    brands: desktopBrands,
+                                    mobile: false,
+                                    platform: 'Windows'
+                                };
+                            }
+                        };
+                        Object.defineProperty(navigator, 'userAgentData', {
+                            get: function() { return fakeUaData; },
+                            configurable: true
+                        });
+                    } catch (uaErr) {}
+
+                    window.__cpExitPreviewStage = window.__cpExitPreviewStage || 'IDLE';
+                    window.__cpExitPreviewInFlightFetches = 0;
+                    window.__cpExitPreviewCompletedFetches = 0;
+
                     function isFortniteSession() {
                         const h = (location.href || '').toLowerCase();
                         return h.indexOf('fortnite') !== -1 || h.indexOf('bt5p2x999vh2') !== -1 || !!window.__fortniteArenaMode;
@@ -439,10 +501,22 @@ class XboxBridge(
                             }
 
                             let response;
+                            const trackExitFetch = (window.__cpExitPreviewStage === 'MODAL_OPENING' || window.__cpExitPreviewStage === 'OPTING_OUT');
+                            if (trackExitFetch) {
+                                window.__cpExitPreviewInFlightFetches = (window.__cpExitPreviewInFlightFetches || 0) + 1;
+                            }
                             try {
                                 response = await NATIVE_FETCH(request, init);
                             } catch(err) {
+                                if (trackExitFetch) {
+                                    window.__cpExitPreviewInFlightFetches = Math.max(0, (window.__cpExitPreviewInFlightFetches || 1) - 1);
+                                    window.__cpExitPreviewCompletedFetches = (window.__cpExitPreviewCompletedFetches || 0) + 1;
+                                }
                                 throw err;
+                            }
+                            if (trackExitFetch) {
+                                window.__cpExitPreviewInFlightFetches = Math.max(0, (window.__cpExitPreviewInFlightFetches || 1) - 1);
+                                window.__cpExitPreviewCompletedFetches = (window.__cpExitPreviewCompletedFetches || 0) + 1;
                             }
 
                             // Intercept /v2/login/user to ensure target region is selected and active
@@ -1465,9 +1539,26 @@ class XboxBridge(
                         if (document.body) document.body.appendChild(bar);
                     }
 
+                    function hasActionLoadingSpinner() {
+                        return !!document.querySelector('[data-testid*="PlayButton" i] [role="progressbar"], [data-testid*="launch" i] [role="progressbar"], button[aria-busy="true"], [class*="PlayButton" i] [class*="spinner" i], [class*="ActionButtons" i] [role="progressbar"]');
+                    }
+
                     function checkRegionLockDomState() {
                         // Never read document.body.innerText during active stream, on /launch/ page, or more than 4 times per URL (avoids layout reflow)
-                        if (notifiedStreamConnection || !document.body || location.href.indexOf('/launch/') !== -1 || regionCheckCountForUrl >= 4) return;
+                        if (notifiedStreamConnection || !document.body || location.href.indexOf('/launch/') !== -1) return;
+                        if (hasPlayButtonOnPage()) {
+                            const oldBanner = document.getElementById('__cloudplay_unlock_fail_banner');
+                            if (oldBanner) oldBanner.remove();
+                            if (window.__lastUnlockSignal === 'UNLOCK_FAIL') {
+                                window.__lastUnlockSignal = 'UNLOCK_OK';
+                                notify('onRegionUnlockSignal', 'UNLOCK_OK');
+                                if (window.CloudPlayBridge && window.CloudPlayBridge.dismissUnlockFailPrompt) {
+                                    window.CloudPlayBridge.dismissUnlockFailPrompt();
+                                }
+                            }
+                            return;
+                        }
+                        if (hasActionLoadingSpinner() || regionCheckCountForUrl >= 4) return;
                         regionCheckCountForUrl++;
                         const bodyText = (document.body.textContent || '').toLowerCase();
                         const hasRegionUnsupportedText =
@@ -1607,10 +1698,163 @@ class XboxBridge(
                         }
                     }, 2500);
 
+                    let exitPreviewWatcherId = null;
+
+                    function commitExitPreviewNow() {
+                        if (window.__cpExitPreviewStage === 'COMMITTED') return;
+                        window.__cpExitPreviewStage = 'COMMITTED';
+                        if (exitPreviewWatcherId) {
+                            clearInterval(exitPreviewWatcherId);
+                            exitPreviewWatcherId = null;
+                        }
+                        try {
+                            window.stop();
+                        } catch (e) {}
+                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_COMMIT');
+                    }
+
+                    function startExitPreviewOptOutPhase() {
+                        if (window.__cpExitPreviewStage === 'OPTING_OUT' || window.__cpExitPreviewStage === 'COMMITTED') return;
+                        window.__cpExitPreviewStage = 'OPTING_OUT';
+                        window.__cpExitPreviewOptOutStartedAt = Date.now();
+                        window.__cpExitPreviewStartHref = location.href;
+                        window.__cpExitPreviewSawSpinner = false;
+                        window.__cpExitPreviewInFlightFetches = 0;
+                        window.__cpExitPreviewCompletedFetches = 0;
+                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_OPT_OUT_STARTED');
+                    }
+
+                    function ensureExitPreviewWatcher() {
+                        if (exitPreviewWatcherId) clearInterval(exitPreviewWatcherId);
+                        let modalFoundAt = 0;
+                        let autoClickedCancel = false;
+                        exitPreviewWatcherId = setInterval(function() {
+                            try {
+                                const stage = window.__cpExitPreviewStage;
+                                if (stage !== 'MODAL_OPENING' && stage !== 'OPTING_OUT') {
+                                    clearInterval(exitPreviewWatcherId);
+                                    exitPreviewWatcherId = null;
+                                    return;
+                                }
+                                const now = Date.now();
+                                if (now - (window.__cpExitPreviewArmedAt || now) > 16000) {
+                                    window.__cpExitPreviewStage = 'IDLE';
+                                    clearInterval(exitPreviewWatcherId);
+                                    exitPreviewWatcherId = null;
+                                    return;
+                                }
+
+                                // 1. Chặn bàn phím ảo tự bật lên che nút Hủy/Cancel trong hộp thoại phản hồi
+                                const activeEl = document.activeElement;
+                                if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+                                    try { activeEl.blur(); } catch (e) {}
+                                }
+
+                                const dialogs = document.querySelectorAll('[role="dialog"], [aria-modal="true"]');
+                                let feedbackDialog = null;
+                                for (let d = 0; d < dialogs.length; d++) {
+                                    const dlg = dialogs[d];
+                                    const dTxt = (dlg.textContent || '').toLowerCase();
+                                    if (dTxt.includes('feedback') || dTxt.includes('phản hồi') || dTxt.includes('cancel') || dTxt.includes('hủy') || dTxt.includes('submit') || dTxt.includes('nộp')) {
+                                        feedbackDialog = dlg;
+                                        break;
+                                    }
+                                }
+
+                                if (stage === 'MODAL_OPENING') {
+                                    if (feedbackDialog) {
+                                        if (modalFoundAt === 0) modalFoundAt = now;
+                                        // Đợi 250ms để hộp thoại của React gắn xong sự kiện rồi tự động bấm nút Hủy (Cancel)
+                                        if (!autoClickedCancel && (now - modalFoundAt >= 250)) {
+                                            const btns = feedbackDialog.querySelectorAll('button, [role="button"]');
+                                            let cancelBtn = null;
+                                            let closeBtn = null;
+                                            for (let b = 0; b < btns.length; b++) {
+                                                const btn = btns[b];
+                                                const bTxt = ((btn.innerText || btn.textContent || '').trim()).toLowerCase();
+                                                const bAria = (btn.getAttribute('aria-label') || '').toLowerCase();
+                                                if (bTxt === 'cancel' || bTxt === 'hủy' || bTxt === 'huỷ') {
+                                                    cancelBtn = btn;
+                                                    break;
+                                                }
+                                                if (bAria.includes('close') || bAria.includes('đóng') || bTxt === '✕' || bTxt === '×') {
+                                                    closeBtn = btn;
+                                                }
+                                            }
+                                            const targetBtn = cancelBtn || closeBtn;
+                                            if (targetBtn) {
+                                                autoClickedCancel = true;
+                                                startExitPreviewOptOutPhase();
+                                                targetBtn.click();
+                                                return;
+                                            }
+                                        }
+                                    } else if (now - (window.__cpExitPreviewArmedAt || now) >= 900 && window.__cpExitPreviewInFlightFetches > 0) {
+                                        // Trường hợp trang bắt đầu gửi opt-out ngay mà không hiện hộp thoại
+                                        startExitPreviewOptOutPhase();
+                                    }
+                                    return;
+                                }
+
+                                if (stage === 'OPTING_OUT') {
+                                    const optElapsed = now - (window.__cpExitPreviewOptOutStartedAt || now);
+                                    if (optElapsed < 450) return;
+
+                                    // Kiểm tra số nút/liên kết hiển thị trên màn hình:
+                                    // Khi đang ở màn hình xoay logo Xbox toàn trang (Phase 1: 00:31-00:32 / 00:49-00:51),
+                                    // thanh đầu trang và thanh dưới đáy biến mất (visibleInteractive <= 2).
+                                    const interactives = document.querySelectorAll('header button, nav button, nav a, a[href="/"], button[aria-label]');
+                                    let visibleCount = 0;
+                                    for (let i = 0; i < interactives.length && visibleCount < 4; i++) {
+                                        const r = interactives[i].getBoundingClientRect ? interactives[i].getBoundingClientRect() : null;
+                                        if (r && r.width > 10 && r.height > 10) visibleCount++;
+                                    }
+                                    if (!feedbackDialog && visibleCount <= 2) {
+                                        window.__cpExitPreviewSawSpinner = true;
+                                    }
+
+                                    const urlChanged = location.href !== window.__cpExitPreviewStartHref && location.href.indexOf('/migrate') === -1;
+                                    const spinnerToSkeletonTransition = window.__cpExitPreviewSawSpinner && !feedbackDialog && visibleCount >= 2 && optElapsed >= 1100 && window.__cpExitPreviewInFlightFetches === 0;
+                                    const fetchDoneAfterSpinner = !feedbackDialog && window.__cpExitPreviewCompletedFetches > 0 && window.__cpExitPreviewInFlightFetches === 0 && optElapsed >= 1800;
+                                    const fallbackTimeout = !feedbackDialog && optElapsed >= 2900;
+
+                                    if ((urlChanged && optElapsed >= 650) || spinnerToSkeletonTransition || fetchDoneAfterSpinner || fallbackTimeout) {
+                                        commitExitPreviewNow();
+                                    }
+                                }
+                            } catch (wErr) {}
+                        }, 100);
+                    }
+
                     document.addEventListener('click', function(e) {
                         const target = e.target;
                         if (target) {
-                            const gameLink = target.closest('a[href*="/play/games/"], a[href*="/play/launch/"]');
+                            // Phát hiện thao tác bấm "Exit preview" / "Thoát xem trước" trên play.xbox.com
+                            if (location.hostname === 'play.xbox.com') {
+                                const menuOrBtn = target.closest('[role="menuitem"], [role="menuitemcheckbox"], [role="switch"], button, label, li, div');
+                                if (menuOrBtn) {
+                                    const rawMenuTxt = ((menuOrBtn.innerText || menuOrBtn.textContent || '') + ' ' + (menuOrBtn.getAttribute('aria-label') || '')).trim().toLowerCase();
+                                    if (rawMenuTxt.length < 90 && (rawMenuTxt.includes('exit preview') || rawMenuTxt.includes('thoát xem trước') || rawMenuTxt.includes('thoat xem truoc'))) {
+                                        window.__cpExitPreviewStage = 'MODAL_OPENING';
+                                        window.__cpExitPreviewArmedAt = Date.now();
+                                        window.__cpExitPreviewInFlightFetches = 0;
+                                        window.__cpExitPreviewCompletedFetches = 0;
+                                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_ARMED');
+                                        ensureExitPreviewWatcher();
+                                    } else if (window.__cpExitPreviewStage === 'MODAL_OPENING') {
+                                        const dlgBtn = target.closest('[role="dialog"] button, [aria-modal="true"] button, button');
+                                        if (dlgBtn) {
+                                            const bTxt = ((dlgBtn.innerText || dlgBtn.textContent || '').trim()).toLowerCase();
+                                            const bAria = (dlgBtn.getAttribute('aria-label') || '').toLowerCase();
+                                            if (bTxt === 'cancel' || bTxt === 'hủy' || bTxt === 'huỷ' || bTxt === 'submit' || bTxt === 'nộp' || bAria.includes('close') || bAria.includes('đóng') || bTxt === '✕' || bTxt === '×') {
+                                                startExitPreviewOptOutPhase();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            const gameLink = target.closest('a[href*="/play/games/"], a[href*="/play/launch/"], a[href*="/products/"]');
                             if (gameLink && gameLink.href) {
                                 reportActiveWebGame(gameLink.href, gameLink);
                             }
@@ -2797,6 +3041,13 @@ class XboxBridge(
     fun onRegionUnlockSignal(signal: String?) {
         if (!isCallerTrusted()) return
         val cleanSignal = signal?.trim()?.uppercase() ?: return
+        if (cleanSignal.startsWith("EXIT_PREVIEW_")) {
+            Log.d(TAG, "Exit preview signal: $cleanSignal")
+            scope.launch(Dispatchers.Main) {
+                exitPreviewSignalListener?.invoke(cleanSignal)
+            }
+            return
+        }
         Log.d(TAG, "Region unlock signal: $cleanSignal")
         VpnManager.onUnlockSignalReceived(cleanSignal)
     }

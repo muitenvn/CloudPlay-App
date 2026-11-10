@@ -76,16 +76,13 @@ private val COCKPIT_BTN_SHAPE = RoundedCornerShape(10.dp)
 
 @Composable
 internal fun HeroConsolePlayDeck(
-    vpnState: VpnConnectionState,
+    @Suppress("UNUSED_PARAMETER") vpnState: VpnConnectionState,
     @Suppress("UNUSED_PARAMETER") gamepadStatus: GamepadStatus,
     onOpenXboxCloud: () -> Unit,
     onLaunchFortnite: () -> Unit,
     @Suppress("UNUSED_PARAMETER") onNavigateToSettings: () -> Unit,
     onOpenGuide: () -> Unit
 ) {
-    val isConnected = vpnState.mode != NetworkMode.DISCONNECTED
-    val borderColor = if (isConnected) XboxNeonGreen.copy(alpha = 0.5f) else XboxCardBorder
-
     val context = androidx.compose.ui.platform.LocalContext.current
     val heroBannerRequest = remember(context) {
         coil.request.ImageRequest.Builder(context)
@@ -101,14 +98,14 @@ internal fun HeroConsolePlayDeck(
             .fillMaxWidth()
             .clip(HERO_CARD_SHAPE)
             .background(XboxSurface, HERO_CARD_SHAPE)
-            .border(1.dp, borderColor, HERO_CARD_SHAPE)
+            .border(1.dp, XboxCardBorder, HERO_CARD_SHAPE)
             .testTag("hero_console_play_deck")
     ) {
         coil.compose.AsyncImage(
             model = heroBannerRequest,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alpha = 0.25f,
+            alpha = 0.22f,
             modifier = Modifier
                 .fillMaxWidth()
                 .matchParentSize()
@@ -117,8 +114,8 @@ internal fun HeroConsolePlayDeck(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -145,7 +142,7 @@ internal fun HeroConsolePlayDeck(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .background(XboxSurfaceVariant, CircleShape)
                             .border(1.dp, XboxCardBorder, CircleShape),
                         contentAlignment = Alignment.Center
@@ -168,8 +165,8 @@ internal fun HeroConsolePlayDeck(
                     onClick = onOpenXboxCloud,
                     modifier = Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp)
-                        .height(48.dp)
+                        .defaultMinSize(minHeight = 50.dp)
+                        .height(50.dp)
                         .testTag("hero_launch_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XboxGreen,
@@ -182,13 +179,13 @@ internal fun HeroConsolePlayDeck(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.btn_launch_xcloud),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 13.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
@@ -198,8 +195,8 @@ internal fun HeroConsolePlayDeck(
                     onClick = onLaunchFortnite,
                     modifier = Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 48.dp)
-                        .height(48.dp)
+                        .defaultMinSize(minHeight = 50.dp)
+                        .height(50.dp)
                         .testTag("hero_launch_fortnite_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EpicBlue,
@@ -212,13 +209,13 @@ internal fun HeroConsolePlayDeck(
                         imageVector = Icons.Default.Bolt,
                         contentDescription = null,
                         tint = GoldStar,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.btn_play_fortnite),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 13.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
@@ -268,15 +265,14 @@ internal fun QuickNetworkCockpitCard(
         activeBars == 2 -> WarningAmber
         else -> JapanRed
     }
-    val borderColor = if (isConnected) XboxNeonGreen.copy(alpha = 0.45f) else XboxCardBorder
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(COCKPIT_CARD_SHAPE)
             .background(XboxSurface, COCKPIT_CARD_SHAPE)
-            .border(1.dp, borderColor, COCKPIT_CARD_SHAPE)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .border(1.dp, XboxCardBorder, COCKPIT_CARD_SHAPE)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
             .testTag("network_cockpit_card"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -301,7 +297,7 @@ internal fun QuickNetworkCockpitCard(
                     text = vpnState.currentServer.name,
                     color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 13.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -313,7 +309,7 @@ internal fun QuickNetworkCockpitCard(
                         config.tr("Chạm để đổi máy chủ", "Tap to switch server")
                     },
                     color = TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -374,13 +370,13 @@ internal fun QuickNetworkCockpitCard(
                 imageVector = if (isConnected) Icons.Default.CheckCircle else Icons.Default.VpnKey,
                 contentDescription = null,
                 tint = if (isConnected) XboxNeonGreen else Color.White,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(17.dp)
             )
             Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = if (isConnected) stringResource(R.string.btn_switch_direct) else stringResource(R.string.btn_enable_vpn),
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 12.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 maxLines = 1

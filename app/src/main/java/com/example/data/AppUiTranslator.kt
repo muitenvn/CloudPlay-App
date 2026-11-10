@@ -966,11 +966,12 @@ object AppUiTranslator {
                 "fr" -> "États-Unis"; "de" -> "USA"; "ru" -> "США"; "th" -> "สหรัฐฯ"; "id" -> "AS"
                 else -> en
             }
-            "Third-party public servers • Use for Xbox region unlock only, not for sensitive accounts/data." -> return when (lang) {
-                "zh" -> "第三方公共节点 • 仅用于解锁 Xbox 地区，请勿传输敏感数据。"; "ja" -> "第三者公開サーバー • Xboxの地域解除のみに使用し、機密通信には使わないでください。"; "ko" -> "타사 공개 서버 • Xbox 지역 잠금 해제용으로만 사용하고 민감한 정보는 피하세요."
-                "es" -> "Servidores públicos de terceros • Solo para desbloquear Xbox, no para datos sensibles."; "pt" -> "Servidores públicos de terceiros • Use apenas para desbloquear o Xbox, não para dados sensíveis."
-                "fr" -> "Serveurs publics tiers • Uniquement pour débloquer Xbox, pas pour des données sensibles."; "de" -> "Öffentliche Drittanbieter-Server • Nur zur Xbox-Regionsfreischaltung nutzen, nicht für sensible Daten."
-                "ru" -> "Публичные серверы • Используйте только для разблокировки Xbox, не для важных данных."; "th" -> "เซิร์ฟเวอร์สาธารณะ • ใช้เพื่อปลดล็อกโซน Xbox เท่านั้น ไม่ควรใช้กับข้อมูลสำคัญ"; "id" -> "Server publik pihak ketiga • Gunakan hanya untuk buka kunci wilayah Xbox, bukan data sensitif."
+            "Third-party public servers • Use for Xbox region unlock only, not for sensitive accounts/data.",
+            "⚠️ Public proxies: use for Xbox unlock only, not sensitive data." -> return when (lang) {
+                "zh" -> "⚠️ 公共节点仅用于解锁 Xbox 地区，请勿传输敏感数据。"; "ja" -> "⚠️ 公開サーバーはXboxの地域解除のみに使用し、機密通信は避けてください。"; "ko" -> "⚠️ 공개 서버는 Xbox 지역 해제용으로만 사용하고 민감한 정보는 피하세요."
+                "es" -> "⚠️ Proxies públicos: solo para desbloquear Xbox, no para datos sensibles."; "pt" -> "⚠️ Proxies públicos: use apenas para desbloquear o Xbox, não dados sensíveis."
+                "fr" -> "⚠️ Proxys publics : uniquement pour débloquer Xbox, pas pour données sensibles."; "de" -> "⚠️ Öffentliche Proxys: nur zur Xbox-Regionsfreischaltung nutzen."
+                "ru" -> "⚠️ Публичные прокси: только для разблокировки Xbox, не для важных данных."; "th" -> "⚠️ พร็อกซีสาธารณะ: ใช้ปลดล็อกโซน Xbox เท่านั้น อย่าใช้กับข้อมูลสำคัญ"; "id" -> "⚠️ Proxy publik: gunakan hanya untuk buka wilayah Xbox, bukan data sensitif."
                 else -> en
             }
             "Untested unlock", "Untested" -> return when (lang) {
@@ -1053,9 +1054,9 @@ object AppUiTranslator {
                 "fr" -> "Ping VPN ➔ Session"; "de" -> "VPN-Ping ➔ Sitzung"; "ru" -> "Пинг VPN ➔ Сессия"; "th" -> "ปิง VPN ➔ ในเกม"; "id" -> "Ping VPN ➔ Sesi"
                 else -> en
             }
-            "Auto-Off VPN in game" -> return when (lang) {
-                "zh" -> "进游戏自动关闭 VPN"; "ja" -> "ゲーム開始時にVPN自動オフ"; "ko" -> "게임 진입 시 VPN 자동 끄기"; "es" -> "Apagar VPN al entrar"; "pt" -> "Desligar VPN no jogo"
-                "fr" -> "Couper VPN en jeu"; "de" -> "VPN im Spiel auto-aus"; "ru" -> "Авто-откл. VPN в игре"; "th" -> "ปิด VPN อัตโนมัติเมื่อเข้าเกม"; "id" -> "Matikan VPN saat main"
+            "Auto-Off VPN in game", "Auto-Off VPN" -> return when (lang) {
+                "zh" -> "自动关 VPN"; "ja" -> "VPN自動オフ"; "ko" -> "VPN 자동 끄기"; "es" -> "Apagar VPN"; "pt" -> "Desligar VPN"
+                "fr" -> "Couper VPN"; "de" -> "VPN auto-aus"; "ru" -> "Авто-откл. VPN"; "th" -> "ปิด VPN อัตโนมัติ"; "id" -> "Matikan VPN"
                 else -> en
             }
             "75% Session • 25% Unlock" -> return when (lang) {
@@ -1063,9 +1064,9 @@ object AppUiTranslator {
                 "fr" -> "75% Session • 25% Déblocage"; "de" -> "75% Sitzung • 25% Freisch."; "ru" -> "75% Сессия • 25% Разблок."; "th" -> "75% ปิงในเกม • 25% ปลดล็อก"; "id" -> "75% Sesi • 25% Buka Kunci"
                 else -> en
             }
-            "Keep VPN on in game" -> return when (lang) {
-                "zh" -> "游玩时保持开启 VPN"; "ja" -> "プレイ中もVPNを維持"; "ko" -> "게임 중 VPN 계속 유지"; "es" -> "Mantener VPN en juego"; "pt" -> "Manter VPN ligado"
-                "fr" -> "Garder VPN en jeu"; "de" -> "VPN im Spiel anlassen"; "ru" -> "Держать VPN включённым"; "th" -> "เปิด VPN ตลอดขณะเล่น"; "id" -> "Tetap nyalakan VPN"
+            "Keep VPN on in game", "Keep VPN on" -> return when (lang) {
+                "zh" -> "保持开启 VPN"; "ja" -> "VPNを維持"; "ko" -> "VPN 계속 유지"; "es" -> "Mantener VPN"; "pt" -> "Manter VPN"
+                "fr" -> "Garder VPN"; "de" -> "VPN anlassen"; "ru" -> "Держать VPN"; "th" -> "เปิด VPN ตลอด"; "id" -> "Tetap VPN"
                 else -> en
             }
             "75% VPN Ping • 25% Session" -> return when (lang) {

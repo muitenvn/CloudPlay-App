@@ -630,7 +630,7 @@ fun ServersScreen(
                         Text(
                             text = "${vpnState.unlockFailPromptServer?.flag ?: ""} ${vpnState.unlockFailPromptServer?.name ?: ""}",
                             color = JapanRed,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     }
                     Row(
@@ -706,7 +706,7 @@ fun ServersScreen(
             }
             val currentPingText = when {
                 isGameActiveOnSelected -> {
-                    if (streamTelemetry.rttMs > 0) "RTT WebRTC: ${streamTelemetry.rttMs}ms" else "RTT WebRTC: --"
+                    if (streamTelemetry.rttMs > 0) "RTT: ${streamTelemetry.rttMs}ms" else "RTT: --"
                 }
                 currentMeasurement != null && currentMeasurement.status != ServerPingStatus.UNTESTED -> {
                     currentMeasurement.formatDisplayBadge(isEn, showPort = false)
@@ -724,51 +724,42 @@ fun ServersScreen(
                     .clip(headerCardShape)
                     .background(XboxSurface, headerCardShape)
                     .border(1.dp, XboxCardBorder, headerCardShape)
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Row 1: Selected Server + Auto Best button
+                // Row 1: Selected Server + Auto Best button + Add Custom button
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(modeChipShape)
-                        .background(XboxSurfaceVariant.copy(alpha = 0.6f), modeChipShape)
-                        .border(0.8.dp, XboxCardBorder, modeChipShape)
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .defaultMinSize(minHeight = 48.dp)
+                            .clip(modeChipShape)
+                            .background(XboxSurfaceVariant.copy(alpha = 0.6f), modeChipShape)
+                            .border(0.8.dp, XboxCardBorder, modeChipShape)
                             .clickable { detailServer = currentServer }
-                            .padding(end = 8.dp)
+                            .padding(horizontal = 9.dp, vertical = 5.dp)
                             .testTag("header_selected_server_pill"),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "${currentServer.flag} ${currentServer.name}",
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Text(
-                                text = currentUnlockText,
-                                color = currentUnlockColor,
+                                text = "${currentServer.flag} ${currentServer.name}",
+                                color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
-                            Text(text = "•", color = TextSecondary, fontSize = 11.sp)
+                            Text(text = "•", color = TextSecondary, fontSize = 12.sp)
                             Text(
                                 text = currentPingText,
                                 color = if (currentMeasurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY) {
@@ -779,10 +770,9 @@ fun ServersScreen(
                                     DirectCyan
                                 },
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                maxLines = 1
                             )
                         }
                         val selectionReasonText = remember(
@@ -804,10 +794,10 @@ fun ServersScreen(
                             )
                         }
                         Text(
-                            text = selectionReasonText,
-                            color = TextSecondary,
+                            text = "$currentUnlockText • $selectionReasonText",
+                            color = currentUnlockColor,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.5.sp,
+                            fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
@@ -819,7 +809,7 @@ fun ServersScreen(
                                 text = activeProbeEstimate.formatLabel(isEn),
                                 color = WarningAmber,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.testTag("globalping_estimate_label")
@@ -832,8 +822,7 @@ fun ServersScreen(
                             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                             .height(48.dp)
                             .clip(modeChipShape)
-                            .background(XboxGreen.copy(alpha = 0.22f), modeChipShape)
-                            .border(0.8.dp, XboxNeonGreen.copy(alpha = 0.6f), modeChipShape)
+                            .background(XboxGreen, modeChipShape)
                             .clickable(enabled = !isTestingAll) {
                                 com.example.data.AppLogger.info("UI", "Bấm nút Chọn tối ưu (trên tab Máy chủ)")
                                 android.widget.Toast.makeText(
@@ -847,20 +836,20 @@ fun ServersScreen(
                                     reason = "bấm nút Chọn tối ưu (trên tab Máy chủ)"
                                 )
                             }
-                            .padding(horizontal = 12.dp)
+                            .padding(horizontal = 11.dp)
                             .testTag("auto_pick_best_server_button"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         if (isTestingAll) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(14.dp),
-                                color = XboxNeonGreen,
+                                color = Color.White,
                                 strokeWidth = 1.8.dp
                             )
                             Text(
                                 text = config.tr("Đang chọn...", "Selecting..."),
-                                color = XboxNeonGreen,
+                                color = Color.White,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -870,12 +859,12 @@ fun ServersScreen(
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
-                                tint = XboxNeonGreen,
+                                tint = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = config.tr("Chọn tối ưu", "Auto Best"),
-                                color = XboxNeonGreen,
+                                color = Color.White,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -883,15 +872,85 @@ fun ServersScreen(
                             )
                         }
                     }
+
+                    Row(
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
+                            .clip(modeChipShape)
+                            .background(XboxSurfaceElevated, modeChipShape)
+                            .border(1.dp, XboxCardBorder, modeChipShape)
+                            .clickable { showCustomDialog = true }
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = config.tr("Thêm proxy riêng", "Add Custom"),
+                            tint = TextPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Proxy",
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
                 }
 
-                // Row 2: Compact 2-pill VPN Mode Selector
+                // Row 2: Ping Test button + 2 VPN Mode Selector chips
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("v130_smart_routing_algorithm_card"),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Button(
+                        onClick = {
+                            com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
+                            testAllServers(
+                                autoPickBest = false,
+                                forceRefresh = true,
+                                reason = "bấm nút Đo ping (trên tab Máy chủ)"
+                            )
+                        },
+                        enabled = !isTestingAll,
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
+                            .testTag("ping_test_all_button"),
+                        contentPadding = PaddingValues(horizontal = 11.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        shape = modeChipShape
+                    ) {
+                        if (isTestingAll) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 1.8.dp)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = config.tr("Đang đo...", "Pinging..."),
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
+                        } else {
+                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = config.tr("Đo ping", "Ping Test"),
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
                     val isAutoOff = config.autoBypassEnabled
                     Box(
                         modifier = Modifier
@@ -919,12 +978,12 @@ fun ServersScreen(
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
-                            .padding(horizontal = 8.dp)
+                            .padding(horizontal = 6.dp)
                             .testTag("mode_auto_off_distance_first_chip"),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = config.tr("Tự tắt VPN khi vào game", "Auto-Off VPN in game"),
+                            text = config.tr("Tự tắt VPN", "Auto-Off VPN"),
                             color = if (isAutoOff) XboxNeonGreen else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 12.sp,
@@ -960,88 +1019,18 @@ fun ServersScreen(
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
-                            .padding(horizontal = 8.dp)
+                            .padding(horizontal = 6.dp)
                             .testTag("mode_keep_vpn_ping_first_chip"),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = config.tr("Bật VPN luôn khi chơi", "Keep VPN on in game"),
+                            text = config.tr("Giữ VPN luôn", "Keep VPN on"),
                             color = if (!isAutoOff) XboxNeonGreen else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontSize = 12.sp,
                             fontWeight = if (!isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                // Row 3: Action buttons (Ping Test + Add Custom)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = {
-                            com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
-                            testAllServers(
-                                autoPickBest = false,
-                                forceRefresh = true,
-                                reason = "bấm nút Đo ping (trên tab Máy chủ)"
-                            )
-                        },
-                        enabled = !isTestingAll,
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .height(48.dp)
-                            .testTag("ping_test_all_button"),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        if (isTestingAll) {
-                            CircularProgressIndicator(modifier = Modifier.size(15.dp), color = Color.White, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = config.tr("Đang đo ping...", "Pinging..."),
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
-                        } else {
-                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = config.tr("Đo ping", "Ping Test"),
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = { showCustomDialog = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .height(48.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = config.tr("Thêm proxy riêng", "Add Custom"),
-                            color = XboxNeonGreen,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1
                         )
                     }
                 }
@@ -1191,23 +1180,22 @@ fun ServersScreen(
             }
         }
 
-        // Cảnh báo ngắn cạnh phần máy chủ công cộng
+        // Cảnh báo ngắn 1 dòng cạnh phần máy chủ công cộng
         item(key = "public_proxy_third_party_warning") {
             Text(
                 text = config.tr(
-                    "Máy chủ công cộng do bên thứ ba vận hành • Chỉ dùng mở vùng Xbox, không nhập dữ liệu nhạy cảm khác.",
-                    "Third-party public servers • Use for Xbox region unlock only, not for sensitive accounts/data."
+                    "⚠️ Proxy công cộng chỉ dùng mở vùng Xbox, không nhập dữ liệu nhạy cảm.",
+                    "⚠️ Public proxies: use for Xbox unlock only, not sensitive data."
                 ),
                 color = WarningAmber,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF141108), modeChipShape)
-                    .border(0.8.dp, WarningAmber.copy(alpha = 0.45f), modeChipShape)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
                     .testTag("public_proxy_warning_banner")
             )
         }

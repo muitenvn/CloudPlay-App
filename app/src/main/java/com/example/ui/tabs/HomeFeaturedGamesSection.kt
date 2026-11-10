@@ -144,10 +144,10 @@ internal fun FeaturedGamesSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = 56.dp)
+                    .defaultMinSize(minHeight = 58.dp)
                     .clip(QUICK_RESUME_SHAPE)
                     .background(XboxSurfaceVariant, QUICK_RESUME_SHAPE)
-                    .border(1.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_SHAPE)
+                    .border(1.dp, XboxCardBorder, QUICK_RESUME_SHAPE)
                     .clickable { onLaunchBookmark(lastPlayedGame) }
                     .padding(horizontal = 11.dp, vertical = 8.dp)
                     .testTag("continue_last_game_button"),
@@ -161,7 +161,7 @@ internal fun FeaturedGamesSection(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .background(DirectCyan.copy(alpha = 0.14f), QUICK_RESUME_ICON_SHAPE)
                             .border(0.8.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_ICON_SHAPE),
                         contentAlignment = Alignment.Center
@@ -170,7 +170,7 @@ internal fun FeaturedGamesSection(
                             imageVector = Icons.Default.Gamepad,
                             contentDescription = null,
                             tint = DirectCyan,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                     Column(
@@ -181,14 +181,14 @@ internal fun FeaturedGamesSection(
                             text = config.tr("CHƠI TIẾP NGAY", "QUICK RESUME"),
                             color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 9.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = lastPlayedGame.title,
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 13.5.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -197,9 +197,9 @@ internal fun FeaturedGamesSection(
                 }
                 Row(
                     modifier = Modifier
-                        .defaultMinSize(minHeight = 40.dp)
+                        .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
                         .background(XboxGreen, VIEW_ALL_SHAPE)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -207,13 +207,13 @@ internal fun FeaturedGamesSection(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                     Text(
                         text = stringResource(R.string.btn_continue_game),
                         color = Color.White,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -288,23 +288,30 @@ internal fun FeaturedGamesSection(
             }
         } else {
             val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(start = 1.dp, end = 8.dp)
-            ) {
-                items(
-                    items = featuredGames,
-                    key = { it.id },
-                    contentType = { "featured_game_card" }
-                ) { game ->
-                    FeaturedGameCard(
-                        game = game,
-                        isFavorite = game.id in favoriteIds,
-                        isEn = isEn,
-                        isImportingCatalog = isImportingCatalog,
-                        onToggleFavorite = { onToggleFavorite(game) },
-                        onLaunch = { onLaunchBookmark(game) }
-                    )
+            val gridRows = remember(featuredGames) {
+                featuredGames.take(6).chunked(2)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                gridRows.forEach { rowGames ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowGames.forEach { game ->
+                            FeaturedGameCard(
+                                game = game,
+                                isFavorite = game.id in favoriteIds,
+                                isEn = isEn,
+                                isImportingCatalog = isImportingCatalog,
+                                onToggleFavorite = { onToggleFavorite(game) },
+                                onLaunch = { onLaunchBookmark(game) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowGames.size == 1) {
+                            Box(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         }
@@ -318,7 +325,8 @@ internal fun FeaturedGameCard(
     isEn: Boolean,
     isImportingCatalog: Boolean,
     onToggleFavorite: () -> Unit,
-    onLaunch: () -> Unit
+    onLaunch: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
@@ -328,8 +336,7 @@ internal fun FeaturedGameCard(
     }
 
     Column(
-        modifier = Modifier
-            .width(142.dp)
+        modifier = modifier
             .clip(GAME_CARD_SHAPE)
             .background(XboxSurface, GAME_CARD_SHAPE)
             .border(1.dp, XboxCardBorder, GAME_CARD_SHAPE)
@@ -339,7 +346,7 @@ internal fun FeaturedGameCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(96.dp)
+                .height(92.dp)
                 .background(XboxSurfaceVariant)
         ) {
             if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
@@ -388,7 +395,7 @@ internal fun FeaturedGameCard(
                     text = localizedBadge,
                     color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -407,7 +414,7 @@ internal fun FeaturedGameCard(
                         .padding(5.dp)
                         .background(Color(0xCC060B08), CircleShape)
                         .padding(4.dp)
-                        .size(12.dp)
+                        .size(13.dp)
                 )
             }
 
@@ -422,7 +429,7 @@ internal fun FeaturedGameCard(
                 Box(
                     modifier = Modifier
                         .padding(5.dp)
-                        .size(28.dp)
+                        .size(30.dp)
                         .background(Color(0xCC060B08), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
@@ -430,7 +437,7 @@ internal fun FeaturedGameCard(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isEn) "Favorite" else "Yêu thích",
                         tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.85f),
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -438,13 +445,13 @@ internal fun FeaturedGameCard(
 
         Column(
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = game.title,
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 12.5.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -458,7 +465,7 @@ internal fun FeaturedGameCard(
                 Text(
                     text = localizedCategory,
                     color = TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -474,13 +481,13 @@ internal fun FeaturedGameCard(
                         imageVector = Icons.Default.Star,
                         contentDescription = null,
                         tint = GoldStar,
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = game.rating,
                         color = TextSecondary,
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 10.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

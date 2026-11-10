@@ -151,39 +151,27 @@ internal fun ServerCard(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     if (isRecommended) {
                         Text(
                             text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
                             color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 9.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.ExtraBold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(DirectCyan.copy(alpha = 0.16f), BADGE_SHAPE)
-                                .padding(horizontal = 4.5.dp, vertical = 1.dp)
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
                         )
                     }
-                    Text(
-                        text = server.protocol.uppercase(),
-                        color = XboxNeonGreen,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        softWrap = false,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .background(XboxGreen.copy(alpha = 0.2f), BADGE_SHAPE)
-                            .padding(horizontal = 4.5.dp, vertical = 1.dp)
-                    )
                     Text(
                         text = unlockLabel,
                         color = unlockBadgeColor,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 9.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1,
@@ -196,25 +184,26 @@ internal fun ServerCard(
                             text = if (isEn) "Too far" else "Quá xa",
                             color = WarningAmber,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 9.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(WarningAmber.copy(alpha = 0.14f), BADGE_SHAPE)
-                                .padding(horizontal = 4.5.dp, vertical = 1.dp)
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
                         )
                     }
                 }
 
-                val subtitleText = precomputedSubtitle ?: remember(server.id, distanceKm, isEn) {
+                val baseSubtitle = precomputedSubtitle ?: remember(server.id, distanceKm, isEn) {
                     val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
                     "${server.localizedDescription(isEn)}$distLabel • ${server.ip}"
                 }
+                val subtitleText = "${server.protocol.uppercase()} • $baseSubtitle"
                 Text(
                     text = subtitleText,
                     color = TextSecondary,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("server_card_subtitle_${server.id}")
@@ -272,7 +261,7 @@ internal fun ServerCard(
                         color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else TextSecondary,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (pingMs <= 0) 11.sp else 12.sp,
+                        fontSize = if (pingMs <= 0) 12.sp else 13.sp,
                         maxLines = 1
                     )
                 }
@@ -290,19 +279,19 @@ internal fun ServerCard(
                     if (isSelected) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = secondaryStatusText,
                                 color = if (isFallbackPortOnly) WarningAmber else XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
@@ -312,7 +301,7 @@ internal fun ServerCard(
                             text = secondaryStatusText,
                             color = if (isFallbackPortOnly || isUnstablePing) WarningAmber else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             maxLines = 1
                         )
                     }

@@ -234,7 +234,7 @@ fun DashboardScreen(
                                         NetworkMode.DISCONNECTED -> config.tr("Sẵn sàng", "Ready")
                                     },
                                     color = statusColor,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -713,8 +713,8 @@ private fun ConsoleFloatingNavigationDock(
                     ) {
                         Box(
                             modifier = Modifier
-                                .width(64.dp)
-                                .height(25.dp),
+                                .width(72.dp)
+                                .height(26.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -728,7 +728,7 @@ private fun ConsoleFloatingNavigationDock(
                                     text = if (gamesCount > 99) "99+" else "$gamesCount",
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 10.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
@@ -739,7 +739,7 @@ private fun ConsoleFloatingNavigationDock(
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(end = 12.dp)
+                                        .padding(end = 14.dp)
                                         .size(7.dp)
                                         .clip(CircleShape)
                                         .background(XboxNeonGreen)

@@ -941,14 +941,14 @@ object AppUiTranslator {
                 "fr" -> "Réseau direct"; "de" -> "Direktnetz"; "ru" -> "Прямая сеть"; "th" -> "เครือข่ายตรง"; "id" -> "Jaringan Langsung"
                 else -> en
             }
-            "Tap to switch server" -> return when (lang) {
-                "zh" -> "点击切换节点"; "ja" -> "タップしてサーバー切替"; "ko" -> "탭하여 서버 변경"; "es" -> "Toca para cambiar"; "pt" -> "Toque para trocar"
-                "fr" -> "Toucher pour changer"; "de" -> "Tippen zum Wechseln"; "ru" -> "Нажмите для смены"; "th" -> "แตะเพื่อเปลี่ยนเซิร์ฟเวอร์"; "id" -> "Ketuk untuk ganti server"
+            "Tap to switch server", "Switch server ▸", "Switch ▸" -> return when (lang) {
+                "zh" -> "切换节点 ▸"; "ja" -> "サーバー切替 ▸"; "ko" -> "서버 변경 ▸"; "es" -> "Cambiar ▸"; "pt" -> "Trocar ▸"
+                "fr" -> "Changer ▸"; "de" -> "Wechseln ▸"; "ru" -> "Сменить ▸"; "th" -> "เปลี่ยน ▸"; "id" -> "Ganti ▸"
                 else -> en
             }
-            "WebRTC • Tap to switch" -> return when (lang) {
-                "zh" -> "WebRTC • 点击切换"; "ja" -> "WebRTC • タップで切替"; "ko" -> "WebRTC • 탭하여 변경"; "es" -> "WebRTC • Toca para cambiar"; "pt" -> "WebRTC • Toque para trocar"
-                "fr" -> "WebRTC • Changer"; "de" -> "WebRTC • Wechseln"; "ru" -> "WebRTC • Сменить"; "th" -> "WebRTC • แตะเพื่อเปลี่ยน"; "id" -> "WebRTC • Ketuk untuk ganti"
+            "WebRTC • Tap to switch", "WebRTC • Switch ▸" -> return when (lang) {
+                "zh" -> "WebRTC • 切换 ▸"; "ja" -> "WebRTC • 切替 ▸"; "ko" -> "WebRTC • 변경 ▸"; "es" -> "WebRTC • Cambiar ▸"; "pt" -> "WebRTC • Trocar ▸"
+                "fr" -> "WebRTC • Changer ▸"; "de" -> "WebRTC • Wechseln ▸"; "ru" -> "WebRTC • Сменить ▸"; "th" -> "WebRTC • เปลี่ยน ▸"; "id" -> "WebRTC • Ganti ▸"
                 else -> en
             }
             "Japan" -> return when (lang) {
@@ -989,7 +989,7 @@ object AppUiTranslator {
                 "fr" -> "Trop loin"; "de" -> "Zu weit"; "ru" -> "Далеко"; "th" -> "ไกลเกินไป"; "id" -> "Terlalu jauh"
                 else -> en
             }
-            "Unreachable" -> return when (lang) {
+            "Unreachable", "Offline" -> return when (lang) {
                 "zh" -> "无法连接"; "ja" -> "接続不可"; "ko" -> "연결 불가"; "es" -> "Inaccesible"; "pt" -> "Inacessível"
                 "fr" -> "Injoignable"; "de" -> "Nicht erreichbar"; "ru" -> "Недоступен"; "th" -> "เชื่อมต่อไม่ได้"; "id" -> "Tidak terjangkau"
                 else -> en

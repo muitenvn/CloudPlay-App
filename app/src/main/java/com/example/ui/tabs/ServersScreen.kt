@@ -583,19 +583,20 @@ fun ServersScreen(
                     Button(
                         onClick = { onSelectServer(fasterServer) },
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
+                            .defaultMinSize(minHeight = 36.dp)
                             .testTag("select_faster_server_button")
                     ) {
                         Text(
                             text = if (isEn) "Select" else "Chọn",
                             color = Color.White,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -630,7 +631,7 @@ fun ServersScreen(
                         Text(
                             text = "${vpnState.unlockFailPromptServer?.flag ?: ""} ${vpnState.unlockFailPromptServer?.name ?: ""}",
                             color = JapanRed,
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp
                         )
                     }
                     Row(
@@ -645,31 +646,32 @@ fun ServersScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                .height(48.dp)
+                                .defaultMinSize(minHeight = 36.dp)
                                 .testTag("confirm_switch_best_server_button")
                         ) {
                             Text(
-                                text = if (isEn) "Switch server" else "Chuyển máy chủ",
+                                text = if (isEn) "Switch" else "Đổi",
                                 color = Color.White,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                         TextButton(
                             onClick = { VpnManager.dismissUnlockFailPrompt() },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            modifier = Modifier
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                .height(48.dp)
+                            modifier = Modifier.defaultMinSize(minHeight = 36.dp)
                         ) {
                             Text(
                                 text = if (isEn) "Dismiss" else "Đóng",
                                 color = TextSecondary,
-                                fontSize = 12.sp
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -713,325 +715,322 @@ fun ServersScreen(
                 }
                 hasTriedCurrentPing && currentPingMs > 0 -> "${currentPingMs}ms"
                 isTestingAll -> config.tr("Đang đo...", "Testing...")
-                hasTriedCurrentPing && currentPingMs <= 0 -> config.tr("Không đo được", "Unreachable")
-                isSmartBypassEngine && currentPingMs > 0 -> config.tr("Phiên trước: ${currentPingMs}ms", "Last session: ${currentPingMs}ms")
-                else -> config.tr("Chưa đo", "Not tested")
+                hasTriedCurrentPing && currentPingMs <= 0 -> config.tr("Không phản hồi", "Offline")
+                isSmartBypassEngine && currentPingMs > 0 -> "${currentPingMs}ms"
+                else -> config.tr("Chưa đo", "Untested")
             }
 
-            Column(
+            androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(headerCardShape)
                     .background(XboxSurface, headerCardShape)
                     .border(1.dp, XboxCardBorder, headerCardShape)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(8.dp)
             ) {
-                // Row 1: Selected Server + Auto Best button + Add Custom button
-                Row(
+                val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
+                val effectiveWidthDp = maxWidth.value / fontScale
+                val isNarrowHeader = maxWidth < 345.dp || effectiveWidthDp < 310f
+
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .clip(modeChipShape)
-                            .background(XboxSurfaceVariant.copy(alpha = 0.6f), modeChipShape)
-                            .border(0.8.dp, XboxCardBorder, modeChipShape)
-                            .clickable { detailServer = currentServer }
-                            .padding(horizontal = 9.dp, vertical = 5.dp)
-                            .testTag("header_selected_server_pill"),
-                        verticalArrangement = Arrangement.Center
+                    // Row 1: Selected Server (Dòng 1: tên đầy đủ; Dòng 2: ping + trạng thái) + Chọn tối ưu + Thêm Proxy
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 38.dp)
+                                .clip(modeChipShape)
+                                .background(XboxSurfaceVariant.copy(alpha = 0.6f), modeChipShape)
+                                .border(0.8.dp, XboxCardBorder, modeChipShape)
+                                .clickable { detailServer = currentServer }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("header_selected_server_pill"),
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Text(
                                 text = "${currentServer.flag} ${currentServer.name}",
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 13.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Text(text = "•", color = TextSecondary, fontSize = 12.sp)
-                            Text(
-                                text = currentPingText,
-                                color = if (currentMeasurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY) {
-                                    WarningAmber
-                                } else if (currentPingMs in 1..99) {
-                                    XboxNeonGreen
-                                } else {
-                                    DirectCyan
-                                },
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                        }
-                        val selectionReasonText = remember(
-                            currentServer.id,
-                            isEn,
-                            vpnState.detectedGeoIp,
-                            serverMeasurements[currentServer.id],
-                            serverPings[currentServer.id],
-                            recentSessions,
-                            vpnState.userManuallySelectedServer
-                        ) {
-                            VpnManager.buildServerSelectionReasonText(
-                                server = currentServer,
-                                isEn = isEn,
-                                geo = vpnState.detectedGeoIp,
-                                measurementsMap = serverMeasurements,
-                                pingMap = serverPings,
-                                sessions = recentSessions
-                            )
-                        }
-                        Text(
-                            text = "$currentUnlockText • $selectionReasonText",
-                            color = currentUnlockColor,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .testTag("selected_server_reason_label")
-                                .semantics { contentDescription = selectionReasonText }
-                        )
-                        if (config.enableGlobalpingProbe && activeProbeEstimate != null) {
-                            Text(
-                                text = activeProbeEstimate.formatLabel(isEn),
-                                color = WarningAmber,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.testTag("globalping_estimate_label")
-                            )
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
-                            .clip(modeChipShape)
-                            .background(XboxGreen, modeChipShape)
-                            .clickable(enabled = !isTestingAll) {
-                                com.example.data.AppLogger.info("UI", "Bấm nút Chọn tối ưu (trên tab Máy chủ)")
-                                android.widget.Toast.makeText(
-                                    context,
-                                    config.tr("⚡ Đang đo ping và chọn máy chủ tối ưu...", "⚡ Measuring ping & selecting best server..."),
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                                testAllServers(
-                                    autoPickBest = true,
-                                    forceRefresh = true,
-                                    reason = "bấm nút Chọn tối ưu (trên tab Máy chủ)"
+                            val selectionReasonText = remember(
+                                currentServer.id,
+                                isEn,
+                                vpnState.detectedGeoIp,
+                                serverMeasurements[currentServer.id],
+                                serverPings[currentServer.id],
+                                recentSessions,
+                                vpnState.userManuallySelectedServer
+                            ) {
+                                VpnManager.buildServerSelectionReasonText(
+                                    server = currentServer,
+                                    isEn = isEn,
+                                    geo = vpnState.detectedGeoIp,
+                                    measurementsMap = serverMeasurements,
+                                    pingMap = serverPings,
+                                    sessions = recentSessions
                                 )
                             }
-                            .padding(horizontal = 11.dp)
-                            .testTag("auto_pick_best_server_button"),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (isTestingAll) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                color = Color.White,
-                                strokeWidth = 1.8.dp
-                            )
                             Text(
-                                text = config.tr("Đang chọn...", "Selecting..."),
-                                color = Color.White,
+                                text = "$currentPingText • $currentUnlockText • $selectionReasonText",
+                                color = currentUnlockColor,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .testTag("selected_server_reason_label")
+                                    .semantics { contentDescription = selectionReasonText }
                             )
-                        } else {
+                            if (config.enableGlobalpingProbe && activeProbeEstimate != null) {
+                                Text(
+                                    text = activeProbeEstimate.formatLabel(isEn),
+                                    color = WarningAmber,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 10.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.testTag("globalping_estimate_label")
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 38.dp)
+                                .clip(modeChipShape)
+                                .background(XboxGreen, modeChipShape)
+                                .clickable(enabled = !isTestingAll) {
+                                    com.example.data.AppLogger.info("UI", "Bấm nút Chọn tối ưu (trên tab Máy chủ)")
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        config.tr("⚡ Đang đo ping và chọn máy chủ tối ưu...", "⚡ Measuring ping & selecting best server..."),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                    testAllServers(
+                                        autoPickBest = true,
+                                        forceRefresh = true,
+                                        reason = "bấm nút Chọn tối ưu (trên tab Máy chủ)"
+                                    )
+                                }
+                                .padding(horizontal = if (isNarrowHeader) 8.dp else 10.dp, vertical = 7.dp)
+                                .testTag("auto_pick_best_server_button"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (isTestingAll) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(13.dp),
+                                    color = Color.White,
+                                    strokeWidth = 1.8.dp
+                                )
+                                Text(
+                                    text = config.tr("Đang chọn...", "Selecting..."),
+                                    color = Color.White,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            } else {
+                                if (!isNarrowHeader) {
+                                    Icon(
+                                        imageVector = Icons.Default.Speed,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Text(
+                                    text = config.tr("Chọn tối ưu", "Auto Best"),
+                                    color = Color.White,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 38.dp)
+                                .clip(modeChipShape)
+                                .background(XboxSurfaceElevated, modeChipShape)
+                                .border(1.dp, XboxCardBorder, modeChipShape)
+                                .clickable { showCustomDialog = true }
+                                .padding(horizontal = if (isNarrowHeader) 8.dp else 9.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Speed,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.Add,
+                                contentDescription = config.tr("Thêm proxy riêng", "Add Custom"),
+                                tint = TextPrimary,
+                                modifier = Modifier.size(15.dp)
                             )
-                            Text(
-                                text = config.tr("Chọn tối ưu", "Auto Best"),
-                                color = Color.White,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
+                            if (!isNarrowHeader) {
+                                Text(
+                                    text = "Proxy",
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
                         }
                     }
 
+                    // Row 2: Ping Test button + 2 VPN Mode Selector chips
                     Row(
                         modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
-                            .clip(modeChipShape)
-                            .background(XboxSurfaceElevated, modeChipShape)
-                            .border(1.dp, XboxCardBorder, modeChipShape)
-                            .clickable { showCustomDialog = true }
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            .fillMaxWidth()
+                            .testTag("v130_smart_routing_algorithm_card"),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = config.tr("Thêm proxy riêng", "Add Custom"),
-                            tint = TextPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Proxy",
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
-                    }
-                }
+                        Row(
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 36.dp)
+                                .clip(modeChipShape)
+                                .background(
+                                    if (isTestingAll) XboxSurfaceVariant else XboxGreen,
+                                    modeChipShape
+                                )
+                                .clickable(enabled = !isTestingAll) {
+                                    com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
+                                    testAllServers(
+                                        autoPickBest = false,
+                                        forceRefresh = true,
+                                        reason = "bấm nút Đo ping (trên tab Máy chủ)"
+                                    )
+                                }
+                                .padding(horizontal = if (isNarrowHeader) 8.dp else 10.dp, vertical = 6.dp)
+                                .testTag("ping_test_all_button"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            if (isTestingAll) {
+                                CircularProgressIndicator(modifier = Modifier.size(13.dp), color = Color.White, strokeWidth = 1.8.dp)
+                                Text(
+                                    text = config.tr("Đang đo...", "Pinging..."),
+                                    color = Color.White,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            } else {
+                                Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = config.tr("Đo ping", "Ping Test"),
+                                    color = Color.White,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
 
-                // Row 2: Ping Test button + 2 VPN Mode Selector chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("v130_smart_routing_algorithm_card"),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
-                            testAllServers(
-                                autoPickBest = false,
-                                forceRefresh = true,
-                                reason = "bấm nút Đo ping (trên tab Máy chủ)"
-                            )
-                        },
-                        enabled = !isTestingAll,
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
-                            .testTag("ping_test_all_button"),
-                        contentPadding = PaddingValues(horizontal = 11.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = modeChipShape
-                    ) {
-                        if (isTestingAll) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 1.8.dp)
-                            Spacer(modifier = Modifier.width(5.dp))
+                        val isAutoOff = config.autoBypassEnabled
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 36.dp)
+                                .clip(modeChipShape)
+                                .background(
+                                    if (isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
+                                    modeChipShape
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isAutoOff) XboxNeonGreen else XboxCardBorder,
+                                    modeChipShape
+                                )
+                                .clickable {
+                                    if (!isAutoOff) {
+                                        SettingsRepository.updateAutoBypass(true)
+                                        VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+                                    }
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        config.tr("✓ Chế độ: Tự tắt VPN khi vào game", "✓ Mode: Auto-Off VPN in game"),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                .padding(horizontal = 6.dp, vertical = 6.dp)
+                                .testTag("mode_auto_off_distance_first_chip"),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = config.tr("Đang đo...", "Pinging..."),
+                                text = config.tr("Tự tắt VPN", "Auto-Off VPN"),
+                                color = if (isAutoOff) XboxNeonGreen else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
-                            )
-                        } else {
-                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = config.tr("Đo ping", "Ping Test"),
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
+                                fontSize = 11.5.sp,
+                                fontWeight = if (isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
 
-                    val isAutoOff = config.autoBypassEnabled
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .height(48.dp)
-                            .clip(modeChipShape)
-                            .background(
-                                if (isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
-                                modeChipShape
-                            )
-                            .border(
-                                1.dp,
-                                if (isAutoOff) XboxNeonGreen else XboxCardBorder,
-                                modeChipShape
-                            )
-                            .clickable {
-                                if (!isAutoOff) {
-                                    SettingsRepository.updateAutoBypass(true)
-                                    VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .defaultMinSize(minHeight = 36.dp)
+                                .clip(modeChipShape)
+                                .background(
+                                    if (!isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
+                                    modeChipShape
+                                )
+                                .border(
+                                    1.dp,
+                                    if (!isAutoOff) XboxNeonGreen else XboxCardBorder,
+                                    modeChipShape
+                                )
+                                .clickable {
+                                    if (isAutoOff) {
+                                        SettingsRepository.updateAutoBypass(false)
+                                        VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
+                                    }
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        config.tr("✓ Chế độ: Bật VPN luôn khi chơi", "✓ Mode: Keep VPN on in game"),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
                                 }
-                                android.widget.Toast.makeText(
-                                    context,
-                                    config.tr("✓ Chế độ: Tự tắt VPN khi vào game", "✓ Mode: Auto-Off VPN in game"),
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            .padding(horizontal = 6.dp)
-                            .testTag("mode_auto_off_distance_first_chip"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = config.tr("Tự tắt VPN", "Auto-Off VPN"),
-                            color = if (isAutoOff) XboxNeonGreen else TextSecondary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = if (isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .defaultMinSize(minHeight = 48.dp)
-                            .height(48.dp)
-                            .clip(modeChipShape)
-                            .background(
-                                if (!isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
-                                modeChipShape
+                                .padding(horizontal = 6.dp, vertical = 6.dp)
+                                .testTag("mode_keep_vpn_ping_first_chip"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = config.tr("Giữ VPN luôn", "Keep VPN on"),
+                                color = if (!isAutoOff) XboxNeonGreen else TextSecondary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 11.5.sp,
+                                fontWeight = if (!isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            .border(
-                                1.dp,
-                                if (!isAutoOff) XboxNeonGreen else XboxCardBorder,
-                                modeChipShape
-                            )
-                            .clickable {
-                                if (isAutoOff) {
-                                    SettingsRepository.updateAutoBypass(false)
-                                    VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
-                                }
-                                android.widget.Toast.makeText(
-                                    context,
-                                    config.tr("✓ Chế độ: Bật VPN luôn khi chơi", "✓ Mode: Keep VPN on in game"),
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            .padding(horizontal = 6.dp)
-                            .testTag("mode_keep_vpn_ping_first_chip"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = config.tr("Giữ VPN luôn", "Keep VPN on"),
-                            color = if (!isAutoOff) XboxNeonGreen else TextSecondary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = if (!isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        }
                     }
                 }
             }
@@ -1039,7 +1038,7 @@ fun ServersScreen(
 
         item(key = "servers_region_filter_row") {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val categories = listOf(
@@ -1054,8 +1053,7 @@ fun ServersScreen(
                     val isSelected = selectedCategory == code
                     Box(
                         modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
+                            .defaultMinSize(minHeight = 34.dp)
                             .clip(filterPillShape)
                             .background(
                                 if (isSelected) XboxNeonGreen else XboxSurfaceVariant,
@@ -1067,7 +1065,7 @@ fun ServersScreen(
                                 filterPillShape
                             )
                             .clickable { selectedCategory = code }
-                            .padding(horizontal = 14.dp),
+                            .padding(horizontal = 11.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -1075,8 +1073,9 @@ fun ServersScreen(
                             color = if (isSelected) Color.Black else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                            fontSize = 12.5.sp,
-                            maxLines = 1
+                            fontSize = 11.5.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -1086,8 +1085,7 @@ fun ServersScreen(
                         val hideActive = config.hideUnreachableDynamicServers
                         Box(
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                                .height(48.dp)
+                                .defaultMinSize(minHeight = 34.dp)
                                 .clip(filterPillShape)
                                 .background(
                                     if (hideActive) DirectCyan.copy(alpha = 0.2f) else XboxSurfaceVariant,
@@ -1111,7 +1109,7 @@ fun ServersScreen(
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
-                                .padding(horizontal = 12.dp)
+                                .padding(horizontal = 11.dp, vertical = 6.dp)
                                 .testTag("toggle_hide_dead_live_proxies_chip"),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1124,8 +1122,9 @@ fun ServersScreen(
                                 color = if (hideActive) DirectCyan else TextSecondary,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                maxLines = 1
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -1134,8 +1133,7 @@ fun ServersScreen(
                 item(key = "manual_sync_public_proxies_chip") {
                     Row(
                         modifier = Modifier
-                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                            .height(48.dp)
+                            .defaultMinSize(minHeight = 34.dp)
                             .clip(filterPillShape)
                             .background(XboxSurfaceVariant, filterPillShape)
                             .border(1.dp, XboxCardBorder, filterPillShape)
@@ -1152,16 +1150,16 @@ fun ServersScreen(
                                     force = true
                                 )
                             }
-                            .padding(horizontal = 12.dp)
+                            .padding(horizontal = 11.dp, vertical = 6.dp)
                             .testTag("manual_sync_public_proxies_chip"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.CloudDownload,
                             contentDescription = null,
                             tint = XboxNeonGreen,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Text(
                             text = if (vpnState.isAutoSyncingLiveProxies) {
@@ -1172,8 +1170,9 @@ fun ServersScreen(
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            maxLines = 1
+                            fontSize = 11.5.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -1189,7 +1188,7 @@ fun ServersScreen(
                 ),
                 color = WarningAmber,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

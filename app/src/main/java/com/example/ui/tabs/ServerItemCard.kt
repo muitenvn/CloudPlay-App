@@ -112,7 +112,7 @@ internal fun ServerCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 56.dp)
+            .defaultMinSize(minHeight = 52.dp)
             .clip(SERVER_CARD_SHAPE)
             .background(if (isSelected) SELECTED_CARD_BG else DEFAULT_CARD_BG, SERVER_CARD_SHAPE)
             .border(
@@ -121,19 +121,19 @@ internal fun ServerCard(
                 shape = SERVER_CARD_SHAPE
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 8.dp)
+            .padding(horizontal = 10.dp, vertical = 7.dp)
             .testTag("server_card_${server.id}"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 6.dp)
         ) {
-            Text(text = server.flag, fontSize = 20.sp)
+            Text(text = server.flag, fontSize = 17.sp)
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -144,53 +144,53 @@ internal fun ServerCard(
                     color = if (isSelected) XboxNeonGreen else TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (isRecommended) {
                         Text(
                             text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
                             color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 12.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(DirectCyan.copy(alpha = 0.16f), BADGE_SHAPE)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                     Text(
                         text = unlockLabel,
                         color = unlockBadgeColor,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1,
                         modifier = Modifier
                             .background(unlockBadgeColor.copy(alpha = 0.14f), BADGE_SHAPE)
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
                     )
                     if (isTooFarForAutoSelect) {
                         Text(
                             text = if (isEn) "Too far" else "Quá xa",
                             color = WarningAmber,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(WarningAmber.copy(alpha = 0.14f), BADGE_SHAPE)
-                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
                 }
@@ -203,7 +203,7 @@ internal fun ServerCard(
                 Text(
                     text = subtitleText,
                     color = TextSecondary,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("server_card_subtitle_${server.id}")
@@ -213,7 +213,7 @@ internal fun ServerCard(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
@@ -221,19 +221,19 @@ internal fun ServerCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Canvas(
                         modifier = Modifier
-                            .width(16.dp)
-                            .height(12.dp)
+                            .width(14.dp)
+                            .height(11.dp)
                     ) {
-                        val barWidthPx = 2.6.dp.toPx()
-                        val gapPx = 1.8.dp.toPx()
-                        val cornerPx = 1.2.dp.toPx()
+                        val barWidthPx = 2.3.dp.toPx()
+                        val gapPx = 1.5.dp.toPx()
+                        val cornerPx = 1.dp.toPx()
                         val cornerRadius = CornerRadius(cornerPx, cornerPx)
                         for (bar in 1..4) {
-                            val barHeightPx = (3.5f + bar * 2f).dp.toPx()
+                            val barHeightPx = (3f + bar * 1.8f).dp.toPx()
                             val x = (bar - 1) * (barWidthPx + gapPx)
                             val y = size.height - barHeightPx
                             drawRoundRect(
@@ -247,13 +247,9 @@ internal fun ServerCard(
 
                     val mainPingValueText = when {
                         isGameActiveNow && pingMs > 0 -> "${displayPingMs}ms"
-                        isGameActiveNow -> "--"
                         isServerCurrentlyTesting -> "..."
                         pingMs > 0 -> "${displayPingMs}ms"
-                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> {
-                            if (isEn) "Unreachable" else "Không đo được"
-                        }
-                        else -> if (isEn) "Not tested" else "Chưa đo"
+                        else -> "--"
                     }
 
                     Text(
@@ -261,39 +257,44 @@ internal fun ServerCard(
                         color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else TextSecondary,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (pingMs <= 0) 12.sp else 13.sp,
-                        maxLines = 1
+                        fontSize = 12.5.sp,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
                 val secondaryStatusText: String? = when {
-                    isGameActiveNow -> "RTT WebRTC"
-                    isFallbackPortOnly -> if (isEn) "Fallback port" else "Cổng phụ"
+                    isGameActiveNow -> "WebRTC"
+                    isFallbackPortOnly -> if (isEn) "Fallback" else "Cổng phụ"
                     pingMs > 0 && isUnstablePing -> if (isEn) "Unstable" else "Chập chờn"
-                    isSmartBypass && !hasTriedPing && pingMs > 0 -> if (isEn) "Last session" else "Phiên trước"
+                    hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> {
+                        if (isEn) "Offline" else "Không đo được"
+                    }
+                    isSmartBypass && !hasTriedPing && pingMs > 0 -> if (isEn) "Last" else "Phiên trước"
                     isSelected -> if (isEn) "Selected" else "Đang chọn"
-                    else -> null
+                    else -> if (isEn) "Untested" else "Chưa đo"
                 }
 
                 if (secondaryStatusText != null) {
                     if (isSelected) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(11.dp)
                             )
                             Text(
                                 text = secondaryStatusText,
                                 color = if (isFallbackPortOnly) WarningAmber else XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 12.sp,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     } else {
@@ -301,8 +302,9 @@ internal fun ServerCard(
                             text = secondaryStatusText,
                             color = if (isFallbackPortOnly || isUnstablePing) WarningAmber else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            maxLines = 1
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -312,14 +314,14 @@ internal fun ServerCard(
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(36.dp)
                         .testTag("delete_server_${server.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = if (isEn) "Delete custom proxy" else "Xóa proxy tùy chỉnh",
                         tint = JapanRed,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }

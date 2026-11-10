@@ -27,10 +27,7 @@ import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,13 +62,17 @@ import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxDark
 import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
+
+private val VIEW_ALL_SHAPE = RoundedCornerShape(8.dp)
+private val QUICK_RESUME_SHAPE = RoundedCornerShape(12.dp)
+private val QUICK_RESUME_ICON_SHAPE = RoundedCornerShape(8.dp)
+private val RECENT_CHIP_SHAPE = RoundedCornerShape(8.dp)
+private val GAME_CARD_SHAPE = RoundedCornerShape(12.dp)
+private val GAME_BADGE_SHAPE = RoundedCornerShape(bottomEnd = 8.dp)
 
 @Composable
 internal fun FeaturedGamesSection(
@@ -86,12 +86,8 @@ internal fun FeaturedGamesSection(
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
-    val motionEnabled = rememberXboxMotionEnabled(
-        lowEndDeviceMode = config.lowEndDeviceMode,
-        gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
-    )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -99,207 +95,157 @@ internal fun FeaturedGamesSection(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(4.dp, 20.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(XboxNeonGreen, DirectCyan)
-                            )
-                        )
+                        .size(3.dp, 15.dp)
+                        .background(XboxNeonGreen, RoundedCornerShape(2.dp))
                 )
-                Column {
-                    Text(
-                        text = stringResource(R.string.featured_games_title).uppercase(),
-                        color = TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.6.sp
-                    )
-                    Text(
-                        text = stringResource(R.string.featured_games_subtitle),
-                        color = TextSecondary,
-                        fontSize = 10.5.sp
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.featured_games_title).uppercase(),
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.4.sp
+                )
             }
 
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = XboxSurfaceVariant.copy(alpha = 0.9f),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.45f)),
+            Row(
                 modifier = Modifier
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(VIEW_ALL_SHAPE)
+                    .background(XboxSurfaceVariant, VIEW_ALL_SHAPE)
+                    .border(1.dp, XboxCardBorder, VIEW_ALL_SHAPE)
                     .clickable { onNavigateToLibrary() }
+                    .padding(horizontal = 9.dp, vertical = 4.5.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.5.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.btn_view_all),
-                        color = XboxNeonGreen,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = XboxNeonGreen,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.btn_view_all),
+                    color = XboxNeonGreen,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = XboxNeonGreen,
+                    modifier = Modifier.size(14.dp)
+                )
             }
         }
 
-        // Thẻ "Chơi tiếp" (Quick Resume Console Card) cho game vừa chơi gần nhất nếu đã có dữ liệu
+        // Thẻ "Chơi tiếp" cho game vừa chơi gần nhất
         if (lastPlayedGame != null) {
-            Surface(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(QUICK_RESUME_SHAPE)
+                    .background(XboxSurfaceVariant, QUICK_RESUME_SHAPE)
+                    .border(1.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_SHAPE)
                     .clickable { onLaunchBookmark(lastPlayedGame) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
                     .testTag("continue_last_game_button"),
-                shape = RoundedCornerShape(16.dp),
-                color = XboxSurfaceVariant.copy(alpha = 0.95f),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.2.dp,
-                    Brush.horizontalGradient(
-                        listOf(DirectCyan.copy(alpha = 0.65f), XboxNeonGreen.copy(alpha = 0.65f))
-                    )
-                )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.weight(1f)
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .background(DirectCyan.copy(alpha = 0.14f), QUICK_RESUME_ICON_SHAPE)
+                            .border(0.8.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_ICON_SHAPE),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = DirectCyan.copy(alpha = 0.16f),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.5f)),
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Gamepad,
-                                    contentDescription = null,
-                                    tint = DirectCyan,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = config.tr("CHƠI TIẾP NGAY", "QUICK RESUME"),
-                                    color = DirectCyan,
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
-                                Text(
-                                    text = config.tr("• STREAM 60FPS", "• 60FPS STREAM"),
-                                    color = XboxNeonGreen,
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Text(
-                                text = "${stringResource(R.string.btn_continue_game)}: ${lastPlayedGame.title}",
-                                color = TextPrimary,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Gamepad,
+                            contentDescription = null,
+                            tint = DirectCyan,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = XboxGreen,
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.6f))
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(1.dp)
                     ) {
+                        Text(
+                            text = config.tr("CHƠI TIẾP NGAY", "QUICK RESUME"),
+                            color = DirectCyan,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = lastPlayedGame.title,
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .background(XboxGreen, VIEW_ALL_SHAPE)
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.btn_continue_game),
+                        color = Color.White,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+
+            if (recentGames.size > 1) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(horizontal = 1.dp)
+                ) {
+                    items(recentGames.drop(1), key = { "recent_${it.id}" }) { recent ->
                         Row(
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .clip(RECENT_CHIP_SHAPE)
+                                .background(XboxSurface, RECENT_CHIP_SHAPE)
+                                .border(1.dp, XboxCardBorder, RECENT_CHIP_SHAPE)
+                                .clickable { onLaunchBookmark(recent) }
+                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                                .testTag("recent_quick_chip_${recent.id}"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(13.dp)
+                                tint = DirectCyan,
+                                modifier = Modifier.size(11.dp)
                             )
                             Text(
-                                text = stringResource(R.string.btn_continue_game),
-                                color = Color.White,
+                                text = recent.title,
+                                color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
                             )
-                        }
-                    }
-                }
-            }
-
-            if (recentGames.size > 1) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    items(recentGames.drop(1), key = { "recent_${it.id}" }) { recent ->
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = XboxSurface.copy(alpha = 0.9f),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onLaunchBookmark(recent) }
-                                .testTag("recent_quick_chip_${recent.id}")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = DirectCyan,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = recent.title,
-                                    color = TextPrimary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
                         }
                     }
                 }
@@ -308,43 +254,38 @@ internal fun FeaturedGamesSection(
 
         if (featuredGames.isEmpty()) {
             val isSyncing by GameLibraryRepository.isSyncingCatalog.collectAsState()
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = XboxSurface.copy(alpha = 0.9f),
-                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(XboxSurface, QUICK_RESUME_SHAPE)
+                    .border(1.dp, XboxCardBorder, QUICK_RESUME_SHAPE)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Gamepad,
-                        contentDescription = null,
-                        tint = DirectCyan,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = if (isSyncing) {
-                            config.tr("Đang tải game...", "Loading games...")
-                        } else {
-                            config.tr("Chưa có game", "No games yet")
-                        },
-                        color = TextSecondary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Gamepad,
+                    contentDescription = null,
+                    tint = DirectCyan,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = if (isSyncing) {
+                        config.tr("Đang tải game...", "Loading games...")
+                    } else {
+                        config.tr("Chưa có game", "No games yet")
+                    },
+                    color = TextSecondary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         } else {
             val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(start = 2.dp, end = 12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(start = 1.dp, end = 8.dp)
             ) {
                 items(
                     items = featuredGames,
@@ -377,297 +318,160 @@ internal fun FeaturedGameCard(
     val localizedBadge = game.localizedBadge(isEn)
     val localizedCategory = game.localizedCategory(isEn)
     val monogram = game.monogram
-    val secondaryColorHex = game.secondaryColorHex
-    val cardBorderBrush = remember(game.accentColorHex) {
-        Brush.verticalGradient(
-            listOf(
-                Color(game.accentColorHex).copy(alpha = 0.65f),
-                XboxCardBorder,
-                DirectCyan.copy(alpha = 0.4f)
-            )
-        )
-    }
-    val fallbackBgBrush = remember(game.accentColorHex, secondaryColorHex) {
-        Brush.linearGradient(
-            listOf(
-                Color(game.accentColorHex).copy(alpha = 0.65f),
-                Color(secondaryColorHex).copy(alpha = 0.35f),
-                XboxDark
-            )
-        )
-    }
-    val bottomScrimBrush = remember {
-        Brush.verticalGradient(
-            listOf(Color.Transparent, XboxSurface.copy(alpha = 0.94f)),
-            startY = 115f
-        )
-    }
     var coverImageLoaded by remember(game.id, game.imageUrl) {
         mutableStateOf(false)
     }
-    Card(
+
+    Column(
         modifier = Modifier
-            .width(156.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .border(1.1.dp, cardBorderBrush, RoundedCornerShape(18.dp))
+            .width(136.dp)
+            .clip(GAME_CARD_SHAPE)
+            .background(XboxSurface, GAME_CARD_SHAPE)
+            .border(1.dp, XboxCardBorder, GAME_CARD_SHAPE)
             .clickable { onLaunch() }
-            .testTag("featured_game_${game.id}"),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .testTag("featured_game_${game.id}")
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(124.dp)
-            ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(94.dp)
+                .background(XboxSurfaceVariant)
+        ) {
+            if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(fallbackBgBrush),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xAA060B08),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.2.dp,
-                                    Color(game.accentColorHex).copy(alpha = 0.85f)
-                                ),
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = monogram,
-                                        color = Color.White,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Black
-                                    )
-                                }
-                            }
-                            if (!game.publisher.isNullOrBlank()) {
-                                Text(
-                                    text = game.publisher,
-                                    color = DirectCyan.copy(alpha = 0.9f),
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
-                    val context = LocalContext.current
-                    AsyncImage(
-                        model = remember(game.imageUrl) {
-                            ImageRequest.Builder(context)
-                                .data(game.imageUrl)
-                                .size(320, 440)
-                                .allowRgb565(true)
-                                .crossfade(false)
-                                .build()
-                        },
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        onSuccess = { coverImageLoaded = true },
-                        onError = { coverImageLoaded = false },
-                        modifier = Modifier.fillMaxSize()
+                    Text(
+                        text = monogram,
+                        color = TextPrimary,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black
                     )
-                } else if (game.drawableResId != null) {
-                    Image(
-                        painter = painterResource(id = game.drawableResId),
-                        contentDescription = game.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(bottomScrimBrush)
-                )
-
-                if (localizedBadge != null) {
-                    Surface(
-                        shape = RoundedCornerShape(bottomEnd = 10.dp),
-                        color = Color(0xF0050A07),
-                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.65f)),
-                        modifier = Modifier.align(Alignment.TopStart)
-                    ) {
-                        Text(
-                            text = localizedBadge,
-                            color = XboxNeonGreen,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 8.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (game.supportsTouch) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xCC060B08)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TouchApp,
-                                contentDescription = "Touch",
-                                tint = DirectCyan,
-                                modifier = Modifier
-                                    .padding(4.dp)
-                                    .size(12.dp)
-                            )
-                        }
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xCC060B08),
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .clickable { onToggleFavorite() }
-                            .testTag("fav_featured_${game.id}")
-                    ) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = if (isEn) "Favorite" else "Yêu thích",
-                            tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.75f),
-                            modifier = Modifier
-                                .padding(4.dp)
-                                .size(12.dp)
-                        )
-                    }
-                }
-
-                // Bottom-left Console Telemetry Micro-Pills (60FPS • 16:9)
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(horizontal = 8.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(5.dp),
-                        color = Color(0xD9060B08),
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, DirectCyan.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = "60 FPS",
-                            color = DirectCyan,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(5.dp),
-                        color = Color(0xD9060B08),
-                        border = androidx.compose.foundation.BorderStroke(0.5.dp, XboxNeonGreen.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = "16:9",
-                            color = XboxNeonGreen,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 7.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                        )
-                    }
                 }
             }
 
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = game.title,
-                    color = TextPrimary,
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
+                val context = LocalContext.current
+                AsyncImage(
+                    model = remember(game.imageUrl) {
+                        ImageRequest.Builder(context)
+                            .data(game.imageUrl)
+                            .size(280, 380)
+                            .allowRgb565(true)
+                            .crossfade(false)
+                            .build()
+                    },
+                    contentDescription = game.title,
+                    contentScale = ContentScale.Crop,
+                    onSuccess = { coverImageLoaded = true },
+                    onError = { coverImageLoaded = false },
+                    modifier = Modifier.fillMaxSize()
                 )
+            } else if (game.drawableResId != null) {
+                Image(
+                    painter = painterResource(id = game.drawableResId),
+                    contentDescription = game.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
+            if (localizedBadge != null) {
+                Text(
+                    text = localizedBadge,
+                    color = XboxNeonGreen,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .background(Color(0xD9050A07), GAME_BADGE_SHAPE)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (game.supportsTouch) {
+                    Icon(
+                        imageVector = Icons.Default.TouchApp,
+                        contentDescription = "Touch",
+                        tint = DirectCyan,
+                        modifier = Modifier
+                            .background(Color(0xCC060B08), CircleShape)
+                            .padding(3.5.dp)
+                            .size(11.dp)
+                    )
+                }
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isEn) "Favorite" else "Yêu thích",
+                    tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(Color(0xCC060B08), CircleShape)
+                        .clickable { onToggleFavorite() }
+                        .padding(3.5.dp)
+                        .size(11.dp)
+                        .testTag("fav_featured_${game.id}")
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = game.title,
+                color = TextPrimary,
+                fontFamily = SpaceGroteskFontFamily,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = localizedCategory,
                     color = TextSecondary,
-                    fontSize = 10.5.sp,
+                    fontSize = 10.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 4.dp)
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = GoldStar,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = game.rating,
-                            color = TextPrimary,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = XboxGreen,
-                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.55f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.btn_play_now),
-                                color = Color.White,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = GoldStar,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Text(
+                        text = game.rating,
+                        color = TextSecondary,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }

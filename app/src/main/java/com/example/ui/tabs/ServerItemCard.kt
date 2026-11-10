@@ -1,15 +1,12 @@
 package com.example.ui.tabs
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,27 +16,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -51,19 +44,15 @@ import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
-import com.example.ui.theme.XboxSurfaceVariant
-import com.example.ui.theme.animateXboxIntAsState
-import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxPressScale
 import com.example.vpn.EndpointPingMeasurement
 import com.example.vpn.RegionUnlockStatus
 import com.example.vpn.ServerLocation
 import com.example.vpn.ServerPingStatus
 
-private val SELECTED_CARD_BORDER_BRUSH = Brush.horizontalGradient(listOf(XboxNeonGreen, DirectCyan))
-private val DEFAULT_CARD_BORDER_BRUSH = Brush.horizontalGradient(listOf(XboxCardBorder, XboxCardBorder))
-private val SELECTED_CARD_BG = XboxSurfaceVariant.copy(alpha = 0.96f)
-private val DEFAULT_CARD_BG = XboxSurface.copy(alpha = 0.94f)
+private val SERVER_CARD_SHAPE = RoundedCornerShape(12.dp)
+private val BADGE_SHAPE = RoundedCornerShape(4.dp)
+private val SELECTED_CARD_BG = Color(0xFF122118)
+private val DEFAULT_CARD_BG = XboxSurface
 private val UNTESTED_BADGE_COLOR = Color(0xFF9CA3AF)
 
 @Composable
@@ -76,7 +65,7 @@ internal fun ServerCard(
     hasTriedPing: Boolean = false,
     isSmartBypass: Boolean = false,
     isGameActiveNow: Boolean = false,
-    isTestingPings: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") isTestingPings: Boolean = false,
     unlockStatus: RegionUnlockStatus,
     distanceKm: Int? = null,
     isTooFarForAutoSelect: Boolean = false,
@@ -96,7 +85,6 @@ internal fun ServerCard(
         pingMs <= 120 -> WarningAmber
         else -> JapanRed
     }
-    val cardContainerColor = if (isSelected) SELECTED_CARD_BG else DEFAULT_CARD_BG
 
     val activeBars = when {
         pingMs <= 0 -> 0
@@ -107,11 +95,10 @@ internal fun ServerCard(
         else -> 1
     }
 
-    // 3. HIỂN THỊ: mỗi thẻ máy chủ có nhãn nhỏ: "Đã mở khóa" (xanh), "Không mở khóa" (đỏ), "Chưa thử mở khóa" (xám), "Sai vùng" (vàng)
     val unlockLabel = when (unlockStatus) {
         RegionUnlockStatus.UNLOCKED -> if (isEn) "Unlocked" else "Đã mở khóa"
         RegionUnlockStatus.FAILED -> if (isEn) "Unlock Failed" else "Không mở khóa"
-        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested unlock" else "Chưa thử mở khóa"
+        RegionUnlockStatus.UNTESTED -> if (isEn) "Untested" else "Chưa thử"
         RegionUnlockStatus.WRONG_REGION -> if (isEn) "Wrong Region" else "Sai vùng"
     }
     val unlockBadgeColor = when (unlockStatus) {
@@ -121,266 +108,228 @@ internal fun ServerCard(
         RegionUnlockStatus.WRONG_REGION -> WarningAmber
     }
 
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(SERVER_CARD_SHAPE)
+            .background(if (isSelected) SELECTED_CARD_BG else DEFAULT_CARD_BG, SERVER_CARD_SHAPE)
             .border(
-                width = if (isSelected) 1.6.dp else 1.dp,
-                brush = if (isSelected) SELECTED_CARD_BORDER_BRUSH else DEFAULT_CARD_BORDER_BRUSH,
-                shape = RoundedCornerShape(18.dp)
+                width = if (isSelected) 1.4.dp else 0.8.dp,
+                color = if (isSelected) XboxNeonGreen else XboxCardBorder,
+                shape = SERVER_CARD_SHAPE
             )
             .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 8.dp)
             .testTag("server_card_${server.id}"),
-        colors = CardDefaults.cardColors(
-            containerColor = cardContainerColor
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 2.dp)
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 6.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
+            Text(text = server.flag, fontSize = 19.sp)
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Flag badge with neon ring when active
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            if (isSelected) XboxNeonGreen.copy(alpha = 0.16f) else XboxSurfaceVariant
-                        )
-                        .border(
-                            1.dp,
-                            if (isSelected) XboxNeonGreen else XboxCardBorder,
-                            RoundedCornerShape(13.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = server.flag, fontSize = 22.sp)
-                }
+                Text(
+                    text = server.name,
+                    color = if (isSelected) XboxNeonGreen else TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = server.name,
-                        color = if (isSelected) XboxNeonGreen else TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.5.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        val badgeShape = remember { RoundedCornerShape(5.dp) }
-                        if (isRecommended) {
-                            Text(
-                                text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
-                                color = DirectCyan,
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                softWrap = false,
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .background(DirectCyan.copy(alpha = 0.18f), badgeShape)
-                                    .border(0.7.dp, DirectCyan.copy(alpha = 0.65f), badgeShape)
-                                    .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                            )
-                        }
+                    if (isRecommended) {
                         Text(
-                            text = server.protocol.uppercase(),
-                            color = XboxNeonGreen,
+                            text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
+                            color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
                             fontSize = 8.sp,
                             fontWeight = FontWeight.ExtraBold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
-                                .background(XboxGreen.copy(alpha = 0.22f), badgeShape)
-                                .border(0.6.dp, XboxNeonGreen.copy(alpha = 0.45f), badgeShape)
-                                .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                                .background(DirectCyan.copy(alpha = 0.16f), BADGE_SHAPE)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
+                    }
+                    Text(
+                        text = server.protocol.uppercase(),
+                        color = XboxNeonGreen,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        softWrap = false,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(XboxGreen.copy(alpha = 0.2f), BADGE_SHAPE)
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                    Text(
+                        text = unlockLabel,
+                        color = unlockBadgeColor,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        softWrap = false,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .background(unlockBadgeColor.copy(alpha = 0.14f), BADGE_SHAPE)
+                            .padding(horizontal = 4.5.dp, vertical = 1.dp)
+                    )
+                    if (isTooFarForAutoSelect) {
                         Text(
-                            text = unlockLabel,
-                            color = unlockBadgeColor,
+                            text = if (isEn) "Too far" else "Quá xa",
+                            color = WarningAmber,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 8.5.sp,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
                             softWrap = false,
                             maxLines = 1,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             modifier = Modifier
-                                .defaultMinSize(minWidth = 52.dp)
-                                .background(unlockBadgeColor.copy(alpha = 0.16f), badgeShape)
-                                .border(0.7.dp, unlockBadgeColor.copy(alpha = 0.6f), badgeShape)
-                                .padding(horizontal = 5.5.dp, vertical = 1.5.dp)
+                                .background(WarningAmber.copy(alpha = 0.14f), BADGE_SHAPE)
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
-                        if (isTooFarForAutoSelect) {
-                            Text(
-                                text = if (isEn) "Too far" else "Quá xa",
-                                color = WarningAmber,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                softWrap = false,
-                                maxLines = 1,
-                                modifier = Modifier
-                                    .background(WarningAmber.copy(alpha = 0.16f), badgeShape)
-                                    .border(0.7.dp, WarningAmber.copy(alpha = 0.65f), badgeShape)
-                                    .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                    }
+                }
+
+                val subtitleText = precomputedSubtitle ?: remember(server.id, distanceKm, isEn) {
+                    val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
+                    "${server.localizedDescription(isEn)}$distLabel • ${server.ip}"
+                }
+                Text(
+                    text = subtitleText,
+                    color = TextSecondary,
+                    fontSize = 10.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("server_card_subtitle_${server.id}")
+                )
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Canvas(
+                        modifier = Modifier
+                            .width(16.dp)
+                            .height(12.dp)
+                    ) {
+                        val barWidthPx = 2.6.dp.toPx()
+                        val gapPx = 1.8.dp.toPx()
+                        val cornerPx = 1.2.dp.toPx()
+                        val cornerRadius = CornerRadius(cornerPx, cornerPx)
+                        for (bar in 1..4) {
+                            val barHeightPx = (3.5f + bar * 2f).dp.toPx()
+                            val x = (bar - 1) * (barWidthPx + gapPx)
+                            val y = size.height - barHeightPx
+                            drawRoundRect(
+                                color = if (bar <= activeBars) pingColor else XboxCardBorder,
+                                topLeft = Offset(x, y),
+                                size = Size(barWidthPx, barHeightPx),
+                                cornerRadius = cornerRadius
                             )
                         }
                     }
 
-                    val subtitleText = precomputedSubtitle ?: remember(server.id, distanceKm, isEn) {
-                        val distLabel = if (distanceKm != null) " • ~${distanceKm}km" else ""
-                        val directPingNote = if (isEn) " • No data yet" else " • Chưa có dữ liệu"
-                        "${server.localizedDescription(isEn)}$distLabel$directPingNote • ${server.ip}"
-                    }
-                    Text(
-                        text = subtitleText,
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.testTag("server_card_subtitle_${server.id}")
-                    )
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Signal Bars + Ping & Selection state
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // 4-Bar Signal Quality Meter drawn in a single Canvas node
-                        androidx.compose.foundation.Canvas(
-                            modifier = Modifier
-                                .width(18.dp)
-                                .height(13.dp)
-                        ) {
-                            val barWidthPx = 3.dp.toPx()
-                            val gapPx = 2.dp.toPx()
-                            val cornerPx = 1.5.dp.toPx()
-                            val cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerPx, cornerPx)
-                            for (bar in 1..4) {
-                                val barHeightPx = (4 + bar * 2).dp.toPx()
-                                val x = (bar - 1) * (barWidthPx + gapPx)
-                                val y = size.height - barHeightPx
-                                drawRoundRect(
-                                    color = if (bar <= activeBars) pingColor else XboxCardBorder,
-                                    topLeft = androidx.compose.ui.geometry.Offset(x, y),
-                                    size = androidx.compose.ui.geometry.Size(barWidthPx, barHeightPx),
-                                    cornerRadius = cornerRadius
-                                )
-                            }
+                    val mainPingValueText = when {
+                        isGameActiveNow && pingMs > 0 -> "${displayPingMs}ms"
+                        isGameActiveNow -> "--"
+                        isServerCurrentlyTesting -> "..."
+                        pingMs > 0 -> "${displayPingMs}ms"
+                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> {
+                            if (isEn) "Unreachable" else "Không đo được"
                         }
-
-                        val mainPingValueText = when {
-                            isGameActiveNow && pingMs > 0 -> "${displayPingMs}ms"
-                            isGameActiveNow -> "--"
-                            isServerCurrentlyTesting -> "..."
-                            isFallbackPortOnly && pingMs > 0 -> "${displayPingMs}ms"
-                            pingMs > 0 && isUnstablePing -> "${displayPingMs}ms • ${if (isEn) "Unstable" else "Mạng chập chờn"}"
-                            pingMs > 0 -> "${displayPingMs}ms"
-                            hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
-                            else -> if (isEn) "Not tested" else "Chưa đo"
-                        }
-
-                        Text(
-                            text = mainPingValueText,
-                            color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else pingColor,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = if (pingMs <= 0 || isFallbackPortOnly || isUnstablePing) 10.sp else 12.sp
-                        )
-                    }
-
-                    val metricLabelText = when {
-                        isGameActiveNow -> "RTT WebRTC"
-                        isServerCurrentlyTesting -> if (isEn) "Testing..." else "Đang đo..."
-                        isFallbackPortOnly -> {
-                            if (isEn) "Fallback port • Primary closed" else "Cổng phụ • Cổng chính đóng"
-                        }
-                        measurement?.status == ServerPingStatus.MEASURED_PRIMARY && pingMs > 0 -> {
-                            when {
-                                isUnstablePing -> if (isEn) "Latency (Unstable)" else "Độ trễ mạng (Mạng chập chờn)"
-                                pingMs <= 80 -> if (isEn) "Latency (Good)" else "Độ trễ mạng (Tốt)"
-                                pingMs <= 120 -> if (isEn) "Latency (Fair)" else "Độ trễ mạng (Trung bình)"
-                                else -> if (isEn) "Latency (High)" else "Độ trễ mạng (Cao)"
-                            }
-                        }
-                        hasTriedPing && pingMs > 0 -> if (isEn) "Network latency" else "Độ trễ mạng"
-                        hasTriedPing || measurement?.status == ServerPingStatus.UNREACHABLE -> if (isEn) "Unreachable" else "Không đo được"
-                        isSmartBypass && pingMs > 0 -> if (isEn) "Last session latency" else "Độ trễ phiên gần nhất"
                         else -> if (isEn) "Not tested" else "Chưa đo"
                     }
 
+                    Text(
+                        text = mainPingValueText,
+                        color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else TextSecondary,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = if (pingMs <= 0) 10.sp else 11.5.sp,
+                        maxLines = 1
+                    )
+                }
+
+                val secondaryStatusText: String? = when {
+                    isGameActiveNow -> "RTT WebRTC"
+                    isFallbackPortOnly -> if (isEn) "Fallback port" else "Cổng phụ"
+                    pingMs > 0 && isUnstablePing -> if (isEn) "Unstable" else "Chập chờn"
+                    isSmartBypass && !hasTriedPing && pingMs > 0 -> if (isEn) "Last session" else "Phiên trước"
+                    isSelected -> if (isEn) "Selected" else "Đang chọn"
+                    else -> null
+                }
+
+                if (secondaryStatusText != null) {
                     if (isSelected) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(11.dp)
                             )
                             Text(
-                                text = metricLabelText,
+                                text = secondaryStatusText,
                                 color = if (isFallbackPortOnly) WarningAmber else XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
                             )
                         }
                     } else {
                         Text(
-                            text = metricLabelText,
-                            color = if (isFallbackPortOnly) WarningAmber else TextSecondary,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 9.5.sp
+                            text = secondaryStatusText,
+                            color = if (isFallbackPortOnly || isUnstablePing) WarningAmber else TextSecondary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 9.sp,
+                            maxLines = 1
                         )
                     }
                 }
+            }
 
-                if (onDelete != null) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .testTag("delete_server_${server.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = if (isEn) "Delete custom proxy" else "Xóa proxy tùy chỉnh",
-                            tint = JapanRed,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+            if (onDelete != null) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .testTag("delete_server_${server.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = if (isEn) "Delete custom proxy" else "Xóa proxy tùy chỉnh",
+                        tint = JapanRed,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

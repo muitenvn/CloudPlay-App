@@ -782,8 +782,8 @@ object AppUiTranslator {
                 else -> en
             }
         }
-        if (en.startsWith("Last session ping: ")) {
-            val v = en.removePrefix("Last session ping: ")
+        if (en.startsWith("Last session ping: ") || en.startsWith("Last session: ")) {
+            val v = en.removePrefix("Last session ping: ").removePrefix("Last session: ")
             return when (lang) {
                 "zh" -> "上次游玩延迟: $v"
                 "ja" -> "前回のPing: $v"
@@ -837,7 +837,7 @@ object AppUiTranslator {
                 "ja" -> "ネットワーク遅延: $v"
                 "ko" -> "네트워크 지연: $v"
                 "es" -> "Latencia de red: $v"
-                "pt" -> "Latência de rede: $v"
+                "pt" -> "Latencia de rede: $v"
                 "fr" -> "Latence réseau : $v"
                 "de" -> "Netzwerklatenz: $v"
                 "ru" -> "Задержка сети: $v"
@@ -939,6 +939,38 @@ object AppUiTranslator {
             "Direct Network" -> return when (lang) {
                 "zh" -> "直连网络"; "ja" -> "ダイレクト接続"; "ko" -> "직접 연결"; "es" -> "Red directa"; "pt" -> "Rede direta"
                 "fr" -> "Réseau direct"; "de" -> "Direktnetz"; "ru" -> "Прямая сеть"; "th" -> "เครือข่ายตรง"; "id" -> "Jaringan Langsung"
+                else -> en
+            }
+            "Tap to switch server" -> return when (lang) {
+                "zh" -> "点击切换节点"; "ja" -> "タップしてサーバー切替"; "ko" -> "탭하여 서버 변경"; "es" -> "Toca para cambiar"; "pt" -> "Toque para trocar"
+                "fr" -> "Toucher pour changer"; "de" -> "Tippen zum Wechseln"; "ru" -> "Нажмите для смены"; "th" -> "แตะเพื่อเปลี่ยนเซิร์ฟเวอร์"; "id" -> "Ketuk untuk ganti server"
+                else -> en
+            }
+            "WebRTC • Tap to switch" -> return when (lang) {
+                "zh" -> "WebRTC • 点击切换"; "ja" -> "WebRTC • タップで切替"; "ko" -> "WebRTC • 탭하여 변경"; "es" -> "WebRTC • Toca para cambiar"; "pt" -> "WebRTC • Toque para trocar"
+                "fr" -> "WebRTC • Changer"; "de" -> "WebRTC • Wechseln"; "ru" -> "WebRTC • Сменить"; "th" -> "WebRTC • แตะเพื่อเปลี่ยน"; "id" -> "WebRTC • Ketuk untuk ganti"
+                else -> en
+            }
+            "Japan" -> return when (lang) {
+                "zh" -> "日本"; "ja" -> "日本"; "ko" -> "일본"; "es" -> "Japón"; "pt" -> "Japão"
+                "fr" -> "Japon"; "de" -> "Japan"; "ru" -> "Япония"; "th" -> "ญี่ปุ่น"; "id" -> "Jepang"
+                else -> en
+            }
+            "Korea" -> return when (lang) {
+                "zh" -> "韩国"; "ja" -> "韓国"; "ko" -> "한국"; "es" -> "Corea"; "pt" -> "Coreia"
+                "fr" -> "Corée"; "de" -> "Korea"; "ru" -> "Корея"; "th" -> "เกาหลี"; "id" -> "Korea"
+                else -> en
+            }
+            "USA" -> return when (lang) {
+                "zh" -> "美国"; "ja" -> "米国"; "ko" -> "미국"; "es" -> "EE. UU."; "pt" -> "EUA"
+                "fr" -> "États-Unis"; "de" -> "USA"; "ru" -> "США"; "th" -> "สหรัฐฯ"; "id" -> "AS"
+                else -> en
+            }
+            "Third-party public servers • Use for Xbox region unlock only, not for sensitive accounts/data." -> return when (lang) {
+                "zh" -> "第三方公共节点 • 仅用于解锁 Xbox 地区，请勿传输敏感数据。"; "ja" -> "第三者公開サーバー • Xboxの地域解除のみに使用し、機密通信には使わないでください。"; "ko" -> "타사 공개 서버 • Xbox 지역 잠금 해제용으로만 사용하고 민감한 정보는 피하세요."
+                "es" -> "Servidores públicos de terceros • Solo para desbloquear Xbox, no para datos sensibles."; "pt" -> "Servidores públicos de terceiros • Use apenas para desbloquear o Xbox, não para dados sensíveis."
+                "fr" -> "Serveurs publics tiers • Uniquement pour débloquer Xbox, pas pour des données sensibles."; "de" -> "Öffentliche Drittanbieter-Server • Nur zur Xbox-Regionsfreischaltung nutzen, nicht für sensible Daten."
+                "ru" -> "Публичные серверы • Используйте только для разблокировки Xbox, не для важных данных."; "th" -> "เซิร์ฟเวอร์สาธารณะ • ใช้เพื่อปลดล็อกโซน Xbox เท่านั้น ไม่ควรใช้กับข้อมูลสำคัญ"; "id" -> "Server publik pihak ketiga • Gunakan hanya untuk buka kunci wilayah Xbox, bukan data sensitif."
                 else -> en
             }
             "Untested unlock", "Untested" -> return when (lang) {

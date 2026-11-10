@@ -219,48 +219,44 @@ fun HomeScreen(
         val isWideScreen = maxWidth >= 640.dp
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(11.dp)
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
             val availableUpdate = updateState as? com.example.data.UpdateCheckState.UpdateAvailable
             if (availableUpdate != null) {
                 item(key = "home_update_banner") {
-                    Surface(
+                    val bannerShape = remember { RoundedCornerShape(10.dp) }
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                            .clip(bannerShape)
+                            .background(XboxNeonGreen.copy(alpha = 0.12f), bannerShape)
+                            .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), bannerShape)
                             .clickable {
                                 com.example.data.AppLogger.info("UI", "Bấm thanh thông báo bản cập nhật mới từ Trang chủ")
                                 com.example.data.UpdateChecker.openUpdateDialog()
                             }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
                             .testTag("home_update_available_banner"),
-                        color = XboxNeonGreen.copy(alpha = 0.12f)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 7.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (isEn) {
-                                    "New version ${availableUpdate.latestVersion} available · Tap to update"
-                                } else {
-                                    "Có bản mới ${availableUpdate.latestVersion} · Bấm để tải cập nhật"
-                                },
-                                color = XboxNeonGreen,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "↗",
-                                color = XboxNeonGreen,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
+                        Text(
+                            text = if (isEn) {
+                                "New version ${availableUpdate.latestVersion} available · Tap to update"
+                            } else {
+                                "Có bản mới ${availableUpdate.latestVersion} · Bấm để tải cập nhật"
+                            },
+                            color = XboxNeonGreen,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "↗",
+                            color = XboxNeonGreen,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
                     }
                 }
             }

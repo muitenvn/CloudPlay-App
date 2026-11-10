@@ -3,6 +3,7 @@ package com.example.ui.tabs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -134,7 +135,7 @@ internal fun CustomProxyDialog(
                             "⚠️ Địa chỉ IP nội bộ / loopback (127.0.0.1, 10.x, 192.168.x) không hợp lệ."
                         },
                         color = JapanRed,
-                        fontSize = 11.sp
+                        fontSize = 12.sp
                     )
                 }
 
@@ -236,13 +237,15 @@ internal fun CustomProxyDialog(
                             isTesting = false
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
                 ) {
                     if (isTesting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
                     } else {
-                        Text(if (isEn) "Test Connection" else "Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.sp)
+                        Text(if (isEn) "Test Connection" else "Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.5.sp)
                     }
                 }
 
@@ -281,14 +284,18 @@ internal fun CustomProxyDialog(
                     onAddServer(server)
                 },
                 enabled = trimmedHost.isNotBlank() && !isPrivateIp,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
             ) {
-                Text(if (isEn) "Save & Use" else "Lưu & Sử Dụng")
+                Text(if (isEn) "Save & Use" else "Lưu & Sử Dụng", fontSize = 12.5.sp)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary)
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontSize = 12.5.sp)
             }
         },
         containerColor = XboxSurface
@@ -358,8 +365,11 @@ internal fun ServerDetailDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(config.tr("Đóng", "Close"), color = XboxNeonGreen)
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            ) {
+                Text(config.tr("Đóng", "Close"), color = XboxNeonGreen, fontSize = 12.5.sp)
             }
         },
         containerColor = XboxSurface

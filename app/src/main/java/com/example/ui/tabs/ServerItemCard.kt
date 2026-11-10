@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -111,6 +112,7 @@ internal fun ServerCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .defaultMinSize(minHeight = 56.dp)
             .clip(SERVER_CARD_SHAPE)
             .background(if (isSelected) SELECTED_CARD_BG else DEFAULT_CARD_BG, SERVER_CARD_SHAPE)
             .border(
@@ -131,7 +133,7 @@ internal fun ServerCard(
                 .weight(1f)
                 .padding(end = 6.dp)
         ) {
-            Text(text = server.flag, fontSize = 19.sp)
+            Text(text = server.flag, fontSize = 20.sp)
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -142,7 +144,7 @@ internal fun ServerCard(
                     color = if (isSelected) XboxNeonGreen else TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = 13.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -156,51 +158,51 @@ internal fun ServerCard(
                             text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
                             color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 8.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(DirectCyan.copy(alpha = 0.16f), BADGE_SHAPE)
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                .padding(horizontal = 4.5.dp, vertical = 1.dp)
                         )
                     }
                     Text(
                         text = server.protocol.uppercase(),
                         color = XboxNeonGreen,
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 8.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1,
                         modifier = Modifier
                             .background(XboxGreen.copy(alpha = 0.2f), BADGE_SHAPE)
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                            .padding(horizontal = 4.5.dp, vertical = 1.dp)
                     )
                     Text(
                         text = unlockLabel,
                         color = unlockBadgeColor,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 8.sp,
+                        fontSize = 9.5.sp,
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1,
                         modifier = Modifier
                             .background(unlockBadgeColor.copy(alpha = 0.14f), BADGE_SHAPE)
-                            .padding(horizontal = 4.5.dp, vertical = 1.dp)
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
                     )
                     if (isTooFarForAutoSelect) {
                         Text(
                             text = if (isEn) "Too far" else "Quá xa",
                             color = WarningAmber,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 8.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold,
                             softWrap = false,
                             maxLines = 1,
                             modifier = Modifier
                                 .background(WarningAmber.copy(alpha = 0.14f), BADGE_SHAPE)
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                .padding(horizontal = 4.5.dp, vertical = 1.dp)
                         )
                     }
                 }
@@ -212,7 +214,7 @@ internal fun ServerCard(
                 Text(
                     text = subtitleText,
                     color = TextSecondary,
-                    fontSize = 10.5.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("server_card_subtitle_${server.id}")
@@ -270,7 +272,7 @@ internal fun ServerCard(
                         color = if (pingMs > 0) pingColor else if (isServerCurrentlyTesting) DirectCyan else TextSecondary,
                         fontFamily = JetBrainsMonoFontFamily,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = if (pingMs <= 0) 10.sp else 11.5.sp,
+                        fontSize = if (pingMs <= 0) 11.sp else 12.sp,
                         maxLines = 1
                     )
                 }
@@ -294,13 +296,13 @@ internal fun ServerCard(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = secondaryStatusText,
                                 color = if (isFallbackPortOnly) WarningAmber else XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
@@ -310,7 +312,7 @@ internal fun ServerCard(
                             text = secondaryStatusText,
                             color = if (isFallbackPortOnly || isUnstablePing) WarningAmber else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             maxLines = 1
                         )
                     }
@@ -321,14 +323,14 @@ internal fun ServerCard(
                 IconButton(
                     onClick = onDelete,
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(48.dp)
                         .testTag("delete_server_${server.id}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.DeleteOutline,
                         contentDescription = if (isEn) "Delete custom proxy" else "Xóa proxy tùy chỉnh",
                         tint = JapanRed,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

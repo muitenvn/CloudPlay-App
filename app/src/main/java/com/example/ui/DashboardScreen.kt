@@ -173,7 +173,7 @@ fun DashboardScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp)
+                        .height(54.dp)
                         .padding(start = 12.dp, end = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -185,7 +185,7 @@ fun DashboardScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(TOP_LOGO_SHAPE)
                                 .border(1.dp, XboxCardBorder, TOP_LOGO_SHAPE),
                             contentAlignment = Alignment.Center
@@ -207,7 +207,7 @@ fun DashboardScreen(
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
                                 fontWeight = FontWeight.Black,
-                                fontSize = 13.5.sp,
+                                fontSize = 14.sp,
                                 letterSpacing = 0.3.sp,
                                 maxLines = 1,
                                 softWrap = false
@@ -234,7 +234,7 @@ fun DashboardScreen(
                                         NetworkMode.DISCONNECTED -> config.tr("Sẵn sàng", "Ready")
                                     },
                                     color = statusColor,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -258,28 +258,30 @@ fun DashboardScreen(
                             Box(
                                 modifier = Modifier
                                     .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                    .clip(TOP_PILL_SHAPE)
                                     .clickable { switchTab(DashboardTab.SERVERS, "bấm pill Ping trên thanh đầu") },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(
                                     modifier = Modifier
+                                        .height(34.dp)
                                         .background(pingTint.copy(alpha = 0.12f), TOP_PILL_SHAPE)
                                         .border(1.dp, pingTint.copy(alpha = 0.45f), TOP_PILL_SHAPE)
-                                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                                        .padding(horizontal = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Speed,
                                         contentDescription = "Ping",
                                         tint = pingTint,
-                                        modifier = Modifier.size(11.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
                                     Text(
                                         text = "${directPing}ms",
                                         color = pingTint,
                                         fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1
                                     )
@@ -300,24 +302,24 @@ fun DashboardScreen(
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .height(30.dp)
+                                        .height(34.dp)
                                         .background(XboxSurfaceVariant, TOP_PILL_SHAPE)
                                         .border(1.dp, XboxCardBorder, TOP_PILL_SHAPE)
-                                        .padding(horizontal = 7.dp),
+                                        .padding(horizontal = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Language,
                                         contentDescription = stringResource(R.string.current_language),
                                         tint = XboxNeonGreen,
-                                        modifier = Modifier.size(13.dp)
+                                        modifier = Modifier.size(15.dp)
                                     )
                                     Text(
                                         text = currentLangLabel,
                                         color = TextPrimary,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1
                                     )
@@ -344,7 +346,7 @@ fun DashboardScreen(
                                                     text = langOption.localizedTitle(isEnUi),
                                                     color = if (isSelected) XboxNeonGreen else TextPrimary,
                                                     fontFamily = SpaceGroteskFontFamily,
-                                                    fontSize = 12.5.sp,
+                                                    fontSize = 13.sp,
                                                     fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
                                                 )
                                             }
@@ -379,7 +381,7 @@ fun DashboardScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(34.dp)
                                     .background(
                                         if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant,
                                         TOP_PILL_SHAPE
@@ -395,7 +397,7 @@ fun DashboardScreen(
                                     imageVector = Icons.Default.Translate,
                                     contentDescription = config.tr("Dịch tự động", "Auto Translate"),
                                     tint = if (isTranslateOn) XboxNeonGreen else TextSecondary,
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -412,7 +414,7 @@ fun DashboardScreen(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(30.dp)
+                                        .size(34.dp)
                                         .background(XboxSurfaceVariant, TOP_PILL_SHAPE)
                                         .border(1.dp, XboxCardBorder, TOP_PILL_SHAPE),
                                     contentAlignment = Alignment.Center
@@ -421,7 +423,7 @@ fun DashboardScreen(
                                         imageVector = Icons.Default.MoreVert,
                                         contentDescription = config.tr("Thêm tùy chọn", "More options"),
                                         tint = TextPrimary,
-                                        modifier = Modifier.size(17.dp)
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
                             }
@@ -689,7 +691,7 @@ private fun ConsoleFloatingNavigationDock(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 3.dp)
-                        .defaultMinSize(minHeight = 48.dp)
+                        .defaultMinSize(minHeight = 56.dp)
                         .clip(NAV_TAB_SHAPE)
                         .background(
                             if (isSelected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
@@ -702,43 +704,43 @@ private fun ConsoleFloatingNavigationDock(
                         )
                         .clickable { onSelectTab(tab) }
                         .testTag("nav_tab_${tab.name.lowercase()}")
-                        .padding(vertical = 5.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .width(52.dp)
-                                .height(20.dp),
+                                .width(64.dp)
+                                .height(25.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
                                 tint = if (isSelected) accentColor else TextSecondary,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                             if (tab == DashboardTab.LIBRARY && gamesCount > 0) {
                                 Text(
                                     text = if (gamesCount > 99) "99+" else "$gamesCount",
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 7.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .background(DirectCyan.copy(alpha = 0.16f), NAV_BADGE_SHAPE)
-                                        .padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
                                 )
                             } else if (tab == DashboardTab.SERVERS && isVpnActive) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(end = 9.dp)
-                                        .size(6.dp)
+                                        .padding(end = 12.dp)
+                                        .size(7.dp)
                                         .clip(CircleShape)
                                         .background(XboxNeonGreen)
                                 )
@@ -749,7 +751,7 @@ private fun ConsoleFloatingNavigationDock(
                             text = label,
                             color = if (isSelected) TextPrimary else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

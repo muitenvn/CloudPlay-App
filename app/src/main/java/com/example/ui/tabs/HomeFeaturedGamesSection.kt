@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,10 +68,10 @@ import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
 
-private val VIEW_ALL_SHAPE = RoundedCornerShape(8.dp)
+private val VIEW_ALL_SHAPE = RoundedCornerShape(10.dp)
 private val QUICK_RESUME_SHAPE = RoundedCornerShape(12.dp)
 private val QUICK_RESUME_ICON_SHAPE = RoundedCornerShape(8.dp)
-private val RECENT_CHIP_SHAPE = RoundedCornerShape(8.dp)
+private val RECENT_CHIP_SHAPE = RoundedCornerShape(10.dp)
 private val GAME_CARD_SHAPE = RoundedCornerShape(12.dp)
 private val GAME_BADGE_SHAPE = RoundedCornerShape(bottomEnd = 8.dp)
 
@@ -99,14 +100,14 @@ internal fun FeaturedGamesSection(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(3.dp, 15.dp)
+                        .size(3.dp, 16.dp)
                         .background(XboxNeonGreen, RoundedCornerShape(2.dp))
                 )
                 Text(
                     text = stringResource(R.string.featured_games_title).uppercase(),
                     color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 13.5.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 0.4.sp
                 )
@@ -114,25 +115,26 @@ internal fun FeaturedGamesSection(
 
             Row(
                 modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                     .clip(VIEW_ALL_SHAPE)
                     .background(XboxSurfaceVariant, VIEW_ALL_SHAPE)
                     .border(1.dp, XboxCardBorder, VIEW_ALL_SHAPE)
                     .clickable { onNavigateToLibrary() }
-                    .padding(horizontal = 9.dp, vertical = 4.5.dp),
+                    .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = stringResource(R.string.btn_view_all),
                     color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 10.5.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
                     tint = XboxNeonGreen,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -142,23 +144,24 @@ internal fun FeaturedGamesSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .defaultMinSize(minHeight = 56.dp)
                     .clip(QUICK_RESUME_SHAPE)
                     .background(XboxSurfaceVariant, QUICK_RESUME_SHAPE)
                     .border(1.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_SHAPE)
                     .clickable { onLaunchBookmark(lastPlayedGame) }
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
                     .testTag("continue_last_game_button"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(34.dp)
                             .background(DirectCyan.copy(alpha = 0.14f), QUICK_RESUME_ICON_SHAPE)
                             .border(0.8.dp, DirectCyan.copy(alpha = 0.45f), QUICK_RESUME_ICON_SHAPE),
                         contentAlignment = Alignment.Center
@@ -167,7 +170,7 @@ internal fun FeaturedGamesSection(
                             imageVector = Icons.Default.Gamepad,
                             contentDescription = null,
                             tint = DirectCyan,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                     Column(
@@ -178,14 +181,14 @@ internal fun FeaturedGamesSection(
                             text = config.tr("CHƠI TIẾP NGAY", "QUICK RESUME"),
                             color = DirectCyan,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 8.5.sp,
+                            fontSize = 9.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = lastPlayedGame.title,
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.5.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -194,22 +197,23 @@ internal fun FeaturedGamesSection(
                 }
                 Row(
                     modifier = Modifier
+                        .defaultMinSize(minHeight = 40.dp)
                         .background(XboxGreen, VIEW_ALL_SHAPE)
-                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(13.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                     Text(
                         text = stringResource(R.string.btn_continue_game),
                         color = Color.White,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 10.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
                 }
@@ -217,32 +221,33 @@ internal fun FeaturedGamesSection(
 
             if (recentGames.size > 1) {
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 1.dp)
                 ) {
                     items(recentGames.drop(1), key = { "recent_${it.id}" }) { recent ->
                         Row(
                             modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
                                 .clip(RECENT_CHIP_SHAPE)
                                 .background(XboxSurface, RECENT_CHIP_SHAPE)
                                 .border(1.dp, XboxCardBorder, RECENT_CHIP_SHAPE)
                                 .clickable { onLaunchBookmark(recent) }
-                                .padding(horizontal = 9.dp, vertical = 5.dp)
+                                .padding(horizontal = 12.dp)
                                 .testTag("recent_quick_chip_${recent.id}"),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
                                 tint = DirectCyan,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = recent.title,
                                 color = TextPrimary,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1
                             )
@@ -267,7 +272,7 @@ internal fun FeaturedGamesSection(
                     imageVector = Icons.Default.Gamepad,
                     contentDescription = null,
                     tint = DirectCyan,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = if (isSyncing) {
@@ -277,7 +282,7 @@ internal fun FeaturedGamesSection(
                     },
                     color = TextSecondary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 11.5.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -324,7 +329,7 @@ internal fun FeaturedGameCard(
 
     Column(
         modifier = Modifier
-            .width(136.dp)
+            .width(142.dp)
             .clip(GAME_CARD_SHAPE)
             .background(XboxSurface, GAME_CARD_SHAPE)
             .border(1.dp, XboxCardBorder, GAME_CARD_SHAPE)
@@ -334,7 +339,7 @@ internal fun FeaturedGameCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(94.dp)
+                .height(96.dp)
                 .background(XboxSurfaceVariant)
         ) {
             if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
@@ -383,7 +388,7 @@ internal fun FeaturedGameCard(
                     text = localizedBadge,
                     color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 8.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -392,36 +397,42 @@ internal fun FeaturedGameCard(
                 )
             }
 
-            Row(
+            if (game.supportsTouch) {
+                Icon(
+                    imageVector = Icons.Default.TouchApp,
+                    contentDescription = "Touch",
+                    tint = DirectCyan,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(5.dp)
+                        .background(Color(0xCC060B08), CircleShape)
+                        .padding(4.dp)
+                        .size(12.dp)
+                )
+            }
+
+            Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(48.dp)
+                    .clickable { onToggleFavorite() }
+                    .testTag("fav_featured_${game.id}"),
+                contentAlignment = Alignment.TopEnd
             ) {
-                if (game.supportsTouch) {
+                Box(
+                    modifier = Modifier
+                        .padding(5.dp)
+                        .size(28.dp)
+                        .background(Color(0xCC060B08), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
-                        imageVector = Icons.Default.TouchApp,
-                        contentDescription = "Touch",
-                        tint = DirectCyan,
-                        modifier = Modifier
-                            .background(Color(0xCC060B08), CircleShape)
-                            .padding(3.5.dp)
-                            .size(11.dp)
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isEn) "Favorite" else "Yêu thích",
+                        tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (isEn) "Favorite" else "Yêu thích",
-                    tint = if (isFavorite) JapanRed else Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color(0xCC060B08), CircleShape)
-                        .clickable { onToggleFavorite() }
-                        .padding(3.5.dp)
-                        .size(11.dp)
-                        .testTag("fav_featured_${game.id}")
-                )
             }
         }
 
@@ -433,7 +444,7 @@ internal fun FeaturedGameCard(
                 text = game.title,
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 12.sp,
+                fontSize = 12.5.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -447,7 +458,7 @@ internal fun FeaturedGameCard(
                 Text(
                     text = localizedCategory,
                     color = TextSecondary,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -463,13 +474,13 @@ internal fun FeaturedGameCard(
                         imageVector = Icons.Default.Star,
                         contentDescription = null,
                         tint = GoldStar,
-                        modifier = Modifier.size(11.dp)
+                        modifier = Modifier.size(12.dp)
                     )
                     Text(
                         text = game.rating,
                         color = TextSecondary,
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 9.5.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }

@@ -229,6 +229,7 @@ fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(48.dp)
                             .clip(bannerShape)
                             .background(XboxNeonGreen.copy(alpha = 0.12f), bannerShape)
                             .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), bannerShape)
@@ -236,7 +237,7 @@ fun HomeScreen(
                                 com.example.data.AppLogger.info("UI", "Bấm thanh thông báo bản cập nhật mới từ Trang chủ")
                                 com.example.data.UpdateChecker.openUpdateDialog()
                             }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                            .padding(horizontal = 12.dp)
                             .testTag("home_update_available_banner"),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -248,13 +249,13 @@ fun HomeScreen(
                                 "Có bản mới ${availableUpdate.latestVersion} · Bấm để tải cập nhật"
                             },
                             color = XboxNeonGreen,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "↗",
                             color = XboxNeonGreen,
-                            fontSize = 12.5.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }

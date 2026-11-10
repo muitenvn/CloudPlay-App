@@ -129,7 +129,7 @@ internal fun HeroConsolePlayDeck(
                     text = stringResource(R.string.hero_title),
                     color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 15.5.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -138,19 +138,25 @@ internal fun HeroConsolePlayDeck(
 
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .background(XboxSurfaceVariant, CircleShape)
-                        .border(1.dp, XboxCardBorder, CircleShape)
                         .clickable { onOpenGuide() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                        contentDescription = stringResource(R.string.guide_button),
-                        tint = DirectCyan,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(XboxSurfaceVariant, CircleShape)
+                            .border(1.dp, XboxCardBorder, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = stringResource(R.string.guide_button),
+                            tint = DirectCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
@@ -162,26 +168,27 @@ internal fun HeroConsolePlayDeck(
                     onClick = onOpenXboxCloud,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp)
+                        .defaultMinSize(minHeight = 48.dp)
+                        .height(48.dp)
                         .testTag("hero_launch_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XboxGreen,
                         contentColor = Color.White
                     ),
                     shape = HERO_BTN_SHAPE,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(17.dp)
+                        modifier = Modifier.size(19.dp)
                     )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.btn_launch_xcloud),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
@@ -191,26 +198,27 @@ internal fun HeroConsolePlayDeck(
                     onClick = onLaunchFortnite,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp)
+                        .defaultMinSize(minHeight = 48.dp)
+                        .height(48.dp)
                         .testTag("hero_launch_fortnite_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EpicBlue,
                         contentColor = Color.White
                     ),
                     shape = HERO_BTN_SHAPE,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Bolt,
                         contentDescription = null,
                         tint = GoldStar,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = stringResource(R.string.btn_play_fortnite),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1
                     )
@@ -268,7 +276,7 @@ internal fun QuickNetworkCockpitCard(
             .clip(COCKPIT_CARD_SHAPE)
             .background(XboxSurface, COCKPIT_CARD_SHAPE)
             .border(1.dp, borderColor, COCKPIT_CARD_SHAPE)
-            .padding(horizontal = 11.dp, vertical = 8.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp)
             .testTag("network_cockpit_card"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -276,23 +284,24 @@ internal fun QuickNetworkCockpitCard(
         Row(
             modifier = Modifier
                 .weight(1f)
+                .defaultMinSize(minHeight = 48.dp)
                 .clip(COCKPIT_PILL_SHAPE)
                 .clickable { onNavigateToServers() }
                 .padding(end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(text = vpnState.currentServer.flag, fontSize = 18.sp)
+            Text(text = vpnState.currentServer.flag, fontSize = 20.sp)
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = vpnState.currentServer.name,
                     color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -304,7 +313,7 @@ internal fun QuickNetworkCockpitCard(
                         config.tr("Chạm để đổi máy chủ", "Tap to switch server")
                     },
                     color = TextSecondary,
-                    fontSize = 9.5.sp,
+                    fontSize = 11.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -314,17 +323,17 @@ internal fun QuickNetworkCockpitCard(
                 modifier = Modifier
                     .background(signalTint.copy(alpha = 0.12f), COCKPIT_PILL_SHAPE)
                     .border(0.8.dp, signalTint.copy(alpha = 0.45f), COCKPIT_PILL_SHAPE)
-                    .padding(horizontal = 6.dp, vertical = 3.5.dp),
+                    .padding(horizontal = 7.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Canvas(
                     modifier = Modifier
-                        .width(14.dp)
-                        .height(11.dp)
+                        .width(15.dp)
+                        .height(12.dp)
                 ) {
-                    val barW = 2.2.dp.toPx()
-                    val gap = 1.5.dp.toPx()
+                    val barW = 2.4.dp.toPx()
+                    val gap = 1.6.dp.toPx()
                     val cr = CornerRadius(1.dp.toPx(), 1.dp.toPx())
                     for (bar in 1..4) {
                         val barH = (3 + bar * 2).dp.toPx()
@@ -342,7 +351,7 @@ internal fun QuickNetworkCockpitCard(
                     text = if (hasPing) "${directPing}ms" else "--",
                     color = signalTint,
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
@@ -352,26 +361,26 @@ internal fun QuickNetworkCockpitCard(
         Button(
             onClick = { if (isConnected) onDisconnectVpn() else onConnectVpn() },
             modifier = Modifier
-                .defaultMinSize(minHeight = 36.dp)
-                .height(36.dp)
+                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                .height(48.dp)
                 .testTag("quick_vpn_toggle_button"),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (isConnected) XboxSurfaceElevated else XboxGreen
             ),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
             shape = COCKPIT_BTN_SHAPE
         ) {
             Icon(
                 imageVector = if (isConnected) Icons.Default.CheckCircle else Icons.Default.VpnKey,
                 contentDescription = null,
                 tint = if (isConnected) XboxNeonGreen else Color.White,
-                modifier = Modifier.size(13.dp)
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = if (isConnected) stringResource(R.string.btn_switch_direct) else stringResource(R.string.btn_enable_vpn),
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = 11.sp,
+                fontSize = 12.5.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 maxLines = 1

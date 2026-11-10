@@ -574,7 +574,7 @@ fun ServersScreen(
                         },
                         color = XboxNeonGreen,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 11.5.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .weight(1f)
@@ -583,17 +583,18 @@ fun ServersScreen(
                     Button(
                         onClick = { onSelectServer(fasterServer) },
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                         modifier = Modifier
-                            .defaultMinSize(minHeight = 32.dp)
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
                             .testTag("select_faster_server_button")
                     ) {
                         Text(
                             text = if (isEn) "Select" else "Chọn",
                             color = Color.White,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -623,13 +624,13 @@ fun ServersScreen(
                             text = if (isEn) "This server cannot unlock the region, switch to another server?" else "Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?",
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${vpnState.unlockFailPromptServer?.flag ?: ""} ${vpnState.unlockFailPromptServer?.name ?: ""}",
                             color = JapanRed,
-                            fontSize = 10.sp
+                            fontSize = 11.sp
                         )
                     }
                     Row(
@@ -644,27 +645,31 @@ fun ServersScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
-                                .defaultMinSize(minHeight = 32.dp)
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .height(48.dp)
                                 .testTag("confirm_switch_best_server_button")
                         ) {
                             Text(
                                 text = if (isEn) "Switch server" else "Chuyển máy chủ",
                                 color = Color.White,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
                         }
                         TextButton(
                             onClick = { VpnManager.dismissUnlockFailPrompt() },
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .height(48.dp)
                         ) {
                             Text(
                                 text = if (isEn) "Dismiss" else "Đóng",
                                 color = TextSecondary,
-                                fontSize = 10.5.sp
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -736,6 +741,7 @@ fun ServersScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f)
+                            .defaultMinSize(minHeight = 48.dp)
                             .clickable { detailServer = currentServer }
                             .padding(end = 8.dp)
                             .testTag("header_selected_server_pill"),
@@ -745,7 +751,7 @@ fun ServersScreen(
                             text = "${currentServer.flag} ${currentServer.name}",
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.5.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -758,11 +764,11 @@ fun ServersScreen(
                                 text = currentUnlockText,
                                 color = currentUnlockColor,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1
                             )
-                            Text(text = "•", color = TextSecondary, fontSize = 10.sp)
+                            Text(text = "•", color = TextSecondary, fontSize = 11.sp)
                             Text(
                                 text = currentPingText,
                                 color = if (currentMeasurement?.status == ServerPingStatus.MEASURED_FALLBACK_ONLY) {
@@ -773,7 +779,7 @@ fun ServersScreen(
                                     DirectCyan
                                 },
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -801,7 +807,7 @@ fun ServersScreen(
                             text = selectionReasonText,
                             color = TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 9.5.sp,
+                            fontSize = 10.5.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
@@ -813,7 +819,7 @@ fun ServersScreen(
                                 text = activeProbeEstimate.formatLabel(isEn),
                                 color = WarningAmber,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 9.sp,
+                                fontSize = 10.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.testTag("globalping_estimate_label")
@@ -823,6 +829,8 @@ fun ServersScreen(
 
                     Row(
                         modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
                             .clip(modeChipShape)
                             .background(XboxGreen.copy(alpha = 0.22f), modeChipShape)
                             .border(0.8.dp, XboxNeonGreen.copy(alpha = 0.6f), modeChipShape)
@@ -839,22 +847,22 @@ fun ServersScreen(
                                     reason = "bấm nút Chọn tối ưu (trên tab Máy chủ)"
                                 )
                             }
-                            .padding(horizontal = 9.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp)
                             .testTag("auto_pick_best_server_button"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         if (isTestingAll) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(11.dp),
+                                modifier = Modifier.size(14.dp),
                                 color = XboxNeonGreen,
-                                strokeWidth = 1.6.dp
+                                strokeWidth = 1.8.dp
                             )
                             Text(
                                 text = config.tr("Đang chọn...", "Selecting..."),
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
@@ -863,13 +871,13 @@ fun ServersScreen(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(13.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = config.tr("Chọn tối ưu", "Auto Best"),
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
@@ -888,13 +896,15 @@ fun ServersScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
+                            .defaultMinSize(minHeight = 48.dp)
+                            .height(48.dp)
                             .clip(modeChipShape)
                             .background(
                                 if (isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
                                 modeChipShape
                             )
                             .border(
-                                0.9.dp,
+                                1.dp,
                                 if (isAutoOff) XboxNeonGreen else XboxCardBorder,
                                 modeChipShape
                             )
@@ -909,7 +919,7 @@ fun ServersScreen(
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
-                            .padding(horizontal = 8.dp, vertical = 7.dp)
+                            .padding(horizontal = 8.dp)
                             .testTag("mode_auto_off_distance_first_chip"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -917,7 +927,7 @@ fun ServersScreen(
                             text = config.tr("Tự tắt VPN khi vào game", "Auto-Off VPN in game"),
                             color = if (isAutoOff) XboxNeonGreen else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -927,13 +937,15 @@ fun ServersScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
+                            .defaultMinSize(minHeight = 48.dp)
+                            .height(48.dp)
                             .clip(modeChipShape)
                             .background(
                                 if (!isAutoOff) XboxGreen.copy(alpha = 0.24f) else XboxSurfaceVariant.copy(alpha = 0.6f),
                                 modeChipShape
                             )
                             .border(
-                                0.9.dp,
+                                1.dp,
                                 if (!isAutoOff) XboxNeonGreen else XboxCardBorder,
                                 modeChipShape
                             )
@@ -948,7 +960,7 @@ fun ServersScreen(
                                     android.widget.Toast.LENGTH_SHORT
                                 ).show()
                             }
-                            .padding(horizontal = 8.dp, vertical = 7.dp)
+                            .padding(horizontal = 8.dp)
                             .testTag("mode_keep_vpn_ping_first_chip"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -956,7 +968,7 @@ fun ServersScreen(
                             text = config.tr("Bật VPN luôn khi chơi", "Keep VPN on in game"),
                             color = if (!isAutoOff) XboxNeonGreen else TextSecondary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             fontWeight = if (!isAutoOff) FontWeight.ExtraBold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -981,30 +993,30 @@ fun ServersScreen(
                         enabled = !isTestingAll,
                         modifier = Modifier
                             .weight(1f)
-                            .defaultMinSize(minHeight = 38.dp)
-                            .height(38.dp)
+                            .defaultMinSize(minHeight = 48.dp)
+                            .height(48.dp)
                             .testTag("ping_test_all_button"),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                        shape = RoundedCornerShape(9.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         if (isTestingAll) {
-                            CircularProgressIndicator(modifier = Modifier.size(13.dp), color = Color.White, strokeWidth = 1.8.dp)
-                            Spacer(modifier = Modifier.width(5.dp))
+                            CircularProgressIndicator(modifier = Modifier.size(15.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = config.tr("Đang đo ping...", "Pinging..."),
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
                         } else {
-                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(5.dp))
+                            Icon(Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = config.tr("Đo ping", "Ping Test"),
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
+                                fontSize = 12.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
@@ -1015,19 +1027,19 @@ fun ServersScreen(
                         onClick = { showCustomDialog = true },
                         modifier = Modifier
                             .weight(1f)
-                            .defaultMinSize(minHeight = 38.dp)
-                            .height(38.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            .defaultMinSize(minHeight = 48.dp)
+                            .height(48.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceElevated),
-                        shape = RoundedCornerShape(9.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = config.tr("Thêm proxy riêng", "Add Custom"),
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 11.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             maxLines = 1
                         )
@@ -1038,7 +1050,7 @@ fun ServersScreen(
 
         item(key = "servers_region_filter_row") {
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val categories = listOf(
@@ -1051,13 +1063,10 @@ fun ServersScreen(
 
                 items(categories) { (code, title) ->
                     val isSelected = selectedCategory == code
-                    Text(
-                        text = title,
-                        color = if (isSelected) Color.Black else TextSecondary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
-                        fontSize = 11.sp,
+                    Box(
                         modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
                             .clip(filterPillShape)
                             .background(
                                 if (isSelected) XboxNeonGreen else XboxSurfaceVariant,
@@ -1069,24 +1078,27 @@ fun ServersScreen(
                                 filterPillShape
                             )
                             .clickable { selectedCategory = code }
-                            .padding(horizontal = 11.dp, vertical = 6.dp)
-                    )
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = title,
+                            color = if (isSelected) Color.Black else TextSecondary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                            fontSize = 12.5.sp,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 if (allServersSnapshot.any { it.id.startsWith("live_") }) {
                     item(key = "toggle_hide_dead_live_proxies") {
                         val hideActive = config.hideUnreachableDynamicServers
-                        Text(
-                            text = if (hideActive) {
-                                config.tr("✓ Đang ẩn proxy chết", "✓ Hiding dead proxies")
-                            } else {
-                                config.tr("Ẩn proxy động chết", "Hide dead proxies")
-                            },
-                            color = if (hideActive) DirectCyan else TextSecondary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.5.sp,
+                        Box(
                             modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .height(48.dp)
                                 .clip(filterPillShape)
                                 .background(
                                     if (hideActive) DirectCyan.copy(alpha = 0.2f) else XboxSurfaceVariant,
@@ -1110,15 +1122,31 @@ fun ServersScreen(
                                         android.widget.Toast.LENGTH_SHORT
                                     ).show()
                                 }
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                                .testTag("toggle_hide_dead_live_proxies_chip")
-                        )
+                                .padding(horizontal = 12.dp)
+                                .testTag("toggle_hide_dead_live_proxies_chip"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (hideActive) {
+                                    config.tr("✓ Đang ẩn proxy chết", "✓ Hiding dead proxies")
+                                } else {
+                                    config.tr("Ẩn proxy động chết", "Hide dead proxies")
+                                },
+                                color = if (hideActive) DirectCyan else TextSecondary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
 
                 item(key = "manual_sync_public_proxies_chip") {
                     Row(
                         modifier = Modifier
+                            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                            .height(48.dp)
                             .clip(filterPillShape)
                             .background(XboxSurfaceVariant, filterPillShape)
                             .border(1.dp, XboxCardBorder, filterPillShape)
@@ -1135,16 +1163,16 @@ fun ServersScreen(
                                     force = true
                                 )
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp)
                             .testTag("manual_sync_public_proxies_chip"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.CloudDownload,
                             contentDescription = null,
                             tint = XboxNeonGreen,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = if (vpnState.isAutoSyncingLiveProxies) {
@@ -1155,7 +1183,8 @@ fun ServersScreen(
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 10.5.sp
+                            fontSize = 12.sp,
+                            maxLines = 1
                         )
                     }
                 }

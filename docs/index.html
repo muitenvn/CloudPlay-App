@@ -1,435 +1,643 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CloudPlay – Xbox Cloud Gaming trên Android</title>
-<meta name="description" content="CloudPlay: công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android, hiển thị số đo thật khi chơi và gợi ý nguyên nhân lag. Miễn phí.">
-<link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/">
-<link rel="icon" type="image/png" href="img/icon.png">
-<link rel="apple-touch-icon" href="img/icon.png">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b1210" media="(prefers-color-scheme: dark)">
-<meta name="color-scheme" content="light dark">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="CloudPlay">
-<meta property="og:title" content="CloudPlay – Xbox Cloud Gaming trên Android">
-<meta property="og:description" content="Số đo thật khi chơi, gợi ý nguyên nhân lag, tự chỉnh chất lượng hình ảnh. Miễn phí.">
-<meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/">
-<meta property="og:image" content="https://muitenvn.github.io/CloudPlay-App/img/og.jpg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"CloudPlay","applicationCategory":"GameApplication","operatingSystem":"Android 7.0+","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"url":"https://muitenvn.github.io/CloudPlay-App/","image":"https://muitenvn.github.io/CloudPlay-App/img/icon.png"}
-</script>
-<style>
-  :root{
-    --bg:#ffffff; --surface:#f5f7f6; --line:#e4e8e6; --text:#16191a; --muted:#5d6764;
-    --accent:#107c10; --accent-d:#0b5f0b; --accent-soft:#e8f3e8; --on-accent:#fff;
-    --warn-bg:#fff7e6; --warn-line:#f1dcae; --warn-text:#6b4a00; --bar:rgba(255,255,255,.94);
-    --shadow:0 6px 18px rgba(0,0,0,.08); --r:16px;
-  }
-  @media (prefers-color-scheme:dark){
-    :root{
-      --bg:#0b1210; --surface:#121b17; --line:#223029; --text:#eaf1ee; --muted:#9db0a8;
-      --accent:#3fb950; --accent-d:#2f9a40; --accent-soft:#12261a; --on-accent:#06130a;
-      --warn-bg:#241c0b; --warn-line:#4a3a12; --warn-text:#f0d594; --bar:rgba(11,18,16,.94);
-      --shadow:0 6px 18px rgba(0,0,0,.45);
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudPlay — Ứng dụng hỗ trợ chơi Xbox Cloud Gaming trên Android</title>
+  <meta name="description" content="CloudPlay là ứng dụng Android gọn nhẹ giúp mở và chơi Xbox Cloud Gaming trên điện thoại với tay cầm ảo cảm ứng tùy chỉnh, dịch giao diện và bộ công cụ mạng tùy chọn." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/" />
+  <meta name="theme-color" content="#0d1117" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="CloudPlay — Chơi Xbox Cloud Gaming trên Android" />
+  <meta property="og:description" content="Ứng dụng Android gọn nhẹ hỗ trợ chơi Xbox Cloud Gaming với tay cầm cảm ứng tùy chỉnh, hiển thị thông số thực và dịch giao diện." />
+  <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/" />
+  <meta property="og:image" content="https://muitenvn.github.io/CloudPlay-App/img/home.jpg" />
+
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-alt: #1c2128;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #2ea043;
+      --accent-hover: #3fb950;
+      --link: #58a6ff;
+      --warn-bg: rgba(210, 153, 34, 0.1);
+      --warn-border: rgba(210, 153, 34, 0.35);
+      --radius: 12px;
     }
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;font-size:16px;padding-bottom:84px}
-  .wrap{max-width:720px;margin:0 auto;padding:0 20px}
-  a{color:var(--accent)}
-  :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
-  /* top bar */
-  .top{position:sticky;top:0;z-index:20;background:var(--bar);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid transparent;transition:border-color .2s}
-  .top.scrolled{border-color:var(--line)}
-  .top .wrap{display:flex;align-items:center;justify-content:space-between;height:56px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;opacity:0;transform:translateY(4px);transition:opacity .2s,transform .2s}
-  .top.scrolled .brand{opacity:1;transform:none}
-  .brand img{width:28px;height:28px;border-radius:7px}
-  .lang{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--bg)}
-  .lang button{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 12px;min-height:34px;cursor:pointer}
-  .lang button[aria-pressed="true"]{background:var(--text);color:var(--bg)}
-  /* hero */
-  .hero{display:flex;gap:18px;align-items:center;padding:20px 0 6px}
-  .hero img{width:96px;height:96px;border-radius:22px;box-shadow:0 1px 2px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.14);flex:none}
-  h1{font-size:30px;line-height:1.15;letter-spacing:-.02em}
-  .by{color:var(--muted);font-size:14px;margin-top:4px}
-  .tagline{color:var(--muted);font-size:17px;margin:14px 0 0}
-  .cta{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 22px;border-radius:999px;font-weight:700;font-size:16px;text-decoration:none;border:1px solid transparent;white-space:nowrap;transition:transform .15s,background .15s,border-color .15s}
-  .btn.primary{background:var(--accent);color:var(--on-accent);flex:1 1 180px}
-  .btn.primary:hover{background:var(--accent-d)}
-  .btn.primary:active{background:var(--accent-d);transform:scale(.98)}
-  .btn.ghost{background:var(--bg);color:var(--text);border-color:var(--line);flex:1 1 150px}
-  .btn.ghost:hover{background:var(--surface)}
-  .btn svg{width:20px;height:20px}
-  .hash{display:flex;align-items:center;gap:8px;margin-top:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;font-size:12.5px;color:var(--muted)}
-  .hash b{color:var(--text);font-weight:600;flex:none}
-  .hash code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
-  .hash button{font:inherit;font-size:12.5px;font-weight:600;color:var(--accent);background:transparent;border:0;padding:6px 8px;cursor:pointer;flex:none}
-  /* facts */
-  .facts{display:grid;grid-template-columns:repeat(4,1fr);margin:24px 0 4px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface)}
-  .fact{padding:14px 6px;text-align:center;border-left:1px solid var(--line)}
-  .fact:first-child{border-left:0}
-  .fact b{display:block;font-size:15px;white-space:nowrap}
-  .fact span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-  /* sections */
-  section{padding:30px 0 4px}
-  h2{font-size:20px;letter-spacing:-.01em;margin-bottom:14px}
-  /* screenshots */
-  .shots{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -20px;padding:2px 20px 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .shots::-webkit-scrollbar{display:none}
-  .shot{flex:none;width:176px;scroll-snap-align:start;cursor:zoom-in}
-  .shot img{display:block;width:100%;height:auto;aspect-ratio:540/1125;border-radius:18px;border:1px solid var(--line);box-shadow:var(--shadow);background:var(--surface);transition:transform .2s,border-color .2s}
-  .shot:hover img{transform:translateY(-3px);border-color:var(--accent)}
-  .shot figcaption{font-size:13px;color:var(--muted);margin-top:8px;text-align:center;font-weight:500}
-  .dots{display:flex;justify-content:center;gap:6px;margin-top:10px}
-  .dots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
-  .dots i.on{background:var(--accent);width:16px;border-radius:3px}
-  /* features */
-  .feats{display:grid;gap:12px}
-  .feat{display:flex;gap:14px;padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);transition:border-color .2s}
-  .feat:hover{border-color:var(--accent)}
-  .ico{flex:none;width:42px;height:42px;border-radius:12px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
-  .ico svg{width:22px;height:22px}
-  .feat h3{font-size:16px;margin-bottom:2px}
-  .feat p{font-size:14.5px;color:var(--muted)}
-  /* steps */
-  .steps{display:grid;gap:10px;counter-reset:s}
-  .step{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
-  .step::before{counter-increment:s;content:counter(s);flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:14px;display:grid;place-items:center}
-  .step p{padding-top:2px;font-size:15px}
-  /* faq */
-  .faq-grid{display:grid;gap:0}
-  details{border-bottom:1px solid var(--line)}
-  summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;font-weight:600;font-size:16px;min-height:52px}
-  summary::-webkit-details-marker{display:none}
-  summary::after{content:"+";font-size:22px;font-weight:400;color:var(--muted);flex:none}
-  details[open] summary::after{content:"\2212"}
-  details p{color:var(--muted);font-size:15px;padding:0 0 16px}
-  /* notice */
-  .notice{margin-top:30px;padding:14px 16px;border-radius:var(--r);background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-text);font-size:14px}
-  .notice b{display:block;margin-bottom:2px}
-  footer{margin-top:34px;padding:22px 0 10px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
-  /* sticky download bar */
-  .bar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bar);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:10px 20px calc(10px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .25s}
-  .bar.show{transform:none}
-  .bar .btn{width:100%;max-width:680px;margin:0 auto;display:flex}
-  /* lightbox */
-  .lightbox{position:fixed;inset:0;z-index:60;background:rgba(6,10,8,.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
-  .lightbox.open{display:flex}
-  .lightbox img{max-width:min(90vw,420px);max-height:84vh;width:auto;height:auto;border-radius:20px;border:1.5px solid var(--accent);box-shadow:0 20px 50px rgba(0,0,0,.65)}
-  /* iPad / Tablet (640px+) */
-  @media (min-width:640px){
-    .wrap{max-width:880px;padding:0 28px}
-    h1{font-size:34px}
-    .shots{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:0;padding:4px 0;overflow:visible}
-    .shot{width:100%}
-    .dots{display:none}
-    .feats{grid-template-columns:1fr 1fr;gap:14px}
-    .steps{grid-template-columns:repeat(3,1fr);gap:14px}
-  }
-  /* PC / Desktop / Large Tablet Landscape (1024px+) */
-  @media (min-width:1024px){
-    body{padding-bottom:36px}
-    .wrap{max-width:1100px;padding:0 36px}
-    .brand{opacity:1;transform:none}
-    .top-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:40px;align-items:center;padding-top:18px}
-    #shots-sec{padding-top:0}
-    #shots-sec h2{display:none}
-    .shots{gap:14px}
-    .feats{grid-template-columns:repeat(3,1fr);gap:16px}
-    .faq-grid{grid-template-columns:1fr 1fr;gap:0 32px}
-    .bar{display:none!important}
-  }
-  @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
-</style>
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    /* Header */
+    .header {
+      border-bottom: 1px solid var(--border);
+      background-color: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 56px;
+      gap: 12px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 17px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand:hover {
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background-color: var(--accent);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 10px;
+      border-radius: 8px;
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .nav-link:hover {
+      color: var(--text);
+      background-color: var(--surface);
+      text-decoration: none;
+    }
+
+    .lang-btn {
+      background-color: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      min-height: 38px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .lang-btn:hover {
+      border-color: var(--text-muted);
+    }
+
+    /* Main content */
+    main {
+      padding: 28px 0 40px;
+    }
+
+    .hero-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 20px;
+      margin-bottom: 20px;
+    }
+
+    .version-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      background-color: var(--surface-alt);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      display: inline-block;
+    }
+
+    h1 {
+      font-size: clamp(22px, 5vw, 28px);
+      line-height: 1.25;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    .lead {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 20px;
+    }
+
+    /* Download Actions */
+    .dl-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      border: 1px solid transparent;
+    }
+
+    .btn:hover {
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background-color: var(--surface-alt);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .sha-box {
+      margin-top: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      word-break: break-all;
+    }
+
+    /* Features */
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .feature-item {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .feature-item h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    .feature-item p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+
+    /* Notice / Terms card */
+    .notice-card {
+      background-color: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 13.5px;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    .notice-card p + p {
+      margin-top: 6px;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 20px 0 32px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 560px) {
+      .dl-group,
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-card {
+        padding: 18px 16px;
+      }
+    }
+  </style>
 </head>
 <body>
-<header class="top" id="top">
-  <div class="wrap">
-    <div class="brand"><img src="img/icon.png" alt="" width="28" height="28"><span>CloudPlay</span></div>
-    <div class="lang" role="group" aria-label="Language">
-      <button type="button" data-lang="en" aria-pressed="false">EN</button>
-      <button type="button" data-lang="vi" aria-pressed="true">VI</button>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a href="./" class="brand">
+        <span class="brand-icon">C</span>
+        <span>CloudPlay</span>
+      </a>
+      <nav class="header-nav" aria-label="Điều hướng chính">
+        <a href="terms.html" class="nav-link" id="navTermsLink" data-i18n="navTerms">Điều khoản &amp; Quyền riêng tư</a>
+        <a href="https://github.com/muitenvn/CloudPlay-App" target="_blank" rel="noopener noreferrer" class="nav-link">GitHub</a>
+        <button type="button" class="lang-btn" id="langBtn" aria-label="Switch language">EN</button>
+      </nav>
     </div>
-  </div>
-</header>
+  </header>
 
-<main class="wrap">
-  <div class="top-grid">
-    <div class="hero-col">
-      <div class="hero">
-        <img src="img/icon.png" alt="CloudPlay" width="96" height="96">
-        <div>
-          <h1>CloudPlay</h1>
-          <p class="by" data-i="by">Ứng dụng cho Android</p>
-        </div>
+  <main class="container">
+    <section class="hero-card" aria-labelledby="heroTitle">
+      <div class="version-line">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="releaseBadgeText" data-i18n="badgeLoading">Bản phát hành Android mới nhất • Android 8.0+</span>
       </div>
-      <p class="tagline" data-i="tagline">Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android: hiển thị số đo thật khi chơi, tự chỉnh chất lượng hình ảnh và gợi ý nguyên nhân lag.</p>
 
-      <div class="cta" id="cta">
-        <a class="btn primary" id="dl" href="https://github.com/muitenvn/CloudPlay-App/releases/latest">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16"/></svg>
-          <span data-i="dl">Tải APK</span>
+      <h1 id="heroTitle" data-i18n="heroTitle">Chơi Xbox Cloud Gaming gọn nhẹ trên điện thoại Android</h1>
+      <p class="lead" data-i18n="heroDesc">
+        CloudPlay là ứng dụng độc lập giúp bạn mở và chơi Xbox Cloud Gaming (xbox.com/play) thuận tiện trên điện thoại, tích hợp sẵn tay cầm cảm ứng tùy chỉnh, dịch giao diện và bộ công cụ mạng tùy chọn.
+      </p>
+
+      <div class="dl-group">
+        <a id="primaryDownloadBtn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn btn-primary">
+          <span data-i18n="dlPrimary">Tải APK mới nhất (GitHub)</span>
         </a>
-        <a class="btn ghost" id="dlfast" href="https://gh-proxy.com/https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
-          <span data-i="fast" id="dlfast-txt">Tải nhanh qua máy chủ phụ</span>
+        <a id="mirrorDownloadBtn" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" class="btn btn-secondary">
+          <span data-i18n="dlMirror">Tải nhanh (Mirror phụ)</span>
         </a>
       </div>
-      <div class="hash" id="hash">
-        <b>SHA-256</b><code id="hashv" data-i="hashna">Chưa lấy được mã kiểm tra</code>
-        <button type="button" id="copy" data-i="copy" hidden>Sao chép</button>
+
+      <div class="meta-row">
+        <span id="metaVersion" data-i18n="metaVerDefault">Phiên bản: Đang kiểm tra...</span>
+        <span id="metaSize" data-i18n="metaSizeDefault">Dung lượng: ~15 MB</span>
+        <a href="https://github.com/muitenvn/CloudPlay-App/releases" target="_blank" rel="noopener noreferrer" data-i18n="allReleasesLink">Xem tất cả phiên bản →</a>
       </div>
 
-      <div class="facts">
-        <div class="fact"><b id="f-ver">—</b><span data-i="f1">Phiên bản</span></div>
-        <div class="fact"><b id="f-size">—</b><span data-i="f2">Dung lượng</span></div>
-        <div class="fact"><b>7.0+</b><span>Android</span></div>
-        <div class="fact"><b data-i="free">Miễn phí</b><span data-i="f4">Giá</span></div>
+      <div class="sha-box" id="shaBox">
+        <strong data-i18n="shaLabel">SHA-256:</strong>
+        <span id="shaValue" data-i18n="shaDefault">Đang tải mã kiểm tra từ GitHub Releases...</span>
       </div>
-    </div>
-
-    <section id="shots-sec">
-      <h2 data-i="h_shots">Ảnh chụp</h2>
-      <div class="shots" id="shots">
-        <figure class="shot"><img src="img/screenshot-1.webp" alt="" width="540" height="1125" loading="lazy" onerror="shotErr(this)"><figcaption data-i="c1">Trang chủ</figcaption></figure>
-        <figure class="shot"><img src="img/screenshot-2.webp" alt="" width="540" height="1125" loading="lazy" onerror="shotErr(this)"><figcaption data-i="c2">Thư viện game</figcaption></figure>
-        <figure class="shot"><img src="img/screenshot-3.webp" alt="" width="540" height="1125" loading="lazy" onerror="shotErr(this)"><figcaption data-i="c3">Cài đặt đồ họa</figcaption></figure>
-      </div>
-      <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
     </section>
-  </div>
 
-  <section>
-    <h2 data-i="h_feat">Tính năng</h2>
-    <div class="feats">
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
-        <div><h3 data-i="t1">Số đo thật khi chơi</h3><p data-i="d1">Độ trễ mạng, độ biến động, FPS và thời gian giải mã hiện ngay trên màn hình. Chưa có số đo thì hiện “—”, không điền số giả.</p></div>
+    <h2 class="section-title" data-i18n="featHeading">Tính năng chính</h2>
+    <section class="features-grid" aria-label="Tính năng chính">
+      <article class="feature-item">
+        <h2 data-i18n="f1Title">1. Tay cầm cảm ứng &amp; tay cầm rời</h2>
+        <p data-i18n="f1Desc">Kéo thả từng nút, chỉnh kích thước, độ trong suốt, rung phản hồi và lưu bố cục riêng cho từng trò chơi. Hỗ trợ tay cầm Bluetooth/USB-C.</p>
+      </article>
+
+      <article class="feature-item">
+        <h2 data-i18n="f2Title">2. Chỉnh hình ảnh &amp; thông số thật</h2>
+        <p data-i18n="f2Desc">Tùy chỉnh độ phân giải (720p/1080p), giới hạn băng thông, làm nét hình ảnh, quay màn hình và xem FPS, ping, jitter, bitrate thực tế từ WebRTC.</p>
+      </article>
+
+      <article class="feature-item">
+        <h2 data-i18n="f3Title">3. Đa ngôn ngữ &amp; dịch nhanh</h2>
+        <p data-i18n="f3Desc">Hỗ trợ 12 ngôn ngữ giao diện ứng dụng, tự động dịch menu trên trang Xbox Cloud Gaming và tích hợp công cụ dịch nhanh trong ứng dụng.</p>
+      </article>
+
+      <article class="feature-item">
+        <h2 data-i18n="f4Title">4. Công cụ mạng &amp; an toàn tài khoản</h2>
+        <p data-i18n="f4Desc">Đo độ trễ thực tế, hỗ trợ máy chủ proxy tùy chọn khi kết nối vùng và tự động ngắt trung gian khi mở trang đăng nhập hoặc thanh toán Microsoft.</p>
+      </article>
+    </section>
+
+    <section class="notice-card" aria-label="Lưu ý pháp lý">
+      <p data-i18n="noticeIndependent">
+        <strong>Lưu ý độc lập:</strong> CloudPlay là dự án độc lập, không liên kết, không thuộc sở hữu và không được Microsoft Corporation, Xbox hay Epic Games bảo trợ hoặc cấp phép.
+      </p>
+      <p>
+        <span data-i18n="noticeTermsPrefix">Trước khi tải và sử dụng, vui lòng đọc kỹ </span>
+        <a href="terms.html" id="inlineTermsLink" data-i18n="noticeTermsLink">Điều khoản Sử dụng &amp; Chính sách Quyền riêng tư đầy đủ (15 mục)</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-links">
+        <a href="terms.html" id="footerTermsLink" data-i18n="footerTerms">Điều khoản &amp; Quyền riêng tư</a>
+        <a href="https://github.com/muitenvn/CloudPlay-App" target="_blank" rel="noopener noreferrer" data-i18n="footerRepo">Mã nguồn GitHub</a>
+        <a href="https://github.com/muitenvn/CloudPlay-App/releases" target="_blank" rel="noopener noreferrer" data-i18n="footerReleases">Tải bản phát hành (Releases)</a>
+        <a href="https://github.com/muitenvn/CloudPlay-App/issues" target="_blank" rel="noopener noreferrer" data-i18n="footerIssues">Báo lỗi &amp; Góp ý</a>
       </div>
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></div>
-        <div><h3 data-i="t2">Vì sao có lag?</h3><p data-i="d2">Sau mỗi phiên, app dùng số liệu đã lưu để gợi ý nguyên nhân (mạng, giải mã hay mất khung hình) và cách thử khắc phục.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div>
-        <div><h3 data-i="t3">Tự điều chỉnh chất lượng</h3><p data-i="d3">Độ phân giải và tốc độ khung hình thay đổi theo Wi-Fi hoặc dữ liệu di động.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
-        <div><h3 data-i="t4">Máy chủ và đo ping</h3><p data-i="d4">Danh sách máy chủ có cờ quốc gia và độ trễ đo trực tiếp trên điện thoại của bạn; máy chưa đo được hiển thị là chưa đo.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c.5 4 3 7 6 8M12 5c-.5 4-3 7-6 8M13 21l4-10 4 10M14.5 18h5"/></svg></div>
-        <div><h3 data-i="t5">Dịch giao diện game</h3><p data-i="d5">Dịch menu Xbox sang ngôn ngữ bạn chọn, tách biệt với ngôn ngữ của ứng dụng.</p></div>
-      </div>
-      <div class="feat">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 10.5v4M5 12.5h4M16 11.5h.01M18.5 13.5h.01"/></svg></div>
-        <div><h3 data-i="t6">Tay cầm ảo và thư viện</h3><p data-i="d6">Tay cầm ảo trên màn hình cảm ứng, thư viện game và lịch sử các phiên chơi.</p></div>
-      </div>
+      <p data-i18n="footerCopy">
+        CloudPlay • Dự án độc lập không liên kết với Microsoft / Xbox. Định vị IP bởi DB-IP.com (CC BY 4.0).
+      </p>
     </div>
-  </section>
-
-  <section>
-    <h2 data-i="h_install">Cách cài</h2>
-    <div class="steps">
-      <div class="step"><p data-i="s1">Tải file APK bằng nút ở đầu trang.</p></div>
-      <div class="step"><p data-i="s2">Mở file, khi được hỏi hãy cho phép “Cài từ nguồn này”.</p></div>
-      <div class="step"><p data-i="s3">Bấm Cài đặt rồi mở CloudPlay và đăng nhập tài khoản Xbox của bạn.</p></div>
-    </div>
-  </section>
-
-  <section>
-    <h2 data-i="h_faq">Câu hỏi thường gặp</h2>
-    <div class="faq-grid">
-      <details><summary data-i="q1">Có cần tài khoản Xbox không?</summary><p data-i="a1">Có. Bạn đăng nhập bằng tài khoản Microsoft/Xbox của chính mình trên trang Xbox, và cần gói được phép dùng Xbox Cloud Gaming.</p></details>
-      <details><summary data-i="q2">Vì sao Android cảnh báo khi cài?</summary><p data-i="a2">Vì ứng dụng được tải ngoài kho ứng dụng. Chỉ tải từ trang này hoặc GitHub chính thức, và kiểm tra mã SHA-256 nếu dùng máy chủ phụ.</p></details>
-      <details><summary data-i="q3">Mã SHA-256 dùng để làm gì?</summary><p data-i="a3">Đó là “dấu vân tay” của file APK. Nếu mã của file bạn tải khớp với mã hiển thị ở đầu trang thì file không bị thay đổi trên đường tải.</p></details>
-      <details><summary data-i="q4">Chơi bằng 4G/5G được không?</summary><p data-i="a4">Được, tùy chất lượng sóng. Wi-Fi 5 GHz gần bộ phát thường ổn định hơn; app hiển thị số đo thật để bạn tự đánh giá.</p></details>
-      <details><summary data-i="q5">Cập nhật như thế nào?</summary><p data-i="a5">Ứng dụng báo khi có bản mới và kiểm tra file trước khi cài.</p></details>
-    </div>
-  </section>
-
-  <div class="notice" role="note">
-    <b data-i="n_t">Lưu ý</b>
-    <span data-i="n_b">Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.</span>
-  </div>
-
-  <footer>
-    <span data-i="foot">CloudPlay cho Android</span>
-    <span><a href="https://github.com/muitenvn/CloudPlay-App/releases" data-i="rel">Các bản phát hành</a> · <a href="https://github.com/muitenvn/CloudPlay-App" data-i="src">Mã nguồn</a> · <a href="https://muitenvn.github.io/CloudPlay-App/terms.html" data-i="terms">Điều khoản sử dụng</a></span>
   </footer>
-</main>
 
-<div class="bar" id="bar"><a class="btn primary" id="dl2" href="https://github.com/muitenvn/CloudPlay-App/releases/latest"><span data-i="dl">Tải APK</span></a></div>
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Screenshot preview"><img id="lightbox-img" src="" alt=""></div>
+  <script>
+    (function () {
+      var I18N = {
+        vi: {
+          pageTitle: "CloudPlay — Ứng dụng hỗ trợ chơi Xbox Cloud Gaming trên Android",
+          navTerms: "Điều khoản & Quyền riêng tư",
+          badgeLoading: "Bản phát hành Android mới nhất • Android 8.0+",
+          HeroBadgeReady: "Phiên bản mới nhất {ver} • Android 8.0+",
+          heroTitle: "Chơi Xbox Cloud Gaming gọn nhẹ trên điện thoại Android",
+          heroDesc: "CloudPlay là ứng dụng độc lập giúp bạn mở và chơi Xbox Cloud Gaming (xbox.com/play) thuận tiện trên điện thoại, tích hợp sẵn tay cầm cảm ứng tùy chỉnh, dịch giao diện và bộ công cụ mạng tùy chọn.",
+          dlPrimary: "Tải APK mới nhất (GitHub)",
+          dlMirror: "Tải nhanh (Mirror phụ)",
+          metaVerDefault: "Phiên bản: Xem trên GitHub Releases",
+          metaSizeDefault: "Dung lượng: ~15 MB",
+          allReleasesLink: "Xem tất cả phiên bản →",
+          shaLabel: "SHA-256:",
+          shaDefault: "Xem tệp .sha256 đính kèm tại trang GitHub Releases",
+          featHeading: "Tính năng chính",
+          f1Title: "1. Tay cầm cảm ứng & tay cầm rời",
+          f1Desc: "Kéo thả từng nút, chỉnh kích thước, độ trong suốt, rung phản hồi và lưu bố cục riêng cho từng trò chơi. Hỗ trợ tay cầm Bluetooth/USB-C.",
+          f2Title: "2. Chỉnh hình ảnh & thông số thật",
+          f2Desc: "Tùy chỉnh độ phân giải (720p/1080p), giới hạn băng thông, làm nét hình ảnh, quay màn hình và xem FPS, ping, jitter, bitrate thực tế từ WebRTC.",
+          f3Title: "3. Đa ngôn ngữ & dịch nhanh",
+          f3Desc: "Hỗ trợ 12 ngôn ngữ giao diện ứng dụng, tự động dịch menu trên trang Xbox Cloud Gaming và tích hợp công cụ dịch nhanh trong ứng dụng.",
+          f4Title: "4. Công cụ mạng & an toàn tài khoản",
+          f4Desc: "Đo độ trễ thực tế, hỗ trợ máy chủ proxy tùy chọn khi kết nối vùng và tự động ngắt trung gian khi mở trang đăng nhập hoặc thanh toán Microsoft.",
+          noticeIndependent: "<strong>Lưu ý độc lập:</strong> CloudPlay là dự án độc lập, không liên kết, không thuộc sở hữu và không được Microsoft Corporation, Xbox hay Epic Games bảo trợ hoặc cấp phép.",
+          noticeTermsPrefix: "Trước khi tải và sử dụng, vui lòng đọc kỹ ",
+          noticeTermsLink: "Điều khoản Sử dụng & Chính sách Quyền riêng tư đầy đủ (15 mục)",
+          footerTerms: "Điều khoản & Quyền riêng tư",
+          footerRepo: "Mã nguồn GitHub",
+          footerReleases: "Tải bản phát hành (Releases)",
+          footerIssues: "Báo lỗi & Góp ý",
+          footerCopy: "CloudPlay • Dự án độc lập không liên kết với Microsoft / Xbox. Định vị IP bởi DB-IP.com (CC BY 4.0)."
+        },
+        en: {
+          pageTitle: "CloudPlay — Lightweight Xbox Cloud Gaming Client for Android",
+          navTerms: "Terms & Privacy Policy",
+          badgeLoading: "Latest Android Release • Android 8.0+",
+          HeroBadgeReady: "Latest Release {ver} • Android 8.0+",
+          heroTitle: "Play Xbox Cloud Gaming Conveniently on Android",
+          heroDesc: "CloudPlay is an independent Android app for accessing Xbox Cloud Gaming (xbox.com/play) with customizable on-screen touch controls, menu translation, and optional network routing tools.",
+          dlPrimary: "Download Latest APK (GitHub)",
+          dlMirror: "Fast Download (Mirror)",
+          metaVerDefault: "Version: Check GitHub Releases",
+          metaSizeDefault: "Size: ~15 MB",
+          allReleasesLink: "View all releases →",
+          shaLabel: "SHA-256:",
+          shaDefault: "Check the .sha256 file on the GitHub Releases page",
+          featHeading: "Core Features",
+          f1Title: "1. Touch & Physical Gamepad Support",
+          f1Desc: "Drag and resize buttons, adjust opacity and haptic feedback, and save per-game layouts. Full support for Bluetooth and USB-C controllers.",
+          f2Title: "2. Stream Tuning & Real Telemetry",
+          f2Desc: "Adjust target resolution (720p/1080p), bitrate caps, clarity filters, screen recording, and view real-time WebRTC FPS, RTT ping, jitter, and bitrate.",
+          f3Title: "3. Multi-Language & Menu Translation",
+          f3Desc: "Supports 12 app UI languages, automatic localization of Xbox Cloud Gaming menus, and a built-in quick translation tool.",
+          f4Title: "4. Optional Network Tools & Account Safety",
+          f4Desc: "Measures real TCP/HTTP latency, supports user-selected proxies for regional connection, and automatically bypasses proxies on Microsoft login and billing pages.",
+          noticeIndependent: "<strong>Non-Affiliation Notice:</strong> CloudPlay is an independent project and is NOT affiliated with, owned by, endorsed, or authorized by Microsoft Corporation, Xbox, or Epic Games.",
+          noticeTermsPrefix: "Before downloading and using the app, please read the ",
+          noticeTermsLink: "Full 15-Section Terms of Use & Privacy Policy",
+          footerTerms: "Terms & Privacy Policy",
+          footerRepo: "GitHub Source Code",
+          footerReleases: "GitHub Releases",
+          footerIssues: "Report Issues & Feedback",
+          footerCopy: "CloudPlay • Independent project not affiliated with Microsoft / Xbox. IP geolocation by DB-IP.com (CC BY 4.0)."
+        }
+      };
 
-<script>
-  function shotErr(im){
-    var fig=im.parentNode;
-    fig.style.display="none";fig.setAttribute("data-err","1");
-    var sec=document.getElementById("shots-sec");if(!sec)return;
-    var figs=sec.querySelectorAll(".shot"),alive=0,i;
-    for(i=0;i<figs.length;i++){if(figs[i].getAttribute("data-err")!=="1")alive++;}
-    var ds=document.querySelectorAll("#dots i");
-    for(i=0;i<ds.length;i++){ds[i].style.display=(i<alive&&alive>1)?"":"none";}
-    if(alive===0)sec.style.display="none";
-  }
-(function(){
-  var D={
-    vi:{by:"Ứng dụng cho Android",
-      tagline:"Công cụ hỗ trợ chơi Xbox Cloud Gaming trên Android: hiển thị số đo thật khi chơi, tự chỉnh chất lượng hình ảnh và gợi ý nguyên nhân lag.",
-      dl:"Tải APK",fast:"Tải nhanh qua máy chủ phụ",
-      hashna:"Chưa lấy được mã kiểm tra",copy:"Sao chép",copied:"Đã chép",
-      f1:"Phiên bản",f2:"Dung lượng",free:"Miễn phí",f4:"Giá",
-      h_shots:"Ảnh chụp",c1:"Trang chủ",c2:"Thư viện game",c3:"Cài đặt đồ họa",
-      h_feat:"Tính năng",
-      t1:"Số đo thật khi chơi",d1:"Độ trễ mạng, độ biến động, FPS và thời gian giải mã hiện ngay trên màn hình. Chưa có số đo thì hiện “—”, không điền số giả.",
-      t2:"Vì sao có lag?",d2:"Sau mỗi phiên, app dùng số liệu đã lưu để gợi ý nguyên nhân (mạng, giải mã hay mất khung hình) và cách thử khắc phục.",
-      t3:"Tự điều chỉnh chất lượng",d3:"Độ phân giải và tốc độ khung hình thay đổi theo Wi-Fi hoặc dữ liệu di động.",
-      t4:"Máy chủ và đo ping",d4:"Danh sách máy chủ có cờ quốc gia và độ trễ đo trực tiếp trên điện thoại của bạn; máy chưa đo được hiển thị là chưa đo.",
-      t5:"Dịch giao diện game",d5:"Dịch menu Xbox sang ngôn ngữ bạn chọn, tách biệt với ngôn ngữ của ứng dụng.",
-      t6:"Tay cầm ảo và thư viện",d6:"Tay cầm ảo trên màn hình cảm ứng, thư viện game và lịch sử các phiên chơi.",
-      h_install:"Cách cài",s1:"Tải file APK bằng nút ở đầu trang.",s2:"Mở file, khi được hỏi hãy cho phép “Cài từ nguồn này”.",s3:"Bấm Cài đặt rồi mở CloudPlay và đăng nhập tài khoản Xbox của bạn.",
-      h_faq:"Câu hỏi thường gặp",
-      q1:"Có cần tài khoản Xbox không?",a1:"Có. Bạn đăng nhập bằng tài khoản Microsoft/Xbox của chính mình trên trang Xbox, và cần gói được phép dùng Xbox Cloud Gaming.",
-      q2:"Vì sao Android cảnh báo khi cài?",a2:"Vì ứng dụng được tải ngoài kho ứng dụng. Chỉ tải từ trang này hoặc GitHub chính thức, và kiểm tra mã SHA-256 nếu dùng máy chủ phụ.",
-      q3:"Mã SHA-256 dùng để làm gì?",a3:"Đó là “dấu vân tay” của file APK. Nếu mã của file bạn tải khớp với mã hiển thị ở đầu trang thì file không bị thay đổi trên đường tải.",
-      q4:"Chơi bằng 4G/5G được không?",a4:"Được, tùy chất lượng sóng. Wi-Fi 5 GHz gần bộ phát thường ổn định hơn; app hiển thị số đo thật để bạn tự đánh giá.",
-      q5:"Cập nhật như thế nào?",a5:"Ứng dụng báo khi có bản mới và kiểm tra file trước khi cài.",
-      n_t:"Lưu ý",n_b:"Ứng dụng độc lập, không liên kết với Microsoft, Xbox hay Epic Games. Có thể vi phạm điều khoản dịch vụ và dẫn đến khóa tài khoản; người dùng tự chịu rủi ro.",
-      foot:"CloudPlay cho Android",rel:"Các bản phát hành",src:"Mã nguồn",terms:"Điều khoản sử dụng",
-      alts:["Màn hình trang chủ","Thư viện game","Cài đặt đồ họa và FPS"]},
-    en:{by:"App for Android",
-      tagline:"A helper for playing Xbox Cloud Gaming on Android: shows real measurements while you play, adjusts image quality and suggests the cause of lag.",
-      dl:"Download APK",fast:"Fast download via mirror",
-      hashna:"Checksum not available",copy:"Copy",copied:"Copied",
-      f1:"Version",f2:"Size",free:"Free",f4:"Price",
-      h_shots:"Screenshots",c1:"Home",c2:"Game library",c3:"Graphics settings",
-      h_feat:"Features",
-      t1:"Real measurements while you play",d1:"Network latency, jitter, FPS and decode time are shown on screen. When there is no measurement yet it shows “—”, never a made-up number.",
-      t2:"Why is it lagging?",d2:"After each session the app uses the saved data to suggest the cause (network, decoding or dropped frames) and what to try.",
-      t3:"Automatic quality adjustment",d3:"Resolution and frame rate adapt to Wi-Fi or mobile data.",
-      t4:"Servers and ping",d4:"Server list with country flags and latency measured on your own phone; servers not measured yet are shown as not tested.",
-      t5:"In-game translation",d5:"Translates Xbox menus into the language you choose, separate from the app language.",
-      t6:"Virtual gamepad and library",d6:"On-screen virtual gamepad, game library and session history.",
-      h_install:"How to install",s1:"Download the APK with the button at the top.",s2:"Open the file and, when asked, allow “Install from this source”.",s3:"Tap Install, then open CloudPlay and sign in with your Xbox account.",
-      h_faq:"FAQ",
-      q1:"Do I need an Xbox account?",a1:"Yes. You sign in with your own Microsoft/Xbox account on the Xbox site, and you need a plan that allows Xbox Cloud Gaming.",
-      q2:"Why does Android show a warning?",a2:"Because the app is downloaded outside an app store. Only download from this page or the official GitHub, and check the SHA-256 if you use the mirror.",
-      q3:"What is the SHA-256 for?",a3:"It is a fingerprint of the APK file. If the code of the file you downloaded matches the one shown at the top, the file was not changed on the way.",
-      q4:"Can I play on 4G/5G?",a4:"Yes, depending on signal quality. 5 GHz Wi-Fi close to the router is usually steadier; the app shows real measurements so you can judge for yourself.",
-      q5:"How do updates work?",a5:"The app tells you when a new version is out and verifies the file before installing.",
-      n_t:"Note",n_b:"Independent app, not affiliated with Microsoft, Xbox or Epic Games. It may violate terms of service and could lead to account suspension; use at your own risk.",
-      foot:"CloudPlay for Android",rel:"Releases",src:"Source code",terms:"Terms",
-      alts:["Home screen","Game library","Graphics and FPS settings"]}
-  };
-  var lang="en";
-  try{var sv=localStorage.getItem("cp_lang");if(sv==="vi"||sv==="en")lang=sv;else lang=guess();}catch(e){lang=guess();}
-  function guess(){var tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch(e){}return((navigator.language||"").toLowerCase().indexOf("vi")===0||/Ho_Chi_Minh|Saigon/.test(tz))?"vi":"en";}
-  var hashHex="";
-  function apply(l){
-    lang=l;var t=D[l];document.documentElement.lang=l;
-    [].forEach.call(document.querySelectorAll("[data-i]"),function(el){var k=el.getAttribute("data-i");if(t[k]===undefined)return;if(k==="hashna"&&hashHex)return;if(k==="copy"&&el.id==="copy"&&el.getAttribute("data-copied")==="1")return;el.textContent=t[k];});
-    [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.setAttribute("aria-pressed",b.getAttribute("data-lang")===l?"true":"false");});
-    [].forEach.call(document.querySelectorAll("#shots img"),function(im,i){im.alt=t.alts[i]||"";});
-  }
-  [].forEach.call(document.querySelectorAll(".lang button"),function(b){b.addEventListener("click",function(){var l=b.getAttribute("data-lang");try{localStorage.setItem("cp_lang",l);}catch(e){}apply(l);});});
-  apply(lang);
-  // top bar + sticky download bar
-  var top=document.getElementById("top"),bar=document.getElementById("bar"),cta=document.getElementById("cta");
-  function onScroll(){top.classList.toggle("scrolled",window.scrollY>40);bar.classList.toggle("show",cta.getBoundingClientRect().bottom<0);}
-  window.addEventListener("scroll",onScroll,{passive:true});onScroll();
-  // screenshot dots + lightbox
-  var sh=document.getElementById("shots"),dots=document.querySelectorAll("#dots i"),lb=document.getElementById("lightbox"),lbi=document.getElementById("lightbox-img");
-  sh.addEventListener("scroll",function(){
-    var figs=sh.querySelectorAll("figure"),best=0,bd=1e9,n=0,m;
-    for(m=0;m<figs.length;m++){if(figs[m].getAttribute("data-err")==="1")continue;var d=Math.abs(figs[m].offsetLeft-sh.scrollLeft-20);if(d<bd){bd=d;best=n;}n++;}
-    for(m=0;m<dots.length;m++)dots[m].classList.toggle("on",m===best);
-  },{passive:true});
-  [].forEach.call(document.querySelectorAll("#shots .shot img"),function(im){
-    im.addEventListener("click",function(){if(!lb||!lbi)return;lbi.src=im.src;lbi.alt=im.alt||"";lb.classList.add("open");});
-  });
-  if(lb){
-    lb.addEventListener("click",function(){lb.classList.remove("open");});
-    document.addEventListener("keydown",function(ev){if(ev.key==="Escape")lb.classList.remove("open");});
-  }
-  // copy hash
-  var cp=document.getElementById("copy");
-  cp.addEventListener("click",function(){
-    try{navigator.clipboard.writeText(hashHex).then(function(){cp.setAttribute("data-copied","1");cp.textContent=D[lang].copied;setTimeout(function(){cp.removeAttribute("data-copied");cp.textContent=D[lang].copy;},1500);});}catch(e){}
-  });
-  function show(h){hashHex=h.toLowerCase();var el=document.getElementById("hashv");el.textContent=hashHex;el.removeAttribute("data-i");cp.hidden=false;}
-  // silent multi-mirror auto-failover
-  var directApkUrl="https://github.com/muitenvn/CloudPlay-App/releases/latest";
-  var MIRRORS=[
-    {id:"gh_proxy",probe:"https://gh-proxy.com/",build:function(u){return "https://gh-proxy.com/"+u;}},
-    {id:"ghproxy_net",probe:"https://ghproxy.net/",build:function(u){return "https://ghproxy.net/"+u;}},
-    {id:"ghfast",probe:"https://ghfast.top/",build:function(u){return "https://ghfast.top/"+u;}},
-    {id:"mirror_ghproxy",probe:"https://mirror.ghproxy.com/",build:function(u){return "https://mirror.ghproxy.com/"+u;}},
-    {id:"kkgithub",probe:"https://kkgithub.com/",build:function(u){return u.replace(/^https:\/\/github\.com\//i,"https://kkgithub.com/");}}
-  ];
-  var autoCursor=0,healthyIds=["gh_proxy","ghproxy_net","ghfast","mirror_ghproxy","kkgithub"];
-  var dlfastEl=document.getElementById("dlfast");
-  function getMirrorById(id){for(var i=0;i<MIRRORS.length;i++){if(MIRRORS[i].id===id)return MIRRORS[i];}return MIRRORS[0];}
-  function resolveActiveMirror(){
-    var id=healthyIds[autoCursor%healthyIds.length]||"gh_proxy";
-    return getMirrorById(id);
-  }
-  function syncMirrorLink(){
-    var m=resolveActiveMirror();
-    if(dlfastEl)dlfastEl.href=m.build(directApkUrl);
-  }
-  if(dlfastEl){
-    dlfastEl.addEventListener("click",function(){
-      if(healthyIds.length>1){
-        setTimeout(function(){autoCursor=(autoCursor+1)%healthyIds.length;syncMirrorLink();},400);
+      var currentLang = "vi";
+      var releaseInfo = null;
+      var mirrorCursor = 0;
+
+      function buildMirrors(directUrl) {
+        if (!directUrl || directUrl.indexOf("https://github.com/") !== 0) return [directUrl];
+        return [
+          "https://gh-proxy.com/" + directUrl,
+          "https://ghproxy.net/" + directUrl,
+          "https://gh.llkk.cc/" + directUrl,
+          "https://ghproxy.cc/" + directUrl,
+          "https://gh.ddlc.top/" + directUrl,
+          "https://ghfast.top/" + directUrl,
+          "https://mirror.ghproxy.com/" + directUrl,
+          directUrl.replace("https://github.com/", "https://kkgithub.com/"),
+          "https://gh.con.sh/" + directUrl,
+          "https://github.moeyy.xyz/" + directUrl,
+          directUrl
+        ];
       }
-    });
-  }
-  function probeMirrors(){
-    if(!("fetch" in window))return;
-    var aliveSet={};
-    MIRRORS.forEach(function(m){
-      var c=("AbortController" in window)?new AbortController():null;
-      var t=setTimeout(function(){if(c)c.abort();},3500);
-      fetch(m.probe,{mode:"no-cors",cache:"no-store",signal:c?c.signal:undefined}).then(function(){
-        clearTimeout(t);
-        aliveSet[m.id]=true;
-        var ordered=[];
-        for(var i=0;i<MIRRORS.length;i++){if(aliveSet[MIRRORS[i].id])ordered.push(MIRRORS[i].id);}
-        if(ordered.length)healthyIds=ordered;
-        syncMirrorLink();
-      }).catch(function(){clearTimeout(t);});
-    });
-  }
-  syncMirrorLink();
-  probeMirrors();
-  // live release data (fails silently)
-  var ctl=("AbortController" in window)?new AbortController():null;var tm=setTimeout(function(){if(ctl)ctl.abort();},8000);
-  fetch("https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest",{headers:{Accept:"application/vnd.github+json"},signal:ctl?ctl.signal:undefined})
-  .then(function(r){return r.ok?r.json():null;}).then(function(j){
-    clearTimeout(tm);if(!j)return;
-    var ver=String(j.tag_name||"").replace(/^v/i,"");if(ver)document.getElementById("f-ver").textContent=ver;
-    var apk=null,sha=null;(j.assets||[]).forEach(function(a){if(/\.apk$/i.test(a.name))apk=a;if(/\.apk\.sha256$/i.test(a.name))sha=a;});
-    if(apk){
-      document.getElementById("f-size").textContent=(Math.round(apk.size/1048576*10)/10)+" MB";
-      directApkUrl=apk.browser_download_url;
-      document.getElementById("dl").href=apk.browser_download_url;
-      document.getElementById("dl2").href=apk.browser_download_url;
-      syncMirrorLink();
-      var m=/^sha256:([0-9a-f]{64})$/i.exec(apk.digest||"");if(m)show(m[1]);
-    }
-    if(!hashHex&&sha){fetch(sha.browser_download_url).then(function(r){return r.text();}).then(function(x){var m=/\b([0-9a-f]{64})\b/i.exec(x);if(m)show(m[1]);}).catch(function(){});}
-  }).catch(function(){});
-})();
-</script>
+
+      function applyLang(lang) {
+        currentLang = lang === "en" ? "en" : "vi";
+        document.documentElement.lang = currentLang;
+        try { localStorage.setItem("cp_lang", currentLang); } catch (e) {}
+
+        var dict = I18N[currentLang];
+        document.title = dict.pageTitle;
+        var langBtn = document.getElementById("langBtn");
+        if (langBtn) langBtn.textContent = currentLang === "vi" ? "EN" : "VI";
+
+        var termsHref = "terms.html?lang=" + currentLang;
+        ["navTermsLink", "inlineTermsLink", "footerTermsLink"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.setAttribute("href", termsHref);
+        });
+
+        var nodes = document.querySelectorAll("[data-i18n]");
+        for (var i = 0; i < nodes.length; i++) {
+          var key = nodes[i].getAttribute("data-i18n");
+          if (dict[key]) {
+            if (key === "noticeIndependent") {
+              nodes[i].innerHTML = dict[key];
+            } else {
+              nodes[i].textContent = dict[key];
+            }
+          }
+        }
+
+        renderReleaseMeta();
+      }
+
+      function renderReleaseMeta() {
+        if (!releaseInfo) return;
+        var dict = I18N[currentLang];
+        var badgeEl = document.getElementById("releaseBadgeText");
+        var verEl = document.getElementById("metaVersion");
+        var sizeEl = document.getElementById("metaSize");
+        var shaEl = document.getElementById("shaValue");
+
+        if (badgeEl && releaseInfo.tag) {
+          badgeEl.textContent = dict.HeroBadgeReady.replace("{ver}", releaseInfo.tag);
+        }
+        if (verEl && releaseInfo.tag) {
+          verEl.textContent = (currentLang === "en" ? "Version: " : "Phiên bản: ") + releaseInfo.tag + (releaseInfo.date ? " (" + releaseInfo.date + ")" : "");
+        }
+        if (sizeEl && releaseInfo.sizeMb) {
+          sizeEl.textContent = (currentLang === "en" ? "Size: " : "Dung lượng: ") + releaseInfo.sizeMb + " MB";
+        }
+        if (shaEl && releaseInfo.sha256) {
+          shaEl.textContent = releaseInfo.sha256;
+        }
+      }
+
+      var langBtn = document.getElementById("langBtn");
+      if (langBtn) {
+        langBtn.addEventListener("click", function () {
+          applyLang(currentLang === "vi" ? "en" : "vi");
+        });
+      }
+
+      var mirrorBtn = document.getElementById("mirrorDownloadBtn");
+      if (mirrorBtn) {
+        mirrorBtn.addEventListener("click", function () {
+          if (releaseInfo && releaseInfo.apkUrl) {
+            var list = buildMirrors(releaseInfo.apkUrl);
+            mirrorBtn.href = list[mirrorCursor % list.length];
+            mirrorCursor++;
+          }
+        });
+      }
+
+      var urlLang = new URLSearchParams(window.location.search).get("lang");
+      var savedLang = null;
+      try { savedLang = localStorage.getItem("cp_lang"); } catch (e) {}
+      applyLang(urlLang || savedLang || "vi");
+
+      fetch("https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest", {
+        headers: { "Accept": "application/vnd.github+json" }
+      })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          var assets = Array.isArray(data.assets) ? data.assets : [];
+          var apkAsset = null;
+          for (var i = 0; i < assets.length; i++) {
+            if (assets[i] && typeof assets[i].name === "string" && assets[i].name.toLowerCase().endsWith(".apk")) {
+              apkAsset = assets[i];
+              break;
+            }
+          }
+          var shaMatch = (data.body || "").match(/\b([a-fA-F0-9]{64})\b/);
+          var pubDate = data.published_at ? data.published_at.slice(0, 10) : "";
+          var apkUrl = apkAsset ? apkAsset.browser_download_url : (data.html_url || "https://github.com/muitenvn/CloudPlay-App/releases/latest");
+          var sizeMb = apkAsset && apkAsset.size ? (apkAsset.size / (1024 * 1024)).toFixed(1) : null;
+
+          releaseInfo = {
+            tag: data.tag_name || "",
+            date: pubDate,
+            apkUrl: apkUrl,
+            sizeMb: sizeMb,
+            sha256: shaMatch ? shaMatch[1].toLowerCase() : null
+          };
+
+          var primaryBtn = document.getElementById("primaryDownloadBtn");
+          if (primaryBtn && apkUrl) primaryBtn.href = apkUrl;
+          if (mirrorBtn && apkUrl) mirrorBtn.href = buildMirrors(apkUrl)[0];
+
+          renderReleaseMeta();
+        })
+        .catch(function () {});
+    })();
+  </script>
 </body>
 </html>

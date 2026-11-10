@@ -777,7 +777,10 @@ data class AppConfig(
      * Dịch nhanh chuỗi giao diện ứng dụng (ngoài màn hình Cài đặt) sang bất kỳ ngôn ngữ nào trong 12 ngôn ngữ.
      */
     fun tr(vi: String, en: String): String {
-        return AppUiTranslator.translateUi(vi = vi, en = en, rawLangCode = appLanguage.effectiveLanguageCode())
+        val code = appLanguage.effectiveLanguageCode()
+        if (code == "vi") return vi
+        if (code == "en") return en
+        return AppUiTranslator.translateUi(vi = vi, en = en, rawLangCode = code)
     }
 
     fun isVietnameseUI(): Boolean {

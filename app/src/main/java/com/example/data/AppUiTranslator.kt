@@ -32,9 +32,9 @@ object AppUiTranslator {
         }
     }
 
-    // Từ điển câu tĩnh giao diện App theo mã ngôn ngữ (key = chuỗi tiếng Anh chuẩn `en`)
-    private val UI_PHRASES_BY_LANG: Map<String, Map<String, String>> = mapOf(
-        "zh" to mapOf(
+    private val UI_PHRASES_BY_LANG: Map<String, Map<String, String>> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        mapOf(
+            "zh" to mapOf(
             "Auto Translate" to "自动翻译",
             "More options" to "更多选项",
             "Share & QR Code" to "分享与二维码",
@@ -750,6 +750,7 @@ object AppUiTranslator {
             "What's new" to "Apa yang baru"
         )
     )
+    }
 
     /**
      * Dịch chuỗi giao diện ứng dụng (ngoài màn hình Cài đặt) sang ngôn ngữ đang chọn.
@@ -1485,8 +1486,9 @@ object AppUiTranslator {
      * Bổ sung đầy đủ từ vựng từ trang HTML Xbox Cloud Gaming (Call of Duty: Modern Warfare 4 - Vault Edition,
      * NBA 2K27 (XBOX Series X|S), Chơi game trên mây Xbox tại Xbox.com, v.v.).
      */
-    val XBOX_MULTILANG_DICTIONARIES: Map<String, Map<String, String>> = mapOf(
-        "en" to mapOf(
+    val XBOX_MULTILANG_DICTIONARIES: Map<String, Map<String, String>> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        mapOf(
+            "en" to mapOf(
             // Dịch từ tiếng Nhật / Hàn / Việt trên trang Xbox sang Tiếng Anh chuẩn khi người dùng chọn English
             "クラウド ゲーム" to "Cloud Gaming",
             "クラウド ゲーミング" to "Cloud Gaming",
@@ -1783,6 +1785,7 @@ object AppUiTranslator {
             "Achievements" to "Pencapaian"
         )
     )
+    }
 
     fun getXboxDictForLanguage(rawLangCode: String): Map<String, String> {
         val code = normalizeLangCode(rawLangCode)

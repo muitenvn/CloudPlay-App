@@ -34,6 +34,7 @@ import com.example.ui.CloudBrowserScreen
 import com.example.ui.DashboardScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.vpn.VpnManager
+import kotlinx.coroutines.launch
 
 
 sealed class AppScreen {
@@ -123,11 +124,6 @@ class MainActivity : ComponentActivity() {
                 }
                 conf.setLayoutDirection(targetLocale)
                 val localizedCtx = baseContext.createConfigurationContext(conf)
-                @Suppress("DEPRECATION")
-                this@MainActivity.resources.updateConfiguration(
-                    localizedCtx.resources.configuration,
-                    this@MainActivity.resources.displayMetrics
-                )
                 val wrapper = object : android.content.ContextWrapper(this@MainActivity), androidx.activity.result.ActivityResultRegistryOwner {
                     override fun getResources(): android.content.res.Resources = localizedCtx.resources
                     override fun getAssets(): android.content.res.AssetManager = localizedCtx.assets
@@ -163,6 +159,9 @@ class MainActivity : ComponentActivity() {
             breakdown = breakdown,
             onCreateStartElapsedMs = onCreateStartMs
         )
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+            runCatching { com.example.cloudplay.XboxBridge.queryHardwareCodecSupport() }
+        }
     }
 
     override fun onStart() {
@@ -195,6 +194,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun applyImmersiveFullscreen(enable: Boolean) {
+        if (!enable && !isBrowserScreenActive) return
         isBrowserScreenActive = enable
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
         if (enable) {
@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else {
             lockDisplayRefreshRateTo60Hz(false)
-            WindowCompat.setDecorFitsSystemWindows(window, true)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
             insetsController.show(WindowInsetsCompat.Type.systemBars())
@@ -240,7 +240,7 @@ class MainActivity : ComponentActivity() {
                         it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight
                     }.ifEmpty { supportedModes.toList() }
                     val mode60Hz = sameResModes.minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
-                    if (mode60Hz != null) {
+                    if (mode60Hz != null && lp.preferredDisplayModeId != mode60Hz.modeId) {
                         lp.preferredDisplayModeId = mode60Hz.modeId
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             lp.preferredRefreshRate = 60f
@@ -248,11 +248,15 @@ class MainActivity : ComponentActivity() {
                         window.attributes = lp
                     }
                 } else {
-                    lp.preferredDisplayModeId = 0
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        lp.preferredRefreshRate = 0f
+                    val alreadyDefault = lp.preferredDisplayModeId == 0 &&
+                        (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || lp.preferredRefreshRate == 0f)
+                    if (!alreadyDefault) {
+                        lp.preferredDisplayModeId = 0
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            lp.preferredRefreshRate = 0f
+                        }
+                        window.attributes = lp
                     }
-                    window.attributes = lp
                 }
             }
         } catch (e: Exception) {
@@ -347,51 +351,42 @@ fun MainContent(
     LaunchedEffect(currentScreen) {
         val isBrowser = currentScreen is AppScreen.Browser
         activity.applyImmersiveFullscreen(isBrowser)
-        if (!isBrowser) {
-            activity.resetOrientation()
-        }
     }
 
-    AnimatedContent(
-        targetState = currentScreen,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        label = "screen_navigation"
-    ) { screen ->
-        when (screen) {
-            is AppScreen.Dashboard -> {
-                DashboardScreen(
-                    onLaunchUrl = { url ->
-                        val config = SettingsRepository.config.value
-                        if (config.smartVpnEnabled) {
-                            VpnManager.autoTurnOnForLaunch(context)
-                        } else {
-                            if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
-                                VpnManager.connect(context)
-                            }
+    when (val screen = currentScreen) {
+        is AppScreen.Dashboard -> {
+            DashboardScreen(
+                onLaunchUrl = { url ->
+                    val config = SettingsRepository.config.value
+                    if (config.smartVpnEnabled) {
+                        VpnManager.autoTurnOnForLaunch(context)
+                    } else {
+                        if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
+                            VpnManager.connect(context)
                         }
-                        val currentLocale = config.getEffectiveLocale()
-                        val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
-                        val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-                        com.example.data.AppLogger.info(
-                            "WEB-UI",
-                            "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$uaMode | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
-                        )
-                        currentScreen = AppScreen.Browser(finalUrl)
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            is AppScreen.Browser -> {
-                CloudBrowserScreen(
-                    initialUrl = screen.url,
-                    streamController = streamController,
-                    onNavigateBackToDashboard = {
-                        com.example.data.AppLogger.info("UI", "Thoát trình duyệt game -> quay về Trang chủ")
-                        currentScreen = AppScreen.Dashboard
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+                    }
+                    val currentLocale = config.getEffectiveLocale()
+                    val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
+                    val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$uaMode | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
+                    )
+                    currentScreen = AppScreen.Browser(finalUrl)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+        is AppScreen.Browser -> {
+            CloudBrowserScreen(
+                initialUrl = screen.url,
+                streamController = streamController,
+                onNavigateBackToDashboard = {
+                    com.example.data.AppLogger.info("UI", "Thoát trình duyệt game -> quay về Trang chủ")
+                    currentScreen = AppScreen.Dashboard
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }

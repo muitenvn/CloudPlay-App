@@ -139,7 +139,7 @@ internal fun CollapsibleSettingsGroup(
             }
         }
 
-        AnimatedVisibility(visible = expanded) {
+        if (expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 content()
             }

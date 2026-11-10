@@ -117,7 +117,13 @@ object AppLogger {
     val logs: StateFlow<List<AppLogEntry>>
         get() {
             if (pendingQueue.isNotEmpty() || unPublishedUiChanges) {
-                processPendingLogsLocked(publishUiNow = true, flushDiskNow = false)
+                val isRealMainThread = android.os.Looper.getMainLooper()?.thread === Thread.currentThread() &&
+                    !android.os.Build.FINGERPRINT.equals("robolectric", ignoreCase = true)
+                if (isRealMainThread) {
+                    scheduleWorkerDrain(flushImmediately = true)
+                } else {
+                    processPendingLogsLocked(publishUiNow = true, flushDiskNow = false)
+                }
             }
             return _logs.asStateFlow()
         }
@@ -219,8 +225,23 @@ object AppLogger {
      * Khởi tạo bộ lưu nhật ký bền vững trong `context.filesDir`.
      * Tự động nạp lại log cũ từ đĩa khi tiến trình mới khởi động và ghi dòng đánh dấu PID.
      */
+    private val asyncInitScheduled = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun init(context: android.content.Context) {
-        initWithDirectory(context.applicationContext.filesDir)
+        if (processInitialized || !asyncInitScheduled.compareAndSet(false, true)) return
+        val filesDir = context.applicationContext.filesDir
+        val isRobolectric = android.os.Build.FINGERPRINT.equals("robolectric", ignoreCase = true)
+        if (isRobolectric) {
+            initWithDirectory(filesDir)
+        } else {
+            try {
+                diskExecutor.execute {
+                    initWithDirectory(filesDir)
+                }
+            } catch (_: Throwable) {
+                initWithDirectory(filesDir)
+            }
+        }
     }
 
     fun initWithDirectory(
@@ -300,7 +321,7 @@ object AppLogger {
                             id = idGenerator.getAndIncrement(),
                             timestamp = ts,
                             tag = tag,
-                            message = sanitizeMessage(rawMsg),
+                            message = rawMsg,
                             level = level
                         )
                     )

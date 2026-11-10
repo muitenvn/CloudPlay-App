@@ -185,76 +185,64 @@ internal fun ServerCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
+                        val badgeShape = remember { RoundedCornerShape(5.dp) }
                         if (isRecommended) {
-                            Surface(
-                                shape = RoundedCornerShape(5.dp),
-                                color = DirectCyan.copy(alpha = 0.18f),
-                                border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.65f))
-                            ) {
-                                Text(
-                                    text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
-                                    color = DirectCyan,
-                                    fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                                )
-                            }
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(5.dp),
-                            color = XboxGreen.copy(alpha = 0.22f),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, XboxNeonGreen.copy(alpha = 0.45f))
-                        ) {
                             Text(
-                                text = server.protocol.uppercase(),
-                                color = XboxNeonGreen,
+                                text = if (isEn) "★ BEST" else "★ ĐỀ XUẤT",
+                                color = DirectCyan,
                                 fontFamily = JetBrainsMonoFontFamily,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 softWrap = false,
                                 maxLines = 1,
-                                modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                                modifier = Modifier
+                                    .background(DirectCyan.copy(alpha = 0.18f), badgeShape)
+                                    .border(0.7.dp, DirectCyan.copy(alpha = 0.65f), badgeShape)
+                                    .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
                             )
                         }
-                        Surface(
-                            modifier = Modifier.defaultMinSize(minWidth = 52.dp),
-                            shape = RoundedCornerShape(5.dp),
-                            color = unlockBadgeColor.copy(alpha = 0.16f),
-                            border = androidx.compose.foundation.BorderStroke(0.7.dp, unlockBadgeColor.copy(alpha = 0.6f))
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = unlockLabel,
-                                    color = unlockBadgeColor,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 5.5.dp, vertical = 1.5.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = server.protocol.uppercase(),
+                            color = XboxNeonGreen,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            softWrap = false,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .background(XboxGreen.copy(alpha = 0.22f), badgeShape)
+                                .border(0.6.dp, XboxNeonGreen.copy(alpha = 0.45f), badgeShape)
+                                .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                        )
+                        Text(
+                            text = unlockLabel,
+                            color = unlockBadgeColor,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            softWrap = false,
+                            maxLines = 1,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 52.dp)
+                                .background(unlockBadgeColor.copy(alpha = 0.16f), badgeShape)
+                                .border(0.7.dp, unlockBadgeColor.copy(alpha = 0.6f), badgeShape)
+                                .padding(horizontal = 5.5.dp, vertical = 1.5.dp)
+                        )
                         if (isTooFarForAutoSelect) {
-                            Surface(
-                                shape = RoundedCornerShape(5.dp),
-                                color = WarningAmber.copy(alpha = 0.16f),
-                                border = androidx.compose.foundation.BorderStroke(0.7.dp, WarningAmber.copy(alpha = 0.65f))
-                            ) {
-                                Text(
-                                    text = if (isEn) "Too far" else "Quá xa",
-                                    color = WarningAmber,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    softWrap = false,
-                                    maxLines = 1,
-                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 1.5.dp)
-                                )
-                            }
+                            Text(
+                                text = if (isEn) "Too far" else "Quá xa",
+                                color = WarningAmber,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                softWrap = false,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .background(WarningAmber.copy(alpha = 0.16f), badgeShape)
+                                    .border(0.7.dp, WarningAmber.copy(alpha = 0.65f), badgeShape)
+                                    .padding(horizontal = 4.5.dp, vertical = 1.5.dp)
+                            )
                         }
                     }
 
@@ -287,22 +275,25 @@ internal fun ServerCard(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 4-Bar Signal Quality Meter
-                        Row(
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            modifier = Modifier.height(13.dp)
+                        // 4-Bar Signal Quality Meter drawn in a single Canvas node
+                        androidx.compose.foundation.Canvas(
+                            modifier = Modifier
+                                .width(18.dp)
+                                .height(13.dp)
                         ) {
+                            val barWidthPx = 3.dp.toPx()
+                            val gapPx = 2.dp.toPx()
+                            val cornerPx = 1.5.dp.toPx()
+                            val cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerPx, cornerPx)
                             for (bar in 1..4) {
-                                val barHeight = (4 + bar * 2).dp
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.dp)
-                                        .height(barHeight)
-                                        .clip(RoundedCornerShape(1.5.dp))
-                                        .background(
-                                            if (bar <= activeBars) pingColor else XboxCardBorder
-                                        )
+                                val barHeightPx = (4 + bar * 2).dp.toPx()
+                                val x = (bar - 1) * (barWidthPx + gapPx)
+                                val y = size.height - barHeightPx
+                                drawRoundRect(
+                                    color = if (bar <= activeBars) pingColor else XboxCardBorder,
+                                    topLeft = androidx.compose.ui.geometry.Offset(x, y),
+                                    size = androidx.compose.ui.geometry.Size(barWidthPx, barHeightPx),
+                                    cornerRadius = cornerRadius
                                 )
                             }
                         }

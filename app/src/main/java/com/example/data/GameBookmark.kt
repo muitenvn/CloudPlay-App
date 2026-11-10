@@ -134,6 +134,11 @@ object GameLibraryRepository {
         0xFF107C10L, 0xFF0074E4L, 0xFFFF007AL, 0xFF00B4D8L,
         0xFF38B000L, 0xFF7209B7L, 0xFFF77F00L, 0xFF2D6A4FL
     )
+    private val SLUG_NON_ALNUM_REGEX = Regex("[^a-z0-9]+")
+    private val XBOX_CLOUD_SUFFIX_REGEX = Regex("\\s*[•|\\-–—]\\s*Xbox Cloud Gaming.*", RegexOption.IGNORE_CASE)
+    private val XBOX_PIPE_SUFFIX_REGEX = Regex("\\s*\\|?\\s*Xbox.*", RegexOption.IGNORE_CASE)
+    private val XBOX_BULLET_SUFFIX_REGEX = Regex("\\s*[•|\\-–—]\\s*Xbox.*", RegexOption.IGNORE_CASE)
+    private val WHITESPACE_COLLAPSE_REGEX = Regex("\\s+")
 
     @Volatile
     private var prefs: SharedPreferences? = null
@@ -255,13 +260,14 @@ object GameLibraryRepository {
 
                 val now = System.currentTimeMillis()
                 val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
+                val targetMinSynced = (savedTotalCloud.coerceAtMost(500) - 20).coerceAtLeast(0)
                 val needsAutoFullScan = syncedList.isEmpty() ||
                     missingCoverArt ||
-                    (savedTotalCloud > 0 && syncedList.size < (savedTotalCloud - 20)) ||
+                    (targetMinSynced > 0 && syncedList.size < targetMinSynced) ||
                     syncedList.size < 120 ||
                     (now - lastSyncMs) > 6 * 3600 * 1000L
                 if (needsAutoFullScan) {
-                    kotlinx.coroutines.delay(3_500L)
+                    kotlinx.coroutines.delay(4_500L)
                     if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
                         syncLiveXboxCatalog(force = missingCoverArt)
                     }
@@ -341,7 +347,7 @@ object GameLibraryRepository {
 
     private fun slugifyTitle(title: String): String {
         return title.lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9]+"), "-")
+            .replace(SLUG_NON_ALNUM_REGEX, "-")
             .trim('-')
             .ifBlank { "xbox-game" }
     }
@@ -472,8 +478,8 @@ object GameLibraryRepository {
             cleanUrl.contains("/play/launch/", ignoreCase = true)
 
         val cleanedTitle = rawTitle
-            ?.replace(Regex("\\s*[•|\\-–—]\\s*Xbox Cloud Gaming.*", RegexOption.IGNORE_CASE), "")
-            ?.replace(Regex("\\s*\\|?\\s*Xbox.*", RegexOption.IGNORE_CASE), "")
+            ?.replace(XBOX_CLOUD_SUFFIX_REGEX, "")
+            ?.replace(XBOX_PIPE_SUFFIX_REGEX, "")
             ?.trim()
             .orEmpty()
         val hasValidTitle = cleanedTitle.isNotBlank() &&
@@ -624,7 +630,7 @@ object GameLibraryRepository {
                         }
                     } else if (rawImg != null) {
                         val cleanTitle = rawTitle
-                            .replace(Regex("\\s*[•|\\-–—]\\s*Xbox.*", RegexOption.IGNORE_CASE), "")
+                            .replace(XBOX_BULLET_SUFFIX_REGEX, "")
                             .trim()
                             .ifBlank { formatSlugToTitle(slug) }
                         if (cleanTitle.equals("Xbox Cloud Game", ignoreCase = true)) continue
@@ -725,12 +731,17 @@ object GameLibraryRepository {
                 )
 
                 val sharedPrefs = prefs
-                val customList = if (sharedPrefs != null) {
+                val inMemoryGames = _games.value
+                val customList = if (inMemoryGames.isNotEmpty()) {
+                    inMemoryGames.filter { it.id.startsWith("custom_") }
+                } else if (sharedPrefs != null) {
                     loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
                 } else {
-                    _games.value.filter { it.id.startsWith("custom_") }
+                    emptyList()
                 }
-                val existingSynced = if (sharedPrefs != null) {
+                val existingSynced = if (inMemoryGames.isNotEmpty()) {
+                    inMemoryGames.filter { !it.id.startsWith("custom_") }
+                } else if (sharedPrefs != null) {
                     loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
                 } else emptyList()
 
@@ -1031,7 +1042,7 @@ object GameLibraryRepository {
 
                 val shortDesc = locProps.optString("ShortDescription", "").trim()
                     .ifBlank { locProps.optString("ProductDescription", "").trim() }
-                    .replace(Regex("\\s+"), " ")
+                    .replace(WHITESPACE_COLLAPSE_REGEX, " ")
                     .take(280)
                     .takeIf { it.isNotBlank() }
 

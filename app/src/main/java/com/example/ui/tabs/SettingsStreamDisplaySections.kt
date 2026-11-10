@@ -6,11 +6,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -123,9 +122,7 @@ internal fun SettingsGraphicsFpsSection(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 manualModes.chunked(2).forEach { rowModes ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Max),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowModes.forEach { mode ->
@@ -137,7 +134,7 @@ internal fun SettingsGraphicsFpsSection(
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .fillMaxHeight()
+                                    .heightIn(min = 66.dp)
                                     .clip(RoundedCornerShape(10.dp))
                                     .border(
                                         1.dp,
@@ -154,7 +151,6 @@ internal fun SettingsGraphicsFpsSection(
                             ) {
                                 Column(
                                     modifier = Modifier
-                                        .fillMaxHeight()
                                         .padding(horizontal = 10.dp, vertical = 9.dp),
                                     verticalArrangement = Arrangement.spacedBy(3.dp)
                                 ) {
@@ -200,9 +196,7 @@ internal fun SettingsGraphicsFpsSection(
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
@@ -210,7 +204,7 @@ internal fun SettingsGraphicsFpsSection(
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
+                            .heightIn(min = 56.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .border(
                                 1.dp,
@@ -223,7 +217,6 @@ internal fun SettingsGraphicsFpsSection(
                     ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxHeight()
                                 .padding(horizontal = 8.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -264,9 +257,7 @@ internal fun SettingsGraphicsFpsSection(
             )
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Max),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
@@ -274,7 +265,7 @@ internal fun SettingsGraphicsFpsSection(
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
+                            .heightIn(min = 60.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .border(
                                 1.dp,
@@ -287,7 +278,6 @@ internal fun SettingsGraphicsFpsSection(
                     ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxHeight()
                                 .padding(horizontal = 8.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(3.dp)

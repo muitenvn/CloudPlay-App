@@ -81,40 +81,60 @@ data class ServerLocation(
         }
     }
 
+    @Transient
+    private var cachedDescVi: String? = null
+
+    @Transient
+    private var cachedDescEn: String? = null
+
     fun localizedDescription(isEn: Boolean): String {
-        val cleaned = description
-            .replace(Regex("\\s*•\\s*Cổng\\s*:\\d+"), "")
-            .replace(Regex("\\s*\\(Cổng\\s*:\\d+\\)"), "")
-            .replace(Regex("\\s*\\(:\\d+\\)"), "")
-            .replace("Đã xác minh IP Tokyo", "Tokyo, Nhật Bản")
-            .replace("Đã xác minh IP Nhật Bản", "Nhật Bản")
-            .replace("Đã xác minh IP Osaka", "Osaka, Nhật Bản")
-            .replace("Uy tín cao • Đã lọc lỗi", "Đã kiểm tra kết nối")
-            .replace("An toàn • Đã xác minh", "Đã kiểm tra kết nối")
-            .replace("An toàn • Uy tín", "Đã kiểm tra kết nối")
-        if (!isEn) return cleaned
-        return cleaned
-            .replace("Đại học Tsukuba Academic", "Tsukuba University Academic")
-            .replace("Đại học Tsukuba", "Tsukuba University")
-            .replace("Đã kiểm tra kết nối", "Connectivity checked")
-            .replace("Tokyo, Nhật Bản", "Tokyo, Japan")
-            .replace("Osaka, Nhật Bản", "Osaka, Japan")
-            .replace("Nhật Bản", "Japan")
-            .replace("Hàn Quốc", "South Korea")
-            .replace("Hoa Kỳ", "United States")
-            .replace("Khuyên dùng", "Recommended")
-            .replace("Dự phòng", "Backup")
-            .replace("Trục cáp quang", "Fiber Backbone")
-            .replace("Cụm máy chủ", "Server Cluster")
-            .replace("Độ trễ thấp cho VN", "Low Latency Regional Route")
-            .replace("Kết nối khu vực Đông Nam Á", "Asia-Pacific Regional Hub")
-            .replace("Đầu mối quốc tế tốc độ cao", "High-Speed International Node")
-            .replace("Mạng lưới toàn cầu", "Global Edge Network")
-            .replace("Cổng kết nối ổn định", "Stable Gateway")
-            .replace("Proxy cá nhân", "Custom proxy")
-            .replace("Máy chủ SOCKS5 do người dùng tự thêm", "User-added custom SOCKS5 proxy")
-            .replace("Máy chủ HTTP do người dùng tự thêm", "User-added custom HTTP proxy")
-            .replace("do người dùng tự thêm", "User-added custom proxy")
+        val vi = cachedDescVi ?: run {
+            val cleaned = description
+                .replace(PORT_BULLET_REGEX, "")
+                .replace(PORT_PAREN_WORD_REGEX, "")
+                .replace(PORT_PAREN_SHORT_REGEX, "")
+                .replace("Đã xác minh IP Tokyo", "Tokyo, Nhật Bản")
+                .replace("Đã xác minh IP Nhật Bản", "Nhật Bản")
+                .replace("Đã xác minh IP Osaka", "Osaka, Nhật Bản")
+                .replace("Uy tín cao • Đã lọc lỗi", "Đã kiểm tra kết nối")
+                .replace("An toàn • Đã xác minh", "Đã kiểm tra kết nối")
+                .replace("An toàn • Uy tín", "Đã kiểm tra kết nối")
+            cachedDescVi = cleaned
+            cleaned
+        }
+        if (!isEn) return vi
+        return cachedDescEn ?: run {
+            val en = vi
+                .replace("Đại học Tsukuba Academic", "Tsukuba University Academic")
+                .replace("Đại học Tsukuba", "Tsukuba University")
+                .replace("Đã kiểm tra kết nối", "Connectivity checked")
+                .replace("Tokyo, Nhật Bản", "Tokyo, Japan")
+                .replace("Osaka, Nhật Bản", "Osaka, Japan")
+                .replace("Nhật Bản", "Japan")
+                .replace("Hàn Quốc", "South Korea")
+                .replace("Hoa Kỳ", "United States")
+                .replace("Khuyên dùng", "Recommended")
+                .replace("Dự phòng", "Backup")
+                .replace("Trục cáp quang", "Fiber Backbone")
+                .replace("Cụm máy chủ", "Server Cluster")
+                .replace("Độ trễ thấp cho VN", "Low Latency Regional Route")
+                .replace("Kết nối khu vực Đông Nam Á", "Asia-Pacific Regional Hub")
+                .replace("Đầu mối quốc tế tốc độ cao", "High-Speed International Node")
+                .replace("Mạng lưới toàn cầu", "Global Edge Network")
+                .replace("Cổng kết nối ổn định", "Stable Gateway")
+                .replace("Proxy cá nhân", "Custom proxy")
+                .replace("Máy chủ SOCKS5 do người dùng tự thêm", "User-added custom SOCKS5 proxy")
+                .replace("Máy chủ HTTP do người dùng tự thêm", "User-added custom HTTP proxy")
+                .replace("do người dùng tự thêm", "User-added custom proxy")
+            cachedDescEn = en
+            en
+        }
+    }
+
+    companion object {
+        private val PORT_BULLET_REGEX = Regex("\\s*•\\s*Cổng\\s*:\\d+")
+        private val PORT_PAREN_WORD_REGEX = Regex("\\s*\\(Cổng\\s*:\\d+\\)")
+        private val PORT_PAREN_SHORT_REGEX = Regex("\\s*\\(:\\d+\\)")
     }
 }
 

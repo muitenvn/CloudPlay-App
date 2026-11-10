@@ -139,18 +139,37 @@ object GeoIpDetector {
         return "$flag $countryName • ${ip.trim()}"
     }
 
-    fun ipv4ToLong(ip: String): Long? {
-        val trimmed = ip.trim()
-        val parts = trimmed.split('.')
-        if (parts.size != 4) return null
+    fun ipv4ToLong(ip: String): Long? = ipv4ToLong(ip, 0, ip.length)
+
+    private fun ipv4ToLong(cs: CharSequence, startIdx: Int, endIdx: Int): Long? {
+        var s = startIdx
+        var e = endIdx
+        while (s < e && cs[s] <= ' ') s++
+        while (e > s && cs[e - 1] <= ' ') e--
+        if (e - s !in 7..15) return null
         var result = 0L
-        for (part in parts) {
-            if (part.isEmpty() || part.length > 3) return null
-            val num = part.toIntOrNull() ?: return null
-            if (num !in 0..255) return null
-            result = (result shl 8) or num.toLong()
+        var currentOctet = 0
+        var digitCount = 0
+        var dotCount = 0
+        for (i in s until e) {
+            val ch = cs[i]
+            if (ch == '.') {
+                if (digitCount == 0 || currentOctet > 255) return null
+                result = (result shl 8) or currentOctet.toLong()
+                currentOctet = 0
+                digitCount = 0
+                dotCount++
+                if (dotCount > 3) return null
+            } else if (ch in '0'..'9') {
+                currentOctet = currentOctet * 10 + (ch - '0')
+                digitCount++
+                if (digitCount > 3) return null
+            } else {
+                return null
+            }
         }
-        return result
+        if (dotCount != 3 || digitCount == 0 || currentOctet > 255) return null
+        return (result shl 8) or currentOctet.toLong()
     }
 
     private val fastHttpClient = OkHttpClient.Builder()
@@ -367,39 +386,91 @@ object GeoIpDetector {
         }
     }
 
+    private val countryCodeInternPool = java.util.concurrent.ConcurrentHashMap<Int, String>(256)
+
+    private fun internTwoCharCountry(c0: Char, c1: Char): String {
+        val key = (c0.code shl 16) or c1.code
+        return countryCodeInternPool.getOrPut(key) {
+            String(charArrayOf(c0, c1))
+        }
+    }
+
     fun loadCsvRangesFromStream(inputStream: java.io.InputStream): Boolean {
         return try {
-            val starts = ArrayList<Long>(65536)
-            val ends = ArrayList<Long>(65536)
-            val codes = ArrayList<String>(65536)
+            var capacity = 65536
+            var starts = LongArray(capacity)
+            var ends = LongArray(capacity)
+            var codes = arrayOfNulls<String>(capacity)
+            var size = 0
             var lastStart = -1L
 
-            java.io.BufferedReader(java.io.InputStreamReader(inputStream, Charsets.UTF_8)).useLines { lines ->
+            java.io.BufferedReader(java.io.InputStreamReader(inputStream, Charsets.UTF_8), 32768).useLines { lines ->
                 for (rawLine in lines) {
-                    val line = rawLine.trim()
-                    if (line.isEmpty() || line.startsWith("#")) continue
-                    val parts = line.split(',')
-                    if (parts.size < 3) continue
-                    val sStr = parts[0].trim().removeSurrounding("\"")
-                    val eStr = parts[1].trim().removeSurrounding("\"")
-                    val cc = parts[2].trim().removeSurrounding("\"").uppercase(java.util.Locale.ROOT)
-                    if (sStr.contains(':') || eStr.contains(':')) continue
-                    if (cc.length != 2 || cc == "ZZ" || cc == "XX" || !cc.all { it in 'A'..'Z' }) continue
-                    val startIp = ipv4ToLong(sStr) ?: continue
-                    val endIp = ipv4ToLong(eStr) ?: continue
+                    val len = rawLine.length
+                    if (len < 16 || rawLine[0] == '#') continue
+                    val comma1 = rawLine.indexOf(',')
+                    if (comma1 <= 0) continue
+                    // Bỏ qua ngay dòng IPv6 có dấu ':' mà không cấp phát mảng split()
+                    var hasColon = false
+                    for (i in 0 until comma1) {
+                        if (rawLine[i] == ':') {
+                            hasColon = true
+                            break
+                        }
+                    }
+                    if (hasColon) continue
+
+                    val comma2 = rawLine.indexOf(',', comma1 + 1)
+                    if (comma2 <= comma1 + 1) continue
+
+                    var s0 = 0
+                    var s1 = comma1
+                    while (s0 < s1 && (rawLine[s0] <= ' ' || rawLine[s0] == '"')) s0++
+                    while (s1 > s0 && (rawLine[s1 - 1] <= ' ' || rawLine[s1 - 1] == '"')) s1--
+
+                    var e0 = comma1 + 1
+                    var e1 = comma2
+                    while (e0 < e1 && (rawLine[e0] <= ' ' || rawLine[e0] == '"')) e0++
+                    while (e1 > e0 && (rawLine[e1 - 1] <= ' ' || rawLine[e1 - 1] == '"')) e1--
+
+                    val comma3 = rawLine.indexOf(',', comma2 + 1)
+                    var c0 = comma2 + 1
+                    var c1 = if (comma3 > comma2) comma3 else len
+                    while (c0 < c1 && (rawLine[c0] <= ' ' || rawLine[c0] == '"')) c0++
+                    while (c1 > c0 && (rawLine[c1 - 1] <= ' ' || rawLine[c1 - 1] == '"')) c1--
+                    if (c1 - c0 != 2) continue
+
+                    val ch0 = rawLine[c0].uppercaseChar()
+                    val ch1 = rawLine[c0 + 1].uppercaseChar()
+                    if (ch0 !in 'A'..'Z' || ch1 !in 'A'..'Z') continue
+                    if ((ch0 == 'Z' && ch1 == 'Z') || (ch0 == 'X' && ch1 == 'X')) continue
+
+                    val startIp = ipv4ToLong(rawLine, s0, s1) ?: continue
+                    val endIp = ipv4ToLong(rawLine, e0, e1) ?: continue
                     if (startIp > endIp || startIp < lastStart) continue
-                    starts.add(startIp)
-                    ends.add(endIp)
-                    codes.add(cc)
+
+                    if (size == capacity) {
+                        val nextCap = capacity * 2
+                        starts = starts.copyOf(nextCap)
+                        ends = ends.copyOf(nextCap)
+                        codes = codes.copyOf(nextCap)
+                        capacity = nextCap
+                    }
+                    starts[size] = startIp
+                    ends[size] = endIp
+                    codes[size] = internTwoCharCountry(ch0, ch1)
+                    size++
                     lastStart = startIp
                 }
             }
 
-            if (starts.size >= 5) {
+            if (size >= 5) {
+                @Suppress("UNCHECKED_CAST")
+                val finalCodes = (if (size == capacity) codes else codes.copyOf(size)) as Array<String>
                 activeRangeTable = IpRangeTable(
-                    startIps = starts.toLongArray(),
-                    endIps = ends.toLongArray(),
-                    countryCodes = codes.toTypedArray()
+                    startIps = if (size == capacity) starts else starts.copyOf(size),
+                    endIps = if (size == capacity) ends else ends.copyOf(size),
+                    countryCodes = finalCodes
                 )
                 ipCountryCache.clear()
                 true
@@ -408,6 +479,56 @@ object GeoIpDetector {
             }
         } catch (_: Exception) {
             false
+        }
+    }
+
+    private const val BINARY_CACHE_MAGIC = 0x44424950 // "DBIP"
+
+    private fun loadBinaryRangeCache(binFile: java.io.File): Boolean {
+        if (!binFile.exists() || binFile.length() < 16L) return false
+        return try {
+            java.io.DataInputStream(java.io.BufferedInputStream(java.io.FileInputStream(binFile), 65536)).use { dis ->
+                if (dis.readInt() != BINARY_CACHE_MAGIC) return false
+                val count = dis.readInt()
+                if (count !in 5..1_500_000) return false
+                val starts = LongArray(count)
+                val ends = LongArray(count)
+                val codes = Array(count) { "" }
+                for (i in 0 until count) {
+                    starts[i] = dis.readLong()
+                    ends[i] = dis.readLong()
+                    val c0 = dis.readByte().toInt().toChar()
+                    val c1 = dis.readByte().toInt().toChar()
+                    codes[i] = internTwoCharCountry(c0, c1)
+                }
+                activeRangeTable = IpRangeTable(starts, ends, codes)
+                ipCountryCache.clear()
+                true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun saveBinaryRangeCache(binFile: java.io.File, table: IpRangeTable) {
+        try {
+            val count = table.startIps.size
+            if (count < 5) return
+            val tmpBin = java.io.File(binFile.parentFile, "${binFile.name}.tmp")
+            java.io.DataOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(tmpBin), 65536)).use { dos ->
+                dos.writeInt(BINARY_CACHE_MAGIC)
+                dos.writeInt(count)
+                for (i in 0 until count) {
+                    dos.writeLong(table.startIps[i])
+                    dos.writeLong(table.endIps[i])
+                    val cc = table.countryCodes[i]
+                    dos.writeByte(if (cc.isNotEmpty()) cc[0].code else 'U'.code)
+                    dos.writeByte(if (cc.length > 1) cc[1].code else 'S'.code)
+                }
+            }
+            if (binFile.exists()) binFile.delete()
+            tmpBin.renameTo(binFile)
+        } catch (_: Exception) {
         }
     }
 
@@ -509,17 +630,24 @@ object GeoIpDetector {
     ): Boolean = withContext(Dispatchers.IO) {
         val dbDir = java.io.File(context.filesDir, "geoip")
         if (!dbDir.exists()) dbDir.mkdirs()
+        val binFile = java.io.File(dbDir, "dbip-country-lite.bin")
         val csvFile = java.io.File(dbDir, "dbip-country-lite.csv")
         val tmpFile = java.io.File(dbDir, "dbip-country-lite.csv.tmp")
 
-        if (csvFile.exists() && csvFile.length() > 1024L && activeRangeTable === defaultSeedTable) {
-            try {
-                java.io.FileInputStream(csvFile).use { fis ->
-                    if (loadCsvRangesFromStream(fis)) {
-                        return@withContext true
+        if (activeRangeTable === defaultSeedTable) {
+            if (loadBinaryRangeCache(binFile)) {
+                return@withContext true
+            }
+            if (csvFile.exists() && csvFile.length() > 1024L) {
+                try {
+                    java.io.FileInputStream(csvFile).use { fis ->
+                        if (loadCsvRangesFromStream(fis)) {
+                            saveBinaryRangeCache(binFile, activeRangeTable)
+                            return@withContext true
+                        }
                     }
-                }
-            } catch (_: Exception) {}
+                } catch (_: Exception) {}
+            }
         }
 
         val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
@@ -558,6 +686,7 @@ object GeoIpDetector {
                     loadCsvRangesFromStream(fis)
                 }
                 if (loadedOk) {
+                    saveBinaryRangeCache(binFile, activeRangeTable)
                     if (csvFile.exists()) csvFile.delete()
                     tmpFile.renameTo(csvFile)
                     return@withContext true

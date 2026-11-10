@@ -230,9 +230,6 @@ object VpnManager {
         scope.launch(Dispatchers.IO) {
             loadPersistedServers(appCtx)
             loadPersistedUnlockRecords(appCtx)
-            launch {
-                GeoIpDetector.downloadDbIpLiteIfPermitted(appCtx, isCellularConfirmedByUser = false)
-            }
             ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = false)
             if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
                 testAllServers(
@@ -245,6 +242,10 @@ object VpnManager {
             delay(3_500L)
             if (!isInGameStreamActive) {
                 autoSyncPublicProxiesIfNeeded(context = appCtx, force = false)
+            }
+            delay(1_500L)
+            if (!isInGameStreamActive) {
+                GeoIpDetector.downloadDbIpLiteIfPermitted(appCtx, isCellularConfirmedByUser = false)
             }
         }
 

@@ -299,8 +299,12 @@ fun ServersScreen(
         userNeedsVpn,
         isEn
     ) {
+        while (listState.isScrollInProgress && value.filteredServers.isNotEmpty()) {
+            kotlinx.coroutines.delay(48)
+        }
         val isScrolledDown = listState.isScrollInProgress || listState.firstVisibleItemIndex > 1
-        val sortEpochKey = "$selectedCategory|${allServersSnapshot.size}|${vpnState.engine}|${config.hideUnreachableDynamicServers}|${config.autoBypassEnabled}|${VpnManager.getCurrentMeasurementGeneration()}"
+        val filterEpochKey = "$selectedCategory|${allServersSnapshot.size}|${vpnState.engine}|${config.hideUnreachableDynamicServers}|${config.autoBypassEnabled}"
+        val sortEpochKey = "$filterEpochKey|${VpnManager.getCurrentMeasurementGeneration()}"
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val rawFiltered = when (selectedCategory) {
                 "ALL" -> allServersSnapshot
@@ -327,10 +331,10 @@ fun ServersScreen(
                 geo = vpnState.detectedGeoIp
             )
 
-            // Khi người dùng đang cuộn ở giữa danh sách và chỉ có kết quả đo lười (lazy probe) mới về,
-            // giữ nguyên thứ tự các dòng hiện tại để danh sách không bị nhảy dưới ngón tay.
+            // Khi người dùng đang cuộn ở giữa danh sách, giữ nguyên thứ tự các dòng hiện tại
+            // (kể cả khi đang đo ping nền isTestingAll) để danh sách không bị đảo/nhảy gây giật khung hình.
             val prevOrderPair = stableOrderCache.get()
-            val sortedFiltered = if (isScrolledDown && !isTestingAll && prevOrderPair != null && prevOrderPair.first == sortEpochKey) {
+            val sortedFiltered = if (isScrolledDown && prevOrderPair != null && prevOrderPair.first.startsWith(filterEpochKey)) {
                 val byId = rawFiltered.associateBy { it.id }
                 val preserved = ArrayList<ServerLocation>(rawFiltered.size)
                 val seen = HashSet<String>(rawFiltered.size * 2)
@@ -347,9 +351,7 @@ fun ServersScreen(
                 }
                 preserved
             } else {
-                if (!isTestingAll || prevOrderPair == null || prevOrderPair.first != sortEpochKey) {
-                    stableOrderCache.set(sortEpochKey to fullSorted.map { it.id })
-                }
+                stableOrderCache.set(sortEpochKey to fullSorted.map { it.id })
                 fullSorted
             }
 
@@ -1421,6 +1423,19 @@ fun ServersScreen(
             val distanceKm = meta?.distanceKm
             val isTooFarForAutoSelect = meta?.isTooFarForAutoSelect ?: false
 
+            val onClickStable = remember(server, onSelectServer) {
+                { onSelectServer(server) }
+            }
+            val onDeleteStable: (() -> Unit)? = remember(server.id, server.isCustom) {
+                if (server.isCustom) {
+                    {
+                        VpnManager.removeCustomServer(server.id)
+                        allServers.removeAll { it.id == server.id }
+                        Unit
+                    }
+                } else null
+            }
+
             ServerCard(
                 server = server,
                 isSelected = isSelected,
@@ -1436,13 +1451,8 @@ fun ServersScreen(
                 isTooFarForAutoSelect = isTooFarForAutoSelect,
                 precomputedSubtitle = meta?.subtitleText,
                 isEn = isEn,
-                onClick = { onSelectServer(server) },
-                onDelete = if (server.isCustom) {
-                    {
-                        VpnManager.removeCustomServer(server.id)
-                        allServers.removeAll { it.id == server.id }
-                    }
-                } else null
+                onClick = onClickStable,
+                onDelete = onDeleteStable
             )
         }
 

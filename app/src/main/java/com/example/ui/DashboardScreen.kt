@@ -599,18 +599,24 @@ fun DashboardScreen(
             // - Lúc mới mở app chỉ dựng HOME.
             // - Tab nào người dùng bấm vào lần đầu mới dựng và giữ sống cây LayoutNode + LazyListState.
             // - Khi chuyển qua lại giữa các tab đã mở, chỉ bật/tắt placeable ở pha Placement (0 Compose, 0 Measure/SubcomposeLayout).
+            val onSelectServerStable = remember(context) {
+                { srv: com.example.vpn.ServerLocation -> VpnManager.selectServer(srv, context) }
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 visitedTabs.forEach { tab ->
                     androidx.compose.runtime.key(tab) {
+                        val isSelectedTab = (currentTab == tab)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .layout { measurable, constraints ->
-                                    val placeable = measurable.measure(constraints)
-                                    layout(placeable.width, placeable.height) {
-                                        if (currentTab == tab) {
+                                    if (isSelectedTab) {
+                                        val placeable = measurable.measure(constraints)
+                                        layout(placeable.width, placeable.height) {
                                             placeable.placeRelative(0, 0)
                                         }
+                                    } else {
+                                        layout(0, 0) {}
                                     }
                                 }
                         ) {
@@ -649,8 +655,8 @@ fun DashboardScreen(
                                     DashboardTab.SERVERS -> {
                                         ServersScreen(
                                             currentServer = vpnState.currentServer,
-                                            onSelectServer = { VpnManager.selectServer(it, context) },
-                                            isTabActive = (currentTab == DashboardTab.SERVERS)
+                                            onSelectServer = onSelectServerStable,
+                                            isTabActive = isSelectedTab
                                         )
                                     }
                                     DashboardTab.SETTINGS -> {

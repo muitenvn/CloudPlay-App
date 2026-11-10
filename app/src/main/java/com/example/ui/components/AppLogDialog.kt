@@ -253,7 +253,7 @@ fun AppLogDialog(
                                 .padding(10.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(filteredLogs, key = { it.id }) { entry ->
+                            items(filteredLogs, key = { it.id }, contentType = { "log_entry_row" }) { entry ->
                                 val isError = entry.level == AppLogLevel.ERROR
                                 val isWarn = entry.level == AppLogLevel.WARN
                                 val badgeColor = when (entry.level) {
@@ -321,30 +321,33 @@ fun AppLogDialog(
                                                 fontFamily = JetBrainsMonoFontFamily,
                                                 fontSize = 9.5.sp
                                             )
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = badgeColor.copy(alpha = if (isError) 0.28f else 0.18f),
-                                                border = androidx.compose.foundation.BorderStroke(
-                                                    0.6.dp,
-                                                    badgeColor.copy(alpha = 0.75f)
-                                                )
-                                            ) {
-                                                Text(
-                                                    text = "${entry.tag}•${entry.level.name}",
-                                                    color = badgeColor,
-                                                    fontFamily = JetBrainsMonoFontFamily,
-                                                    fontSize = 8.5.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                )
-                                            }
+                                            Text(
+                                                text = "${entry.tag}•${entry.level.name}",
+                                                color = badgeColor,
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                fontSize = 8.5.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier
+                                                    .background(
+                                                        badgeColor.copy(alpha = if (isError) 0.28f else 0.18f),
+                                                        RoundedCornerShape(4.dp)
+                                                    )
+                                                    .border(
+                                                        0.6.dp,
+                                                        badgeColor.copy(alpha = 0.75f),
+                                                        RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
                                         }
                                         Text(
                                             text = "$levelIcon${entry.message}",
                                             color = msgColor,
                                             fontFamily = JetBrainsMonoFontFamily,
                                             fontWeight = if (isError) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 10.5.sp
+                                            fontSize = 10.5.sp,
+                                            maxLines = 10,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
                                     }
                                 }

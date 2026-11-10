@@ -145,6 +145,12 @@ class XboxBridge(
         @Volatile
         private var cachedHardwareCodecSupport: HardwareCodecSupport? = null
 
+        @Volatile
+        private var lastInjectionCacheKey: String? = null
+
+        @Volatile
+        private var lastInjectionScript: String? = null
+
         fun queryHardwareCodecSupport(): HardwareCodecSupport {
             cachedHardwareCodecSupport?.let { return it }
             var h264Any = false
@@ -255,6 +261,10 @@ class XboxBridge(
             val isEnglishUi = currentConfig.isEnglishUI()
             val autoExitPreviewEnabled = currentConfig.autoExitPreviewHandlerEnabled
             val targetTranslateLang = currentConfig.getTargetTranslateLanguageCode()
+            val cacheKey = "$clarityBoost|$clarityPreset|$maxBitrateMbps|$antiAfk|$targetCountry|$targetIp|$userLocale|$xcloudTranslate|$preserveTitles|$bilingualMode|$hideStreamStats|$cellularMode|$networkTuningMode|$speedFirstPriority|$effectiveBitrateMbps|$lowEndDeviceMode|$virtualGamepadEnabled|$renderScaleFactor|$fpsCap|$gpuLoadReduction|$isCellular|$isEnglishUi|$autoExitPreviewEnabled|$targetTranslateLang|${currentConfig.hashCode()}"
+            if (cacheKey == lastInjectionCacheKey) {
+                lastInjectionScript?.let { return it }
+            }
             val hwCaps = queryHardwareCodecSupport()
             val translatorScript = XboxTranslator.getTranslatorScript(
                 enabled = xcloudTranslate,
@@ -2964,7 +2974,10 @@ class XboxBridge(
                 // 8. Dedicated Xbox Cloud Vietnamese Translator
                 // ==========================================
                 $translatorScript
-            """.trimIndent()
+            """.trimIndent().also { built ->
+                lastInjectionCacheKey = cacheKey
+                lastInjectionScript = built
+            }
         }
     }
 

@@ -401,13 +401,22 @@ object PerformanceMonitor {
         }
 
         val allLoggerEntries = AppLogger.logs.value
-        val initLines = LinkedHashSet<String>()
+        val initLines = ArrayList<String>()
+        val seenMilestoneBodies = HashSet<String>()
         for (line in initMilestoneHistory) {
-            initLines.add(line)
+            val body = line.substringAfter("[INFO] ", line).trim()
+            if (seenMilestoneBodies.add(body)) {
+                initLines.add(line)
+            }
         }
-        for (entry in allLoggerEntries) {
-            if (entry.tag == "PERF-INIT") {
-                initLines.add("[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] ${entry.message}")
+        if (initLines.isEmpty()) {
+            for (entry in allLoggerEntries) {
+                if (entry.tag == "PERF-INIT") {
+                    val body = entry.message.trim()
+                    if (seenMilestoneBodies.add(body)) {
+                        initLines.add("[${entry.timestamp}] [${entry.tag}] [${entry.level.name}] ${entry.message}")
+                    }
+                }
             }
         }
         if (initLines.isNotEmpty()) {

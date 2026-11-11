@@ -2,31 +2,59 @@
 <html lang="vi" data-lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Điều khoản Sử dụng &amp; Chính sách Quyền riêng tư — CloudPlay</title>
   <meta name="description" content="Điều khoản Sử dụng, Chính sách Quyền riêng tư và Minh bạch Kỹ thuật đầy đủ (15 mục) của ứng dụng CloudPlay dành cho Android." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/terms.html" />
-  <meta name="theme-color" content="#0d1117" />
+  <link rel="icon" href="img/icon.png" type="image/png" />
+  <meta name="theme-color" content="#f5f8f7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0b1412" media="(prefers-color-scheme: dark)" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Điều khoản Sử dụng &amp; Chính sách Quyền riêng tư — CloudPlay" />
+  <meta property="og:description" content="Điều khoản Sử dụng, Chính sách Quyền riêng tư và Minh bạch Kỹ thuật đầy đủ (15 mục) của ứng dụng CloudPlay dành cho Android." />
+  <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/terms.html" />
+  <meta property="og:image" content="https://muitenvn.github.io/CloudPlay-App/img/og.jpg" />
 
   <style>
     :root {
-      --bg: #0d1117;
-      --surface: #161b22;
-      --surface-alt: #1c2128;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent: #2ea043;
-      --link: #58a6ff;
-      --summary-bg: rgba(46, 160, 67, 0.08);
-      --summary-border: rgba(46, 160, 67, 0.35);
-      --warn-bg: rgba(210, 153, 34, 0.1);
-      --warn-border: rgba(210, 153, 34, 0.4);
-      --placeholder-bg: rgba(248, 81, 73, 0.14);
-      --placeholder-border: rgba(248, 81, 73, 0.5);
-      --placeholder-text: #ff7b72;
-      --radius: 10px;
+      --bg: #f5f8f7;
+      --surface: #ffffff;
+      --surface-alt: #e6f0ec;
+      --border: #d9e4df;
+      --text: #0f1a17;
+      --text-muted: #4f605a;
+      --accent: #0e7a4d;
+      --link: #0b6a42;
+      --summary-bg: #e6f0ec;
+      --summary-border: #b9d7ca;
+      --summary-strong: #0b6a42;
+      --warn-bg: #fff6e0;
+      --warn-border: #e9cf86;
+      --warn-ink: #5a4300;
+      --gutter: 16px;
+      --radius: 14px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0b1412;
+        --surface: #121e1b;
+        --surface-alt: #17261f;
+        --border: #24352f;
+        --text: #e8f1ee;
+        --text-muted: #9db2ab;
+        --accent: #3ccf91;
+        --link: #5fe0ac;
+        --summary-bg: #14261f;
+        --summary-border: #254b3c;
+        --summary-strong: #5fe0ac;
+        --warn-bg: #261f0b;
+        --warn-border: #54451a;
+        --warn-ink: #efd9a0;
+        color-scheme: dark;
+      }
     }
 
     * {
@@ -49,45 +77,42 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       line-height: 1.65;
-      font-size: 15px;
+      font-size: 16px;
+      padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+      padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     a {
       color: var(--link);
-      text-decoration: none;
+      text-underline-offset: 3px;
     }
 
     a:hover {
-      text-decoration: underline;
+      text-decoration-thickness: 2px;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 6px;
     }
 
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
+      font-size: 0.875rem;
       background-color: var(--surface-alt);
       border: 1px solid var(--border);
-      padding: 1px 5px;
-      border-radius: 4px;
-      color: #d2a8ff;
-    }
-
-    .fill-tag {
-      display: inline;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 13px;
-      font-weight: 600;
-      background-color: var(--placeholder-bg);
-      border: 1px dashed var(--placeholder-border);
-      color: var(--placeholder-text);
       padding: 1px 6px;
-      border-radius: 4px;
+      border-radius: 6px;
+      color: var(--text);
     }
 
-    /* Header */
+    /* Header (đồng bộ với index.html của Claude) */
     .header {
       border-bottom: 1px solid var(--border);
       background-color: var(--bg);
@@ -97,10 +122,9 @@
     }
 
     .header-inner {
-      max-width: 1080px;
+      max-width: 960px;
       margin: 0 auto;
-      padding: 0 16px;
-      min-height: 56px;
+      padding-block: 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -111,75 +135,68 @@
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      font-weight: 700;
-      font-size: 16px;
+      font-weight: 750;
+      font-size: 18px;
+      letter-spacing: -0.01em;
       color: var(--text);
-    }
-
-    .brand:hover {
       text-decoration: none;
     }
 
-    .brand-icon {
-      width: 28px;
-      height: 28px;
-      border-radius: 7px;
-      background-color: var(--accent);
-      color: #ffffff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 15px;
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: block;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
     .nav-btn {
       color: var(--text-muted);
-      font-size: 13.5px;
-      font-weight: 500;
-      padding: 7px 10px;
-      border-radius: 8px;
-      min-height: 38px;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 0 12px;
+      border-radius: 10px;
+      min-height: 44px;
       display: inline-flex;
       align-items: center;
+      text-decoration: none;
     }
 
     .nav-btn:hover {
       color: var(--text);
-      background-color: var(--surface);
-      text-decoration: none;
     }
 
     .lang-btn {
-      background-color: var(--surface);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: transparent;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 12px;
-      min-height: 38px;
-      font-size: 13px;
-      font-weight: 600;
+      border-radius: 10px;
+      padding: 0 12px;
+      min-height: 44px;
       cursor: pointer;
     }
 
     .lang-btn:hover {
-      border-color: var(--text-muted);
+      background-color: var(--surface-alt);
     }
 
     /* Layout */
     .page-wrap {
-      max-width: 1080px;
+      max-width: 960px;
       margin: 0 auto;
-      padding: 24px 16px 48px;
+      padding: 28px 0 40px;
       display: grid;
-      grid-template-columns: 270px 1fr;
-      gap: 28px;
+      grid-template-columns: 256px 1fr;
+      gap: 32px;
       align-items: start;
     }
 
@@ -188,16 +205,16 @@
       background-color: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px;
+      padding: 16px;
       position: sticky;
-      top: 72px;
-      max-height: calc(100vh - 90px);
+      top: 84px;
+      max-height: calc(100vh - 104px);
       overflow-y: auto;
     }
 
     .toc-title {
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 750;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       color: var(--text-muted);
@@ -215,89 +232,92 @@
 
     .toc-list a {
       display: block;
-      font-size: 13px;
+      font-size: 13.5px;
       line-height: 1.4;
       color: var(--text-muted);
       padding: 6px 8px;
-      border-radius: 6px;
+      border-radius: 8px;
+      text-decoration: none;
     }
 
     .toc-list a:hover {
       color: var(--text);
       background-color: var(--surface-alt);
-      text-decoration: none;
     }
 
     /* Document Header */
     .doc-header {
-      background-color: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 22px 20px;
-      margin-bottom: 20px;
+      padding-bottom: 24px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
     }
 
     .doc-meta {
       display: flex;
       flex-wrap: wrap;
       gap: 8px 14px;
-      font-size: 13px;
+      font-size: 13.5px;
       color: var(--text-muted);
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .meta-pill {
       background-color: var(--surface-alt);
       border: 1px solid var(--border);
-      padding: 3px 9px;
-      border-radius: 6px;
-      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 8px;
+      font-weight: 650;
       color: var(--text);
     }
 
     h1 {
-      font-size: clamp(21px, 4vw, 26px);
-      line-height: 1.3;
-      margin-bottom: 10px;
+      font-size: clamp(1.75rem, 5vw, 2.35rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+      margin-bottom: 12px;
       color: var(--text);
     }
 
     .doc-intro {
       color: var(--text-muted);
-      font-size: 14.5px;
+      font-size: 1rem;
     }
 
-    /* Sections */
+    /* Sections: không đóng khung dày đặc, phân tách sạch bằng đường kẻ giống phong cách Claude */
     .legal-section {
-      background-color: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      margin-bottom: 16px;
-      scroll-margin-top: 72px;
+      padding-bottom: 26px;
+      margin-bottom: 26px;
+      border-bottom: 1px solid var(--border);
+      scroll-margin-top: 84px;
+    }
+
+    .legal-section:last-of-type {
+      border-bottom: none;
+      margin-bottom: 0;
     }
 
     .legal-section h2 {
-      font-size: 17.5px;
+      font-size: 1.25rem;
       line-height: 1.35;
+      letter-spacing: -0.01em;
+      font-weight: 750;
       margin-bottom: 12px;
       color: var(--text);
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
     }
 
     .summary-box {
       background-color: var(--summary-bg);
       border: 1px solid var(--summary-border);
-      border-radius: 8px;
-      padding: 10px 13px;
-      margin-bottom: 14px;
-      font-size: 13.5px;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 0.9375rem;
       color: var(--text);
     }
 
     .summary-box strong {
-      color: #56d364;
+      color: var(--summary-strong);
     }
 
     .clause {
@@ -315,7 +335,7 @@
 
     .legal-section ul,
     .legal-section ol {
-      margin: 8px 0 12px 20px;
+      margin: 8px 0 12px 22px;
     }
 
     .legal-section li {
@@ -325,27 +345,34 @@
     /* Tables */
     .table-wrap {
       overflow-x: auto;
-      margin: 10px 0 12px;
+      margin: 12px 0;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13.5px;
+      font-size: 0.9rem;
     }
 
     th,
     td {
-      border: 1px solid var(--border);
-      padding: 9px 11px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 12px;
       text-align: left;
       vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
     }
 
     th {
       background-color: var(--surface-alt);
       color: var(--text);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     td {
@@ -356,43 +383,49 @@
     .not-legal-advice {
       background-color: var(--warn-bg);
       border: 1px solid var(--warn-border);
+      color: var(--warn-ink);
       border-radius: var(--radius);
       padding: 16px 18px;
-      margin-top: 20px;
-      font-size: 13.5px;
+      margin-top: 24px;
+      font-size: 0.95rem;
     }
 
     /* Footer */
     .footer {
       border-top: 1px solid var(--border);
-      padding: 20px 16px 36px;
-      font-size: 13px;
+      padding-block: 22px 28px;
+      font-size: 0.9375rem;
       color: var(--text-muted);
-      max-width: 1080px;
+      max-width: 960px;
       margin: 0 auto;
     }
 
     .footer-links {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px 18px;
-      margin-bottom: 8px;
+      gap: 4px 18px;
+      margin-bottom: 10px;
+    }
+
+    .footer-links a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    @media (min-width: 760px) {
+      :root { --gutter: 24px; }
     }
 
     @media (max-width: 820px) {
       .page-wrap {
         grid-template-columns: 1fr;
-        gap: 16px;
+        gap: 20px;
       }
 
       .toc-panel {
         position: static;
         max-height: none;
-      }
-
-      .legal-section,
-      .doc-header {
-        padding: 16px;
       }
     }
   </style>
@@ -402,16 +435,16 @@
   <header class="header">
     <div class="header-inner">
       <a href="./" class="brand" id="brandHomeLink">
-        <span class="brand-icon">C</span>
+        <img src="img/icon.png" width="34" height="34" alt="" />
         <span>CloudPlay</span>
       </a>
       <div class="header-actions">
         <a href="./" class="nav-btn" id="backHomeBtn">
-          <span class="lang-vi">← Trang chủ &amp; Tải APK</span>
-          <span class="lang-en">← Home &amp; Download APK</span>
+          <span class="lang-vi">Trang chủ</span>
+          <span class="lang-en">Home</span>
         </a>
         <a href="https://github.com/muitenvn/CloudPlay-App" target="_blank" rel="noopener noreferrer" class="nav-btn">GitHub</a>
-        <button type="button" class="lang-btn" id="langBtn" aria-label="Switch language">EN</button>
+        <button type="button" class="lang-btn" id="langBtn" aria-label="Đổi ngôn ngữ / Switch language">EN</button>
       </div>
     </div>
   </header>

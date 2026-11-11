@@ -545,22 +545,9 @@ fun WebDownloadPortalDialog(
                                         """
                                         (function() {
                                             try {
-                                                document.documentElement.style.setProperty('--bg', '#0b1210');
-                                                document.documentElement.style.setProperty('--surface', '#121b17');
-                                                document.documentElement.style.setProperty('--line', '#223029');
-                                                document.documentElement.style.setProperty('--text', '#eaf1ee');
-                                                document.documentElement.style.setProperty('--muted', '#9db0a8');
-                                                document.documentElement.style.setProperty('--accent', '#3fb950');
-                                                document.documentElement.style.setProperty('--accent-d', '#2f9a40');
-                                                document.documentElement.style.setProperty('--accent-soft', '#12261a');
-                                                document.documentElement.style.setProperty('--on-accent', '#06130a');
-                                                document.documentElement.style.setProperty('--warn-bg', '#241c0b');
-                                                document.documentElement.style.setProperty('--warn-line', '#4a3a12');
-                                                document.documentElement.style.setProperty('--warn-text', '#f0d594');
-                                                document.documentElement.style.setProperty('--bar', 'rgba(11,18,16,0.94)');
+                                                document.documentElement.setAttribute('data-theme', 'dark');
                                                 localStorage.setItem('cp_lang', '$targetLang');
-                                                var btn = document.querySelector('.lang button[data-lang="$targetLang"]');
-                                                if (btn) btn.click();
+                                                if (window.setPortalLang) window.setPortalLang('$targetLang');
                                                 if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');
                                             } catch (e) {}
                                         })();
@@ -570,7 +557,7 @@ fun WebDownloadPortalDialog(
                                         modifier = Modifier.fillMaxSize(),
                                         factory = { ctx ->
                                             WebView(ctx).apply {
-                                                setBackgroundColor(android.graphics.Color.parseColor("#0B1210"))
+                                                setBackgroundColor(android.graphics.Color.parseColor("#0B1412"))
                                                 settings.javaScriptEnabled = true
                                                 settings.domStorageEnabled = true
                                                 webViewClient = object : WebViewClient() {

@@ -26,6 +26,7 @@
       --text: #0f1a17;
       --text-muted: #4f605a;
       --accent: #0e7a4d;
+      --on-accent: #ffffff;
       --link: #0b6a42;
       --summary-bg: #e6f0ec;
       --summary-border: #b9d7ca;
@@ -46,6 +47,7 @@
         --text: #e8f1ee;
         --text-muted: #9db2ab;
         --accent: #3ccf91;
+        --on-accent: #05281a;
         --link: #5fe0ac;
         --summary-bg: #14261f;
         --summary-border: #254b3c;
@@ -55,6 +57,25 @@
         --warn-ink: #efd9a0;
         color-scheme: dark;
       }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0b1412;
+      --surface: #121e1b;
+      --surface-alt: #17261f;
+      --border: #24352f;
+      --text: #e8f1ee;
+      --text-muted: #9db2ab;
+      --accent: #3ccf91;
+      --on-accent: #05281a;
+      --link: #5fe0ac;
+      --summary-bg: #14261f;
+      --summary-border: #254b3c;
+      --summary-strong: #5fe0ac;
+      --warn-bg: #261f0b;
+      --warn-border: #54451a;
+      --warn-ink: #efd9a0;
+      color-scheme: dark;
     }
 
     * {
@@ -73,6 +94,10 @@
     }
 
     html[data-lang="en"] .lang-vi {
+      display: none !important;
+    }
+
+    html[data-inapp="true"] .web-only {
       display: none !important;
     }
 
@@ -112,23 +137,23 @@
       color: var(--text);
     }
 
-    /* Header (đồng bộ với index.html của Claude) */
+    /* Header */
     .header {
       border-bottom: 1px solid var(--border);
       background-color: var(--bg);
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 30;
     }
 
     .header-inner {
       max-width: 960px;
       margin: 0 auto;
-      padding-block: 14px;
+      padding-block: 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
     }
 
     .brand {
@@ -155,45 +180,99 @@
       gap: 6px;
     }
 
-    .nav-btn {
-      color: var(--text-muted);
-      font-size: 15px;
-      font-weight: 600;
+    .nav-btn,
+    .toc-btn,
+    .lang-btn {
+      font: inherit;
+      font-size: 14px;
+      font-weight: 650;
       padding: 0 12px;
       border-radius: 10px;
-      min-height: 44px;
+      min-height: 42px;
       display: inline-flex;
       align-items: center;
+      gap: 6px;
       text-decoration: none;
+      cursor: pointer;
+    }
+
+    .nav-btn {
+      color: var(--text-muted);
+      background: transparent;
+      border: 0;
     }
 
     .nav-btn:hover {
       color: var(--text);
     }
 
+    .toc-btn {
+      display: none;
+      background-color: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .toc-btn[aria-expanded="true"] {
+      background-color: var(--surface-alt);
+      border-color: var(--accent);
+      color: var(--link);
+    }
+
     .lang-btn {
-      font: inherit;
-      font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.04em;
       background: transparent;
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0 12px;
-      min-height: 44px;
-      cursor: pointer;
     }
 
-    .lang-btn:hover {
+    .lang-btn:hover,
+    .toc-btn:hover {
       background-color: var(--surface-alt);
+    }
+
+    /* Mobile TOC Drawer */
+    .mobile-toc-drawer {
+      display: none;
+      max-width: 960px;
+      margin: 0 auto 12px;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .mobile-toc-drawer.open {
+      display: block;
+    }
+
+    .mobile-toc-grid {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 4px;
+    }
+
+    .mobile-toc-grid a {
+      display: block;
+      font-size: 13.5px;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+
+    .mobile-toc-grid a:hover {
+      background-color: var(--surface-alt);
+      color: var(--text);
     }
 
     /* Layout */
     .page-wrap {
       max-width: 960px;
       margin: 0 auto;
-      padding: 28px 0 40px;
+      padding: 24px 0 40px;
       display: grid;
       grid-template-columns: 256px 1fr;
       gap: 32px;
@@ -207,8 +286,8 @@
       border-radius: var(--radius);
       padding: 16px;
       position: sticky;
-      top: 84px;
-      max-height: calc(100vh - 104px);
+      top: 80px;
+      max-height: calc(100vh - 100px);
       overflow-y: auto;
     }
 
@@ -247,7 +326,7 @@
 
     /* Document Header */
     .doc-header {
-      padding-bottom: 24px;
+      padding-bottom: 22px;
       margin-bottom: 24px;
       border-bottom: 1px solid var(--border);
     }
@@ -255,7 +334,7 @@
     .doc-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px 14px;
+      gap: 8px 12px;
       font-size: 13.5px;
       color: var(--text-muted);
       margin-bottom: 12px;
@@ -271,7 +350,7 @@
     }
 
     h1 {
-      font-size: clamp(1.75rem, 5vw, 2.35rem);
+      font-size: clamp(1.65rem, 5vw, 2.3rem);
       line-height: 1.15;
       letter-spacing: -0.02em;
       font-weight: 800;
@@ -284,12 +363,12 @@
       font-size: 1rem;
     }
 
-    /* Sections: không đóng khung dày đặc, phân tách sạch bằng đường kẻ giống phong cách Claude */
+    /* Sections */
     .legal-section {
       padding-bottom: 26px;
       margin-bottom: 26px;
       border-bottom: 1px solid var(--border);
-      scroll-margin-top: 84px;
+      scroll-margin-top: 80px;
     }
 
     .legal-section:last-of-type {
@@ -298,7 +377,7 @@
     }
 
     .legal-section h2 {
-      font-size: 1.25rem;
+      font-size: 1.22rem;
       line-height: 1.35;
       letter-spacing: -0.01em;
       font-weight: 750;
@@ -418,14 +497,18 @@
     }
 
     @media (max-width: 820px) {
+      .toc-btn {
+        display: inline-flex;
+      }
+
       .page-wrap {
         grid-template-columns: 1fr;
-        gap: 20px;
+        gap: 18px;
+        padding-top: 18px;
       }
 
       .toc-panel {
-        position: static;
-        max-height: none;
+        display: none;
       }
     }
   </style>
@@ -439,18 +522,42 @@
         <span>CloudPlay</span>
       </a>
       <div class="header-actions">
-        <a href="./" class="nav-btn" id="backHomeBtn">
+        <button type="button" class="toc-btn" id="tocToggleBtn" aria-expanded="false" aria-controls="mobileTocDrawer">
+          <span class="lang-vi">☰ Mục lục (15)</span>
+          <span class="lang-en">☰ Contents (15)</span>
+        </button>
+        <a href="./" class="nav-btn web-only" id="backHomeBtn">
           <span class="lang-vi">Trang chủ</span>
           <span class="lang-en">Home</span>
         </a>
-        <a href="https://github.com/muitenvn/CloudPlay-App" target="_blank" rel="noopener noreferrer" class="nav-btn">GitHub</a>
+        <a href="https://github.com/muitenvn/CloudPlay-App" target="_blank" rel="noopener noreferrer" class="nav-btn web-only">GitHub</a>
         <button type="button" class="lang-btn" id="langBtn" aria-label="Đổi ngôn ngữ / Switch language">EN</button>
       </div>
     </div>
+
+    <nav class="mobile-toc-drawer" id="mobileTocDrawer" aria-label="Mục lục trên điện thoại">
+      <ol class="mobile-toc-grid">
+        <li><a href="#sec-1"><span class="lang-vi">1. Định nghĩa thuật ngữ</span><span class="lang-en">1. Definitions</span></a></li>
+        <li><a href="#sec-2"><span class="lang-vi">2. Bản chất app &amp; Không liên kết</span><span class="lang-en">2. App Nature &amp; Non-Affiliation</span></a></li>
+        <li><a href="#sec-3"><span class="lang-vi">3. Các tính năng thực tế của app</span><span class="lang-en">3. Actual App Features</span></a></li>
+        <li><a href="#sec-4"><span class="lang-vi">4. Dịch vụ bên thứ ba &amp; Rủi ro tài khoản</span><span class="lang-en">4. Third-Party Services &amp; Account Risks</span></a></li>
+        <li><a href="#sec-5"><span class="lang-vi">5. Máy chủ Proxy/VPN &amp; Định tuyến mạng</span><span class="lang-en">5. Proxy/VPN Servers &amp; Routing</span></a></li>
+        <li><a href="#sec-6"><span class="lang-vi">6. Quyền riêng tư &amp; Dữ liệu lưu trên máy</span><span class="lang-en">6. Privacy &amp; Local Device Data</span></a></li>
+        <li><a href="#sec-7"><span class="lang-vi">7. Kết nối ra ngoài, Quyền &amp; Xóa dữ liệu</span><span class="lang-en">7. Outbound Calls, Permissions &amp; Deletion</span></a></li>
+        <li><a href="#sec-8"><span class="lang-vi">8. Sử dụng hợp lệ &amp; Hành vi bị cấm</span><span class="lang-en">8. Acceptable Use &amp; Prohibited Conduct</span></a></li>
+        <li><a href="#sec-9"><span class="lang-vi">9. Sở hữu trí tuệ &amp; Ghi công mã nguồn mở</span><span class="lang-en">9. Intellectual Property &amp; Attribution</span></a></li>
+        <li><a href="#sec-10"><span class="lang-vi">10. Từ chối bảo đảm (Nguyên trạng)</span><span class="lang-en">10. Disclaimer of Warranties (AS IS)</span></a></li>
+        <li><a href="#sec-11"><span class="lang-vi">11. Giới hạn trách nhiệm &amp; Tự chịu rủi ro</span><span class="lang-en">11. Limitation of Liability &amp; Risk</span></a></li>
+        <li><a href="#sec-12"><span class="lang-vi">12. Báo cáo vi phạm &amp; Yêu cầu gỡ bỏ</span><span class="lang-en">12. Violation Reporting &amp; Takedown</span></a></li>
+        <li><a href="#sec-13"><span class="lang-vi">13. Bảo mật, Cập nhật &amp; Chấm dứt</span><span class="lang-en">13. Security, Updates &amp; Termination</span></a></li>
+        <li><a href="#sec-14"><span class="lang-vi">14. Sửa đổi điều khoản &amp; Lịch sử bản</span><span class="lang-en">14. Changes to Terms &amp; Changelog</span></a></li>
+        <li><a href="#sec-15"><span class="lang-vi">15. Luật điều chỉnh, Ngôn ngữ &amp; Liên hệ</span><span class="lang-en">15. Governing Law, Language &amp; Contact</span></a></li>
+      </ol>
+    </nav>
   </header>
 
   <div class="page-wrap">
-    <!-- TABLE OF CONTENTS -->
+    <!-- SIDEBAR TABLE OF CONTENTS -->
     <nav class="toc-panel" aria-label="Mục lục điều khoản">
       <div class="toc-title">
         <span class="lang-vi">Mục lục (15 mục)</span>
@@ -1157,7 +1264,7 @@
     </main>
   </div>
 
-  <footer class="footer">
+  <footer class="footer web-only">
     <div class="footer-links">
       <a href="./" id="footerHomeLink">
         <span class="lang-vi">Trang chủ CloudPlay</span>
@@ -1195,6 +1302,8 @@
         });
       }
 
+      window.setTermsLang = applyLang;
+
       var langBtn = document.getElementById("langBtn");
       if (langBtn) {
         langBtn.addEventListener("click", function () {
@@ -1202,7 +1311,29 @@
         });
       }
 
-      var urlLang = new URLSearchParams(window.location.search).get("lang");
+      var tocBtn = document.getElementById("tocToggleBtn");
+      var tocDrawer = document.getElementById("mobileTocDrawer");
+      if (tocBtn && tocDrawer) {
+        tocBtn.addEventListener("click", function () {
+          var isOpen = tocDrawer.classList.toggle("open");
+          tocBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+        var links = tocDrawer.querySelectorAll("a");
+        for (var i = 0; i < links.length; i++) {
+          links[i].addEventListener("click", function () {
+            tocDrawer.classList.remove("open");
+            tocBtn.setAttribute("aria-expanded", "false");
+          });
+        }
+      }
+
+      var params = new URLSearchParams(window.location.search);
+      if (window.location.protocol === "file:" || params.get("inapp") === "1") {
+        document.documentElement.setAttribute("data-inapp", "true");
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+
+      var urlLang = params.get("lang");
       var savedLang = null;
       try { savedLang = localStorage.getItem("cp_lang"); } catch (e) {}
       applyLang(urlLang || savedLang || "vi");

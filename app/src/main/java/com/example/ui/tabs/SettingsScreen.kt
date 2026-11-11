@@ -618,24 +618,10 @@ private fun FullTermsInAppDialog(
         """
         (function() {
             try {
-                document.documentElement.style.setProperty('--bg', '#0b1210');
-                document.documentElement.style.setProperty('--surface', '#121b17');
-                document.documentElement.style.setProperty('--sum-bg', '#17231e');
-                document.documentElement.style.setProperty('--sum-hover', '#1d2c26');
-                document.documentElement.style.setProperty('--line', '#283931');
-                document.documentElement.style.setProperty('--text', '#eaf1ee');
-                document.documentElement.style.setProperty('--muted', '#b2c5bd');
-                document.documentElement.style.setProperty('--accent', '#3fb950');
-                document.documentElement.style.setProperty('--accent-d', '#2f9a40');
-                document.documentElement.style.setProperty('--accent-soft', '#132a1c');
-                document.documentElement.style.setProperty('--on-accent', '#06130a');
-                document.documentElement.style.setProperty('--warn-bg', '#241c0b');
-                document.documentElement.style.setProperty('--warn-line', '#524014');
-                document.documentElement.style.setProperty('--warn-text', '#f3dca2');
-                document.documentElement.style.setProperty('--bar', 'rgba(11,18,16,0.95)');
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.documentElement.setAttribute('data-inapp', 'true');
                 localStorage.setItem('cp_lang', '$targetLang');
-                var btn = document.querySelector('.lang button[data-lang="$targetLang"]');
-                if (btn) btn.click();
+                if (window.setTermsLang) window.setTermsLang('$targetLang');
             } catch (e) {}
         })();
         """.trimIndent()
@@ -648,17 +634,17 @@ private fun FullTermsInAppDialog(
         androidx.compose.material3.Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .height(580.dp)
-                .clip(RoundedCornerShape(22.dp))
+                .height(620.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .testTag("full_terms_in_app_dialog"),
-            color = com.example.ui.theme.XboxDark,
-            border = androidx.compose.foundation.BorderStroke(1.2.dp, XboxNeonGreen.copy(alpha = 0.65f))
+            color = androidx.compose.ui.graphics.Color(0xFF0B1412),
+            border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFF24352F))
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(XboxSurface)
+                        .background(androidx.compose.ui.graphics.Color(0xFF121E1B))
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -671,36 +657,44 @@ private fun FullTermsInAppDialog(
                         Icon(
                             imageVector = Icons.Default.Shield,
                             contentDescription = null,
-                            tint = XboxNeonGreen,
+                            tint = androidx.compose.ui.graphics.Color(0xFF3CCF91),
                             modifier = Modifier.size(18.dp)
                         )
-                        Text(
-                            text = if (isEn) "Terms of Use & Privacy" else "Điều khoản & Quyền riêng tư",
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 14.sp,
-                            maxLines = 1
-                        )
+                        Column {
+                            Text(
+                                text = if (isEn) "Terms of Use & Privacy (15 Sections)" else "Điều khoản & Quyền riêng tư (15 mục)",
+                                color = androidx.compose.ui.graphics.Color(0xFFE8F1EE),
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = if (isEn) "Tap '☰ Contents (15)' below to jump to any section" else "Bấm '☰ Mục lục (15)' bên dưới để nhảy nhanh từng mục",
+                                color = androidx.compose.ui.graphics.Color(0xFF9DB2AB),
+                                fontSize = 12.sp,
+                                maxLines = 1
+                            )
+                        }
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         TextButton(onClick = onOpenExternalBrowser) {
                             Text(
-                                text = if (isEn) "↗ Browser" else "↗ Trình duyệt",
+                                text = if (isEn) "↗ Web" else "↗ Mở Web",
                                 color = DirectCyan,
-                                fontSize = 11.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         TextButton(onClick = onDismiss) {
                             Text(
                                 text = if (isEn) "✕ Close" else "✕ Đóng",
-                                color = XboxNeonGreen,
+                                color = androidx.compose.ui.graphics.Color(0xFF3CCF91),
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -712,16 +706,40 @@ private fun FullTermsInAppDialog(
                         .weight(1f),
                     factory = { ctx ->
                         android.webkit.WebView(ctx).apply {
-                            setBackgroundColor(android.graphics.Color.parseColor("#0B1210"))
+                            setBackgroundColor(android.graphics.Color.parseColor("#0B1412"))
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
                             webViewClient = object : android.webkit.WebViewClient() {
+                                private fun handleExternalUri(uri: android.net.Uri?): Boolean {
+                                    val scheme = uri?.scheme?.lowercase() ?: return false
+                                    if (scheme == "http" || scheme == "https" || scheme == "mailto") {
+                                        try {
+                                            ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            })
+                                        } catch (_: Exception) {}
+                                        return true
+                                    }
+                                    return false
+                                }
+
+                                override fun shouldOverrideUrlLoading(
+                                    view: android.webkit.WebView?,
+                                    request: android.webkit.WebResourceRequest?
+                                ): Boolean = handleExternalUri(request?.url)
+
+                                @Deprecated("Deprecated in Java")
+                                override fun shouldOverrideUrlLoading(
+                                    view: android.webkit.WebView?,
+                                    url: String?
+                                ): Boolean = handleExternalUri(url?.let { android.net.Uri.parse(it) })
+
                                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                                     super.onPageFinished(view, url)
                                     view?.evaluateJavascript(syncTermsThemeAndLangJs, null)
                                 }
                             }
-                            loadUrl("file:///android_asset/web/terms.html")
+                            loadUrl("file:///android_asset/web/terms.html?inapp=1")
                         }
                     },
                     update = { webView ->
@@ -732,3 +750,4 @@ private fun FullTermsInAppDialog(
         }
     }
 }
+

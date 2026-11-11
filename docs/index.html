@@ -52,6 +52,21 @@
         color-scheme: dark;
       }
     }
+    :root[data-theme="dark"] {
+      --bg: #0b1412;
+      --surface: #121e1b;
+      --ink: #e8f1ee;
+      --muted: #9db2ab;
+      --line: #24352f;
+      --accent: #3ccf91;
+      --on-accent: #05281a;
+      --link: #5fe0ac;
+      --soft: #17261f;
+      --warn-bg: #261f0b;
+      --warn-line: #54451a;
+      --warn-ink: #efd9a0;
+      color-scheme: dark;
+    }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { -webkit-text-size-adjust: 100%; }
@@ -130,7 +145,7 @@
     .features { display: grid; gap: 26px; padding-block: 36px 8px; }
     .feat { display: grid; grid-template-columns: 28px 1fr; column-gap: 14px; }
     .feat svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; margin-top: 2px; }
-    @media (prefers-color-scheme: light) { .feat svg { stroke: var(--link); } }
+    @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .feat svg { stroke: var(--link); } }
     .feat h2 { font-size: 1.0625rem; font-weight: 750; letter-spacing: -0.01em; line-height: 1.35; }
     .feat p { color: var(--muted); font-size: 0.9688rem; margin-top: 4px; text-wrap: pretty; }
 
@@ -358,6 +373,13 @@
     try { localStorage.setItem("cp_lang", lang); } catch (e) {}
     render();
   }
+  window.setPortalLang = setLang;
+  window.__updatePortalConfig = function (apkUrl) {
+    if (apkUrl) {
+      $("dlMain").href = apkUrl;
+      $("dlMirror").href = mirrors(apkUrl)[0];
+    }
+  };
 
   $("langBtn").addEventListener("click", function () { setLang(lang === "vi" ? "en" : "vi"); });
 

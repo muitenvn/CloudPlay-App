@@ -14,11 +14,13 @@ object QualityAdapter {
     private const val TAG = "QualityAdapter"
     private var webViewRef: WeakReference<WebView>? = null
     private var lastAppliedBitrateMbps: Double = -1.0
+    private var lastAppliedAtMs: Long = 0L
 
     fun setWebView(webView: WebView?) {
         webViewRef = if (webView != null) WeakReference(webView) else null
         if (webView == null) {
             lastAppliedBitrateMbps = -1.0
+            lastAppliedAtMs = 0L
         }
     }
 
@@ -31,14 +33,16 @@ object QualityAdapter {
         smoothGlide: Boolean = true
     ) {
         val webView = webViewRef?.get() ?: return
-        // Chỉ gửi lệnh cập nhật vào WebView khi mức bitrate mục tiêu thay đổi đáng kể (>= 1.0 Mbps)
-        // để tránh làm phiền luồng chính của Chromium trong lúc đang giải mã khung hình 60FPS.
+        val nowMs = android.os.SystemClock.uptimeMillis()
+        // Chỉ gửi lệnh cập nhật vào WebView khi mức bitrate mục tiêu thay đổi đáng kể (>= 2.0 Mbps)
+        // và cách lần gửi trước ít nhất 4 giây để tránh làm phiền luồng chính của Chromium trong lúc đang giải mã 60FPS.
         if (lastAppliedBitrateMbps > 0 &&
-            abs(targetBitrateMbps - lastAppliedBitrateMbps) < 1.0
+            (abs(targetBitrateMbps - lastAppliedBitrateMbps) < 2.0 || (nowMs - lastAppliedAtMs) < 4000L)
         ) {
             return
         }
         lastAppliedBitrateMbps = targetBitrateMbps
+        lastAppliedAtMs = nowMs
 
         val js = "if (window.__setAdaptiveBitrate) window.__setAdaptiveBitrate($targetBitrateMbps, $smoothGlide);"
         webView.post {

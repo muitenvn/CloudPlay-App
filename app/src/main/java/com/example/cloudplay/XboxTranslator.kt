@@ -881,7 +881,7 @@ object XboxTranslator {
                 // Batched MutationObserver via requestAnimationFrame -> single requestBatchTranslate call
                 let pendingNodes = new Set();
                 let rafId = null;
-                let isTranslatorPausedForStream = false;
+                let isTranslatorPausedForStream = !!((location.pathname && location.pathname.toLowerCase().indexOf('/launch/') !== -1) || window.__activePeerConnection);
                 let isObserverAttached = false;
                 let startupTimer1 = null;
                 let startupTimer2 = null;

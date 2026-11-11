@@ -209,6 +209,7 @@ class StreamController(private val context: Context) {
                 isGameActive = true,
                 gameTitle = syncedBookmark?.title ?: updatedTitle
             )
+            NetworkOptimizer.setStreamActive(true)
 
             val config = SettingsRepository.config.value
             val isEn = config.isEnglishUI()
@@ -244,6 +245,7 @@ class StreamController(private val context: Context) {
         scope.launch {
             launchFallbackJob?.cancel()
             launchFallbackJob = null
+            NetworkOptimizer.setStreamActive(false)
             finalizeActiveSessionIfNeeded()
             _uiState.value = _uiState.value.copy(
                 isStreamConnected = false,

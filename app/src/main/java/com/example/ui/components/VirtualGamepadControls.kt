@@ -68,8 +68,6 @@ internal fun VirtualAnalogStick(
 
     var stickX by remember { mutableFloatStateOf(0f) }
     var stickY by remember { mutableFloatStateOf(0f) }
-    var lastSentX by remember { mutableFloatStateOf(0f) }
-    var lastSentY by remember { mutableFloatStateOf(0f) }
     var isTouching by remember { mutableStateOf(false) }
     var isAutoSprinting by remember { mutableStateOf(false) }
 
@@ -113,27 +111,49 @@ internal fun VirtualAnalogStick(
                             isTouching = true
                             val centerX = size.width / 2f
                             val centerY = size.height / 2f
+                            var lastSentX = 0f
+                            var lastSentY = 0f
+                            var lastSentAtMs = 0L
 
-                            fun updateFromPos(pos: Offset) {
+                            fun updateFromPos(pos: Offset, forceImmediate: Boolean = false) {
                                 val dx = pos.x - centerX
                                 val dy = pos.y - centerY
                                 val dist = sqrt(dx * dx + dy * dy)
+                                val nextStickX: Float
+                                val nextStickY: Float
                                 if (dist <= maxRadiusPx) {
-                                    stickX = dx
-                                    stickY = dy
+                                    nextStickX = dx
+                                    nextStickY = dy
                                 } else if (dist > 0.001f) {
-                                    stickX = (dx / dist) * maxRadiusPx
-                                    stickY = (dy / dist) * maxRadiusPx
+                                    nextStickX = (dx / dist) * maxRadiusPx
+                                    nextStickY = (dy / dist) * maxRadiusPx
+                                } else {
+                                    nextStickX = 0f
+                                    nextStickY = 0f
                                 }
-                                val rawX = (stickX / maxRadiusPx).coerceIn(-1f, 1f)
-                                val rawY = (stickY / maxRadiusPx).coerceIn(-1f, 1f)
+                                if (abs(nextStickX - stickX) >= 0.5f || abs(nextStickY - stickY) >= 0.5f) {
+                                    stickX = nextStickX
+                                    stickY = nextStickY
+                                }
+                                val rawX = (nextStickX / maxRadiusPx).coerceIn(-1f, 1f)
+                                val rawY = (nextStickY / maxRadiusPx).coerceIn(-1f, 1f)
                                 val curvedX = applyDeadzoneAndCurve(rawX)
                                 val curvedY = applyDeadzoneAndCurve(rawY)
 
-                                if (abs(curvedX - lastSentX) >= 0.012f || abs(curvedY - lastSentY) >= 0.012f) {
-                                    lastSentX = curvedX
-                                    lastSentY = curvedY
-                                    onMove(curvedX, curvedY)
+                                val deltaX = abs(curvedX - lastSentX)
+                                val deltaY = abs(curvedY - lastSentY)
+                                if (deltaX >= 0.014f || deltaY >= 0.014f || (curvedX == 0f && curvedY == 0f && (lastSentX != 0f || lastSentY != 0f))) {
+                                    val nowMs = android.os.SystemClock.uptimeMillis()
+                                    val isFastFlickOrZero = forceImmediate ||
+                                        (curvedX == 0f && curvedY == 0f) ||
+                                        deltaX >= 0.16f ||
+                                        deltaY >= 0.16f
+                                    if (isFastFlickOrZero || (nowMs - lastSentAtMs) >= 12L) {
+                                        lastSentX = curvedX
+                                        lastSentY = curvedY
+                                        lastSentAtMs = nowMs
+                                        onMove(curvedX, curvedY)
+                                    }
                                 }
 
                                 // Auto-Sprint L3 when Left Stick is pushed strongly forward
@@ -146,14 +166,14 @@ internal fun VirtualAnalogStick(
                                 }
                             }
 
-                            updateFromPos(down.position)
+                            updateFromPos(down.position, forceImmediate = true)
 
                             do {
                                 val event = awaitPointerEvent()
                                 val activeChange = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
                                 if (activeChange != null && activeChange.pressed) {
                                     activeChange.consume()
-                                    updateFromPos(activeChange.position)
+                                    updateFromPos(activeChange.position, forceImmediate = false)
                                 }
                             } while (event.changes.any { it.pressed })
 

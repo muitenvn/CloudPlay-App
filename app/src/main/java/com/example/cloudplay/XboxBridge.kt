@@ -1893,9 +1893,14 @@ class XboxBridge(
                         }, 100);
                     }
 
+                    function isGameplayStreamActiveNow() {
+                        return !!(notifiedStreamConnection || window.__activePeerConnection || (location.pathname && location.pathname.indexOf('/launch/') !== -1));
+                    }
+
                     // Tự động phát hiện hộp thoại "Gửi phản hồi tới Xbox" / "Give feedback to Xbox" ngay cả khi công tắc React chặn sự kiện click
                     setInterval(function() {
                         try {
+                            if (isGameplayStreamActiveNow()) return;
                             if (location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return;
                             if (window.__cpExitPreviewStage === 'IDLE') {
                                 const dlg = findExitPreviewFeedbackDialog();
@@ -1907,11 +1912,11 @@ class XboxBridge(
                     }, 350);
 
                     function checkTargetForExitPreviewRow(target) {
-                        if (!target || location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return false;
+                        if (!target || isGameplayStreamActiveNow() || location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return false;
                         // Duyệt ngược lên tối đa 9 cấp cha vì nút gạt (switch thumb) bên trong dòng "Thoát xem trước" là thẻ div rỗng không có chữ
                         let node = target;
                         for (let depth = 0; node && node !== document.body && depth < 9; depth++, node = node.parentElement) {
-                            const txt = ((node.innerText || node.textContent || '') + ' ' + ((node.getAttribute && node.getAttribute('aria-label')) || '')).trim().toLowerCase();
+                            const txt = ((node.textContent || '') + ' ' + ((node.getAttribute && node.getAttribute('aria-label')) || '')).trim().toLowerCase();
                             if (txt.length >= 6 && txt.length <= 160) {
                                 if (txt.includes('exit preview') ||
                                     txt.includes('thoát xem trước') ||
@@ -1926,6 +1931,7 @@ class XboxBridge(
                     }
 
                     document.addEventListener('pointerdown', function(e) {
+                        if (isGameplayStreamActiveNow()) return;
                         const target = e.target;
                         if (checkTargetForExitPreviewRow(target)) {
                             armExitPreviewModalWatcher();
@@ -1933,6 +1939,7 @@ class XboxBridge(
                     }, true);
 
                     document.addEventListener('click', function(e) {
+                        if (isGameplayStreamActiveNow()) return;
                         const target = e.target;
                         if (target) {
                             // Phát hiện thao tác bấm "Exit preview" / "Thoát xem trước" trên play.xbox.com
@@ -1942,7 +1949,7 @@ class XboxBridge(
                                 } else if (window.__cpExitPreviewStage === 'MODAL_OPENING') {
                                     const dlgBtn = target.closest('[role="dialog"] button, [aria-modal="true"] button, button, [role="button"]');
                                     if (dlgBtn) {
-                                        const bTxt = ((dlgBtn.innerText || dlgBtn.textContent || '').trim()).toLowerCase();
+                                        const bTxt = ((dlgBtn.textContent || '').trim()).toLowerCase();
                                         const bAria = (dlgBtn.getAttribute('aria-label') || '').toLowerCase();
                                         if (bTxt === 'cancel' || bTxt === 'hủy' || bTxt === 'huỷ' || bTxt === 'submit' || bTxt === 'nộp' || bAria.includes('close') || bAria.includes('đóng') || bTxt === '✕' || bTxt === '×') {
                                             startExitPreviewOptOutPhase();
@@ -1957,7 +1964,7 @@ class XboxBridge(
                             }
                             const btn = target.closest('button, a');
                             if (btn) {
-                                const txt = (btn.innerText || btn.getAttribute('aria-label') || '').toLowerCase();
+                                const txt = (btn.textContent || btn.getAttribute('aria-label') || '').toLowerCase();
                                 const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
                                 if (txt.includes('play') || txt.includes('chơi') || testId.includes('play') || testId.includes('launch')) {
                                     notifiedStreamConnection = false;
@@ -2200,124 +2207,159 @@ class XboxBridge(
                         }
 
                         const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null;
+                        // Pre-allocated zero-GC buffers for 60-120Hz navigator.getGamepads() polling
+                        const reusableGamepadList = [null, null, null, null];
+                        const remappedPhysButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+                        const mergedButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
+                        const physProcessedAxes = [0, 0, 0, 0];
+                        const mergedAxes = [0, 0, 0, 0];
+                        const reusablePhysWrapper = {
+                            id: "",
+                            index: 0,
+                            connected: true,
+                            timestamp: 0,
+                            mapping: "standard",
+                            axes: physProcessedAxes,
+                            buttons: remappedPhysButtons,
+                            vibrationActuator: null,
+                            hapticActuators: undefined
+                        };
+
                         navigator.getGamepads = function() {
-                            const real = origGetGamepads ? origGetGamepads() : [];
-                            const list = Array.from(real || []);
+                            const real = origGetGamepads ? origGetGamepads() : null;
+                            reusableGamepadList[0] = null;
+                            reusableGamepadList[1] = null;
+                            reusableGamepadList[2] = null;
+                            reusableGamepadList[3] = null;
                             let physPad = null;
-                            for (let i = 0; i < list.length; i++) {
-                                if (list[i] && list[i].connected) {
-                                    physPad = list[i];
-                                    break;
+                            if (real) {
+                                const len = Math.min(real.length || 0, 4);
+                                for (let i = 0; i < len; i++) {
+                                    const pad = real[i];
+                                    reusableGamepadList[i] = pad || null;
+                                    if (!physPad && pad && pad.connected) {
+                                        physPad = pad;
+                                    }
                                 }
                             }
                             window.__hasPhysicalGamepadConnected = !!physPad;
                             const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
                             if (!physPad) {
                                 physViewDownAt = 0;
-                                physShortcutLatched = {};
                                 if (shouldExposeVirtual) {
-                                    list[0] = virtualGamepadState;
+                                    reusableGamepadList[0] = virtualGamepadState;
                                 }
-                            } else {
-                                const pCfg = window.__physControllerConfig || {};
-                                const bMap = pCfg.buttonMap || {};
-                                const remappedPhysButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
-                                const rawBtns = physPad.buttons || [];
-                                for (let s = 0; s < 17; s++) {
-                                    const sb = rawBtns[s] || { pressed: false, touched: false, value: 0 };
-                                    const mappedKey = String(s);
-                                    const dst = (typeof bMap[mappedKey] === 'number' && bMap[mappedKey] >= 0 && bMap[mappedKey] < 17) ? bMap[mappedKey] : s;
-                                    const prev = remappedPhysButtons[dst];
-                                    remappedPhysButtons[dst] = {
-                                        pressed: !!(prev.pressed || sb.pressed),
-                                        touched: !!(prev.touched || sb.touched),
-                                        value: Math.max(prev.value || 0, sb.value || 0)
-                                    };
-                                }
+                                return reusableGamepadList;
+                            }
 
-                                // Non-blocking View (button 8) combo shortcut detection:
-                                // View button itself goes to game immediately without delay; only the matched 2nd button is intercepted when View is held >= 400ms.
-                                const viewPressed = !!(remappedPhysButtons[8] && remappedPhysButtons[8].pressed);
-                                if (viewPressed) {
-                                    if (physViewDownAt === 0) {
-                                        physViewDownAt = Date.now();
-                                    } else if (pCfg.shortcutsEnabled && (Date.now() - physViewDownAt >= 400)) {
-                                        for (let b = 0; b < 17; b++) {
-                                            if (b === 8) continue;
-                                            const act = checkComboShortcutMatch(b);
-                                            if (act) {
-                                                if (remappedPhysButtons[b].pressed) {
-                                                    if (!physShortcutLatched[b]) {
-                                                        physShortcutLatched[b] = true;
-                                                        if (window.CloudPlayBridge && typeof window.CloudPlayBridge.onControllerShortcut === 'function') {
-                                                            window.CloudPlayBridge.onControllerShortcut(act);
-                                                        }
+                            const pCfg = window.__physControllerConfig || {};
+                            const bMap = pCfg.buttonMap || null;
+                            for (let s = 0; s < 17; s++) {
+                                const slot = remappedPhysButtons[s];
+                                slot.pressed = false;
+                                slot.touched = false;
+                                slot.value = 0;
+                            }
+                            const rawBtns = physPad.buttons || [];
+                            for (let s = 0; s < 17; s++) {
+                                const sb = rawBtns[s];
+                                if (!sb) continue;
+                                let dst = s;
+                                if (bMap) {
+                                    const mapped = bMap[s];
+                                    if (typeof mapped === 'number' && mapped >= 0 && mapped < 17) {
+                                        dst = mapped;
+                                    }
+                                }
+                                const targetSlot = remappedPhysButtons[dst];
+                                if (sb.pressed) targetSlot.pressed = true;
+                                if (sb.touched) targetSlot.touched = true;
+                                const val = sb.value || 0;
+                                if (val > targetSlot.value) targetSlot.value = val;
+                            }
+
+                            // Non-blocking View (button 8) combo shortcut detection:
+                            const viewPressed = !!remappedPhysButtons[8].pressed;
+                            if (viewPressed) {
+                                if (physViewDownAt === 0) {
+                                    physViewDownAt = Date.now();
+                                } else if (pCfg.shortcutsEnabled && (Date.now() - physViewDownAt >= 400)) {
+                                    for (let b = 0; b < 17; b++) {
+                                        if (b === 8) continue;
+                                        const act = checkComboShortcutMatch(b);
+                                        if (act) {
+                                            const btnSlot = remappedPhysButtons[b];
+                                            if (btnSlot.pressed) {
+                                                if (!physShortcutLatched[b]) {
+                                                    physShortcutLatched[b] = true;
+                                                    if (window.CloudPlayBridge && typeof window.CloudPlayBridge.onControllerShortcut === 'function') {
+                                                        window.CloudPlayBridge.onControllerShortcut(act);
                                                     }
-                                                    remappedPhysButtons[b] = { pressed: false, touched: false, value: 0 };
-                                                } else {
-                                                    physShortcutLatched[b] = false;
                                                 }
+                                                btnSlot.pressed = false;
+                                                btnSlot.touched = false;
+                                                btnSlot.value = 0;
+                                            } else {
+                                                physShortcutLatched[b] = false;
                                             }
                                         }
                                     }
-                                } else {
-                                    physViewDownAt = 0;
-                                    physShortcutLatched = {};
                                 }
-
-                                // Apply physical stick inner/outer deadzone BEFORE mergedAxes (defaults inner=0, outer=1.0 leave sticks unchanged)
-                                const rawAx0 = (physPad.axes && typeof physPad.axes[0] === 'number') ? physPad.axes[0] : 0;
-                                const rawAx1 = (physPad.axes && typeof physPad.axes[1] === 'number') ? physPad.axes[1] : 0;
-                                const rawAx2 = (physPad.axes && typeof physPad.axes[2] === 'number') ? physPad.axes[2] : 0;
-                                const rawAx3 = (physPad.axes && typeof physPad.axes[3] === 'number') ? physPad.axes[3] : 0;
-                                const leftPair = applyPhysStickDeadzone(rawAx0, rawAx1, pCfg.leftInner, pCfg.leftOuter);
-                                const rightPair = applyPhysStickDeadzone(rawAx2, rawAx3, pCfg.rightInner, pCfg.rightOuter);
-                                const physProcessedAxes = [leftPair[0], leftPair[1], rightPair[0], rightPair[1]];
-
-                                if (shouldExposeVirtual) {
-                                    // Hybrid merge: allow on-screen virtual buttons/sticks to work alongside physical pad while preserving physPad.vibrationActuator
-                                    const mergedButtons = [];
-                                    for (let b = 0; b < 17; b++) {
-                                        const vb = virtualGamepadState.buttons[b] || { pressed: false, touched: false, value: 0 };
-                                        const pb = remappedPhysButtons[b] || { pressed: false, touched: false, value: 0 };
-                                        mergedButtons.push({
-                                            pressed: !!(vb.pressed || pb.pressed),
-                                            touched: !!(vb.touched || pb.touched),
-                                            value: Math.max(vb.value || 0, pb.value || 0)
-                                        });
-                                    }
-                                    const mergedAxes = [0, 0, 0, 0];
-                                    for (let a = 0; a < 4; a++) {
-                                        const va = virtualGamepadState.axes[a] || 0;
-                                        const pa = physProcessedAxes[a] || 0;
-                                        mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
-                                    }
-                                    list[physPad.index || 0] = {
-                                        id: physPad.id || virtualGamepadState.id,
-                                        index: physPad.index || 0,
-                                        connected: true,
-                                        timestamp: Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp),
-                                        mapping: physPad.mapping || "standard",
-                                        axes: mergedAxes,
-                                        buttons: mergedButtons,
-                                        vibrationActuator: physPad.vibrationActuator || null,
-                                        hapticActuators: physPad.hapticActuators
-                                    };
-                                } else {
-                                    list[physPad.index || 0] = {
-                                        id: physPad.id,
-                                        index: physPad.index || 0,
-                                        connected: true,
-                                        timestamp: physPad.timestamp || nowTs(),
-                                        mapping: physPad.mapping || "standard",
-                                        axes: physProcessedAxes,
-                                        buttons: remappedPhysButtons,
-                                        vibrationActuator: physPad.vibrationActuator || null,
-                                        hapticActuators: physPad.hapticActuators
-                                    };
+                            } else if (physViewDownAt !== 0) {
+                                physViewDownAt = 0;
+                                for (const k in physShortcutLatched) {
+                                    physShortcutLatched[k] = false;
                                 }
                             }
-                            return list;
+
+                            const pAxes = physPad.axes;
+                            const rawAx0 = (pAxes && typeof pAxes[0] === 'number') ? pAxes[0] : 0;
+                            const rawAx1 = (pAxes && typeof pAxes[1] === 'number') ? pAxes[1] : 0;
+                            const rawAx2 = (pAxes && typeof pAxes[2] === 'number') ? pAxes[2] : 0;
+                            const rawAx3 = (pAxes && typeof pAxes[3] === 'number') ? pAxes[3] : 0;
+                            const leftPair = applyPhysStickDeadzone(rawAx0, rawAx1, pCfg.leftInner, pCfg.leftOuter);
+                            const rightPair = applyPhysStickDeadzone(rawAx2, rawAx3, pCfg.rightInner, pCfg.rightOuter);
+                            physProcessedAxes[0] = leftPair[0];
+                            physProcessedAxes[1] = leftPair[1];
+                            physProcessedAxes[2] = rightPair[0];
+                            physProcessedAxes[3] = rightPair[1];
+
+                            const padIdx = physPad.index || 0;
+                            reusablePhysWrapper.id = physPad.id || virtualGamepadState.id;
+                            reusablePhysWrapper.index = padIdx;
+                            reusablePhysWrapper.connected = true;
+                            reusablePhysWrapper.mapping = physPad.mapping || "standard";
+                            reusablePhysWrapper.vibrationActuator = physPad.vibrationActuator || null;
+                            reusablePhysWrapper.hapticActuators = physPad.hapticActuators;
+
+                            if (shouldExposeVirtual) {
+                                const vBtns = virtualGamepadState.buttons;
+                                for (let b = 0; b < 17; b++) {
+                                    const vb = vBtns[b];
+                                    const pb = remappedPhysButtons[b];
+                                    const mb = mergedButtons[b];
+                                    mb.pressed = !!(vb.pressed || pb.pressed);
+                                    mb.touched = !!(vb.touched || pb.touched);
+                                    const vv = vb.value || 0;
+                                    const pv = pb.value || 0;
+                                    mb.value = vv >= pv ? vv : pv;
+                                }
+                                const vAxes = virtualGamepadState.axes;
+                                for (let a = 0; a < 4; a++) {
+                                    const va = vAxes[a] || 0;
+                                    const pa = physProcessedAxes[a] || 0;
+                                    mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
+                                }
+                                reusablePhysWrapper.timestamp = Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp);
+                                reusablePhysWrapper.axes = mergedAxes;
+                                reusablePhysWrapper.buttons = mergedButtons;
+                            } else {
+                                reusablePhysWrapper.timestamp = physPad.timestamp || nowTs();
+                                reusablePhysWrapper.axes = physProcessedAxes;
+                                reusablePhysWrapper.buttons = remappedPhysButtons;
+                            }
+                            reusableGamepadList[padIdx] = reusablePhysWrapper;
+                            return reusableGamepadList;
                         };
                     } catch(e) {}
 
@@ -2386,7 +2428,11 @@ class XboxBridge(
                             } else if (preset === 'OFF') {
                                 window.__clarityBoostActive = false;
                             }
-                            const css = getPresetCss(preset);
+                            const gt = window.__graphicsTuning || {};
+                            const isLowEndOrThermal = !!(gt.lowEndDeviceMode || gt.gpuLoadReduction || window.__deviceThermalThrottled || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                            // Khi bật Chế độ máy yếu, Giảm tải GPU hoặc máy đang quá nhiệt, tự động giữ <video> nguyên bản (không gắn CSS filter)
+                            // để Android SurfaceFlinger dùng Hardware Overlay zero-copy trực tiếp, giảm tối đa độ trễ khung hình.
+                            const css = isLowEndOrThermal ? '' : getPresetCss(preset);
                             const nextBlock = css ? (`
                                 video#stream-video, video[data-testid="stream-video"], #segmented-video video {
                                     ` + css + `
@@ -2487,6 +2533,10 @@ class XboxBridge(
                         if (!conf) return;
                         window.__graphicsTuning = Object.assign(window.__graphicsTuning || {}, conf);
                         window.__applyGpuAndRenderScaleCss();
+                        window.__applyVideoAspectAndColorCss();
+                        if (typeof window.__setClarityPreset === 'function') {
+                            window.__setClarityPreset(window.__clarityBoostActive ? (window.__currentClarityPreset || 'BALANCED') : 'OFF');
+                        }
                     };
 
                     window.__setRecordingPerformanceMode = function(active) {

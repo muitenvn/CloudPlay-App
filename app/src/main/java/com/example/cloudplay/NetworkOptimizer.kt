@@ -375,6 +375,18 @@ object NetworkOptimizer {
         )
 
         recomputeEffectiveProfile(config, candidateStatus)
+        if (isStreamCurrentlyActive) {
+            try {
+                val lock = wifiLowLatencyLock
+                if (lock != null) {
+                    if (isWifi) {
+                        if (!lock.isHeld) lock.acquire()
+                    } else {
+                        if (lock.isHeld) lock.release()
+                    }
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     /**

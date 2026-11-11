@@ -662,48 +662,48 @@ private fun ConsoleFloatingNavigationDock(
         )
     }
 
+    val navBarBg = Color(0xFF0B1412)
+    val navBarLine = Color(0xFF24352F)
+    val navSelectedBg = Color(0xFF143328)
+    val navAccent = Color(0xFF3CCF91)
+    val navOnAccent = Color(0xFF05281A)
+    val navMuted = Color(0xFF9DB2AB)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(XboxSurface)
+            .background(navBarBg)
             .testTag("bottom_navigation_bar")
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(XboxCardBorder)
+                .background(navBarLine)
         )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 6.dp, vertical = 3.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             navItems.forEach { (tab, icon, label) ->
                 val isSelected = currentTab == tab
-                val accentColor = if (tab == DashboardTab.SERVERS) DirectCyan else XboxNeonGreen
 
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp)
-                        .defaultMinSize(minHeight = 48.dp)
+                        .defaultMinSize(minHeight = 54.dp)
                         .clip(NAV_TAB_SHAPE)
                         .background(
-                            if (isSelected) accentColor.copy(alpha = 0.14f) else Color.Transparent,
+                            if (isSelected) navSelectedBg else Color.Transparent,
                             NAV_TAB_SHAPE
-                        )
-                        .border(
-                            width = if (isSelected) 1.dp else 0.dp,
-                            color = if (isSelected) accentColor.copy(alpha = 0.55f) else Color.Transparent,
-                            shape = NAV_TAB_SHAPE
                         )
                         .clickable { onSelectTab(tab) }
                         .testTag("nav_tab_${tab.name.lowercase()}")
-                        .padding(vertical = 4.dp, horizontal = 2.dp),
+                        .padding(vertical = 5.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -712,49 +712,49 @@ private fun ConsoleFloatingNavigationDock(
                     ) {
                         Box(
                             modifier = Modifier
-                                .width(54.dp)
-                                .height(22.dp),
+                                .width(60.dp)
+                                .height(24.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = icon,
                                 contentDescription = label,
-                                tint = if (isSelected) accentColor else TextSecondary,
-                                modifier = Modifier.size(20.dp)
+                                tint = if (isSelected) navAccent else navMuted,
+                                modifier = Modifier.size(22.dp)
                             )
                             if (tab == DashboardTab.LIBRARY && gamesCount > 0) {
                                 Text(
                                     text = if (gamesCount > 99) "99+" else "$gamesCount",
-                                    color = DirectCyan,
+                                    color = navOnAccent,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.sp,
-                                    lineHeight = 10.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     softWrap = false,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .background(DirectCyan.copy(alpha = 0.16f), NAV_BADGE_SHAPE)
-                                        .padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                        .background(navAccent, CircleShape)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
                                 )
                             } else if (tab == DashboardTab.SERVERS && isVpnActive) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(end = 10.dp)
-                                        .size(6.dp)
+                                        .padding(end = 12.dp, top = 1.dp)
+                                        .size(7.dp)
                                         .clip(CircleShape)
-                                        .background(XboxNeonGreen)
+                                        .background(navAccent)
                                 )
                             }
                         }
 
                         Text(
                             text = label,
-                            color = if (isSelected) TextPrimary else TextSecondary,
+                            color = if (isSelected) navAccent else navMuted,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                             maxLines = 1,
                             softWrap = false,
                             overflow = TextOverflow.Ellipsis

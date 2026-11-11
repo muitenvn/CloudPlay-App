@@ -71,8 +71,9 @@ import com.example.vpn.VpnConnectionState
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
 
-private val HERO_CARD_SHAPE = RoundedCornerShape(12.dp)
-private val HERO_BTN_SHAPE = RoundedCornerShape(10.dp)
+private val HERO_CARD_SHAPE = RoundedCornerShape(14.dp)
+private val HERO_BTN_SHAPE = RoundedCornerShape(12.dp)
+private val HERO_BADGE_SHAPE = RoundedCornerShape(6.dp)
 private val COCKPIT_CARD_SHAPE = RoundedCornerShape(12.dp)
 private val COCKPIT_PILL_SHAPE = RoundedCornerShape(8.dp)
 private val COCKPIT_BTN_SHAPE = RoundedCornerShape(9.dp)
@@ -80,13 +81,14 @@ private val COCKPIT_BTN_SHAPE = RoundedCornerShape(9.dp)
 @Composable
 internal fun HeroConsolePlayDeck(
     @Suppress("UNUSED_PARAMETER") vpnState: VpnConnectionState,
-    @Suppress("UNUSED_PARAMETER") gamepadStatus: GamepadStatus,
+    gamepadStatus: GamepadStatus,
     onOpenXboxCloud: () -> Unit,
     onLaunchFortnite: () -> Unit,
     @Suppress("UNUSED_PARAMETER") onNavigateToSettings: () -> Unit,
     onOpenGuide: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val config by SettingsRepository.config.collectAsState()
     val heroBannerRequest = remember(context) {
         coil.request.ImageRequest.Builder(context)
             .data(R.drawable.gamepass_hub_banner_1791394609676)
@@ -112,7 +114,7 @@ internal fun HeroConsolePlayDeck(
             model = heroBannerRequest,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alpha = 0.22f,
+            alpha = 0.32f,
             modifier = Modifier
                 .fillMaxWidth()
                 .matchParentSize()
@@ -121,37 +123,71 @@ internal fun HeroConsolePlayDeck(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = stringResource(R.string.hero_title),
-                    color = TextPrimary,
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontSize = if (isNarrow) 13.sp else 14.sp,
-                    fontWeight = FontWeight.Black,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Column(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(end = 6.dp)
-                )
+                        .padding(end = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "🎮 XBOX CLOUD",
+                            color = XboxNeonGreen,
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .background(XboxNeonGreen.copy(alpha = 0.14f), HERO_BADGE_SHAPE)
+                                .border(1.dp, XboxNeonGreen.copy(alpha = 0.35f), HERO_BADGE_SHAPE)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                        Text(
+                            text = if (gamepadStatus.hasPhysicalController) {
+                                config.tr("🕹️ Tay cầm rời", "🕹️ Controller")
+                            } else {
+                                config.tr("📱 Cảm ứng • ⚡ 60FPS", "📱 Touch • ⚡ 60FPS")
+                            },
+                            color = TextSecondary,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Text(
+                        text = stringResource(R.string.hero_title),
+                        color = TextPrimary,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = if (isNarrow) 14.sp else 15.5.sp,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
                         .clickable { onOpenGuide() },
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(32.dp)
                             .background(XboxSurfaceVariant, CircleShape)
                             .border(1.dp, XboxCardBorder, CircleShape),
                         contentAlignment = Alignment.Center
@@ -160,7 +196,7 @@ internal fun HeroConsolePlayDeck(
                             imageVector = Icons.AutoMirrored.Filled.HelpOutline,
                             contentDescription = stringResource(R.string.guide_button),
                             tint = DirectCyan,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -175,28 +211,29 @@ internal fun HeroConsolePlayDeck(
                     onClick = onOpenXboxCloud,
                     modifier = Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 40.dp)
+                        .defaultMinSize(minHeight = 46.dp)
+                        .border(1.dp, Color.White.copy(alpha = 0.22f), HERO_BTN_SHAPE)
                         .testTag("hero_launch_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XboxGreen,
                         contentColor = Color.White
                     ),
                     shape = HERO_BTN_SHAPE,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                 ) {
                     if (!isNarrow) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                     }
                     Text(
                         text = stringResource(R.string.btn_launch_xcloud),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
                         softWrap = false,
@@ -208,28 +245,29 @@ internal fun HeroConsolePlayDeck(
                     onClick = onLaunchFortnite,
                     modifier = Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 40.dp)
+                        .defaultMinSize(minHeight = 46.dp)
+                        .border(1.dp, Color.White.copy(alpha = 0.22f), HERO_BTN_SHAPE)
                         .testTag("hero_launch_fortnite_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = EpicBlue,
                         contentColor = Color.White
                     ),
                     shape = HERO_BTN_SHAPE,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 7.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
                 ) {
                     if (!isNarrow) {
                         Icon(
                             imageVector = Icons.Default.Bolt,
                             contentDescription = null,
                             tint = GoldStar,
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
                         text = stringResource(R.string.btn_play_fortnite),
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
                         softWrap = false,

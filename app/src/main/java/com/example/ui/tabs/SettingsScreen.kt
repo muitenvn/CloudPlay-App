@@ -113,14 +113,19 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(horizontal = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { Spacer(modifier = Modifier.height(4.dp)) }
-
-        // =========================================================================
-        // TẦNG 1: CÀI ĐẶT CƠ BẢN (Chất lượng, Mạng & Mở khóa vùng, Tay cầm, Ngôn ngữ, Quay màn hình)
-        // =========================================================================
+        item {
+            Text(
+                text = config.tr("HÌNH ẢNH", "DISPLAY & VIDEO"),
+                color = TextSecondary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                modifier = Modifier.padding(top = 4.dp, start = 2.dp)
+            )
+        }
 
         // 1. ĐỒ HỌA & KHUNG HÌNH (FPS) (Mặc định mở)
         item {
@@ -132,18 +137,28 @@ fun SettingsScreen(
             )
         }
 
-        // 2. MẠNG & MỞ KHÓA VÙNG (Tự bật/tắt VPN & Chế độ mở khóa vùng)
+        // 2. QUAY MÀN HÌNH (.MP4)
         item {
-            SettingsNetworkVpnSection(
+            SettingsScreenRecordingSection(
                 config = config,
-                vpnState = vpnState,
                 isEn = isEn,
-                expandNetwork = expandNetwork,
-                onToggleExpand = { expandNetwork = !expandNetwork }
+                expandRecording = expandRecording,
+                onToggleExpand = { expandRecording = !expandRecording }
             )
         }
 
-        // 3. TAY CẦM & CẢM ỨNG (Tay cầm ảo, cỡ nút, độ mờ, 1 thanh độ nhạy cần)
+        item {
+            Text(
+                text = config.tr("ĐIỀU KHIỂN", "CONTROLS"),
+                color = TextSecondary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                modifier = Modifier.padding(top = 6.dp, start = 2.dp)
+            )
+        }
+
+        // 3. TAY CẦM & CẢM ỨNG
         item {
             SettingsGamepadTouchSection(
                 config = config,
@@ -154,7 +169,29 @@ fun SettingsScreen(
             )
         }
 
-        // 4. NGÔN NGỮ & DỊCH GIAO DIỆN XBOX
+        item {
+            Text(
+                text = config.tr("MẠNG VÀ ỨNG DỤNG", "NETWORK & APP"),
+                color = TextSecondary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.6.sp,
+                modifier = Modifier.padding(top = 6.dp, start = 2.dp)
+            )
+        }
+
+        // 4. MẠNG & MỞ KHÓA VÙNG
+        item {
+            SettingsNetworkVpnSection(
+                config = config,
+                vpnState = vpnState,
+                isEn = isEn,
+                expandNetwork = expandNetwork,
+                onToggleExpand = { expandNetwork = !expandNetwork }
+            )
+        }
+
+        // 5. NGÔN NGỮ & DỊCH GIAO DIỆN XBOX
         item {
             SettingsLanguageBasicSection(
                 config = config,
@@ -164,19 +201,7 @@ fun SettingsScreen(
             )
         }
 
-        // 5. QUAY MÀN HÌNH (.MP4)
-        item {
-            SettingsScreenRecordingSection(
-                config = config,
-                isEn = isEn,
-                expandRecording = expandRecording,
-                onToggleExpand = { expandRecording = !expandRecording }
-            )
-        }
-
-        // =========================================================================
-        // TẦNG 2: CÀI ĐẶT NÂNG CAO (Mặc định ĐÓNG SẴN)
-        // =========================================================================
+        // 6. CÀI ĐẶT NÂNG CAO (Mặc định ĐÓNG SẴN)
         item {
             SettingsAdvancedSection(
                 config = config,
@@ -187,10 +212,6 @@ fun SettingsScreen(
                 onOpenAppLog = { showAppLogDialog = true }
             )
         }
-
-        // =========================================================================
-        // TẦNG 3: THÔNG TIN, TÀI KHOẢN & ĐIỀU KHOẢN (Ở dưới cùng, bấm vào dễ dàng)
-        // =========================================================================
 
         // 7. CẬP NHẬT ỨNG DỤNG, GIỚI THIỆU & CHIA SẺ MÃ QR
         item {

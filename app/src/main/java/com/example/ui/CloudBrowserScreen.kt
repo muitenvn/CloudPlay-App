@@ -1119,20 +1119,10 @@ fun CloudBrowserScreen(
                     }
 
                     val formattedInitialUrl = SettingsRepository.formatXboxUrlWithLocale(activeSessionInitialUrl, effectiveLocale)
-                    val customHeaders = if (config.forceDesktopUserAgent) {
-                        mapOf(
-                            "Accept-Language" to "$effectiveLocale,en;q=0.9",
-                            "X-Edge-Shopping-Flag" to "0",
-                            "Sec-CH-UA" to "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
-                            "Sec-CH-UA-Mobile" to "?0",
-                            "Sec-CH-UA-Platform" to "\"Windows\""
-                        )
-                    } else {
-                        mapOf(
-                            "Accept-Language" to "$effectiveLocale,en;q=0.9",
-                            "X-Edge-Shopping-Flag" to "0"
-                        )
-                    }
+                    val customHeaders = mapOf(
+                        "Accept-Language" to "$effectiveLocale,en;q=0.9",
+                        "X-Edge-Shopping-Flag" to "0"
+                    )
                     val initUaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
                     if (pendingAppNavReason == null) {
                         pendingAppNavReason = "khởi tạo WebView (initialUrl=${com.example.data.AppLogger.safeUrlHostPath(activeSessionInitialUrl)}, chế độ=${config.xboxWebUiMode.name}, ua=$initUaMode)"

@@ -444,9 +444,9 @@ fun FloatingHud(
             (offsetX <= edgeDockThresholdPx || offsetX >= (rightScreenEdgeX - edgeDockThresholdPx))
 
         if (dockedEdge != HudDockedEdge.NONE) {
-            // THANH GỜ SÁT RÌA MÀN HÌNH: Vuốt qua (hoặc chạm) để bật lại nút nổi
-            val handleWidthDp = 20.dp
-            val handleHeightDp = 62.dp
+            // THANH GỜ SÁT RÌA MÀN HÌNH (30x56dp như bản mẫu .hud-handle): Chạm hoặc kéo để mở
+            val handleWidthDp = 30.dp
+            val handleHeightDp = 56.dp
             val handleWidthPx = with(density) { handleWidthDp.toPx() }
             val handleHeightPx = with(density) { handleHeightDp.toPx() }
             val swipeUnlockThresholdPx = with(density) { 10.dp.toPx() }
@@ -458,11 +458,10 @@ fun FloatingHud(
             val handleMaxY = (maxHeightPx - safeBottomPx - handleHeightPx).coerceAtLeast(safeTopPx)
             val handleY = animatedOffsetY.coerceIn(safeTopPx, handleMaxY).roundToInt()
 
-            val handleAccent = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else XboxNeonGreen
             val handleShape = if (dockedEdge == HudDockedEdge.LEFT) {
-                RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
+                RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
             } else {
-                RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
+                RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
             }
 
             fun restoreFromEdge() {
@@ -481,7 +480,7 @@ fun FloatingHud(
                     .offset { IntOffset(handleX, handleY) }
                     .size(width = handleWidthDp, height = handleHeightDp)
                     .graphicsLayer {
-                        alpha = if (isInteracting || isDragging) 0.96f else 0.45f
+                        alpha = if (isInteracting || isDragging) 0.98f else 0.55f
                     }
                     .pointerInput(dockedEdge, maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeRightPx, safeTopPx, handleMaxY) {
                         var accumulatedSwipeX = 0f
@@ -503,9 +502,7 @@ fun FloatingHud(
                                 change.consume()
                                 markUserInteraction()
                                 accumulatedSwipeX += dragAmount.x
-                                // Cho phép trượt dọc thanh gờ dọc theo rìa màn hình
                                 offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, handleMaxY)
-                                // Nếu vuốt qua vào trong màn hình -> bật lại nút nổi ngay lập tức
                                 val swipedInward = (dockedEdge == HudDockedEdge.LEFT && accumulatedSwipeX > swipeUnlockThresholdPx) ||
                                     (dockedEdge == HudDockedEdge.RIGHT && accumulatedSwipeX < -swipeUnlockThresholdPx)
                                 if (swipedInward) {
@@ -520,50 +517,24 @@ fun FloatingHud(
                         restoreFromEdge()
                     }
                     .border(
-                        1.2.dp,
-                        handleAccent.copy(alpha = 0.85f),
+                        1.dp,
+                        XboxCardBorder,
                         handleShape
                     )
                     .testTag("hud_edge_dock_handle"),
-                color = Color(0xF209120D),
-                shadowElevation = 8.dp
+                color = XboxSurface,
+                shadowElevation = 0.dp
             ) {
-                Row(
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (dockedEdge == HudDockedEdge.LEFT) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(26.dp)
-                                .clip(CircleShape)
-                                .background(handleAccent)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = "›",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                    } else {
-                        Text(
-                            text = "‹",
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(26.dp)
-                                .clip(CircleShape)
-                                .background(handleAccent)
-                        )
-                    }
+                    Text(
+                        text = if (dockedEdge == HudDockedEdge.LEFT) "›" else "‹",
+                        color = XboxNeonGreen,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         } else {
@@ -588,7 +559,6 @@ fun FloatingHud(
                         onDragEnd = {
                             isDragging = false
                             markUserInteraction()
-                            // Chỉ khi kéo SÁT rìa màn hình bên trái hoặc bên phải mới ẩn nút nổi thành thanh gờ
                             if (hudMode != HudMode.EXPANDED && offsetX <= edgeDockThresholdPx) {
                                 offsetX = 0f
                                 dockedEdge = HudDockedEdge.LEFT
@@ -609,317 +579,218 @@ fun FloatingHud(
                         onDrag = { change, dragAmount ->
                             change.consume()
                             markUserInteraction()
-                            // Di chuyển tự do không giới hạn vùng (chỉ giới hạn trong khung màn hình)
                             offsetX = (offsetX + dragAmount.x).coerceIn(0f, rightScreenEdgeX)
                             offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, maxBoundY)
                         }
                     )
                 }
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .border(
-                    if (isNearEdgeForDock) 1.5.dp else 1.dp,
-                    if (isNearEdgeForDock) XboxNeonGreen else Color(0xFF24382C),
-                    RoundedCornerShape(12.dp)
+                    1.dp,
+                    if (isNearEdgeForDock) XboxNeonGreen else XboxCardBorder,
+                    RoundedCornerShape(14.dp)
                 )
                 .testTag("floating_hud_container"),
-            color = Color(0xF20D1511),
-            shadowElevation = 6.dp
+            color = XboxSurface,
+            shadowElevation = 0.dp
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
+                modifier = Modifier.padding(if (hudMode == HudMode.EXPANDED) 12.dp else 6.dp),
                 horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
-                // MINIMIZED STATE: Ultra-compact 1-line Capsule Pill (Ping + Controller icon)
+                // 1. TRẠNG THÁI THU NHỎ (MINIMIZED): Thanh gọn kèm mũi tên › và ping
                 if (hudMode == HudMode.MINIMIZED) {
                     val rawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
                     val hasValidPing = rawPing != null && rawPing > 0
                     val pingColor = when {
-                        !hasValidPing -> Color.Gray
+                        !hasValidPing -> TextSecondary
                         rawPing < 80 -> XboxNeonGreen
-                        rawPing <= 120 -> Color(0xFFFFB300)
+                        rawPing <= 120 -> Color(0xFFE3B341)
                         else -> JapanRed
                     }
-                    val pingText = if (!hasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡—" else "${vpnState.currentServer.flag}—"
-                    } else {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${rawPing}ms" else "${vpnState.currentServer.flag}${rawPing}ms"
-                    }
+                    val pingText = if (!hasValidPing) "—" else "${rawPing}ms"
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
                             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                            .clip(RoundedCornerShape(9.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .clickable {
                                 markUserInteraction()
                                 hudMode = HudMode.COMPACT
                             }
-                            .padding(horizontal = 7.dp, vertical = 3.5.dp)
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                             .testTag("hud_minimized_pill")
                     ) {
+                        Text(
+                            text = "›",
+                            color = XboxNeonGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                         Box(
                             modifier = Modifier
-                                .size(6.5.dp)
+                                .size(6.dp)
                                 .clip(CircleShape)
                                 .background(pingColor)
                         )
                         Text(
                             text = pingText,
                             color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
                             maxLines = 1
                         )
-                        Icon(
-                            imageVector = Icons.Default.Gamepad,
-                            contentDescription = if (isEn) "Expand quick controls" else "Mở điều khiển nhanh",
-                            tint = if (physicalControllerConnected || virtualControllerEnabled) XboxNeonGreen else TextSecondary,
-                            modifier = Modifier.size(11.5.dp)
-                        )
                     }
-                } else {
+                } else if (hudMode == HudMode.COMPACT) {
                     // ==========================================
-                    // COMPACT STATE: ULTRA-SLIM ROW WITH HOME BUTTON (~145dp)
+                    // 2. TRẠNG THÁI GỌN (COMPACT): Cột dọc các nút 44dp phẳng theo bản mẫu .hud-compact
                     // ==========================================
-                    val compactRawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
-                    val compactHasValidPing = compactRawPing != null && compactRawPing > 0
-                    val pingColor = when {
-                        !compactHasValidPing -> Color.Gray
-                        compactRawPing < 80 -> XboxNeonGreen
-                        compactRawPing <= 120 -> Color(0xFFFFB300)
-                        else -> JapanRed
-                    }
-                    val compactPingText = if (!compactHasValidPing) {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡—" else "${vpnState.currentServer.flag}—"
-                    } else {
-                        if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "⚡${compactRawPing}ms" else "${vpnState.currentServer.flag}${compactRawPing}ms"
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 2.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        // 0. Dedicated Visible Home Button with Label
+                        // Nút Mở rộng sang bảng Menu nhanh (›)
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = DirectCyan.copy(alpha = 0.28f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f)),
+                            shape = RoundedCornerShape(10.dp),
+                            color = XboxSurfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    showExitConfirmDialog = true
+                                    markUserInteraction()
+                                    hudMode = HudMode.EXPANDED
                                 }
-                                .testTag("hud_home_button")
+                                .testTag("hud_expand_button")
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Home,
-                                    contentDescription = if (isEn) "Home" else "Trang chủ",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                            Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "Home",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
+                                    text = "›",
+                                    color = XboxNeonGreen,
+                                    fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // 1. Unified 1-Tap Network Pill: Ping + Mode
+                        // Nút Mạng / Thông số (chuyển nhanh VPN / Direct)
                         Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = when (vpnState.mode) {
-                                NetworkMode.DIRECT_NETWORK -> DirectCyan.copy(alpha = 0.22f)
-                                NetworkMode.VPN_JAPAN -> JapanRed.copy(alpha = 0.22f)
-                                NetworkMode.DISCONNECTED -> Color(0x33233A2D)
-                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (vpnState.mode != NetworkMode.DIRECT_NETWORK) Color(0xFF0F2C1D) else XboxSurfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (vpnState.mode != NetworkMode.DIRECT_NETWORK) XboxNeonGreen else XboxCardBorder
+                            ),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(7.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
+                                    markUserInteraction()
                                     onToggleNetwork()
                                 }
                                 .testTag("hud_toggle_network_button")
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 3.5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(pingColor)
-                                )
-                                Text(
-                                    text = compactPingText,
-                                    color = TextPrimary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) "Direct" else "VPN",
-                                    color = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) DirectCyan else JapanRed,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.SemiBold
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = if (isEn) "Network & stats" else "Thông số mạng",
+                                    tint = if (vpnState.mode != NetworkMode.DIRECT_NETWORK) XboxNeonGreen else TextPrimary,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
 
-                        // 2. Controller Toggle (Icon only)
+                        // Nút Tay cầm ảo
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (physicalControllerConnected) XboxGreen.copy(alpha = 0.35f)
-                                    else if (virtualControllerEnabled) DirectCyan.copy(alpha = 0.25f)
-                                    else Color(0x33233A2D),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (virtualControllerEnabled || physicalControllerConnected) Color(0xFF0F2C1D) else XboxSurfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (virtualControllerEnabled || physicalControllerConnected) XboxNeonGreen else XboxCardBorder
+                            ),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
+                                    markUserInteraction()
                                     onToggleVirtualController()
                                 }
                                 .testTag("hud_toggle_controller_button")
                         ) {
-                            Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Gamepad,
                                     contentDescription = if (isEn) "Gamepad" else "Tay cầm",
-                                    tint = if (physicalControllerConnected) XboxNeonGreen else if (virtualControllerEnabled) DirectCyan else TextSecondary,
-                                    modifier = Modifier.size(12.dp)
+                                    tint = if (virtualControllerEnabled || physicalControllerConnected) XboxNeonGreen else TextPrimary,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
 
-                        // 3. Translation Toggle (Flag)
+                        // Nút Quay màn hình
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (translationActive) XboxNeonGreen.copy(alpha = 0.25f) else Color(0x33233A2D),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (recorderState.isRecording) Color(0xFF331A19) else XboxSurfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (recorderState.isRecording) Color(0xFF612826) else XboxCardBorder
+                            ),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    onToggleTranslation(!translationActive)
+                                    markUserInteraction()
+                                    onToggleRecording()
                                 }
-                                .testTag("hud_translate_button")
+                                .testTag("hud_record_button")
                         ) {
-                            Box(modifier = Modifier.padding(horizontal = 3.5.dp, vertical = 2.5.dp)) {
-                                Text(
-                                    text = if (translationActive) "🇻🇳" else "🌐",
-                                    fontSize = 10.sp
+                            Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(if (recorderState.isRecording) JapanRed else TextPrimary)
                                 )
                             }
                         }
 
-                        // 4. Clarity Boost Toggle (Icon only)
+                        // Nút Thoát (đỏ cảnh báo)
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (clarityBoostActive) XboxNeonGreen.copy(alpha = 0.25f) else Color(0x33233A2D),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF331A19),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF612826)),
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    onToggleClarityBoost(!clarityBoostActive)
+                                    markUserInteraction()
+                                    showExitConfirmDialog = true
                                 }
-                                .testTag("hud_clarity_button")
+                                .testTag("hud_home_button")
                         ) {
-                            Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = if (isEn) "Clarity Boost" else "Làm nét",
-                                    tint = if (clarityBoostActive) XboxNeonGreen else TextSecondary,
-                                    modifier = Modifier.size(12.dp)
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = if (isEn) "Exit game" else "Thoát game",
+                                    tint = JapanRed,
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
 
-                        // 4.5. Recording Status Pill (Only displayed when actively recording so secondary feature does not clutter primary gameplay bar)
-                        if (recorderState.isRecording) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0x44FF3B30),
-                                border = androidx.compose.foundation.BorderStroke(0.9.dp, Color(0xFFFF3B30)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable {
-                                        lastInteractionTime = System.currentTimeMillis()
-                                        isInteracting = true
-                                        onToggleRecording()
-                                    }
-                                    .testTag("hud_record_button")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 4.5.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.5.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.5.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFFFF3B30))
-                                    )
-                                    val mins = recorderState.elapsedSeconds / 60
-                                    val secs = recorderState.elapsedSeconds % 60
-                                    Text(
-                                        text = "%02d:%02d".format(mins, secs),
-                                        color = Color(0xFFFF8A80),
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.ExtraBold
-                                    )
-                                }
-                            }
-                        }
-
-
-                        // 5. Expand Game Bar Menu Button
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (hudMode == HudMode.EXPANDED) XboxNeonGreen.copy(alpha = 0.3f) else Color(0x33233A2D),
-                            modifier = Modifier
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.92f)
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
-                                    isInteracting = true
-                                    hudMode = if (hudMode == HudMode.EXPANDED) HudMode.COMPACT else HudMode.EXPANDED
-                                }
-                                .testTag("hud_expand_button")
-                        ) {
-                            Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.5.dp)) {
-                                Icon(
-                                    imageVector = Icons.Default.Tune,
-                                    contentDescription = if (isEn) "Settings menu" else "Menu tùy chỉnh",
-                                    tint = if (hudMode == HudMode.EXPANDED) XboxNeonGreen else TextSecondary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-
-                        // 6. Minimize to Corner Dot
+                        // Nút thu nhỏ về viên thuốc gọn
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(5.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .clickable {
-                                    lastInteractionTime = System.currentTimeMillis()
+                                    markUserInteraction()
                                     hudMode = HudMode.MINIMIZED
                                 }
-                                .padding(horizontal = 3.dp, vertical = 2.dp)
-                                .testTag("hud_minimize_button")
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .testTag("hud_minimize_button"),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "─",
@@ -929,120 +800,289 @@ fun FloatingHud(
                             )
                         }
                     }
-
+                } else {
                     // ==========================================
-                    // B. BẢNG MỞ RỘNG (NHỎ GỌN, DÀY THÔNG TIN, CUỘN BÊN TRONG)
-                    // - Chiều rộng tối đa 38% màn hình, chiều cao tối đa 60% màn hình
-                    // - Mở sát cạnh nơi HUD đang đứng (trái/phải)
-                    // - Nút thu gọn rõ ràng, vùng bấm chuẩn 48dp
-                    // - Bỏ ô lớn "Chất lượng đồ họa & hiệu năng máy", chỉ giữ:
-                    //   Độ trễ, FPS, Thời gian giải mã, Tay cầm, Pin & Sạc, Nhiệt độ (chỉ hiện trong mở rộng), Chế độ chất lượng + nút chức năng
+                    // 3. TRẠNG THÁI MỞ RỘNG (EXPANDED): Bảng Menu nhanh chuẩn bản mẫu .hud-panel
                     // ==========================================
-                    val panelMaxWidth = (screenMaxWidth * 0.48f).coerceIn(248.dp, 312.dp)
-                    val panelMaxHeight = (screenMaxHeight * 0.68f).coerceAtLeast(220.dp)
+                    val panelMaxWidth = 272.dp
+                    val panelMaxHeight = (screenMaxHeight * 0.78f).coerceAtLeast(240.dp)
                     val scrollState = rememberScrollState()
                     var showMoreHudOptions by rememberSaveable { mutableStateOf(false) }
 
-                    LaunchedEffect(hudMode) {
-                        if (hudMode != HudMode.EXPANDED) {
-                            showMoreHudOptions = false
-                        }
-                    }
+                    val hasRealSample = telemetry.hasStatsSample
+                    val effectivePing: Int? = if (hasRealSample && telemetry.rttMs > 0) telemetry.rttMs else null
+                    val pingValStr = effectivePing?.toString() ?: "—"
+                    val fpsValStr = if (hasRealSample && telemetry.fps > 0) "${telemetry.fps}" else "—"
+                    val jitterValStr = if (hasRealSample && (telemetry.jitterMs > 0 || effectivePing != null)) "${telemetry.jitterMs}" else "—"
+                    val mbpsValStr = if (hasRealSample && telemetry.bitrateMbps > 0) String.format("%.1f", telemetry.bitrateMbps) else "—"
 
-                    AnimatedVisibility(
-                        visible = hudMode == HudMode.EXPANDED,
-                        enter = if (!motionEnabled) EnterTransition.None else xboxHudExpandEnterTransition(),
-                        exit = if (!motionEnabled) ExitTransition.None else xboxHudCollapseExitTransition()
+                    Column(
+                        modifier = Modifier
+                            .width(panelMaxWidth)
+                            .heightIn(max = panelMaxHeight)
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(top = 4.dp, start = 2.dp, end = 2.dp, bottom = 2.dp)
-                                .width(panelMaxWidth)
-                                .widthIn(min = 248.dp, max = 312.dp)
-                                .heightIn(max = panelMaxHeight),
-                            verticalArrangement = Arrangement.spacedBy(5.dp),
-                            horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
+                        // Hàng đầu: "Menu nhanh" + nút thu gọn 36dp
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Thanh tiêu đề + Nút THU GỌN rõ ràng, đủ lớn để bấm (48dp)
-                            ExpandedHudCollapseHeader(
-                                isAnchoredRight = isAnchoredRight,
-                                gameProfile = gameProfile,
-                                onCollapseToCompact = {
-                                    markUserInteraction()
-                                    hudMode = HudMode.COMPACT
-                                },
-                                onCollapseToMinimized = {
-                                    markUserInteraction()
-                                    hudMode = HudMode.MINIMIZED
-                                }
+                            Text(
+                                text = gameProfile?.title ?: if (isEn) "Quick Menu" else "Menu nhanh",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f)
                             )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            hudMode = HudMode.COMPACT
+                                        }
+                                        .testTag("hud_collapse_48dp_button")
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "‹",
+                                            color = TextSecondary,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            hudMode = HudMode.MINIMIZED
+                                        }
+                                        .testTag("hud_minimize_48dp_button")
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "─",
+                                            color = TextSecondary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
-                            // Cảnh báo nhiệt độ khi từ MODERATE trở lên (chỉ hiển thị trong bảng cài đặt mở rộng)
-                            if (isThermalSupported && showThermalWarningBanner) {
+                        // Cảnh báo nhiệt độ khi từ MODERATE trở lên
+                        if (isThermalSupported && showThermalWarningBanner) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showThermalWarningBanner = false }
+                                    .testTag("hud_thermal_warning_banner"),
+                                shape = RoundedCornerShape(8.dp),
+                                color = Color(0xFF331A19),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF612826))
+                            ) {
+                                Text(
+                                    text = if (isEn) "Device is warm, consider lowering resolution" else "Máy đang nóng, nên hạ chất lượng",
+                                    color = JapanRed,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    maxLines = 2
+                                )
+                            }
+                        }
+
+                        // Lưới 4 cột thông số (.hud-stats): ms | FPS | jitter | Mbps
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val statsList = listOf(
+                                Triple(pingValStr, "ms", true),
+                                Triple(fpsValStr, "FPS", false),
+                                Triple(jitterValStr, "jitter", false),
+                                Triple(mbpsValStr, "Mbps", false)
+                            )
+                            statsList.forEach { (numStr, unitStr, highlightGreen) ->
+                                Surface(
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = numStr,
+                                            color = if (highlightGreen) XboxNeonGreen else TextPrimary,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = unitStr,
+                                            color = TextSecondary,
+                                            fontSize = 10.5.sp,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Lưới 3x2 nút hành động (.hud-actions): Tay cầm, Đồ họa, Xoay, Quay, Tải lại, Thoát
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // 1. Tay cầm
+                                val padOn = virtualControllerEnabled || physicalControllerConnected
                                 Surface(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable { showThermalWarningBanner = false }
-                                        .testTag("hud_thermal_warning_banner"),
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = JapanRed.copy(alpha = 0.24f),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.7f))
-                                ) {
-                                    Text(
-                                        text = if (isEn) "🔥 Device is hot, take a break or lower quality" else "🔥 Máy đang nóng, nên nghỉ hoặc hạ chất lượng",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        maxLines = 2
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            onToggleVirtualController()
+                                        }
+                                        .testTag("hud_toggle_controller_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (padOn) Color(0xFF0F2C1D) else XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (padOn) XboxNeonGreen else XboxCardBorder
                                     )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Gamepad,
+                                            contentDescription = null,
+                                            tint = if (padOn) XboxNeonGreen else TextPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (isEn) "Gamepad" else "Tay cầm",
+                                            color = if (padOn) XboxNeonGreen else TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                // 2. Đồ họa (mở rộng tùy chỉnh chất lượng/làm nét/màu sắc ngay trong HUD)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            showMoreHudOptions = !showMoreHudOptions
+                                        }
+                                        .testTag("hud_more_options_toggle_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (showMoreHudOptions) Color(0xFF0F2C1D) else XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (showMoreHudOptions) XboxNeonGreen else XboxCardBorder
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Tune,
+                                            contentDescription = null,
+                                            tint = if (showMoreHudOptions) XboxNeonGreen else TextPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (isEn) "Graphics" else "Đồ họa",
+                                            color = if (showMoreHudOptions) XboxNeonGreen else TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                // 3. Xoay
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            markUserInteraction()
+                                            onToggleOrientation()
+                                        }
+                                        .testTag("hud_expanded_rotate_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ScreenRotation,
+                                            contentDescription = null,
+                                            tint = TextPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (isEn) "Rotate" else "Xoay",
+                                            color = TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
 
-                            // Nội dung bên trong cuộn dọc nếu màn hình thấp
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f, fill = false)
-                                    .verticalScroll(scrollState),
-                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                // ========================================================
-                                // 1. BẢNG THÔNG SỐ CỐT LÕI (Ping, FPS, Giải mã, Tay cầm, Nhiệt độ & Pin)
-                                // ========================================================
-                                DenseCoreTelemetrySection(
-                                    vpnState = vpnState,
-                                    telemetry = telemetry,
-                                    compactRawPing = compactRawPing,
-                                    compactHasValidPing = compactHasValidPing,
-                                    physicalControllerConnected = physicalControllerConnected,
-                                    virtualControllerEnabled = virtualControllerEnabled,
-                                    controllerName = controllerName,
-                                    batteryPercent = batteryPercent,
-                                    isBatteryCharging = isBatteryCharging,
-                                    isThermalSupported = isThermalSupported,
-                                    thermalIcon = thermalIcon,
-                                    thermalLabel = thermalLabel,
-                                    thermalColor = thermalColor,
-                                    onToggleNetwork = {
-                                        markUserInteraction()
-                                        onToggleNetwork()
-                                    },
-                                    onToggleVirtualController = {
-                                        markUserInteraction()
-                                        onToggleVirtualController()
-                                    },
-                                    adaptiveBufferMs = adaptiveQualityState.smoothBufferMs.roundToInt()
-                                )
-
-                                // ========================================================
-                                // 2. NÚT QUAY MÀN HÌNH (.MP4) — Luôn hiện ở chế độ thu gọn mặc định
-                                // ========================================================
+                                // 4. Quay
                                 Surface(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             markUserInteraction()
                                             if (!recorderState.isRecording) {
@@ -1051,259 +1091,212 @@ fun FloatingHud(
                                             onToggleRecording()
                                         }
                                         .testTag("hud_expanded_record_card"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (recorderState.isRecording) Color(0x33FF3B30) else Color(0xFF0F1813),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (recorderState.isRecording) Color(0xFF331A19) else XboxSurfaceVariant,
                                     border = androidx.compose.foundation.BorderStroke(
-                                        0.8.dp,
-                                        if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0x40808080)
+                                        1.dp,
+                                        if (recorderState.isRecording) Color(0xFF612826) else XboxCardBorder
                                     )
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .clip(CircleShape)
-                                                    .background(if (recorderState.isRecording) Color(0xFFFF3B30) else Color(0xFF888888))
-                                            )
-                                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                Text(
-                                                    text = if (recorderState.isRecording) {
-                                                        val mins = recorderState.elapsedSeconds / 60
-                                                        val secs = recorderState.elapsedSeconds % 60
-                                                        if (isEn) "Recording %02d:%02d — Tap to Save".format(mins, secs)
-                                                        else "Đang quay %02d:%02d — Chạm để Lưu".format(mins, secs)
-                                                    } else {
-                                                        if (isEn) "Record Screen (.MP4)" else "Quay màn hình (.MP4)"
-                                                    },
-                                                    color = if (recorderState.isRecording) Color(0xFFFF8A80) else TextPrimary,
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    text = if (isEn) {
-                                                        "${config.screenRecordQuality.shortEn} • Game Audio"
-                                                    } else {
-                                                        "${config.screenRecordQuality.shortVi} • Có tiếng game"
-                                                    },
-                                                    color = Color(0xFF90A89B),
-                                                    fontSize = 11.sp,
-                                                    maxLines = 1
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(if (recorderState.isRecording) JapanRed else TextPrimary)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = if (recorderState.isRecording) {
-                                                if (isEn) "SAVE" else "LƯU"
+                                                val mins = recorderState.elapsedSeconds / 60
+                                                val secs = recorderState.elapsedSeconds % 60
+                                                "%02d:%02d".format(mins, secs)
                                             } else {
-                                                if (isEn) "REC" else "QUAY"
+                                                if (isEn) "Record" else "Quay"
                                             },
-                                            color = if (recorderState.isRecording) Color(0xFFFF5252) else DirectCyan,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.ExtraBold
+                                            color = if (recorderState.isRecording) JapanRed else TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
                                         )
                                     }
                                 }
 
-                                // ========================================================
-                                // 3. NÚT MỞ RỘNG CÁC BẢNG TÙY CHỈNH PHỤ (Mặc định thu gọn)
-                                // ========================================================
+                                // 5. Tải lại
                                 Surface(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable {
                                             markUserInteraction()
-                                            showMoreHudOptions = !showMoreHudOptions
+                                            onReloadPage()
                                         }
-                                        .testTag("hud_more_options_toggle_button"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (showMoreHudOptions) DirectCyan.copy(alpha = 0.16f) else Color(0xFF101C16),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        0.8.dp,
-                                        if (showMoreHudOptions) DirectCyan else XboxCardBorder.copy(alpha = 0.65f)
-                                    )
+                                        .testTag("hud_expanded_reload_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = XboxSurfaceVariant,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
                                     ) {
-                                        Text(
-                                            text = if (showMoreHudOptions) {
-                                                if (isEn) "Hide Resolution, Gamepad & Color Options" else "Thu gọn Độ phân giải, Tay cầm & Màu sắc"
-                                            } else {
-                                                if (isEn) "Expand (Resolution, Quick Toggles, Gamepad, Colors)" else "Mở rộng (Độ phân giải, Công tắc, Tay cầm, Màu sắc)"
-                                            },
-                                            color = if (showMoreHudOptions) DirectCyan else XboxNeonGreen,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            modifier = Modifier.weight(1f)
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = TextPrimary,
+                                            modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = if (showMoreHudOptions) "▲" else "▼",
-                                            color = if (showMoreHudOptions) DirectCyan else XboxNeonGreen,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.ExtraBold
+                                            text = if (isEn) "Reload" else "Tải lại",
+                                            color = TextPrimary,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
                                         )
                                     }
                                 }
 
-                                // CÁC BẢNG PHỤ NẰM SAU NÚT "MỞ RỘNG":
-                                // Độ phân giải, Công tắc nhanh, Chỉnh tay cầm ảo, Chỉnh màu
-                                if (showMoreHudOptions) {
-                                    DenseQualityModeSection(
-                                        networkStatus = networkStatus,
-                                        adaptiveQualityState = adaptiveQualityState,
-                                        telemetry = telemetry,
-                                        isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
-                                        onSelectCellularMode = { mode ->
+                                // 6. Thoát (màu đỏ cảnh báo)
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
                                             markUserInteraction()
-                                            onSelectCellularMode(mode)
-                                        },
-                                        onToggleAutoAdapting = { enabled ->
-                                            markUserInteraction()
-                                            onToggleAutoAdapting(enabled)
-                                        },
-                                        onToggleWifiSpeedFirst = { enabled ->
-                                            markUserInteraction()
-                                            onToggleWifiSpeedFirst(enabled)
+                                            com.example.data.AppLogger.info("UI", "Mở hộp thoại xác nhận Thoát game từ HUD")
+                                            showExitConfirmDialog = true
                                         }
-                                    )
-
-                                    if (gameProfile?.gameId == "fortnite") {
-                                        FortniteExclusiveHudCard(
-                                            isEn = isEn,
-                                            virtualControllerEnabled = virtualControllerEnabled,
-                                            onSelectFortniteControlMode = { useVirtualFpsPro ->
-                                                markUserInteraction()
-                                                onSelectFortniteControlMode(useVirtualFpsPro)
-                                            }
-                                        )
-                                    }
-
-                                    DenseFeatureTogglesSection(
-                                        clarityBoostActive = clarityBoostActive,
-                                        hideStreamStats = hideStreamStats,
-                                        translationActive = translationActive,
-                                        translatedCount = translatedCount,
-                                        onToggleClarityBoost = { enabled ->
-                                            markUserInteraction()
-                                            onToggleClarityBoost(enabled)
-                                        },
-                                        onToggleHideStreamStats = { enabled ->
-                                            markUserInteraction()
-                                            onToggleHideStreamStats(enabled)
-                                        },
-                                        onToggleTranslation = { enabled ->
-                                            markUserInteraction()
-                                            onToggleTranslation(enabled)
-                                        },
-                                        onToggleGpuLoadReduction = {
-                                            markUserInteraction()
-                                            val nextState = !config.gpuLoadReductionEnabled
-                                            com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
-                                        }
-                                    )
-
-                                    if (virtualControllerEnabled) {
-                                        DenseQuickGamepadSection(
-                                            virtualControllerEnabled = true,
-                                            onInteraction = { markUserInteraction() }
-                                        )
-                                    }
-
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                markUserInteraction()
-                                                onOpenSettings()
-                                            }
-                                            .testTag("hud_expanded_video_settings_card"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color(0xFF121D17),
-                                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF24382C))
+                                        .testTag("hud_expanded_home_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF331A19),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF612826))
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.weight(1f),
-                                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (isEn) "Colors & Graphics" else "Màu sắc & Đồ họa",
-                                                    color = TextPrimary,
-                                                    fontSize = 11.5.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    text = if (isEn) {
-                                                        "${config.cellularMode.localizedTitle(true)} • ${config.streamFpsCap.fps} FPS • Contrast ${config.videoContrast}%"
-                                                    } else {
-                                                        "${config.cellularMode.localizedTitle(false)} • ${config.streamFpsCap.fps} FPS • Tương phản ${config.videoContrast}%"
-                                                    },
-                                                    color = TextSecondary,
-                                                    fontSize = 11.sp,
-                                                    maxLines = 2
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Surface(
-                                                shape = RoundedCornerShape(6.dp),
-                                                color = Color(0xFF1C2E24)
-                                            ) {
-                                                Text(
-                                                    text = if (isEn) "Open" else "Mở",
-                                                    color = XboxNeonGreen,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                                )
-                                            }
-                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = null,
+                                            tint = JapanRed,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (isEn) "Exit" else "Thoát",
+                                            color = JapanRed,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1
+                                        )
                                     }
                                 }
+                            }
+                        }
 
-                                // ========================================================
-                                // 4. HÀNG NÚT TÁC VỤ DƯỚI CÙNG (Tải lại, Xoay, Đồ họa, Thoát)
-                                // ========================================================
-                                DenseBottomActionsSection(
-                                    onReloadPage = {
+                        // Bảng mở rộng chi tiết khi người dùng bấm "Đồ họa"
+                        if (showMoreHudOptions) {
+                            DenseQualityModeSection(
+                                networkStatus = networkStatus,
+                                adaptiveQualityState = adaptiveQualityState,
+                                telemetry = telemetry,
+                                isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
+                                onSelectCellularMode = { mode ->
+                                    markUserInteraction()
+                                    onSelectCellularMode(mode)
+                                },
+                                onToggleAutoAdapting = { enabled ->
+                                    markUserInteraction()
+                                    onToggleAutoAdapting(enabled)
+                                },
+                                onToggleWifiSpeedFirst = { enabled ->
+                                    markUserInteraction()
+                                    onToggleWifiSpeedFirst(enabled)
+                                }
+                            )
+
+                            if (gameProfile?.gameId == "fortnite") {
+                                FortniteExclusiveHudCard(
+                                    isEn = isEn,
+                                    virtualControllerEnabled = virtualControllerEnabled,
+                                    onSelectFortniteControlMode = { useVirtualFpsPro ->
                                         markUserInteraction()
-                                        onReloadPage()
-                                    },
-                                    onToggleOrientation = {
-                                        markUserInteraction()
-                                        onToggleOrientation()
-                                    },
-                                    onOpenSettings = {
-                                        markUserInteraction()
-                                        onOpenSettings()
-                                    },
-                                    onRequestExitHome = {
-                                        markUserInteraction()
-                                        com.example.data.AppLogger.info("UI", "Mở hộp thoại xác nhận Thoát game từ HUD")
-                                        showExitConfirmDialog = true
+                                        onSelectFortniteControlMode(useVirtualFpsPro)
                                     }
                                 )
+                            }
+
+                            DenseFeatureTogglesSection(
+                                clarityBoostActive = clarityBoostActive,
+                                hideStreamStats = hideStreamStats,
+                                translationActive = translationActive,
+                                translatedCount = translatedCount,
+                                onToggleClarityBoost = { enabled ->
+                                    markUserInteraction()
+                                    onToggleClarityBoost(enabled)
+                                },
+                                onToggleHideStreamStats = { enabled ->
+                                    markUserInteraction()
+                                    onToggleHideStreamStats(enabled)
+                                },
+                                onToggleTranslation = { enabled ->
+                                    markUserInteraction()
+                                    onToggleTranslation(enabled)
+                                },
+                                onToggleGpuLoadReduction = {
+                                    markUserInteraction()
+                                    val nextState = !config.gpuLoadReductionEnabled
+                                    com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
+                                }
+                            )
+
+                            if (virtualControllerEnabled) {
+                                DenseQuickGamepadSection(
+                                    virtualControllerEnabled = true,
+                                    onInteraction = { markUserInteraction() }
+                                )
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        markUserInteraction()
+                                        onOpenSettings()
+                                    }
+                                    .testTag("hud_expanded_video_settings_card"),
+                                shape = RoundedCornerShape(8.dp),
+                                color = XboxSurfaceVariant,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (isEn) "Full Settings" else "Mở Cài đặt đầy đủ",
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "›",
+                                        color = XboxNeonGreen,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }

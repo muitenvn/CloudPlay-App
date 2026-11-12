@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -211,7 +212,7 @@ fun GameLibraryScreen(
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Segmented switch: "Thư viện" | "Lịch sử"
+            // Segmented switch: "Thư viện" | "Lịch sử" + Refresh + Add Game (+)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -222,30 +223,30 @@ fun GameLibraryScreen(
                         .weight(1f)
                         .testTag("game_tab_segmented_bar"),
                     shape = RoundedCornerShape(12.dp),
-                    color = XboxSurfaceVariant.copy(alpha = 0.9f),
+                    color = XboxSurface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         val sections = listOf(
-                            GameTabSection.LIBRARY to "${stringResource(R.string.tab_library)} (${games.size})",
+                            GameTabSection.LIBRARY to "${stringResource(R.string.tab_library)} ${games.size}",
                             GameTabSection.HISTORY to config.tr("Lịch sử", "History")
                         )
                         sections.forEach { (section, label) ->
                             val isSelected = activeSection == section
                             val segmentBg by animateColorAsState(
-                                targetValue = if (isSelected) XboxGreen else Color.Transparent,
+                                targetValue = if (isSelected) XboxNeonGreen else Color.Transparent,
                                 animationSpec = tween(durationMillis = if (motionEnabled) 160 else 0),
                                 label = "library_segment_bg"
                             )
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
+                                    .heightIn(min = 38.dp)
                                     .clip(RoundedCornerShape(9.dp))
                                     .clickable { activeSection = section }
                                     .testTag(
@@ -253,21 +254,18 @@ fun GameLibraryScreen(
                                         else "segment_history_button"
                                     ),
                                 shape = RoundedCornerShape(9.dp),
-                                color = segmentBg,
-                                border = if (isSelected) {
-                                    androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.65f))
-                                } else null
+                                color = segmentBg
                             ) {
                                 Box(
-                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = label,
-                                        color = if (isSelected) Color.White else TextSecondary,
+                                        color = if (isSelected) Color(0xFF03140B) else TextSecondary,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -278,40 +276,45 @@ fun GameLibraryScreen(
                 }
 
                 if (activeSection == GameTabSection.LIBRARY) {
+                    // Refresh Button
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = DirectCyan.copy(alpha = 0.14f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.55f)),
+                        color = XboxSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                         modifier = Modifier
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
+                            .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .clickable(enabled = !isSyncingCatalog) {
                                 GameLibraryRepository.syncLiveXboxCatalog(force = true)
                             }
                             .testTag("sync_xbox_catalog_button")
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Sync,
                                 contentDescription = config.tr("Làm mới", "Refresh"),
-                                tint = DirectCyan,
-                                modifier = Modifier.size(14.dp)
+                                tint = if (isSyncingCatalog) XboxNeonGreen else TextPrimary,
+                                modifier = Modifier.size(19.dp)
                             )
-                            Text(
-                                text = if (isSyncingCatalog) {
-                                    "..."
-                                } else {
-                                    config.tr("Làm mới", "Refresh")
-                                },
-                                color = DirectCyan,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1
+                        }
+                    }
+
+                    // Add Custom Game (+) Button
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = XboxNeonGreen,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showAddDialog = true }
+                            .testTag("fab_add_game")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = if (isEn) "Add Game" else "Thêm Game",
+                                tint = Color(0xFF03140B),
+                                modifier = Modifier.size(21.dp)
                             )
                         }
                     }
@@ -398,124 +401,89 @@ fun GameLibraryScreen(
                     singleLine = true
                 )
 
-                // 2. Category Tabs Carousel
+                // 2. Single Clean Filter Chips Row (combining category & genre filters)
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
-                    GameFilterTab.ALL to "🎮 ${stringResource(R.string.filter_all)} (${games.size})",
-                    GameFilterTab.FAVORITES to "❤️ ${config.tr("Yêu thích", "Favorites")} ($favCount)",
-                    GameFilterTab.POPULAR to "🔥 ${config.tr("Phổ biến Xbox", "Xbox Popular")} ($popCount)",
-                    GameFilterTab.RECENTLY_ADDED to "🆕 ${config.tr("Mới lên kệ", "New on Cloud")} ($recentCount)",
-                    GameFilterTab.FREE_TO_PLAY to "⚡ ${stringResource(R.string.filter_free)} ($freeCount)",
-                    GameFilterTab.TOUCH_FRIENDLY to "👆 ${stringResource(R.string.filter_touch)} ($touchCount)",
-                    GameFilterTab.GAME_PASS to "💎 ${stringResource(R.string.filter_gamepass)}"
+                    GameFilterTab.ALL to config.tr("Tất cả", "All"),
+                    GameFilterTab.FAVORITES to config.tr("Yêu thích", "Favorites"),
+                    GameFilterTab.FREE_TO_PLAY to config.tr("Miễn phí", "Free"),
+                    GameFilterTab.TOUCH_FRIENDLY to config.tr("Có cảm ứng", "Touch"),
+                    GameFilterTab.POPULAR to config.tr("Phổ biến", "Popular"),
+                    GameFilterTab.RECENTLY_ADDED to config.tr("Mới", "New"),
+                    GameFilterTab.GAME_PASS to "Game Pass"
+                )
+                val genreOptions = listOf(
+                    "SHOOTER" to config.tr("Bắn súng", "Shooter"),
+                    "ACTION" to config.tr("Hành động", "Action"),
+                    "RACING" to config.tr("Đua xe", "Racing"),
+                    "RPG" to config.tr("Nhập vai", "RPG"),
+                    "SPORTS" to config.tr("Thể thao", "Sports")
                 )
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     items(filterOptions) { (tab, label) ->
-                        val isSelected = selectedTab == tab
-                        val pillBg by animateColorAsState(
-                            targetValue = if (isSelected) XboxGreen else XboxSurfaceVariant.copy(alpha = 0.85f),
-                            animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                            label = "filter_tab_bg"
-                        )
+                        val isSelected = selectedTab == tab && selectedGenre == "ALL"
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = pillBg,
+                            shape = RoundedCornerShape(999.dp),
+                            color = if (isSelected) Color(0xFF0F2C1D) else XboxSurface,
                             border = androidx.compose.foundation.BorderStroke(
                                 1.dp,
                                 if (isSelected) XboxNeonGreen else XboxCardBorder
                             ),
                             modifier = Modifier
-                                .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { selectedTab = tab }
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable {
+                                    selectedTab = tab
+                                    selectedGenre = "ALL"
+                                }
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                             ) {
                                 Text(
                                     text = label,
-                                    color = if (isSelected) Color.White else TextSecondary,
+                                    color = if (isSelected) XboxNeonGreen else TextSecondary,
                                     fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
                                 )
                             }
                         }
                     }
-                }
-
-                // 3. Quick Genre Chips + Live Result Counter
-                val genreOptions = listOf(
-                    "ALL" to config.tr("Mọi thể loại", "All Genres"),
-                    "SHOOTER" to config.tr("Bắn súng", "Shooter / FPS"),
-                    "ACTION" to config.tr("Hành động", "Action & Adv"),
-                    "RACING" to config.tr("Đua xe / Lái", "Racing & Sim"),
-                    "RPG" to config.tr("Nhập vai / Sinh tồn", "RPG & Survival"),
-                    "SPORTS" to config.tr("Thể thao / Đối kháng", "Sports & Fight")
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    LazyRow(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        items(genreOptions) { (genreCode, genreLabel) ->
-                            val isGenreSelected = selectedGenre == genreCode
-                            val genreBg by animateColorAsState(
-                                targetValue = if (isGenreSelected) DirectCyan.copy(alpha = 0.2f) else XboxSurface.copy(alpha = 0.8f),
-                                animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                                label = "genre_chip_bg"
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(9.dp),
-                                color = genreBg,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    0.8.dp,
-                                    if (isGenreSelected) DirectCyan else XboxCardBorder
-                                ),
-                                modifier = Modifier
-                                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.95f)
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .clickable { selectedGenre = genreCode }
-                                    .testTag("genre_chip_${genreCode.lowercase()}")
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                ) {
-                                    Text(
-                                        text = genreLabel,
-                                        color = if (isGenreSelected) DirectCyan else TextSecondary,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isGenreSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                        maxLines = 1
-                                    )
+                    items(genreOptions) { (genreCode, genreLabel) ->
+                        val isGenreSelected = selectedGenre == genreCode
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = if (isGenreSelected) Color(0xFF0F2C1D) else XboxSurface,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isGenreSelected) XboxNeonGreen else XboxCardBorder
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .clickable {
+                                    selectedGenre = if (selectedGenre == genreCode) "ALL" else genreCode
                                 }
+                                .testTag("genre_chip_${genreCode.lowercase()}")
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = genreLabel,
+                                    color = if (isGenreSelected) XboxNeonGreen else TextSecondary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
-
-                    Text(
-                        text = if (isSyncingCatalog) {
-                            config.tr("Đang tải...", "Syncing...")
-                        } else {
-                            if (isEn) "${filteredGames.size} games" else "${filteredGames.size} game"
-                        },
-                        color = if (isSyncingCatalog) DirectCyan else XboxNeonGreen,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
                 }
 
                 // Live Microsoft Xbox Store Search bar trigger when user types a query
@@ -646,56 +614,54 @@ fun GameLibraryScreen(
                         }
                     }
 
-                    LazyVerticalGrid(
-                        state = gridState,
-                        columns = GridCells.Adaptive(minSize = 152.dp),
-                        contentPadding = PaddingValues(bottom = 160.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        items(
-                            items = displayedGames,
-                            key = { it.id },
-                            contentType = { "library_game_card" }
-                        ) { game ->
-                            LibraryGameCard(
-                                game = game,
-                                isFavorite = game.id in favoriteIds,
-                                isEn = isEn,
-                                isImportingCatalog = isSyncingCatalog,
-                                onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
-                                onShowDetail = { selectedDetailGame = game },
-                                onPlay = {
-                                    GameLibraryRepository.recordLastPlayed(game.id)
-                                    onLaunchGame(game.playUrl)
-                                },
-                                onDeleteCustom = if (game.id.startsWith("custom_")) {
-                                    { GameLibraryRepository.removeCustomGame(game.id) }
-                                } else null
-                            )
+                    Column(modifier = Modifier.weight(1f)) {
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = 104.dp),
+                            contentPadding = PaddingValues(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(
+                                items = displayedGames,
+                                key = { it.id },
+                                contentType = { "library_game_card" }
+                            ) { game ->
+                                LibraryGameCard(
+                                    game = game,
+                                    isFavorite = game.id in favoriteIds,
+                                    isEn = isEn,
+                                    isImportingCatalog = isSyncingCatalog,
+                                    onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
+                                    onShowDetail = { selectedDetailGame = game },
+                                    onPlay = {
+                                        GameLibraryRepository.recordLastPlayed(game.id)
+                                        onLaunchGame(game.playUrl)
+                                    },
+                                    onDeleteCustom = if (game.id.startsWith("custom_")) {
+                                        { GameLibraryRepository.removeCustomGame(game.id) }
+                                    } else null
+                                )
+                            }
                         }
+
+                        Text(
+                            text = config.tr(
+                                "Chạm vào ảnh game để chơi. Giữ để xem thông tin.",
+                                "Tap a game poster to play. Hold to view details."
+                            ),
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp, bottom = 4.dp)
+                        )
                     }
                 }
                 }
             }
-            }
-        }
-
-        // FAB to Add Game (only shown on Library section)
-        if (activeSection == GameTabSection.LIBRARY) {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = XboxNeonGreen,
-                contentColor = Color.Black,
-                shape = CircleShape,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(20.dp)
-                    .xboxPressScale(enabled = motionEnabled, pressedScale = 0.93f)
-                    .testTag("fab_add_game")
-            ) {
-                Icon(Icons.Default.Add, contentDescription = if (isEn) "Add Game" else "Thêm Game")
             }
         }
 

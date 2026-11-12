@@ -320,56 +320,6 @@ class XboxBridge(
                         window.__physControllerConfig = Object.assign(window.__physControllerConfig || {}, conf);
                     };
 
-                    // Đồng bộ navigator.platform và navigator.userAgentData khớp hoàn toàn với EDGE_DESKTOP_UA (Windows 10/11 64-bit)
-                    // để play.xbox.com và www.xbox.com không nhận diện nhầm là trình duyệt di động Android (mobile=true).
-                    // Vẫn giữ nguyên navigator.maxTouchPoints thực của máy để hỗ trợ điều khiển Cảm ứng gốc (Native Touch).
-                    try {
-                        Object.defineProperty(navigator, 'platform', {
-                            get: function() { return 'Win32'; },
-                            configurable: true
-                        });
-                        const desktopBrands = [
-                            { brand: 'Microsoft Edge', version: '135' },
-                            { brand: 'Not-A.Brand', version: '8' },
-                            { brand: 'Chromium', version: '135' }
-                        ];
-                        const desktopFullVersionList = [
-                            { brand: 'Microsoft Edge', version: '135.0.0.0' },
-                            { brand: 'Not-A.Brand', version: '8.0.0.0' },
-                            { brand: 'Chromium', version: '135.0.0.0' }
-                        ];
-                        const fakeUaData = {
-                            brands: desktopBrands,
-                            mobile: false,
-                            platform: 'Windows',
-                            getHighEntropyValues: function() {
-                                return Promise.resolve({
-                                    architecture: 'x86',
-                                    bitness: '64',
-                                    brands: desktopBrands,
-                                    fullVersionList: desktopFullVersionList,
-                                    mobile: false,
-                                    model: '',
-                                    platform: 'Windows',
-                                    platformVersion: '15.0.0',
-                                    uaFullVersion: '135.0.0.0',
-                                    wow64: false
-                                });
-                            },
-                            toJSON: function() {
-                                return {
-                                    brands: desktopBrands,
-                                    mobile: false,
-                                    platform: 'Windows'
-                                };
-                            }
-                        };
-                        Object.defineProperty(navigator, 'userAgentData', {
-                            get: function() { return fakeUaData; },
-                            configurable: true
-                        });
-                    } catch (uaErr) {}
-
                     window.__cpExitPreviewStage = window.__cpExitPreviewStage || 'IDLE';
                     window.__cpExitPreviewInFlightFetches = 0;
                     window.__cpExitPreviewCompletedFetches = 0;
@@ -2207,36 +2157,36 @@ class XboxBridge(
                         }
 
                         const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null;
-                        // Pre-allocated zero-GC buffers for 60-120Hz navigator.getGamepads() polling
-                        const reusableGamepadList = [null, null, null, null];
-                        const remappedPhysButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
-                        const mergedButtons = Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 }));
-                        const physProcessedAxes = [0, 0, 0, 0];
-                        const mergedAxes = [0, 0, 0, 0];
-                        const reusablePhysWrapper = {
-                            id: "",
-                            index: 0,
-                            connected: true,
-                            timestamp: 0,
-                            mapping: "standard",
-                            axes: physProcessedAxes,
-                            buttons: remappedPhysButtons,
-                            vibrationActuator: null,
-                            hapticActuators: undefined
-                        };
+
+                        function cloneVirtualGamepadSnapshot() {
+                            const srcBtns = virtualGamepadState.buttons;
+                            const btns = new Array(17);
+                            for (let i = 0; i < 17; i++) {
+                                const b = srcBtns[i];
+                                btns[i] = { pressed: !!b.pressed, touched: !!b.touched, value: b.value || 0 };
+                            }
+                            const srcAxes = virtualGamepadState.axes;
+                            return {
+                                id: virtualGamepadState.id,
+                                index: 0,
+                                connected: virtualGamepadState.connected,
+                                timestamp: virtualGamepadState.timestamp,
+                                mapping: "standard",
+                                axes: [srcAxes[0] || 0, srcAxes[1] || 0, srcAxes[2] || 0, srcAxes[3] || 0],
+                                buttons: btns,
+                                vibrationActuator: virtualVibrationActuator
+                            };
+                        }
 
                         navigator.getGamepads = function() {
                             const real = origGetGamepads ? origGetGamepads() : null;
-                            reusableGamepadList[0] = null;
-                            reusableGamepadList[1] = null;
-                            reusableGamepadList[2] = null;
-                            reusableGamepadList[3] = null;
+                            const pads = [null, null, null, null];
                             let physPad = null;
                             if (real) {
                                 const len = Math.min(real.length || 0, 4);
                                 for (let i = 0; i < len; i++) {
                                     const pad = real[i];
-                                    reusableGamepadList[i] = pad || null;
+                                    pads[i] = pad || null;
                                     if (!physPad && pad && pad.connected) {
                                         physPad = pad;
                                     }
@@ -2247,18 +2197,16 @@ class XboxBridge(
                             if (!physPad) {
                                 physViewDownAt = 0;
                                 if (shouldExposeVirtual) {
-                                    reusableGamepadList[0] = virtualGamepadState;
+                                    pads[0] = cloneVirtualGamepadSnapshot();
                                 }
-                                return reusableGamepadList;
+                                return pads;
                             }
 
                             const pCfg = window.__physControllerConfig || {};
                             const bMap = pCfg.buttonMap || null;
+                            const remappedPhysButtons = new Array(17);
                             for (let s = 0; s < 17; s++) {
-                                const slot = remappedPhysButtons[s];
-                                slot.pressed = false;
-                                slot.touched = false;
-                                slot.value = 0;
+                                remappedPhysButtons[s] = { pressed: false, touched: false, value: 0 };
                             }
                             const rawBtns = physPad.buttons || [];
                             for (let s = 0; s < 17; s++) {
@@ -2319,47 +2267,51 @@ class XboxBridge(
                             const rawAx3 = (pAxes && typeof pAxes[3] === 'number') ? pAxes[3] : 0;
                             const leftPair = applyPhysStickDeadzone(rawAx0, rawAx1, pCfg.leftInner, pCfg.leftOuter);
                             const rightPair = applyPhysStickDeadzone(rawAx2, rawAx3, pCfg.rightInner, pCfg.rightOuter);
-                            physProcessedAxes[0] = leftPair[0];
-                            physProcessedAxes[1] = leftPair[1];
-                            physProcessedAxes[2] = rightPair[0];
-                            physProcessedAxes[3] = rightPair[1];
+                            const physProcessedAxes = [leftPair[0], leftPair[1], rightPair[0], rightPair[1]];
 
                             const padIdx = physPad.index || 0;
-                            reusablePhysWrapper.id = physPad.id || virtualGamepadState.id;
-                            reusablePhysWrapper.index = padIdx;
-                            reusablePhysWrapper.connected = true;
-                            reusablePhysWrapper.mapping = physPad.mapping || "standard";
-                            reusablePhysWrapper.vibrationActuator = physPad.vibrationActuator || null;
-                            reusablePhysWrapper.hapticActuators = physPad.hapticActuators;
+                            let outAxes = physProcessedAxes;
+                            let outButtons = remappedPhysButtons;
+                            let outTimestamp = physPad.timestamp || nowTs();
 
                             if (shouldExposeVirtual) {
                                 const vBtns = virtualGamepadState.buttons;
+                                const mergedButtons = new Array(17);
                                 for (let b = 0; b < 17; b++) {
                                     const vb = vBtns[b];
                                     const pb = remappedPhysButtons[b];
-                                    const mb = mergedButtons[b];
-                                    mb.pressed = !!(vb.pressed || pb.pressed);
-                                    mb.touched = !!(vb.touched || pb.touched);
                                     const vv = vb.value || 0;
                                     const pv = pb.value || 0;
-                                    mb.value = vv >= pv ? vv : pv;
+                                    mergedButtons[b] = {
+                                        pressed: !!(vb.pressed || pb.pressed),
+                                        touched: !!(vb.touched || pb.touched),
+                                        value: vv >= pv ? vv : pv
+                                    };
                                 }
                                 const vAxes = virtualGamepadState.axes;
+                                const mergedAxes = [0, 0, 0, 0];
                                 for (let a = 0; a < 4; a++) {
                                     const va = vAxes[a] || 0;
                                     const pa = physProcessedAxes[a] || 0;
                                     mergedAxes[a] = Math.abs(va) >= Math.abs(pa) ? va : pa;
                                 }
-                                reusablePhysWrapper.timestamp = Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp);
-                                reusablePhysWrapper.axes = mergedAxes;
-                                reusablePhysWrapper.buttons = mergedButtons;
-                            } else {
-                                reusablePhysWrapper.timestamp = physPad.timestamp || nowTs();
-                                reusablePhysWrapper.axes = physProcessedAxes;
-                                reusablePhysWrapper.buttons = remappedPhysButtons;
+                                outTimestamp = Math.max(physPad.timestamp || 0, virtualGamepadState.timestamp);
+                                outAxes = mergedAxes;
+                                outButtons = mergedButtons;
                             }
-                            reusableGamepadList[padIdx] = reusablePhysWrapper;
-                            return reusableGamepadList;
+
+                            pads[padIdx] = {
+                                id: physPad.id || virtualGamepadState.id,
+                                index: padIdx,
+                                connected: true,
+                                timestamp: outTimestamp,
+                                mapping: physPad.mapping || "standard",
+                                axes: outAxes,
+                                buttons: outButtons,
+                                vibrationActuator: physPad.vibrationActuator || null,
+                                hapticActuators: physPad.hapticActuators
+                            };
+                            return pads;
                         };
                     } catch(e) {}
 

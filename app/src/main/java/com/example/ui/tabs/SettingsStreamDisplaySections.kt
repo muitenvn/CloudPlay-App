@@ -51,251 +51,199 @@ internal fun SettingsGraphicsFpsSection(
     expandGraphics: Boolean,
     onToggleExpand: () -> Unit
 ) {
+    val resShortLabel = when (config.cellularMode) {
+        CellularOptimizationMode.AUTO -> config.tr("Tự động", "Auto")
+        CellularOptimizationMode.DATA_SAVER_HIGH_SPEED -> "720p"
+        CellularOptimizationMode.MEDIUM -> "900p"
+        CellularOptimizationMode.HIGH -> "1080p"
+        CellularOptimizationMode.MAX_SPEED_UNCAPPED -> "1080p+"
+    }
     CollapsibleSettingsGroup(
-        title = if (isEn) "Resolution, Graphics & FPS" else "Độ phân giải, Đồ họa & FPS",
-        subtitle = "${config.cellularMode.localizedTitle(isEn)} • ${config.streamFpsCap.fps} FPS",
+        title = if (isEn) "Resolution & FPS" else "Độ phân giải và FPS",
+        subtitle = "$resShortLabel · ${config.streamFpsCap.fps} FPS",
         icon = Icons.Default.Speed,
         expanded = expandGraphics,
         onToggle = onToggleExpand,
         testTag = "settings_group_graphics"
     ) {
-        SettingsCard(title = if (isEn) "Resolution & Bitrate (Wi-Fi / 4G / 5G)" else "Độ phân giải & Băng thông (Wi-Fi / 4G / 5G)") {
+        SettingsCard(title = "") {
+            Text(
+                text = config.tr("Độ phân giải", "Resolution"),
+                color = TextSecondary,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+
             val selectedMode = config.cellularMode
-            val isAutoSelected = selectedMode == CellularOptimizationMode.AUTO
+            val resolutionItems = listOf(
+                Triple(CellularOptimizationMode.AUTO, config.tr("Tự động", "Auto"), "settings_graphics_mode_auto"),
+                Triple(CellularOptimizationMode.DATA_SAVER_HIGH_SPEED, "720p", "settings_graphics_mode_${CellularOptimizationMode.DATA_SAVER_HIGH_SPEED.id}"),
+                Triple(CellularOptimizationMode.MEDIUM, "900p", "settings_graphics_mode_${CellularOptimizationMode.MEDIUM.id}"),
+                Triple(CellularOptimizationMode.HIGH, "1080p", "settings_graphics_mode_${CellularOptimizationMode.HIGH.id}"),
+                Triple(CellularOptimizationMode.MAX_SPEED_UNCAPPED, "1080p+", "settings_graphics_mode_${CellularOptimizationMode.MAX_SPEED_UNCAPPED.id}")
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                resolutionItems.forEach { (mode, label, tag) ->
+                    val isSelected = selectedMode == mode
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 38.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .border(
+                                1.dp,
+                                if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(999.dp)
+                            )
+                            .clickable { SettingsRepository.updateCellularMode(mode) }
+                            .testTag(tag),
+                        color = if (isSelected) Color(0xFF0F2C1D) else Color(0xFF132019)
+                    ) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) XboxNeonGreen else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = config.tr(
+                    "Tự động giữ ổn định khi mạng yếu.",
+                    "Auto keeps stream stable on weak networks."
+                ),
+                color = TextSecondary,
+                fontSize = 12.sp
+            )
+
+            Text(
+                text = config.tr("Tốc độ khung hình (FPS)", "Frame Rate (FPS)"),
+                color = TextSecondary,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold
+            )
 
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .border(
-                        1.2.dp,
-                        if (isAutoSelected) XboxNeonGreen else XboxCardBorder,
-                        RoundedCornerShape(12.dp)
-                    )
-                    .clickable { SettingsRepository.updateCellularMode(CellularOptimizationMode.AUTO) }
-                    .testTag("settings_graphics_mode_auto"),
-                color = if (isAutoSelected) Color(0xFF13241A) else Color(0xFF0F1813)
+                    .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp)),
+                color = Color(0xFF132019)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = if (isAutoSelected) XboxNeonGreen else TextSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Column {
-                            Text(
-                                text = config.tr("Tự động • 720p ⇄ 1080p (Khuyên dùng)", "Auto • 720p ⇄ 1080p (Recommended)"),
-                                color = if (isAutoSelected) XboxNeonGreen else TextPrimary,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = config.tr("Tự hạ độ phân giải để giảm độ trễ trên cả 4G, 5G và Wi-Fi", "Auto-lowers resolution to cut lag on 4G, 5G & Wi-Fi"),
-                                color = TextSecondary,
-                                fontSize = 10.5.sp
-                            )
-                        }
-                    }
-                    if (isAutoSelected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = XboxNeonGreen, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-
-            val manualModes = listOf(
-                CellularOptimizationMode.DATA_SAVER_HIGH_SPEED,
-                CellularOptimizationMode.MEDIUM,
-                CellularOptimizationMode.HIGH,
-                CellularOptimizationMode.MAX_SPEED_UNCAPPED
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                manualModes.chunked(2).forEach { rowModes ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowModes.forEach { mode ->
-                            val isSelected = selectedMode == mode
-                            val isLowOrMed = mode == CellularOptimizationMode.DATA_SAVER_HIGH_SPEED ||
-                                mode == CellularOptimizationMode.MEDIUM
-                            val accent = if (isLowOrMed) XboxNeonGreen else DirectCyan
-
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 66.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) accent else XboxCardBorder,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { SettingsRepository.updateCellularMode(mode) }
-                                    .testTag("settings_graphics_mode_${mode.id}"),
-                                color = if (isSelected) {
-                                    if (isLowOrMed) Color(0xFF132219) else Color(0xFF0F2327)
-                                } else {
-                                    Color(0xFF0F1813)
-                                }
+                    com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
+                        val isSelected = config.streamFpsCap == fpsCap
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .clickable { SettingsRepository.updateStreamFpsCap(fpsCap) }
+                                .testTag("settings_fps_cap_${fpsCap.fps}"),
+                            color = if (isSelected) XboxNeonGreen else Color.Transparent
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Column(
-                                    modifier = Modifier
-                                        .padding(horizontal = 10.dp, vertical = 9.dp),
-                                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = mode.localizedTitle(isEn),
-                                            color = if (isSelected) accent else TextPrimary,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        if (isSelected) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = accent,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        text = mode.localizedSubtitle(isEn),
-                                        color = TextSecondary,
-                                        fontSize = 9.5.sp,
-                                        lineHeight = 12.5.sp,
-                                        maxLines = 3
-                                    )
-                                }
+                                Text(
+                                    text = "${fpsCap.fps}",
+                                    color = if (isSelected) Color(0xFF03140B) else TextSecondary,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
             }
 
-            Text(
-                text = config.tr("Nhịp khung hình (FPS)", "Frame Rate (FPS)"),
-                color = XboxNeonGreen,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                com.example.data.StreamFpsCap.entries.forEach { fpsCap ->
-                    val isSelected = config.streamFpsCap == fpsCap
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 56.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(
-                                1.dp,
-                                if (isSelected) XboxNeonGreen else XboxCardBorder,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable { SettingsRepository.updateStreamFpsCap(fpsCap) }
-                            .testTag("settings_fps_cap_${fpsCap.fps}"),
-                        color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(
-                                text = "${fpsCap.fps} FPS",
-                                color = if (isSelected) XboxNeonGreen else TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                text = fpsCap.localizedDesc(isEn),
-                                color = TextSecondary,
-                                fontSize = 9.sp,
-                                lineHeight = 11.5.sp,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
-                            )
-                        }
-                    }
-                }
-            }
-
             SettingToggleRow(
-                title = if (isEn) "Sharpen Image" else "Tăng độ nét hình ảnh",
-                subtitle = if (isEn) "Makes characters and scenery clearer" else "Làm rõ chi tiết nhân vật và khung cảnh",
+                title = if (isEn) "Sharpen Image" else "Tăng độ nét",
+                subtitle = "",
                 checked = config.clarityBoostEnabled,
                 onCheckedChange = { SettingsRepository.updateClarityBoost(it) },
                 switchTestTag = "settings_switch_clarity_boost"
             )
 
-            Text(
-                text = if (isEn) "Xbox Web Interface (Classic vs New UI)" else "Giao diện web Xbox (Giao diện cũ / Giao diện mới)",
-                color = DirectCyan,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+            SettingToggleRow(
+                title = if (isEn) "Prioritize Smooth Response" else "Ưu tiên phản hồi mượt",
+                subtitle = "",
+                checked = config.wifiSpeedFirstPriority,
+                onCheckedChange = { SettingsRepository.updateWifiSpeedFirstPriority(it) },
+                switchTestTag = "settings_switch_smooth_response"
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            SettingToggleRow(
+                title = if (isEn) "Reduce GPU Load" else "Giảm tải GPU",
+                subtitle = "",
+                checked = config.gpuLoadReductionEnabled,
+                onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
+                switchTestTag = "settings_switch_gpu_reduction"
+            )
+
+            Text(
+                text = if (isEn) "Xbox Web Interface" else "Giao diện web Xbox",
+                color = TextSecondary,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp)),
+                color = Color(0xFF132019)
             ) {
-                com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
-                    val isSelected = config.xboxWebUiMode == uiMode
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 60.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(
-                                1.dp,
-                                if (isSelected) XboxNeonGreen else XboxCardBorder,
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable { SettingsRepository.updateXboxWebUiMode(uiMode) }
-                            .testTag("settings_xbox_ui_mode_${uiMode.id}"),
-                        color = if (isSelected) Color(0xFF13241A) else Color(0xFF0F1813)
-                    ) {
-                        Column(
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
+                        val isSelected = config.xboxWebUiMode == uiMode
+                        Surface(
                             modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                                .weight(1f)
+                                .heightIn(min = 38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .clickable { SettingsRepository.updateXboxWebUiMode(uiMode) }
+                                .testTag("settings_xbox_ui_mode_${uiMode.id}"),
+                            color = if (isSelected) XboxNeonGreen else Color.Transparent
                         ) {
-                            Text(
-                                text = uiMode.localizedTitle(isEn),
-                                color = if (isSelected) XboxNeonGreen else TextPrimary,
-                                fontSize = 11.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = uiMode.localizedDesc(isEn),
-                                color = TextSecondary,
-                                fontSize = 9.sp,
-                                lineHeight = 11.5.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = uiMode.localizedTitle(isEn),
+                                    color = if (isSelected) Color(0xFF03140B) else TextSecondary,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
@@ -303,26 +251,10 @@ internal fun SettingsGraphicsFpsSection(
 
             SettingToggleRow(
                 title = if (isEn) "Auto-Exit New UI Handler" else "Tự động xử lý thoát Giao diện mới",
-                subtitle = if (isEn) {
-                    "Auto-clicks Cancel on the feedback dialog, waits for Xbox opt-out spinner to finish (~3.5s), then switches straight to Classic UI"
-                } else {
-                    "Tự động bấm Hủy hộp thoại phản hồi, đợi vòng xoay Xbox lưu xong (~3.5 giây) rồi chuyển thẳng về Giao diện cũ"
-                },
+                subtitle = "",
                 checked = config.autoExitPreviewHandlerEnabled,
                 onCheckedChange = { SettingsRepository.updateAutoExitPreviewHandlerEnabled(it) },
                 switchTestTag = "settings_switch_auto_exit_preview"
-            )
-
-            Text(
-                text = if (isEn) {
-                    "Tip: When enabled, open any game on play.xbox.com → tap your Xbox avatar → tap Exit preview. The app will automatically handle the rest."
-                } else {
-                    "Lưu ý: Khi bật mục này, nếu bị kẹt ở Giao diện mới, bạn chỉ cần vào trang một game bất kỳ → bấm ảnh đại diện Xbox → gạt Thoát xem trước (Exit preview), ứng dụng sẽ tự động xử lý toàn bộ các bước còn lại."
-                },
-                color = TextSecondary,
-                fontSize = 9.5.sp,
-                lineHeight = 13.sp,
-                modifier = Modifier.padding(top = 4.dp)
             )
         }
     }

@@ -62,15 +62,15 @@ internal fun CollapsibleSettingsGroup(
     val isEnGroup = config.isSettingsEnglishUI()
     val displayTitle = config.tr(title, title)
     val displaySubtitle = config.tr(subtitle, subtitle)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .border(
                     1.dp,
-                    if (expanded) XboxNeonGreen.copy(alpha = 0.55f) else XboxCardBorder,
-                    RoundedCornerShape(16.dp)
+                    if (expanded) XboxNeonGreen else XboxCardBorder,
+                    RoundedCornerShape(12.dp)
                 )
                 .clickable { onToggle() }
                 .semantics {
@@ -81,12 +81,12 @@ internal fun CollapsibleSettingsGroup(
                     }
                 }
                 .testTag(testTag),
-            color = XboxSurface.copy(alpha = 0.96f)
+            color = XboxSurface
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -95,47 +95,46 @@ internal fun CollapsibleSettingsGroup(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (expanded) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (expanded) XboxNeonGreen else DirectCyan,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = displayTitle,
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (expanded) XboxNeonGreen else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = displayTitle,
+                        color = TextPrimary,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (displaySubtitle.isNotBlank()) {
                         Text(
                             text = displaySubtitle,
                             color = TextSecondary,
-                            fontSize = 11.sp
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
                         )
                     }
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) {
+                            if (isEnGroup) "Collapse section" else "Thu gọn nhóm"
+                        } else {
+                            if (isEnGroup) "Expand section" else "Mở rộng nhóm"
+                        },
+                        tint = if (expanded) XboxNeonGreen else TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) {
-                        if (isEnGroup) "Collapse section" else "Thu gọn nhóm"
-                    } else {
-                        if (isEnGroup) "Expand section" else "Mở rộng nhóm"
-                    },
-                    tint = if (expanded) XboxNeonGreen else TextSecondary,
-                    modifier = Modifier.size(22.dp)
-                )
             }
         }
 
@@ -160,7 +159,9 @@ internal fun SettingToggleRow(
     val displayTitle = config.tr(title, title)
     val displaySubtitle = config.tr(subtitle, subtitle)
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -168,19 +169,27 @@ internal fun SettingToggleRow(
             Text(
                 text = displayTitle,
                 color = TextPrimary,
-                fontSize = 12.5.sp,
+                fontSize = 13.5.sp,
                 fontWeight = FontWeight.SemiBold
             )
-            Text(
-                text = displaySubtitle,
-                color = TextSecondary,
-                fontSize = 10.5.sp
-            )
+            if (displaySubtitle.isNotBlank()) {
+                Text(
+                    text = displaySubtitle,
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    maxLines = 2
+                )
+            }
         }
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = activeColor),
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color(0xFF03140B),
+                checkedTrackColor = activeColor,
+                uncheckedThumbColor = TextSecondary,
+                uncheckedTrackColor = XboxSurfaceVariant
+            ),
             modifier = if (switchTestTag != null) Modifier.testTag(switchTestTag) else Modifier
         )
     }
@@ -199,13 +208,13 @@ internal fun LabeledSlider(
     val displayLabel = config.tr(label, label)
     Column {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = displayLabel, color = TextSecondary, fontSize = 11.sp)
+            Text(text = displayLabel, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 text = valueText,
                 color = accentColor,
                 fontFamily = JetBrainsMonoFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 11.sp
+                fontSize = 12.sp
             )
         }
         Slider(
@@ -227,31 +236,22 @@ internal fun SettingsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp)),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.94f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(containerColor = XboxSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(4.dp, 15.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(Brush.verticalGradient(listOf(XboxNeonGreen, DirectCyan)))
-                )
+            if (displayTitle.isNotBlank()) {
                 Text(
                     text = displayTitle,
-                    color = XboxNeonGreen,
+                    color = TextSecondary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
             content()

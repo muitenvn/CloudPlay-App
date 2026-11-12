@@ -1025,10 +1025,9 @@ object SettingsRepository {
             } catch (_: Exception) { XboxWebUiMode.CLASSIC },
             autoExitPreviewHandlerEnabled = sp.getBoolean("auto_exit_preview_handler_enabled", true)
         )
-        // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn; luôn giữ Desktop UA để Xbox không ép chuyển sang play.xbox.com
+        // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn; giữ nguyên lựa chọn User-Agent của người dùng
         val synced = loaded.copy(
-            streamRenderScale = if (loaded.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else loaded.cellularMode.autoRenderScale,
-            forceDesktopUserAgent = true
+            streamRenderScale = if (loaded.lowEndDeviceMode) StreamRenderScale.PERFORMANCE_75 else loaded.cellularMode.autoRenderScale
         )
         _config.value = synced
         AppLogger.info(
@@ -1538,7 +1537,6 @@ object SettingsRepository {
                 cellularMode = mode,
                 lowEndDeviceMode = nextLowEnd,
                 streamRenderScale = if (nextLowEnd) StreamRenderScale.PERFORMANCE_75 else mode.autoRenderScale,
-                forceDesktopUserAgent = true,
                 maxBitrateMbps = mode.bitrateMbps
             )
         }

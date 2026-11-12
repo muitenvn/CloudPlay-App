@@ -158,35 +158,13 @@ fun GameLibraryScreen(
                     GameFilterTab.ALL -> true
                     GameFilterTab.CONTINUE_PLAYING -> playedOrderMap.containsKey(game.id.lowercase())
                     GameFilterTab.FAVORITES -> game.id in favoriteIds
-                    GameFilterTab.POPULAR -> game.isPopular || game.rating >= "4.9"
+                    GameFilterTab.POPULAR -> game.isPopular
                     GameFilterTab.RECENTLY_ADDED -> game.isRecentlyAdded
                     GameFilterTab.FREE_TO_PLAY -> game.freeToPlay
                     GameFilterTab.TOUCH_FRIENDLY -> game.supportsTouch
                     GameFilterTab.GAME_PASS -> !game.freeToPlay
                 }
-                val matchesGenre = when (selectedGenre) {
-                    "ALL" -> true
-                    "SHOOTER" -> game.category.contains("Bắn súng", ignoreCase = true) ||
-                        game.categoryEn.contains("Shooter", ignoreCase = true) ||
-                        game.categoryEn.contains("Battle Royale", ignoreCase = true)
-                    "ACTION" -> game.category.contains("Hành động", ignoreCase = true) ||
-                        game.category.contains("Phiêu lưu", ignoreCase = true) ||
-                        game.categoryEn.contains("Action", ignoreCase = true) ||
-                        game.categoryEn.contains("Adventure", ignoreCase = true)
-                    "RACING" -> game.category.contains("Đua xe", ignoreCase = true) ||
-                        game.category.contains("Lái", ignoreCase = true) ||
-                        game.categoryEn.contains("Racing", ignoreCase = true) ||
-                        game.categoryEn.contains("Simulation", ignoreCase = true)
-                    "RPG" -> game.category.contains("Nhập vai", ignoreCase = true) ||
-                        game.category.contains("Sinh tồn", ignoreCase = true) ||
-                        game.categoryEn.contains("RPG", ignoreCase = true) ||
-                        game.categoryEn.contains("Survival", ignoreCase = true)
-                    "SPORTS" -> game.category.contains("Thể thao", ignoreCase = true) ||
-                        game.category.contains("Đối kháng", ignoreCase = true) ||
-                        game.categoryEn.contains("Sports", ignoreCase = true) ||
-                        game.categoryEn.contains("Fighting", ignoreCase = true)
-                    else -> true
-                }
+                val matchesGenre = GameLibraryRepository.matchesOfficialGenre(game, selectedGenre)
                 val matchesSearch = if (searchQuery.isBlank()) true else {
                     game.title.contains(searchQuery, ignoreCase = true) ||
                         game.category.contains(searchQuery, ignoreCase = true) ||
@@ -209,7 +187,7 @@ fun GameLibraryScreen(
             var touch = 0
             for (g in games) {
                 if (g.id in favoriteIds) fav++
-                if (g.isPopular || g.rating >= "4.9") pop++
+                if (g.isPopular) pop++
                 if (g.isRecentlyAdded) rec++
                 if (g.freeToPlay) free++
                 if (g.supportsTouch) touch++
@@ -421,7 +399,7 @@ fun GameLibraryScreen(
                     singleLine = true
                 )
 
-                // 2. Single Clean Filter Chips Row (combining category & genre filters)
+                // 2. Single Clean Filter Chips Row (theo đúng các danh mục chính thức trên play.xbox.com)
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to config.tr("Tất cả", "All"),
                     GameFilterTab.CONTINUE_PLAYING to if (playedGameIds.isNotEmpty()) {
@@ -430,18 +408,25 @@ fun GameLibraryScreen(
                         config.tr("Tiếp tục chơi", "Continue")
                     },
                     GameFilterTab.FREE_TO_PLAY to "${config.tr("Miễn phí", "Free")} ($freeCount)",
-                    GameFilterTab.FAVORITES to config.tr("Yêu thích", "Favorites"),
-                    GameFilterTab.TOUCH_FRIENDLY to config.tr("Có cảm ứng", "Touch"),
-                    GameFilterTab.POPULAR to config.tr("Phổ biến", "Popular"),
-                    GameFilterTab.RECENTLY_ADDED to config.tr("Mới", "New"),
-                    GameFilterTab.GAME_PASS to "Game Pass"
+                    GameFilterTab.FAVORITES to if (favCount > 0) {
+                        "${config.tr("Yêu thích", "Favorites")} ($favCount)"
+                    } else {
+                        config.tr("Yêu thích", "Favorites")
+                    },
+                    GameFilterTab.RECENTLY_ADDED to "${config.tr("Mới", "Recently added")} ($recentCount)",
+                    GameFilterTab.POPULAR to "${config.tr("Phổ biến", "Popular")} ($popCount)",
+                    GameFilterTab.TOUCH_FRIENDLY to "${config.tr("Có cảm ứng", "Touch")} ($touchCount)"
                 )
+                // 8 thể loại chính thức trong GenresRow của play.xbox.com (đã bỏ Đua xe / Thể thao không còn trên trang chủ Xbox Cloud)
                 val genreOptions = listOf(
+                    "INDIE" to "Indie",
+                    "FAMILY" to config.tr("Gia đình", "Family"),
                     "SHOOTER" to config.tr("Bắn súng", "Shooter"),
                     "ACTION" to config.tr("Hành động", "Action"),
-                    "RACING" to config.tr("Đua xe", "Racing"),
-                    "RPG" to config.tr("Nhập vai", "RPG"),
-                    "SPORTS" to config.tr("Thể thao", "Sports")
+                    "FIGHTING" to config.tr("Đối kháng", "Fighting"),
+                    "STRATEGY" to config.tr("Chiến thuật", "Strategy"),
+                    "SIMULATION" to config.tr("Mô phỏng", "Simulation"),
+                    "RPG" to config.tr("Nhập vai", "RPG")
                 )
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -491,7 +476,13 @@ fun GameLibraryScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
                                 .clickable {
-                                    selectedGenre = if (selectedGenre == genreCode) "ALL" else genreCode
+                                    if (selectedGenre == genreCode) {
+                                        selectedGenre = "ALL"
+                                        selectedTab = GameFilterTab.ALL
+                                    } else {
+                                        selectedTab = GameFilterTab.ALL
+                                        selectedGenre = genreCode
+                                    }
                                 }
                                 .testTag("genre_chip_${genreCode.lowercase()}")
                         ) {
@@ -512,7 +503,7 @@ fun GameLibraryScreen(
                     }
                 }
 
-                // Banner giải thích rõ cho mục "Miễn phí" (chỉ chọn game miễn phí thực sự trên Xbox Cloud không cần Game Pass)
+                // Banner giải thích rõ cho mục "Miễn phí" (danh mục "Truyền phát miễn phí với quảng cáo" trên play.xbox.com)
                 if (selectedTab == GameFilterTab.FREE_TO_PLAY && selectedGenre == "ALL") {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -528,8 +519,8 @@ fun GameLibraryScreen(
                         ) {
                             Text(
                                 text = config.tr(
-                                    "Miễn phí 100% trên Xbox Cloud (Không cần Game Pass)",
-                                    "100% Free on Xbox Cloud (No Game Pass Required)"
+                                    "Truyền phát miễn phí với quảng cáo (Không cần Game Pass)",
+                                    "Stream for free with ads (No Game Pass Required)"
                                 ),
                                 color = XboxNeonGreen,
                                 fontFamily = SpaceGroteskFontFamily,
@@ -538,8 +529,8 @@ fun GameLibraryScreen(
                             )
                             Text(
                                 text = config.tr(
-                                    "Chỉ hiển thị game được Microsoft mở miễn phí hoàn toàn trên Cloud chỉ với tài khoản Microsoft (Fortnite). Các game miễn phí trên PC/Console khác như Overwatch 2, Warzone, Halo Infinite, Apex Legends đều bắt buộc mua Game Pass Ultimate khi chơi trên Xbox Cloud.",
-                                    "Only shows titles Microsoft streams completely free with a Microsoft account (Fortnite). Other PC/Console F2P titles like Overwatch 2, Warzone, Halo Infinite, and Apex Legends require Game Pass Ultimate on Xbox Cloud."
+                                    "Danh sách chính thức 95 tựa game từ mục \"Truyền phát miễn phí với quảng cáo\" trên play.xbox.com (007 First Light, 3on3 FreeStyle, Albion Online, Aniimo, Asphalt Legends, Blindfire, Fortnite, Call of Duty: Warzone, Marvel Rivals, Genshin Impact...).",
+                                    "Official list of 95 titles from \"Stream for free with ads\" on play.xbox.com (007 First Light, 3on3 FreeStyle, Albion Online, Aniimo, Asphalt Legends, Blindfire, Fortnite, Call of Duty: Warzone, Marvel Rivals, Genshin Impact...)."
                                 ),
                                 color = TextSecondary,
                                 fontSize = 11.sp,

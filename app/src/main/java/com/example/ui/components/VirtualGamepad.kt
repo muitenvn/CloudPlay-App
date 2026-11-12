@@ -537,14 +537,14 @@ fun VirtualGamepadOverlay(
                     .clip(RoundedCornerShape(8.dp))
                     .background(
                         if (showControlTuner || isEditPositionMode) {
-                            XboxNeonGreen.copy(alpha = 0.28f)
+                            Color(0xFF16352A)
                         } else {
-                            Color.Black.copy(alpha = effectiveOpacity * 0.75f)
+                            XboxSurface.copy(alpha = effectiveOpacity * 0.88f)
                         }
                     )
                     .border(
                         1.dp,
-                        if (showControlTuner || isEditPositionMode) XboxNeonGreen else DirectCyan.copy(alpha = 0.7f),
+                        if (showControlTuner || isEditPositionMode) XboxNeonGreen else XboxCardBorder,
                         RoundedCornerShape(8.dp)
                     )
                     .clickable {
@@ -733,7 +733,7 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "Y",
-                                accentColor = Color(0xFFFFD166),
+                                accentColor = Color(0xFFE0B44C),
                                 buttonIndex = 3,
                                 scale = nodeScale("btn_y"),
                                 opacity = effectiveOpacity,
@@ -750,7 +750,7 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "A",
-                                accentColor = Color(0xFF00E676),
+                                accentColor = XboxNeonGreen,
                                 buttonIndex = 0,
                                 scale = nodeScale("btn_a"),
                                 opacity = effectiveOpacity,
@@ -767,7 +767,7 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "X",
-                                accentColor = Color(0xFF00B4D8),
+                                accentColor = DirectCyan,
                                 buttonIndex = 2,
                                 scale = nodeScale("btn_x"),
                                 opacity = effectiveOpacity,
@@ -784,7 +784,7 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "B",
-                                accentColor = Color(0xFFFF3366),
+                                accentColor = Color(0xFFEA6D6A),
                                 buttonIndex = 1,
                                 scale = nodeScale("btn_b"),
                                 opacity = effectiveOpacity,
@@ -797,7 +797,7 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Per-Button Edit Mode Inspector Toolbar (Simple Gaming Style + Live X/Y Coordinates)
+        // Per-Button Edit Mode Inspector Toolbar (Bản 4 Flat Style + Live X/Y Coordinates + Fine Nudge)
         if (isEditPositionMode && !showControlTuner) {
             val activeId = selectedButtonId
             val activeInfo = remember(activeId) {
@@ -810,15 +810,23 @@ fun VirtualGamepadOverlay(
             val xSign = if (coordX > 0) "+$coordX" else "$coordX"
             val ySign = if (coordY > 0) "+$coordY" else "$coordY"
 
+            fun nudgeSelectedButton(dx: Float, dy: Float) {
+                val id = activeId ?: return
+                vibrate()
+                val cur = customOffsets[id] ?: (0f to 0f)
+                customOffsets[id] = (cur.first + dx) to (cur.second + dy)
+                saveCustomOffsets()
+            }
+
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 46.dp, start = 12.dp, end = 12.dp)
                     .widthIn(max = 540.dp)
                     .testTag("virtual_gamepad_edit_toolbar"),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xF50E1612),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF283D31))
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF142019),
+                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -850,9 +858,9 @@ fun VirtualGamepadOverlay(
 
                             if (activeId != null) {
                                 Surface(
-                                    shape = RoundedCornerShape(5.dp),
-                                    color = Color(0xFF16241C),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2B4235))
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = XboxSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
                                 ) {
                                     Text(
                                         text = "X:$xSign  Y:$ySign  •  ${(activeScaleMult * 100).roundToInt()}%",
@@ -876,8 +884,8 @@ fun VirtualGamepadOverlay(
                                 // Size -10%
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF17241D),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                    color = XboxSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate()
@@ -897,8 +905,8 @@ fun VirtualGamepadOverlay(
                                 // Size +10%
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF17241D),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen.copy(alpha = 0.7f)),
+                                    color = Color(0xFF16352A),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate()
@@ -918,8 +926,8 @@ fun VirtualGamepadOverlay(
                                 // Reset only selected button
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF17241D),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                    color = XboxSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate()
@@ -939,8 +947,8 @@ fun VirtualGamepadOverlay(
                                 // Delete / Hide Selected Button
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = JapanRed.copy(alpha = 0.18f),
-                                    border = androidx.compose.foundation.BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.75f)),
+                                    color = Color(0xFF2B1818),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, JapanRed),
                                     modifier = Modifier
                                         .clickable {
                                             vibrate(stronger = true)
@@ -951,7 +959,7 @@ fun VirtualGamepadOverlay(
                                 ) {
                                     Text(
                                         text = if (isEn) "🗑 Delete" else "🗑 Xóa nút",
-                                        color = Color(0xFFFF8A80),
+                                        color = JapanRed,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
@@ -962,8 +970,8 @@ fun VirtualGamepadOverlay(
                             // Collapse / Expand Inspector Toolbar
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF17241D),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                color = XboxSurface,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                                 modifier = Modifier.clickable {
                                     isToolbarCollapsed = !isToolbarCollapsed
                                 }
@@ -980,7 +988,7 @@ fun VirtualGamepadOverlay(
                     }
 
                     if (!isToolbarCollapsed) {
-                        // Per-button smooth size slider when a button is selected
+                        // Per-button smooth size slider + Fine 2px Nudge buttons when a button is selected
                         if (activeId != null) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1004,6 +1012,29 @@ fun VirtualGamepadOverlay(
                                         activeTrackColor = XboxNeonGreen
                                     )
                                 )
+                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    listOf(
+                                        Triple("◀", -2f, 0f),
+                                        Triple("▲", 0f, -2f),
+                                        Triple("▼", 0f, 2f),
+                                        Triple("▶", 2f, 0f)
+                                    ).forEach { (sym, dx, dy) ->
+                                        Surface(
+                                            shape = RoundedCornerShape(5.dp),
+                                            color = XboxSurface,
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                                            modifier = Modifier.clickable { nudgeSelectedButton(dx, dy) }
+                                        ) {
+                                            Text(
+                                                text = sym,
+                                                color = Color.White,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -1018,10 +1049,10 @@ fun VirtualGamepadOverlay(
                             // Grid Toggle
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (showEditGrid) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                color = if (showEditGrid) Color(0xFF16352A) else XboxSurface,
                                 border = androidx.compose.foundation.BorderStroke(
-                                    0.8.dp,
-                                    if (showEditGrid) XboxNeonGreen else Color(0xFF2E4739)
+                                    1.dp,
+                                    if (showEditGrid) XboxNeonGreen else XboxCardBorder
                                 ),
                                 modifier = Modifier
                                     .clickable {
@@ -1042,10 +1073,10 @@ fun VirtualGamepadOverlay(
                             // Toggle Split / Merge ABXY
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (abxySplitMode) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                color = if (abxySplitMode) Color(0xFF16352A) else XboxSurface,
                                 border = androidx.compose.foundation.BorderStroke(
-                                    0.8.dp,
-                                    if (abxySplitMode) XboxNeonGreen else Color(0xFF2E4739)
+                                    1.dp,
+                                    if (abxySplitMode) XboxNeonGreen else XboxCardBorder
                                 ),
                                 modifier = Modifier
                                     .clickable {
@@ -1072,10 +1103,10 @@ fun VirtualGamepadOverlay(
                             // Toggle Split / Merge D-Pad
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (dpadSplitMode) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF17241D),
+                                color = if (dpadSplitMode) Color(0xFF16352A) else XboxSurface,
                                 border = androidx.compose.foundation.BorderStroke(
-                                    0.8.dp,
-                                    if (dpadSplitMode) XboxNeonGreen else Color(0xFF2E4739)
+                                    1.dp,
+                                    if (dpadSplitMode) XboxNeonGreen else XboxCardBorder
                                 ),
                                 modifier = Modifier
                                     .clickable {
@@ -1102,8 +1133,8 @@ fun VirtualGamepadOverlay(
                             // + Add / Restore Buttons
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF17241D),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFF2E4739)),
+                                color = XboxSurface,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                                 modifier = Modifier
                                     .clickable {
                                         vibrate()
@@ -1128,8 +1159,8 @@ fun VirtualGamepadOverlay(
                             // Reset All
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF17241D),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, WarningAmber.copy(alpha = 0.7f)),
+                                color = Color(0xFF282210),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber),
                                 modifier = Modifier.clickable {
                                     vibrate()
                                     resetAllCustomizations()
@@ -1147,8 +1178,7 @@ fun VirtualGamepadOverlay(
                             // Done
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = XboxNeonGreen.copy(alpha = 0.22f),
-                                border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen),
+                                color = XboxNeonGreen,
                                 modifier = Modifier.clickable {
                                     vibrate()
                                     isEditPositionMode = false
@@ -1157,9 +1187,9 @@ fun VirtualGamepadOverlay(
                             ) {
                                 Text(
                                     text = if (isEn) "✓ Done" else "✓ Xong",
-                                    color = XboxNeonGreen,
+                                    color = Color(0xFF03140B),
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.ExtraBold,
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                                 )
                             }

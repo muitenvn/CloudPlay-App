@@ -1,16 +1,23 @@
 package com.example.ui.tabs
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -22,6 +29,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +47,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cloudplay.GamepadDetector
 import com.example.data.AppConfig
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
 import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -61,9 +71,73 @@ internal fun SettingsGamepadTouchSection(
     onRequestResetGamepadConfirm: () -> Unit
 ) {
     val context = LocalContext.current
+    val gamepadDetector = remember(context) { GamepadDetector(context) }
+    androidx.compose.runtime.DisposableEffect(gamepadDetector) {
+        onDispose { gamepadDetector.release() }
+    }
+    val gamepadStatus by gamepadDetector.status.collectAsState()
+
+    fun triggerControllerTestRumble() {
+        try {
+            // Try vibrating connected physical gamepad motor first if supported
+            var vibratedGamepad = false
+            for (id in android.view.InputDevice.getDeviceIds()) {
+                val dev = android.view.InputDevice.getDevice(id) ?: continue
+                val isPad = (dev.sources and android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD ||
+                    (dev.sources and android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK
+                if (isPad && !dev.isVirtual) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vm = dev.vibratorManager
+                        if (vm.vibratorIds.isNotEmpty()) {
+                            vm.defaultVibrator.vibrate(VibrationEffect.createOneShot(140L, 220))
+                            vibratedGamepad = true
+                        }
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val v = dev.vibrator
+                        if (v.hasVibrator()) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                v.vibrate(VibrationEffect.createOneShot(140L, 220))
+                            } else {
+                                v.vibrate(140L)
+                            }
+                            vibratedGamepad = true
+                        }
+                    }
+                }
+            }
+            if (!vibratedGamepad) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    val vib = vm?.defaultVibrator
+                    if (vib != null && vib.hasVibrator()) {
+                        vib.vibrate(VibrationEffect.createOneShot(120L, 210))
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (v != null && v.hasVibrator()) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            v.vibrate(VibrationEffect.createOneShot(120L, 210))
+                        } else {
+                            v.vibrate(120L)
+                        }
+                    }
+                }
+            }
+            Toast.makeText(
+                context,
+                if (isEn) "📳 Vibration test signal sent" else "📳 Đã gửi tín hiệu thử rung tay cầm / điện thoại",
+                Toast.LENGTH_SHORT
+            ).show()
+        } catch (_: Exception) {}
+    }
+
     CollapsibleSettingsGroup(
         title = if (isEn) "Gamepad & Touch Controls" else "Tay cầm & Cảm ứng",
-        subtitle = if (config.showVirtualController) {
+        subtitle = if (gamepadStatus.hasPhysicalController) {
+            gamepadStatus.summaryBadge(isEn)
+        } else if (config.showVirtualController) {
             if (isEn) "Virtual Gamepad: ON" else "Tay cầm ảo: Đang bật"
         } else {
             if (isEn) "Virtual Gamepad: OFF" else "Tay cầm ảo: Đang tắt"
@@ -73,6 +147,89 @@ internal fun SettingsGamepadTouchSection(
         onToggle = onToggleExpand,
         testTag = "settings_group_controls"
     ) {
+        // Hardware Controller Status & Rumble Test Card
+        SettingsCard(title = if (isEn) "Controller Hardware & Diagnostics" else "Trạng thái & Kiểm tra Tay cầm") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(XboxSurface)
+                    .border(
+                        1.dp,
+                        if (gamepadStatus.hasPhysicalController) XboxNeonGreen else XboxCardBorder,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (gamepadStatus.hasPhysicalController) XboxNeonGreen else TextSecondary)
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = if (gamepadStatus.hasPhysicalController) {
+                                gamepadStatus.controllerName
+                            } else {
+                                if (isEn) "No physical controller detected" else "Chưa kết nối tay cầm Bluetooth / USB"
+                            },
+                            color = if (gamepadStatus.hasPhysicalController) XboxNeonGreen else TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = if (gamepadStatus.hasPhysicalController) {
+                                val rumbleStr = if (gamepadStatus.supportsRumble) {
+                                    if (isEn) "Rumble Ready" else "Có mô-tơ rung"
+                                } else {
+                                    if (isEn) "Standard Input" else "Chuẩn nút cơ bản"
+                                }
+                                val idPart = if (gamepadStatus.vendorProductHex.isNotEmpty()) " • ID ${gamepadStatus.vendorProductHex}" else ""
+                                "${gamepadStatus.controllerBrand} • ${gamepadStatus.connectionTransport}$idPart • $rumbleStr"
+                            } else {
+                                if (isEn) {
+                                    "Connect Xbox, PlayStation DualSense/DS4, Razer Kishi, Backbone, GameSir or 8BitDo"
+                                } else {
+                                    "Hỗ trợ tự nhận diện Xbox, PlayStation, Nintendo, Razer Kishi, Backbone, GameSir, 8BitDo"
+                                }
+                            },
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontFamily = if (gamepadStatus.hasPhysicalController) JetBrainsMonoFontFamily else null
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF16352A),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
+                    modifier = Modifier
+                        .clickable {
+                            gamepadDetector.checkControllers()
+                            triggerControllerTestRumble()
+                        }
+                        .testTag("settings_test_controller_rumble_btn")
+                ) {
+                    Text(
+                        text = if (isEn) "📳 Test Rumble" else "📳 Thử rung",
+                        color = XboxNeonGreen,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
         SettingsCard(title = if (isEn) "Touch Gamepad" else "Tay cầm ảo trên màn hình") {
             SettingToggleRow(
                 title = if (isEn) "Show Virtual Gamepad" else "Bật tay cầm ảo",
@@ -133,7 +290,7 @@ internal fun SettingsGamepadTouchSection(
                         if (isGlobalLayoutActive) DirectCyan else XboxCardBorder
                     ),
                     colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (isGlobalLayoutActive) DirectCyan.copy(alpha = 0.16f) else Color.Transparent
+                        containerColor = if (isGlobalLayoutActive) Color(0xFF10313A) else XboxSurface
                     )
                 ) {
                     Text(
@@ -165,7 +322,11 @@ internal fun SettingsGamepadTouchSection(
                             contentDescription = if (isEn) "Reset Gamepad Layout" else "Đặt lại bố cục tay cầm"
                         }
                         .testTag("settings_reset_per_game_layouts_btn"),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        containerColor = XboxSurface
+                    )
                 ) {
                     Text(
                         text = if (savedPerGameCount > 0) {
@@ -185,7 +346,8 @@ internal fun SettingsGamepadTouchSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.35f))
+                    .background(XboxSurface)
+                    .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp))
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -235,7 +397,7 @@ internal fun SettingsGamepadTouchSection(
                             .semantics {
                                 contentDescription = if (isEn) "Touch vibration ${level.localizedTitle(true)}" else "Rung khi bấm ${level.localizedTitle(false)}"
                             },
-                        color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF0E1813),
+                        color = if (selected) Color(0xFF16352A) else XboxSurface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             if (selected) XboxNeonGreen else XboxCardBorder
@@ -283,7 +445,7 @@ internal fun SettingsGamepadTouchSection(
                                 contentDescription = if (isEn) "Game rumble ${level.localizedTitle(true)}" else "Rung của game ${level.localizedTitle(false)}"
                             }
                             .testTag("settings_game_rumble_${level.name.lowercase()}_btn"),
-                        color = if (selected) DirectCyan.copy(alpha = 0.22f) else Color(0xFF0E1813),
+                        color = if (selected) Color(0xFF10313A) else XboxSurface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             if (selected) DirectCyan else XboxCardBorder
@@ -317,7 +479,11 @@ internal fun SettingsGamepadTouchSection(
                             contentDescription = if (isEn) "Reset Default Layout" else "Đặt lại bố cục mặc định"
                         }
                         .testTag("settings_reset_gamepad_positions_btn"),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        containerColor = XboxSurface
+                    )
                 ) {
                     Text(
                         text = if (isEn) "Reset Default Layout" else "Đặt lại bố cục mặc định",
@@ -350,7 +516,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.35f))
+                .background(XboxSurface)
+                .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp))
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -419,7 +586,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.Black.copy(alpha = 0.35f))
+                .background(XboxSurface)
+                .border(1.dp, XboxCardBorder, RoundedCornerShape(12.dp))
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -514,7 +682,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                             RoundedCornerShape(10.dp)
                         )
                         .clickable { SettingsRepository.updateGamepadLayoutPreset(preset) },
-                    color = if (isSelected) XboxSurfaceVariant else Color.Transparent
+                    color = if (isSelected) Color(0xFF16352A) else XboxSurface
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -582,7 +750,11 @@ internal fun SettingsAdvancedGamepadControlsCard(
                         contentDescription = if (isEn) "Reset physical button mapping" else "Đặt lại ánh xạ nút tay cầm thật"
                     }
                     .testTag("settings_reset_physical_remap_btn"),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                    containerColor = XboxSurface
+                )
             ) {
                 Text(
                     text = if (isEn) "Reset" else "Đặt lại",
@@ -615,7 +787,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                 }
                             }
                             .testTag("settings_remap_btn_$btnIdx"),
-                        color = if (isRemapped) XboxNeonGreen.copy(alpha = 0.20f) else Color(0xFF0E1813),
+                        color = if (isRemapped) Color(0xFF16352A) else XboxSurface,
                         border = androidx.compose.foundation.BorderStroke(
                             1.dp,
                             if (isRemapped) XboxNeonGreen else XboxCardBorder
@@ -684,7 +856,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = 0.28f))
+                    .background(XboxSurface)
+                    .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -714,7 +887,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                     }
                                 }
                                 .testTag("settings_shortcut_btn_$actionKey"),
-                            color = DirectCyan.copy(alpha = 0.18f),
+                            color = Color(0xFF10313A),
                             border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan)
                         ) {
                             Text(
@@ -736,7 +909,11 @@ internal fun SettingsAdvancedGamepadControlsCard(
                             contentDescription = if (isEn) "Reset controller shortcuts" else "Đặt lại tổ hợp phím tắt tay cầm"
                         }
                         .testTag("settings_reset_controller_shortcuts_btn"),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        containerColor = XboxSurfaceVariant
+                    )
                 ) {
                     Text(
                         text = if (isEn) "Reset Default Shortcuts" else "Đặt lại phím tắt mặc định",
@@ -756,7 +933,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
         val currentDest = currentMap[srcIdx] ?: srcIdx
         AlertDialog(
             onDismissRequest = { activeRemapSourceBtn = null },
-            containerColor = XboxSurface,
+            containerColor = XboxSurfaceVariant,
+            shape = RoundedCornerShape(22.dp),
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary,
             title = {
@@ -795,7 +973,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                         .semantics {
                                             contentDescription = if (isEn) "Map $srcName to $dstShort" else "Gán $srcName thành $dstShort"
                                         },
-                                    color = if (selected) XboxNeonGreen.copy(alpha = 0.25f) else Color(0xFF0E1813),
+                                    color = if (selected) Color(0xFF16352A) else XboxSurface,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
                                         if (selected) XboxNeonGreen else XboxCardBorder
@@ -838,7 +1016,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
         }
         AlertDialog(
             onDismissRequest = { activeShortcutTargetAction = null },
-            containerColor = XboxSurface,
+            containerColor = XboxSurfaceVariant,
+            shape = RoundedCornerShape(22.dp),
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary,
             title = {
@@ -880,8 +1059,8 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                         .semantics {
                                             contentDescription = if (isEn) "Set shortcut to View plus $btnShort" else "Đặt phím tắt là View cộng $btnShort"
                                         },
-                                    color = Color(0xFF0E1813),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f))
+                                    color = XboxSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan)
                                 ) {
                                     Text(
                                         text = "View + $btnShort",

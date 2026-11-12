@@ -42,6 +42,7 @@ import com.example.ui.theme.WarningAmber
 import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
+import com.example.ui.theme.XboxSurfaceVariant
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -72,12 +73,12 @@ internal fun AddOrManageButtonsModal(
         modifier = modifier
             .widthIn(max = 440.dp)
             .testTag("virtual_gamepad_add_button_modal"),
-        shape = RoundedCornerShape(16.dp),
-        color = XboxSurface.copy(alpha = 0.97f),
-        border = androidx.compose.foundation.BorderStroke(1.2.dp, DirectCyan.copy(alpha = 0.8f))
+        shape = RoundedCornerShape(22.dp),
+        color = XboxSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
@@ -87,7 +88,7 @@ internal fun AddOrManageButtonsModal(
             ) {
                 Text(
                     text = if (isEn) "＋ ADD OR REMOVE BUTTONS" else "＋ THÊM / XÓA NÚT TAY CẦM ẢO",
-                    color = DirectCyan,
+                    color = XboxNeonGreen,
                     fontFamily = SpaceGroteskFontFamily,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Black
@@ -95,9 +96,9 @@ internal fun AddOrManageButtonsModal(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (hiddenButtons.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = XboxNeonGreen.copy(alpha = 0.18f),
-                            border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen),
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFF16352A),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
                             modifier = Modifier.clickable { onRestoreAll() }
                         ) {
                             Text(
@@ -110,9 +111,9 @@ internal fun AddOrManageButtonsModal(
                         }
                     }
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF1A2820),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder),
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                         modifier = Modifier.clickable { onClose() }
                     ) {
                         Text(
@@ -145,16 +146,16 @@ internal fun AddOrManageButtonsModal(
                     val isHidden = node.id in hiddenButtons
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isHidden) Color(0xFF1B1416) else XboxNeonGreen.copy(alpha = 0.18f),
+                        color = if (isHidden) Color(0xFF2B1818) else Color(0xFF16352A),
                         border = androidx.compose.foundation.BorderStroke(
-                            0.9.dp,
-                            if (isHidden) JapanRed.copy(alpha = 0.65f) else XboxNeonGreen
+                            1.dp,
+                            if (isHidden) JapanRed else XboxNeonGreen
                         ),
                         modifier = Modifier.clickable { onToggleButtonVisibility(node.id) }
                     ) {
                         Text(
                             text = if (isHidden) "＋ ${node.shortBadge}" else "✓ ${node.shortBadge}",
-                            color = if (isHidden) Color(0xFFFF8A80) else XboxNeonGreen,
+                            color = if (isHidden) JapanRed else XboxNeonGreen,
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.ExtraBold,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -197,7 +198,8 @@ internal fun ControlQuickTunerPanel(
     if (showResetConfirmDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showResetConfirmDialog = false },
-            containerColor = XboxSurface,
+            containerColor = XboxSurfaceVariant,
+            shape = RoundedCornerShape(22.dp),
             titleContentColor = Color.White,
             textContentColor = TextSecondary,
             title = {
@@ -251,9 +253,9 @@ internal fun ControlQuickTunerPanel(
         modifier = modifier
             .widthIn(max = 430.dp)
             .testTag("virtual_gamepad_tuner_panel"),
-        shape = RoundedCornerShape(18.dp),
-        color = XboxSurface.copy(alpha = 0.96f),
-        border = androidx.compose.foundation.BorderStroke(1.2.dp, XboxNeonGreen.copy(alpha = 0.65f))
+        shape = RoundedCornerShape(22.dp),
+        color = XboxSurfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -273,9 +275,9 @@ internal fun ControlQuickTunerPanel(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = DirectCyan.copy(alpha = 0.18f),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, DirectCyan),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF16352A),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
                         modifier = Modifier.clickable { onToggleEditPosition() }
                     ) {
                         Text(
@@ -284,16 +286,16 @@ internal fun ControlQuickTunerPanel(
                             } else {
                                 if (isEn) "✥ Edit Buttons" else "✥ Sửa từng nút"
                             },
-                            color = DirectCyan,
+                            color = XboxNeonGreen,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF1A2820),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder),
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                         modifier = Modifier
                             .clickable { showResetConfirmDialog = true }
                             .testTag("tuner_reset_default_layout_btn")
@@ -307,9 +309,9 @@ internal fun ControlQuickTunerPanel(
                         )
                     }
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = XboxNeonGreen.copy(alpha = 0.22f),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxNeonGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
                         modifier = Modifier.clickable { onClose() }
                     ) {
                         Text(
@@ -368,9 +370,9 @@ internal fun ControlQuickTunerPanel(
                             .weight(1f)
                             .clickable { SettingsRepository.updateGamepadLayoutPreset(item) },
                         shape = RoundedCornerShape(8.dp),
-                        color = if (selected) XboxNeonGreen.copy(alpha = 0.22f) else Color(0xFF0E1813),
+                        color = if (selected) Color(0xFF16352A) else XboxSurface,
                         border = androidx.compose.foundation.BorderStroke(
-                            0.8.dp,
+                            1.dp,
                             if (selected) XboxNeonGreen else XboxCardBorder
                         )
                     ) {
@@ -411,10 +413,10 @@ internal fun ControlQuickTunerPanel(
                         modifier = Modifier.weight(1f)
                     )
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF16241C),
+                        shape = RoundedCornerShape(8.dp),
+                        color = XboxSurface,
                         border = androidx.compose.foundation.BorderStroke(
-                            0.8.dp,
+                            1.dp,
                             if (hasPerGameCustomLayout) DirectCyan else XboxCardBorder
                         ),
                         modifier = Modifier
@@ -433,9 +435,9 @@ internal fun ControlQuickTunerPanel(
                         )
                     }
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFF1A2820),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, WarningAmber.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFF282210),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber),
                         modifier = Modifier
                             .semantics {
                                 contentDescription = if (isEn) "Reset Layout" else "Đặt lại"
@@ -616,15 +618,15 @@ internal fun QuickFeatureChip(
     Surface(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
-        color = if (active) DirectCyan.copy(alpha = 0.20f) else Color(0xFF0E1813),
+        color = if (active) Color(0xFF16352A) else XboxSurface,
         border = androidx.compose.foundation.BorderStroke(
-            0.8.dp,
-            if (active) DirectCyan else XboxCardBorder
+            1.dp,
+            if (active) XboxNeonGreen else XboxCardBorder
         )
     ) {
         Text(
             text = label,
-            color = if (active) DirectCyan else TextSecondary,
+            color = if (active) XboxNeonGreen else TextSecondary,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,

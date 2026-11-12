@@ -7,7 +7,9 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -37,7 +38,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.DirectCyan
+import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxNeonGreen
+import com.example.ui.theme.XboxSurface
+import com.example.ui.theme.XboxSurfaceVariant
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -90,13 +94,13 @@ internal fun VirtualAnalogStick(
         modifier = Modifier
             .size(outerSizeDp)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = opacity * 0.62f))
+            .background(XboxSurface.copy(alpha = opacity * 0.78f))
             .border(
-                width = if (isTouching) 2.dp else 1.5.dp,
+                width = if (isTouching) 1.8.dp else 1.2.dp,
                 color = when {
                     isAutoSprinting -> DirectCyan
                     isTouching -> XboxNeonGreen
-                    else -> Color(0x6600E676)
+                    else -> XboxCardBorder.copy(alpha = opacity)
                 },
                 shape = CircleShape
             )
@@ -131,7 +135,7 @@ internal fun VirtualAnalogStick(
                                     nextStickX = 0f
                                     nextStickY = 0f
                                 }
-                                if (abs(nextStickX - stickX) >= 0.5f || abs(nextStickY - stickY) >= 0.5f) {
+                                if (abs(nextStickX - stickX) >= 0.4f || abs(nextStickY - stickY) >= 0.4f) {
                                     stickX = nextStickX
                                     stickY = nextStickY
                                 }
@@ -142,13 +146,13 @@ internal fun VirtualAnalogStick(
 
                                 val deltaX = abs(curvedX - lastSentX)
                                 val deltaY = abs(curvedY - lastSentY)
-                                if (deltaX >= 0.014f || deltaY >= 0.014f || (curvedX == 0f && curvedY == 0f && (lastSentX != 0f || lastSentY != 0f))) {
+                                if (deltaX >= 0.012f || deltaY >= 0.012f || (curvedX == 0f && curvedY == 0f && (lastSentX != 0f || lastSentY != 0f))) {
                                     val nowMs = android.os.SystemClock.uptimeMillis()
                                     val isFastFlickOrZero = forceImmediate ||
                                         (curvedX == 0f && curvedY == 0f) ||
-                                        deltaX >= 0.16f ||
-                                        deltaY >= 0.16f
-                                    if (isFastFlickOrZero || (nowMs - lastSentAtMs) >= 12L) {
+                                        deltaX >= 0.14f ||
+                                        deltaY >= 0.14f
+                                    if (isFastFlickOrZero || (nowMs - lastSentAtMs) >= 8L) {
                                         lastSentX = curvedX
                                         lastSentY = curvedY
                                         lastSentAtMs = nowMs
@@ -197,23 +201,23 @@ internal fun VirtualAnalogStick(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2f, size.height / 2f)
             drawCircle(
-                color = Color.White.copy(alpha = 0.12f),
+                color = XboxCardBorder.copy(alpha = 0.55f),
                 radius = maxRadiusPx * currentOuterDeadzone.coerceIn(0.50f, 1.0f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )
             drawCircle(
-                color = DirectCyan.copy(alpha = 0.18f),
+                color = DirectCyan.copy(alpha = 0.25f),
                 radius = maxRadiusPx * currentInnerDeadzone.coerceIn(0.0f, 0.35f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )
             if (isTouching && (abs(stickX) > 2f || abs(stickY) > 2f)) {
                 drawLine(
-                    color = if (isAutoSprinting) DirectCyan.copy(alpha = 0.75f) else XboxNeonGreen.copy(alpha = 0.65f),
+                    color = if (isAutoSprinting) DirectCyan else XboxNeonGreen,
                     start = c,
                     end = Offset(c.x + stickX, c.y + stickY),
-                    strokeWidth = 2.5.dp.toPx(),
+                    strokeWidth = 2.2.dp.toPx(),
                     cap = StrokeCap.Round
                 )
             }
@@ -231,23 +235,26 @@ internal fun VirtualAnalogStick(
             )
         }
 
-        // Inner thumb knob
+        // Inner thumb knob (flat Bản 4 surface — zero gradient shader allocation)
         Box(
             modifier = Modifier
                 .offset { IntOffset(stickX.roundToInt(), stickY.roundToInt()) }
                 .size(knobSizeDp)
                 .clip(CircleShape)
                 .background(
-                    Brush.radialGradient(
-                        listOf(
-                            if (isAutoSprinting) DirectCyan.copy(alpha = opacity * 0.55f) else Color(0xFF2E4738).copy(alpha = opacity),
-                            Color(0xFF121D16).copy(alpha = opacity)
-                        )
-                    )
+                    when {
+                        isAutoSprinting -> Color(0xFF10313A).copy(alpha = opacity)
+                        isTouching -> Color(0xFF16352A).copy(alpha = opacity)
+                        else -> XboxSurfaceVariant.copy(alpha = opacity)
+                    }
                 )
                 .border(
-                    width = 2.dp,
-                    color = if (isAutoSprinting) DirectCyan else XboxNeonGreen.copy(alpha = opacity * 0.95f),
+                    width = if (isTouching) 1.8.dp else 1.4.dp,
+                    color = when {
+                        isAutoSprinting -> DirectCyan
+                        isTouching -> XboxNeonGreen
+                        else -> XboxNeonGreen.copy(alpha = opacity * 0.72f)
+                    },
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -300,8 +307,8 @@ internal fun VirtualDpadCross(
         modifier = Modifier
             .size(dpadSize)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.Black.copy(alpha = opacity * 0.62f))
-            .border(1.2.dp, Color(0x5500E676), RoundedCornerShape(16.dp))
+            .background(XboxSurface.copy(alpha = opacity * 0.78f))
+            .border(1.2.dp, XboxCardBorder.copy(alpha = opacity), RoundedCornerShape(16.dp))
             .then(
                 if (isEditMode) {
                     Modifier
@@ -358,9 +365,9 @@ internal fun VirtualDpadCross(
                 .clip(CircleShape)
                 .background(
                     if (upPressed || downPressed || leftPressed || rightPressed) {
-                        XboxNeonGreen.copy(alpha = 0.45f)
+                        XboxNeonGreen
                     } else {
-                        Color.White.copy(alpha = 0.12f)
+                        XboxCardBorder.copy(alpha = opacity)
                     }
                 )
         )
@@ -384,14 +391,14 @@ internal fun StandaloneDpadButton(
             .clip(RoundedCornerShape(9.dp))
             .background(
                 if (isPressed) {
-                    XboxNeonGreen.copy(alpha = 0.48f)
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    Color(0xFF1E2E24).copy(alpha = opacity * 0.85f)
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
                 }
             )
             .border(
-                width = if (isPressed) 1.8.dp else 1.1.dp,
-                color = if (isPressed) XboxNeonGreen else Color(0x7700E676),
+                width = if (isPressed) 1.6.dp else 1.1.dp,
+                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
                 shape = RoundedCornerShape(9.dp)
             )
             .then(
@@ -415,7 +422,7 @@ internal fun StandaloneDpadButton(
     ) {
         Text(
             text = symbol,
-            color = if (isPressed) Color.White else Color.White.copy(alpha = opacity),
+            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontSize = (13f * scale).sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -437,21 +444,21 @@ internal fun DpadVisualKey(
             .clip(RoundedCornerShape(7.dp))
             .background(
                 if (isPressed) {
-                    XboxNeonGreen.copy(alpha = 0.45f)
+                    Color(0xFF16352A)
                 } else {
-                    Color(0xFF1E2E24).copy(alpha = opacity * 0.82f)
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
                 }
             )
             .border(
-                width = if (isPressed) 1.5.dp else 0.8.dp,
-                color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = 0.15f),
+                width = if (isPressed) 1.4.dp else 0.9.dp,
+                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
                 shape = RoundedCornerShape(7.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = symbol,
-            color = if (isPressed) Color.White else Color.White.copy(alpha = opacity),
+            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -476,16 +483,15 @@ internal fun GamepadTriggerButton(
             .size(width = (64.dp * scale), height = (38.dp * scale))
             .clip(RoundedCornerShape(10.dp))
             .background(
-                Brush.verticalGradient(
-                    listOf(
-                        if (isPressed) XboxNeonGreen.copy(alpha = 0.48f) else Color(0xFF263D2E).copy(alpha = opacity * 0.9f),
-                        Color(0xFF0F1A13).copy(alpha = opacity * 0.9f)
-                    )
-                )
+                if (isPressed) {
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                } else {
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                }
             )
             .border(
-                width = if (isPressed) 1.8.dp else 1.2.dp,
-                color = XboxNeonGreen.copy(alpha = opacity * 0.8f),
+                width = if (isPressed) 1.6.dp else 1.1.dp,
+                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
                 shape = RoundedCornerShape(10.dp)
             )
             .then(
@@ -497,8 +503,8 @@ internal fun GamepadTriggerButton(
                             val down = awaitFirstDown(requireUnconsumed = false)
                             down.consume()
                             isPressed = true
-                            analogLevel = 1f
-                            onStateChange(true, 1f)
+                            analogLevel = if (analogDragMode) 0.35f else 1f
+                            onStateChange(true, analogLevel)
 
                             do {
                                 val event = awaitPointerEvent()
@@ -521,9 +527,18 @@ internal fun GamepadTriggerButton(
             ),
         contentAlignment = Alignment.Center
     ) {
+        if (analogDragMode && isPressed) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .fillMaxWidth(analogLevel.coerceIn(0f, 1f))
+                    .background(XboxNeonGreen.copy(alpha = 0.25f))
+            )
+        }
         Text(
             text = if (analogDragMode && isPressed) "$label ${(analogLevel * 100).roundToInt()}%" else label,
-            color = Color.White.copy(alpha = opacity),
+            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontWeight = FontWeight.ExtraBold,
             fontSize = (11.5f * scale).sp
         )
@@ -546,16 +561,15 @@ internal fun GamepadShoulderButton(
             .size(width = (58.dp * scale), height = (38.dp * scale))
             .clip(RoundedCornerShape(10.dp))
             .background(
-                Brush.verticalGradient(
-                    listOf(
-                        if (isHeld) XboxNeonGreen.copy(alpha = 0.45f) else Color(0xFF263D2E).copy(alpha = opacity * 0.9f),
-                        Color(0xFF0F1A13).copy(alpha = opacity * 0.9f)
-                    )
-                )
+                if (isHeld) {
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                } else {
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                }
             )
             .border(
-                width = if (isHeld) 1.8.dp else 1.2.dp,
-                color = XboxNeonGreen.copy(alpha = opacity * 0.75f),
+                width = if (isHeld) 1.6.dp else 1.1.dp,
+                color = if (isHeld) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
                 shape = RoundedCornerShape(10.dp)
             )
             .then(
@@ -579,7 +593,7 @@ internal fun GamepadShoulderButton(
     ) {
         Text(
             text = label,
-            color = Color.White.copy(alpha = opacity),
+            color = if (isHeld) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontWeight = FontWeight.Bold,
             fontSize = (11.5f * scale).sp
         )
@@ -603,14 +617,14 @@ internal fun GamepadThumbClickMiniButton(
             .clip(RoundedCornerShape(9.dp))
             .background(
                 if (isPressed) {
-                    XboxNeonGreen.copy(alpha = 0.42f)
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    Color.Black.copy(alpha = opacity * 0.68f)
+                    XboxSurface.copy(alpha = opacity * 0.85f)
                 }
             )
             .border(
-                width = 1.2.dp,
-                color = if (isPressed) XboxNeonGreen else Color(0x7700E676),
+                width = 1.1.dp,
+                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
                 shape = RoundedCornerShape(9.dp)
             )
             .then(
@@ -634,7 +648,7 @@ internal fun GamepadThumbClickMiniButton(
     ) {
         Text(
             text = label,
-            color = Color.White.copy(alpha = opacity),
+            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontWeight = FontWeight.ExtraBold,
             fontSize = (10.5f * scale).sp
         )
@@ -654,8 +668,18 @@ internal fun GamepadSmallButton(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isPressed) XboxNeonGreen.copy(alpha = 0.35f) else Color.Black.copy(alpha = opacity * 0.7f))
-            .border(1.dp, if (isPressed) XboxNeonGreen else Color(0x6600E676), RoundedCornerShape(8.dp))
+            .background(
+                if (isPressed) {
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                } else {
+                    XboxSurface.copy(alpha = opacity * 0.85f)
+                }
+            )
+            .border(
+                1.dp,
+                if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
+                RoundedCornerShape(8.dp)
+            )
             .then(
                 if (isEditMode) {
                     Modifier
@@ -678,7 +702,7 @@ internal fun GamepadSmallButton(
     ) {
         Text(
             text = label,
-            color = Color.White.copy(alpha = opacity),
+            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
             fontSize = (10f * scale).sp,
             fontWeight = FontWeight.Bold
         )
@@ -697,8 +721,14 @@ internal fun GamepadXboxNexusButton(
         modifier = Modifier
             .size(36.dp * scale)
             .clip(CircleShape)
-            .background(if (isPressed) XboxNeonGreen.copy(alpha = 0.35f) else Color.Black.copy(alpha = opacity))
-            .border(2.dp, XboxNeonGreen.copy(alpha = opacity), CircleShape)
+            .background(
+                if (isPressed) {
+                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                } else {
+                    XboxSurface.copy(alpha = opacity * 0.90f)
+                }
+            )
+            .border(1.5.dp, XboxNeonGreen.copy(alpha = opacity), CircleShape)
             .then(
                 if (isEditMode) {
                     Modifier
@@ -744,16 +774,15 @@ internal fun StandaloneAbxyButton(
             .size(sizeDp)
             .clip(CircleShape)
             .background(
-                Brush.radialGradient(
-                    listOf(
-                        if (isPressed) accentColor.copy(alpha = 0.78f) else accentColor.copy(alpha = opacity * 0.38f),
-                        Color.Black.copy(alpha = opacity * 0.92f)
-                    )
-                )
+                if (isPressed) {
+                    accentColor.copy(alpha = 0.28f)
+                } else {
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                }
             )
             .border(
-                width = if (isPressed) 2.4.dp else 1.8.dp,
-                color = if (isPressed) Color.White else accentColor.copy(alpha = opacity),
+                width = if (isPressed) 2.dp else 1.4.dp,
+                color = if (isPressed) accentColor else accentColor.copy(alpha = opacity * 0.85f),
                 shape = CircleShape
             )
             .then(
@@ -823,8 +852,8 @@ internal fun VirtualAbxyPad(
         modifier = Modifier
             .size(padSize)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = opacity * 0.60f))
-            .border(1.5.dp, Color(0x6600E676), CircleShape)
+            .background(XboxSurface.copy(alpha = opacity * 0.78f))
+            .border(1.2.dp, XboxCardBorder.copy(alpha = opacity), CircleShape)
             .then(
                 if (isEditMode) {
                     Modifier
@@ -877,10 +906,10 @@ internal fun VirtualAbxyPad(
             ),
         contentAlignment = Alignment.Center
     ) {
-        AbxyVisualButton(Modifier.align(Alignment.TopCenter), "Y", Color(0xFFFFD166), buttonSize, yPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.BottomCenter), "A", Color(0xFF00E676), buttonSize, aPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.CenterStart), "X", Color(0xFF00B4D8), buttonSize, xPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.CenterEnd), "B", Color(0xFFFF3366), buttonSize, bPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.TopCenter), "Y", Color(0xFFE0B44C), buttonSize, yPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.BottomCenter), "A", XboxNeonGreen, buttonSize, aPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.CenterStart), "X", DirectCyan, buttonSize, xPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.CenterEnd), "B", Color(0xFFEA6D6A), buttonSize, bPressed, opacity)
     }
 }
 
@@ -905,16 +934,15 @@ internal fun AbxyVisualButton(
             .padding(2.dp)
             .clip(CircleShape)
             .background(
-                Brush.radialGradient(
-                    listOf(
-                        if (isPressed) accentColor.copy(alpha = 0.78f) else accentColor.copy(alpha = opacity * 0.35f),
-                        Color.Black.copy(alpha = opacity * 0.92f)
-                    )
-                )
+                if (isPressed) {
+                    accentColor.copy(alpha = 0.28f)
+                } else {
+                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                }
             )
             .border(
-                width = if (isPressed) 2.4.dp else 1.8.dp,
-                color = if (isPressed) Color.White else accentColor.copy(alpha = opacity),
+                width = if (isPressed) 2.dp else 1.4.dp,
+                color = if (isPressed) accentColor else accentColor.copy(alpha = opacity * 0.85f),
                 shape = CircleShape
             ),
         contentAlignment = Alignment.Center

@@ -1241,15 +1241,22 @@ class XboxBridge(
                     let regionCheckCountForUrl = 0;
                     const discoveredCardUrls = new Set();
 
-                    function extractActiveGameDomMetadata(overrideUrl, clickedEl) {
+                    function extractActiveGameDomMetadata(overrideUrl, clickedEl, forceLaunchFlag) {
                         try {
                             const href = overrideUrl || location.href;
-                            if (!href || (href.indexOf('/play/games/') === -1 && href.indexOf('/play/launch/') === -1)) return null;
+                            const isGameOrLaunchUrl = href && (
+                                href.indexOf('/play/games/') !== -1 ||
+                                href.indexOf('/play/launch/') !== -1 ||
+                                href.indexOf('/products/') !== -1 ||
+                                href.indexOf('/launch/') !== -1
+                            );
+                            const isStreamActiveNow = !!window.__activePeerConnection || notifiedStreamConnection || !!forceLaunchFlag;
+                            if (!isGameOrLaunchUrl && !isStreamActiveNow) return null;
                             let title = '';
                             if (clickedEl) {
                                 title = (clickedEl.getAttribute('aria-label') || clickedEl.getAttribute('title') || clickedEl.innerText || '').trim();
                             }
-                            if (!title || title.length < 2 || /^(play|chơi|chơi ngay)$/i.test(title)) {
+                            if (!title || title.length < 2 || /^(play|chơi|chơi ngay|launch|cloud)$/i.test(title)) {
                                 const h1 = document.querySelector('h1');
                                 if (h1 && h1.textContent) title = h1.textContent.trim();
                             }
@@ -1270,19 +1277,21 @@ class XboxBridge(
                                 if (storeImg && storeImg.src) imgUrl = storeImg.src;
                             }
                             const supportsTouch = !!document.querySelector('[aria-label*="touch" i], [data-testid*="touch" i]');
+                            const isLaunch = (href && (href.indexOf('/play/launch/') !== -1 || href.indexOf('/launch/') !== -1)) || isStreamActiveNow;
                             return {
                                 title: title || '',
                                 url: href,
                                 imageUrl: imgUrl || '',
-                                supportsTouch: supportsTouch
+                                supportsTouch: supportsTouch,
+                                isLaunch: isLaunch
                             };
                         } catch(e) {
                             return null;
                         }
                     }
 
-                    function reportActiveWebGame(overrideUrl, clickedEl) {
-                        const meta = extractActiveGameDomMetadata(overrideUrl, clickedEl);
+                    function reportActiveWebGame(overrideUrl, clickedEl, forceLaunchFlag) {
+                        const meta = extractActiveGameDomMetadata(overrideUrl, clickedEl, forceLaunchFlag);
                         if (meta) {
                             notify('onWebGameDetected', JSON.stringify(meta));
                         }
@@ -1292,7 +1301,7 @@ class XboxBridge(
                     let lastJumpBackCount = 0;
 
                     function scanVisibleCatalogGameCards() {
-                        if (notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1 || !!window.__activePeerConnection) return;
+                        if (notifiedStreamConnection || location.href.indexOf('/play/launch/') !== -1 || location.href.indexOf('/launch/') !== -1 || !!window.__activePeerConnection) return;
                         try {
                             // 1. Detect Xbox Gamertag, Gamerpic & Subscription Tier from xbox.com/play header
                             const profileBtn = document.querySelector(
@@ -1326,7 +1335,7 @@ class XboxBridge(
                                 const heading = sec.querySelector('h2, h3, [role="heading"]');
                                 const hText = ((heading ? heading.innerText : '') + ' ' + (sec.getAttribute('aria-label') || '')).toLowerCase();
                                 if (hText.indexOf('jump back in') !== -1 || hText.indexOf('recently played') !== -1 || hText.indexOf('tiếp tục') !== -1 || hText.indexOf('gần đây') !== -1) {
-                                    const jLinks = sec.querySelectorAll('a[href*="/play/games/"], a[href*="/play/launch/"]');
+                                    const jLinks = sec.querySelectorAll('a[href*="/play/games/"], a[href*="/play/launch/"], a[href*="/products/"]');
                                     for (let j = 0; j < jLinks.length && jumpItems.length < 8; j++) {
                                         const ja = jLinks[j];
                                         const jHref = (ja.href || ja.getAttribute('href') || '').split('?')[0];
@@ -1345,13 +1354,13 @@ class XboxBridge(
                             }
 
                             // 3. Scrape visible Xbox Cloud catalog game cards
-                            const links = document.querySelectorAll('a[href*="/play/games/"]');
+                            const links = document.querySelectorAll('a[href*="/play/games/"], a[href*="/products/"]');
                             if (!links || links.length === 0) return;
                             const batch = [];
                             for (let i = 0; i < links.length && batch.length < 24; i++) {
                                 const a = links[i];
                                 const rawHref = a.href || a.getAttribute('href') || '';
-                                if (!rawHref || rawHref.indexOf('/play/games/') === -1) continue;
+                                if (!rawHref || (rawHref.indexOf('/play/games/') === -1 && rawHref.indexOf('/products/') === -1)) continue;
                                 const cleanUrl = rawHref.split('?')[0];
                                 if (discoveredCardUrls.has(cleanUrl)) continue;
                                 const img = a.querySelector('img[src]');
@@ -1373,25 +1382,25 @@ class XboxBridge(
                         } catch(e) {}
                     }
 
-                    if (location.href.indexOf('/play/launch/') !== -1) {
-                        reportActiveWebGame(location.href, null);
+                    if (location.href.indexOf('/play/launch/') !== -1 || location.href.indexOf('/launch/') !== -1) {
+                        reportActiveWebGame(location.href, null, true);
                         notify('onGameLaunchInitiated', document.title || 'Xbox Game');
-                    } else if (location.href.indexOf('/play/games/') !== -1) {
-                        setTimeout(function() { reportActiveWebGame(location.href, null); }, 600);
+                    } else if (location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1) {
+                        setTimeout(function() { reportActiveWebGame(location.href, null, false); }, 600);
                     }
 
                     function handleNavigationChange() {
                         if (location.href !== lastUrl) {
-                            const wasInLaunch = lastUrl.indexOf('/play/launch/') !== -1;
-                            const nowInLaunch = location.href.indexOf('/play/launch/') !== -1;
-                            const nowInGamePage = location.href.indexOf('/play/games/') !== -1;
+                            const wasInLaunch = lastUrl.indexOf('/play/launch/') !== -1 || lastUrl.indexOf('/launch/') !== -1;
+                            const nowInLaunch = location.href.indexOf('/play/launch/') !== -1 || location.href.indexOf('/launch/') !== -1;
+                            const nowInGamePage = location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1;
                             lastUrl = location.href;
                             notifiedStreamConnection = false;
                             regionCheckCountForUrl = 0;
                             notify('onUrlChanged', location.href);
                             if (nowInLaunch || nowInGamePage) {
-                                reportActiveWebGame(location.href, null);
-                                setTimeout(function() { reportActiveWebGame(location.href, null); }, 900);
+                                reportActiveWebGame(location.href, null, nowInLaunch);
+                                setTimeout(function() { reportActiveWebGame(location.href, null, nowInLaunch); }, 900);
                             }
                             if (nowInLaunch) {
                                 notify('onGameLaunchInitiated', document.title || 'Xbox Game');
@@ -3027,11 +3036,13 @@ class XboxBridge(
             val url = obj.optString("url", "").trim()
             val imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() }
             val supportsTouch = if (obj.has("supportsTouch")) obj.optBoolean("supportsTouch", true) else null
+            val isLaunch = obj.optBoolean("isLaunch", false)
             controller.onWebGameMetadataDetected(
                 title = title,
                 url = url,
                 imageUrl = imageUrl,
-                supportsTouch = supportsTouch
+                supportsTouch = supportsTouch,
+                isLaunch = isLaunch
             )
         } catch (e: Exception) {
             Log.w(TAG, "Could not parse onWebGameDetected: ${e.message}")

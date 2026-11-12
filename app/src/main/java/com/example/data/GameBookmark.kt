@@ -17,6 +17,7 @@ import java.util.Locale
 
 enum class GameFilterTab {
     ALL,
+    CONTINUE_PLAYING,
     FAVORITES,
     POPULAR,
     RECENTLY_ADDED,
@@ -115,6 +116,7 @@ object GameLibraryRepository {
     private const val KEY_LAST_CATALOG_SYNC_MS = "last_catalog_sync_ms"
     private const val KEY_FAVORITE_IDS = "favorite_game_ids"
     private const val KEY_LAST_PLAYED_ID = "last_played_game_id"
+    private const val KEY_PLAYED_GAME_IDS_LIST = "played_game_ids_ordered_v1"
     private const val KEY_XBOX_GAMERTAG = "xbox_gamertag"
     private const val KEY_XBOX_AVATAR_URL = "xbox_avatar_url"
     private const val KEY_XBOX_SUB_TIER = "xbox_sub_tier"
@@ -171,6 +173,9 @@ object GameLibraryRepository {
     private val _lastPlayedId = MutableStateFlow<String?>(null)
     val lastPlayedId: StateFlow<String?> = _lastPlayedId.asStateFlow()
 
+    private val _playedGameIds = MutableStateFlow<List<String>>(emptyList())
+    val playedGameIds: StateFlow<List<String>> = _playedGameIds.asStateFlow()
+
     private val _isSyncingCatalog = MutableStateFlow(false)
     val isSyncingCatalog: StateFlow<Boolean> = _isSyncingCatalog.asStateFlow()
 
@@ -219,8 +224,25 @@ object GameLibraryRepository {
 
                 val savedLast = sharedPrefs.getString(KEY_LAST_PLAYED_ID, null)
                     ?: legacyRecentPrefs.getString(KEY_LAST_PLAYED_ID, null)
-                if (!userModifiedLastPlayedEarly && _lastPlayedId.value == null) {
-                    _lastPlayedId.value = savedLast
+                val savedPlayedRaw = sharedPrefs.getString(KEY_PLAYED_GAME_IDS_LIST, "") ?: ""
+                val savedPlayedList = savedPlayedRaw
+                    .split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                if (!userModifiedLastPlayedEarly) {
+                    if (_lastPlayedId.value == null) {
+                        _lastPlayedId.value = savedPlayedList.firstOrNull() ?: savedLast
+                    }
+                    if (_playedGameIds.value.isEmpty()) {
+                        _playedGameIds.value = if (savedPlayedList.isNotEmpty()) {
+                            savedPlayedList
+                        } else if (!savedLast.isNullOrBlank()) {
+                            listOf(savedLast)
+                        } else {
+                            emptyList()
+                        }
+                    }
                 }
 
                 val lastSyncMs = sharedPrefs.getLong(KEY_LAST_CATALOG_SYNC_MS, 0L)
@@ -288,16 +310,15 @@ object GameLibraryRepository {
             val idKey = item.id.lowercase(Locale.ROOT)
             val pid = extractProductId(item.playUrl)
             val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+            val trulyFree = isFreeToPlayTitle(item.title, pid, item.playUrl)
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
-            val finalItem = if (isFortnite && (item.id != "fortnite" || item.drawableResId != null)) {
-                // Chỉ gọi copy() khi id chưa chuẩn hóa "fortnite" hoặc còn giữ drawableResId khác null,
-                // tránh cấp phát 550 bản sao GameBookmark dư thừa khi nạp từ cache JSON.
-                item.copy(id = "fortnite", drawableResId = null)
-            } else if (item.drawableResId != null) {
-                item.copy(drawableResId = null)
+            val finalItem = if (isFortnite && (item.id != "fortnite" || item.drawableResId != null || !item.freeToPlay)) {
+                item.copy(id = "fortnite", drawableResId = null, freeToPlay = true)
+            } else if (item.drawableResId != null || item.freeToPlay != trulyFree) {
+                item.copy(drawableResId = null, freeToPlay = trulyFree)
             } else {
                 item
             }
@@ -306,6 +327,33 @@ object GameLibraryRepository {
 
         customList.forEach { addUnique(it) }
         syncedList.forEach { addUnique(it) }
+
+        // Đảm bảo Fortnite (game miễn phí 100% thực sự trên Xbox Cloud không cần Game Pass) luôn có mặt trong danh mục
+        if (!existingIds.contains("fortnite") && !existingProductIds.contains(FORTNITE_PRODUCT_ID)) {
+            merged.add(
+                0,
+                GameBookmark(
+                    id = "fortnite",
+                    title = "Fortnite",
+                    category = "Battle Royale • Miễn phí",
+                    categoryEn = "Battle Royale • Free to Play",
+                    playUrl = "https://www.xbox.com/en-US/play/games/fortnite/$FORTNITE_PRODUCT_ID",
+                    freeToPlay = true,
+                    supportsTouch = true,
+                    accentColorHex = 0xFF0074E4L,
+                    badge = "Cảm ứng Epic • Miễn phí",
+                    badgeEn = "Epic Touch • Free",
+                    drawableResId = null,
+                    rating = "4.9",
+                    imageUrl = "https://store-images.s-microsoft.com/image/apps.50670.70702278257994163.1052c4f6-c429-424b-9b56-0303b1420312.69b75902-e543-496f-9464-480b3795328d?w=260&q=70",
+                    heroImageUrl = "https://store-images.s-microsoft.com/image/apps.50670.70702278257994163.1052c4f6-c429-424b-9b56-0303b1420312.69b75902-e543-496f-9464-480b3795328d?w=520&q=70",
+                    description = "Chơi Fortnite miễn phí trên Xbox Cloud Gaming chỉ cần tài khoản Microsoft, không cần gói Game Pass.",
+                    publisher = "Epic Games",
+                    isPopular = true,
+                    isRecentlyAdded = false
+                )
+            )
+        }
 
         _games.value = merged
         _xboxStatus.value = _xboxStatus.value.copy(
@@ -317,21 +365,30 @@ object GameLibraryRepository {
     fun extractProductId(url: String?): String {
         if (url.isNullOrBlank()) return ""
         val clean = url.substringBefore("?").substringBefore("#").trimEnd('/')
+        // Hỗ trợ cả Giao diện mới (play.xbox.com/products/<productId>/<slug>)
+        val afterProducts = clean.substringAfter("/products/", "").trim('/')
+        if (afterProducts.isNotBlank()) {
+            val firstSeg = afterProducts.substringBefore("/").uppercase(Locale.ROOT)
+            if (firstSeg.length in 10..14 && firstSeg.all { it.isLetterOrDigit() }) {
+                return firstSeg
+            }
+        }
         val afterGames = clean.substringAfter("/play/games/", "")
             .ifBlank { clean.substringAfter("/play/launch/", "") }
+            .ifBlank { clean.substringAfter("/games/", "") }
+            .ifBlank { clean.substringAfter("/launch/", "") }
             .trim('/')
         if (afterGames.isBlank()) return ""
-        val lastSlash = afterGames.lastIndexOf('/')
-        if (lastSlash >= 0) {
-            val candidate = afterGames.substring(lastSlash + 1).uppercase(Locale.ROOT)
-            if (candidate.length in 10..14 && candidate.all { it.isLetterOrDigit() }) {
+        val segments = afterGames.split("/").filter { it.isNotBlank() }
+        for (seg in segments.asReversed()) {
+            val candidate = seg.uppercase(Locale.ROOT)
+            if (candidate.length == 12 && candidate.all { it.isLetterOrDigit() } && candidate.any { it.isDigit() }) {
                 return candidate
             }
-        } else {
-            val candidate = afterGames.uppercase(Locale.ROOT)
-            if (candidate.length == 12 && candidate.all { it.isLetterOrDigit() && it !in 'a'..'z' }) {
-                return candidate
-            }
+        }
+        val lastSeg = segments.lastOrNull()?.uppercase(Locale.ROOT).orEmpty()
+        if (lastSeg.length in 10..14 && lastSeg.all { it.isLetterOrDigit() } && lastSeg.any { it.isDigit() }) {
+            return lastSeg
         }
         return ""
     }
@@ -339,10 +396,23 @@ object GameLibraryRepository {
     fun extractSlug(url: String?): String {
         if (url.isNullOrBlank()) return ""
         val clean = url.substringBefore("?").substringBefore("#").trimEnd('/')
+        val afterProducts = clean.substringAfter("/products/", "").trim('/')
+        if (afterProducts.isNotBlank()) {
+            val secondSeg = afterProducts.substringAfter("/", "").substringBefore("/").lowercase(Locale.ROOT).trim()
+            if (secondSeg.isNotBlank()) return secondSeg
+        }
         val afterGames = clean.substringAfter("/play/games/", "")
             .ifBlank { clean.substringAfter("/play/launch/", "") }
+            .ifBlank { clean.substringAfter("/games/", "") }
+            .ifBlank { clean.substringAfter("/launch/", "") }
+            .trim('/')
         if (afterGames.isBlank()) return ""
-        return afterGames.substringBefore("/").lowercase(Locale.ROOT).trim()
+        val firstSeg = afterGames.substringBefore("/").lowercase(Locale.ROOT).trim()
+        // Nếu segment đầu tiên là ProductId 12 ký tự (ví dụ /launch/BT5P2X999VH2) thì không coi là slug
+        if (firstSeg.length == 12 && firstSeg.all { it.isLetterOrDigit() } && firstSeg.any { it.isDigit() }) {
+            return ""
+        }
+        return firstSeg
     }
 
     private fun slugifyTitle(title: String): String {
@@ -374,11 +444,44 @@ object GameLibraryRepository {
     }
 
     fun recordLastPlayed(gameId: String) {
-        if (gameId.isBlank()) return
+        val cleanId = gameId.trim()
+        if (cleanId.isBlank()) return
         userModifiedLastPlayedEarly = true
-        _lastPlayedId.value = gameId
-        prefs?.edit()?.putString(KEY_LAST_PLAYED_ID, gameId)?.apply()
-        recentPrefs?.edit()?.putString(KEY_LAST_PLAYED_ID, gameId)?.apply()
+        _lastPlayedId.value = cleanId
+        val updatedList = (listOf(cleanId) + _playedGameIds.value.filterNot { it.equals(cleanId, ignoreCase = true) })
+            .take(24)
+        _playedGameIds.value = updatedList
+        prefs?.edit()
+            ?.putString(KEY_LAST_PLAYED_ID, cleanId)
+            ?.putString(KEY_PLAYED_GAME_IDS_LIST, updatedList.joinToString(","))
+            ?.apply()
+        recentPrefs?.edit()?.putString(KEY_LAST_PLAYED_ID, cleanId)?.apply()
+    }
+
+    fun removePlayedGame(gameId: String) {
+        val cleanId = gameId.trim()
+        if (cleanId.isBlank()) return
+        userModifiedLastPlayedEarly = true
+        val updatedList = _playedGameIds.value.filterNot { it.equals(cleanId, ignoreCase = true) }
+        _playedGameIds.value = updatedList
+        val nextLast = updatedList.firstOrNull()
+        _lastPlayedId.value = nextLast
+        prefs?.edit()
+            ?.putString(KEY_LAST_PLAYED_ID, nextLast)
+            ?.putString(KEY_PLAYED_GAME_IDS_LIST, updatedList.joinToString(","))
+            ?.apply()
+        recentPrefs?.edit()?.putString(KEY_LAST_PLAYED_ID, nextLast)?.apply()
+    }
+
+    fun clearPlayedGames() {
+        userModifiedLastPlayedEarly = true
+        _playedGameIds.value = emptyList()
+        _lastPlayedId.value = null
+        prefs?.edit()
+            ?.remove(KEY_LAST_PLAYED_ID)
+            ?.remove(KEY_PLAYED_GAME_IDS_LIST)
+            ?.apply()
+        recentPrefs?.edit()?.remove(KEY_LAST_PLAYED_ID)?.apply()
     }
 
     fun recordLastPlayedByUrl(url: String) {
@@ -444,7 +547,7 @@ object GameLibraryRepository {
                         rawTitle = rawTitle,
                         rawUrl = rawUrl,
                         imageUrl = rawImg,
-                        markAsLastPlayed = (i == 0 && _lastPlayedId.value == null)
+                        markAsLastPlayed = false
                     )
                     if (bookmark != null && bookmark.id !in jumpIds) {
                         jumpIds.add(bookmark.id)
@@ -475,7 +578,9 @@ object GameLibraryRepository {
     ): GameBookmark? {
         val cleanUrl = rawUrl.trim()
         val isXboxGameUrl = cleanUrl.contains("/play/games/", ignoreCase = true) ||
-            cleanUrl.contains("/play/launch/", ignoreCase = true)
+            cleanUrl.contains("/play/launch/", ignoreCase = true) ||
+            cleanUrl.contains("/products/", ignoreCase = true) ||
+            cleanUrl.contains("play.xbox.com", ignoreCase = true)
 
         val cleanedTitle = rawTitle
             ?.replace(XBOX_CLOUD_SUFFIX_REGEX, "")
@@ -546,17 +651,18 @@ object GameLibraryRepository {
         }
 
         val accent = ACCENT_PALETTE[(resolvedTitle.hashCode() and 0x7FFFFFFF) % ACCENT_PALETTE.size]
+        val isFreeCloud = isFreeToPlayTitle(resolvedTitle, productId, canonicalPlayUrl)
         val newBookmark = GameBookmark(
-            id = newId,
+            id = if (isFreeCloud && productId.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)) "fortnite" else newId,
             title = resolvedTitle,
             category = category ?: "Xbox Cloud Game Pass",
             categoryEn = category ?: "Xbox Cloud Game Pass",
             playUrl = canonicalPlayUrl,
-            freeToPlay = isFreeToPlayTitle(resolvedTitle),
+            freeToPlay = isFreeCloud,
             supportsTouch = supportsTouch ?: true,
             accentColorHex = accent,
-            badge = "Xbox Cloud",
-            badgeEn = "Xbox Cloud",
+            badge = if (isFreeCloud) "Cảm ứng Epic • Miễn phí" else "Xbox Cloud",
+            badgeEn = if (isFreeCloud) "Epic Touch • Free" else "Xbox Cloud",
             rating = "4.8",
             imageUrl = validImg,
             heroImageUrl = validImg
@@ -575,18 +681,22 @@ object GameLibraryRepository {
         return newBookmark
     }
 
-    private fun isFreeToPlayTitle(title: String): Boolean {
-        return title.contains("Fortnite", ignoreCase = true) ||
-            title.contains("Roblox", ignoreCase = true) ||
-            title.contains("Overwatch", ignoreCase = true) ||
-            title.contains("Apex Legends", ignoreCase = true) ||
-            title.contains("Warzone", ignoreCase = true) ||
-            title.contains("Halo Infinite", ignoreCase = true) ||
-            title.contains("Rocket League", ignoreCase = true) ||
-            title.contains("Destiny 2", ignoreCase = true) ||
-            title.contains("The Finals", ignoreCase = true) ||
-            title.contains("Valorant", ignoreCase = true) ||
-            title.contains("Genshin", ignoreCase = true)
+    /**
+     * Chỉ đánh dấu Miễn phí (freeToPlay = true) cho các tựa game thực sự được Microsoft mở miễn phí 100%
+     * trên Xbox Cloud Gaming mà KHÔNG cần mua gói Game Pass Ultimate (hiện tại là Fortnite - BT5P2X999VH2).
+     * Các game miễn phí trên PC/Console như Overwatch 2, Call of Duty: Warzone, Halo Infinite, Destiny 2,
+     * Apex Legends, Roblox... trên Xbox Cloud đều yêu cầu Game Pass Ultimate (hoặc không có trên Cloud miễn phí)
+     * nên KHÔNG được gắn cờ freeToPlay = true.
+     */
+    private fun isFreeToPlayTitle(
+        title: String,
+        productId: String = "",
+        playUrl: String = ""
+    ): Boolean {
+        val cleanTitle = title.trim()
+        val pid = productId.ifBlank { extractProductId(playUrl) }
+        if (pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)) return true
+        return cleanTitle.equals("Fortnite", ignoreCase = true)
     }
 
     /**
@@ -649,7 +759,7 @@ object GameLibraryRepository {
                                 category = "Xbox Cloud Game Pass",
                                 categoryEn = "Xbox Cloud Game Pass",
                                 playUrl = canonicalUrl,
-                                freeToPlay = isFreeToPlayTitle(cleanTitle),
+                                freeToPlay = isFreeToPlayTitle(cleanTitle, pid, canonicalUrl),
                                 supportsTouch = touch,
                                 accentColorHex = accent,
                                 badge = if (touch) "Cảm ứng • Cloud" else "Game Pass",
@@ -1130,7 +1240,7 @@ object GameLibraryRepository {
                         category = catVi,
                         categoryEn = catEn,
                         playUrl = playUrl,
-                        freeToPlay = isFreeToPlayTitle(cleanTitle),
+                        freeToPlay = isFreeToPlayTitle(cleanTitle, productId, playUrl),
                         supportsTouch = isTouch,
                         accentColorHex = accent,
                         badge = badgeVi,
@@ -1255,7 +1365,8 @@ object GameLibraryRepository {
                 val playUrl = obj.optString("playUrl", "").trim()
                 if (title.isBlank() || playUrl.isBlank()) continue
                 val id = obj.optString("id", "custom_$i")
-                val isFortnite = id == "fortnite" || extractProductId(playUrl).equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+                val pid = extractProductId(playUrl)
+                val isFortnite = id == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true) || title.equals("Fortnite", ignoreCase = true)
                 val cat = obj.optString("category", "Xbox Cloud Game Pass")
                 val rawBadge = obj.optString("badge", "").takeIf { it.isNotBlank() }
                 val badge = rawBadge?.let { b ->
@@ -1267,6 +1378,7 @@ object GameLibraryRepository {
                 }
                 val imgUrl = normalizeImageUrl(obj.optString("imageUrl", ""), widthPx = 260, quality = 70)
                 val heroUrl = normalizeImageUrl(obj.optString("heroImageUrl", ""), widthPx = 520, quality = 70) ?: imgUrl
+                val isCustomFree = id.startsWith("custom_") && obj.optBoolean("freeToPlay", false)
                 list.add(
                     GameBookmark(
                         id = if (isFortnite) "fortnite" else id,
@@ -1274,7 +1386,7 @@ object GameLibraryRepository {
                         category = cat,
                         categoryEn = obj.optString("categoryEn", cat),
                         playUrl = playUrl,
-                        freeToPlay = obj.optBoolean("freeToPlay", false),
+                        freeToPlay = isFreeToPlayTitle(title, pid, playUrl) || isCustomFree,
                         supportsTouch = obj.optBoolean("supportsTouch", true),
                         accentColorHex = obj.optLong("accentColorHex", 0xFF107C10L),
                         badge = badge,

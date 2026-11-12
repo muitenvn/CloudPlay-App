@@ -127,16 +127,11 @@ fun HomeScreen(
     }
     val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
     val repoLastPlayedId by GameLibraryRepository.lastPlayedId.collectAsState()
+    val playedGameIds by GameLibraryRepository.playedGameIds.collectAsState()
     val recentSessions by SessionHistoryRepository.sessions.collectAsState()
-    var localLastPlayedId by remember {
-        mutableStateOf(recentPrefs.getString(KEY_LAST_PLAYED_ID, null))
-    }
-    val effectiveLastPlayedId = repoLastPlayedId ?: localLastPlayedId
 
-    val recordAndLaunch: (GameBookmark) -> Unit = { game ->
-        recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, game.id).apply()
-        localLastPlayedId = game.id
-        GameLibraryRepository.recordLastPlayed(game.id)
+    // Chỉ mở trang game trên Xbox; hệ thống sẽ tự động nhận diện đường link khi người dùng thực sự vào chơi game trên Xbox
+    val launchBookmarkOnly: (GameBookmark) -> Unit = { game ->
         onLaunchGame(game.playUrl)
     }
 
@@ -151,7 +146,8 @@ fun HomeScreen(
         initialValue = initialHomeGames,
         featuredGames,
         favoriteIds,
-        effectiveLastPlayedId,
+        repoLastPlayedId,
+        playedGameIds,
         recentSessions
     ) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -171,40 +167,37 @@ fun HomeScreen(
                 if (favs.size >= 18) favs else (favs + nonFavs).take(18)
             }
 
-            val byId = effectiveLastPlayedId?.let { id ->
-                featuredGames.find { it.id.equals(id, ignoreCase = true) }
+            val playedList = ArrayList<GameBookmark>()
+            val addedIds = HashSet<String>()
+            for (playedId in playedGameIds) {
+                val found = featuredGames.firstOrNull { it.id.equals(playedId, ignoreCase = true) }
+                if (found != null && addedIds.add(found.id.lowercase())) {
+                    playedList.add(found)
+                }
             }
-            val lastGame = if (byId != null) {
-                byId
-            } else {
-                val latestTitle = recentSessions.firstOrNull()?.gameTitle?.trim()
-                if (!latestTitle.isNullOrBlank()) {
-                    featuredGames.firstOrNull {
-                        it.title.equals(latestTitle, ignoreCase = true) ||
-                            it.title.contains(latestTitle, ignoreCase = true) ||
-                            latestTitle.contains(it.title, ignoreCase = true)
+            val currentLastId = repoLastPlayedId
+            if (currentLastId != null) {
+                val byLast = featuredGames.firstOrNull { it.id.equals(currentLastId, ignoreCase = true) }
+                if (byLast != null && addedIds.add(byLast.id.lowercase())) {
+                    playedList.add(0, byLast)
+                }
+            }
+            for (session in recentSessions) {
+                if (playedList.size >= 16) break
+                val title = session.gameTitle.trim()
+                if (title.isNotBlank()) {
+                    val matched = featuredGames.firstOrNull {
+                        it.title.equals(title, ignoreCase = true) ||
+                            it.title.contains(title, ignoreCase = true) ||
+                            title.contains(it.title, ignoreCase = true)
                     }
-                } else null
-            }
-
-            val quickGames = buildList {
-                if (lastGame != null) add(lastGame)
-                for (session in recentSessions) {
-                    if (size >= 4) break
-                    val title = session.gameTitle.trim()
-                    if (title.isNotBlank()) {
-                        val matched = featuredGames.firstOrNull {
-                            it.title.equals(title, ignoreCase = true) ||
-                                it.title.contains(title, ignoreCase = true) ||
-                                title.contains(it.title, ignoreCase = true)
-                        }
-                        if (matched != null && none { it.id == matched.id }) {
-                            add(matched)
-                        }
+                    if (matched != null && addedIds.add(matched.id.lowercase())) {
+                        playedList.add(matched)
                     }
                 }
             }
-            Triple(topFeatured, lastGame, quickGames)
+            val lastGame = playedList.firstOrNull()
+            Triple(topFeatured, lastGame, playedList.toList())
         }
     }
     val sortedFeaturedGames = computedHomeGames.first
@@ -276,9 +269,6 @@ fun HomeScreen(
                                 onOpenXboxCloud = onOpenXboxCloud,
                                 onLaunchFortnite = {
                                     val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
-                                    recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
-                                    localLastPlayedId = "fortnite"
-                                    GameLibraryRepository.recordLastPlayed("fortnite")
                                     onLaunchGame(fortniteUrl)
                                 },
                                 onNavigateToSettings = onNavigateToSettings,
@@ -296,7 +286,7 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và thanh chỉnh nhanh Video 16:9 / Quay Luồng / Đồ họa
+                // 1. Banner chính UI 3.0: nút vào Xbox, nút Fortnite, và chuyển nhanh Giao diện cũ / mới
                 item(key = "home_hero_deck") {
                     HeroConsolePlayDeck(
                         vpnState = vpnState,
@@ -304,9 +294,6 @@ fun HomeScreen(
                         onOpenXboxCloud = onOpenXboxCloud,
                         onLaunchFortnite = {
                             val fortniteUrl = "https://www.xbox.com/en-US/play/games/fortnite/BT5P2X999VH2"
-                            recentPrefs.edit().putString(KEY_LAST_PLAYED_ID, "fortnite").apply()
-                            localLastPlayedId = "fortnite"
-                            GameLibraryRepository.recordLastPlayed("fortnite")
                             onLaunchGame(fortniteUrl)
                         },
                         onNavigateToSettings = onNavigateToSettings,
@@ -325,16 +312,18 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Mục Game nổi bật UI 3.0 + thẻ "Chơi tiếp" (Quick Resume) cho các game vừa chơi gần nhất
+            // 3. Mục Tiếp tục chơi (danh sách riêng các game đã chơi thật trên Xbox) + Mục Đề xuất
             item(key = "home_featured_games") {
                 FeaturedGamesSection(
                     featuredGames = sortedFeaturedGames,
                     favoriteIds = favoriteIds,
                     lastPlayedGame = lastPlayedGame,
                     recentGames = recentQuickGames,
-                    onLaunchBookmark = recordAndLaunch,
+                    onLaunchBookmark = launchBookmarkOnly,
                     onToggleFavorite = { GameLibraryRepository.toggleFavorite(it.id) },
-                    onNavigateToLibrary = onNavigateToLibrary
+                    onNavigateToLibrary = onNavigateToLibrary,
+                    onRemovePlayedGame = { GameLibraryRepository.removePlayedGame(it.id) },
+                    onClearPlayedGames = { GameLibraryRepository.clearPlayedGames() }
                 )
             }
         }

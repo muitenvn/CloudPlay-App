@@ -115,6 +115,7 @@ fun GameLibraryScreen(
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
     val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
+    val playedGameIds by GameLibraryRepository.playedGameIds.collectAsState()
     val isSyncingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
     val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
     val xboxStatus by GameLibraryRepository.xboxStatus.collectAsState()
@@ -136,12 +137,19 @@ fun GameLibraryScreen(
         selectedTab,
         selectedGenre,
         searchQuery,
-        favoriteIds
+        favoriteIds,
+        playedGameIds
     ) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val playedOrderMap = HashMap<String, Int>(playedGameIds.size * 2)
+            playedGameIds.forEachIndexed { idx, id ->
+                playedOrderMap[id.lowercase()] = idx
+            }
+
             val filtered = games.filter { game ->
                 val matchesTab = when (selectedTab) {
                     GameFilterTab.ALL -> true
+                    GameFilterTab.CONTINUE_PLAYING -> playedOrderMap.containsKey(game.id.lowercase())
                     GameFilterTab.FAVORITES -> game.id in favoriteIds
                     GameFilterTab.POPULAR -> game.isPopular || game.rating >= "4.9"
                     GameFilterTab.RECENTLY_ADDED -> game.isRecentlyAdded
@@ -179,7 +187,13 @@ fun GameLibraryScreen(
                         (game.publisher?.contains(searchQuery, ignoreCase = true) == true)
                 }
                 matchesTab && matchesGenre && matchesSearch
-            }.sortedByDescending { it.id in favoriteIds }
+            }.let { list ->
+                if (selectedTab == GameFilterTab.CONTINUE_PLAYING) {
+                    list.sortedBy { playedOrderMap[it.id.lowercase()] ?: Int.MAX_VALUE }
+                } else {
+                    list.sortedByDescending { it.id in favoriteIds }
+                }
+            }
 
             var fav = 0
             var pop = 0
@@ -339,7 +353,6 @@ fun GameLibraryScreen(
             if (sectionState == GameTabSection.HISTORY) {
                 SessionHistoryScreen(
                     onLaunchGame = { url ->
-                        GameLibraryRepository.recordLastPlayedByUrl(url)
                         onLaunchGame(url)
                     },
                     modifier = Modifier.fillMaxSize()
@@ -404,8 +417,13 @@ fun GameLibraryScreen(
                 // 2. Single Clean Filter Chips Row (combining category & genre filters)
                 val filterOptions: List<Pair<GameFilterTab, String>> = listOf(
                     GameFilterTab.ALL to config.tr("Tất cả", "All"),
+                    GameFilterTab.CONTINUE_PLAYING to if (playedGameIds.isNotEmpty()) {
+                        "${config.tr("Tiếp tục chơi", "Continue")} (${playedGameIds.size})"
+                    } else {
+                        config.tr("Tiếp tục chơi", "Continue")
+                    },
+                    GameFilterTab.FREE_TO_PLAY to "${config.tr("Miễn phí", "Free")} ($freeCount)",
                     GameFilterTab.FAVORITES to config.tr("Yêu thích", "Favorites"),
-                    GameFilterTab.FREE_TO_PLAY to config.tr("Miễn phí", "Free"),
                     GameFilterTab.TOUCH_FRIENDLY to config.tr("Có cảm ứng", "Touch"),
                     GameFilterTab.POPULAR to config.tr("Phổ biến", "Popular"),
                     GameFilterTab.RECENTLY_ADDED to config.tr("Mới", "New"),
@@ -437,6 +455,7 @@ fun GameLibraryScreen(
                                     selectedTab = tab
                                     selectedGenre = "ALL"
                                 }
+                                .testTag("filter_tab_${tab.name.lowercase()}")
                         ) {
                             Box(
                                 contentAlignment = Alignment.Center,
@@ -480,6 +499,97 @@ fun GameLibraryScreen(
                                     fontSize = 12.5.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Banner giải thích rõ cho mục "Miễn phí" (chỉ chọn game miễn phí thực sự trên Xbox Cloud không cần Game Pass)
+                if (selectedTab == GameFilterTab.FREE_TO_PLAY && selectedGenre == "ALL") {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFF0F2C1D),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen.copy(alpha = 0.6f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("free_to_play_verified_banner")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = config.tr(
+                                    "Miễn phí 100% trên Xbox Cloud (Không cần Game Pass)",
+                                    "100% Free on Xbox Cloud (No Game Pass Required)"
+                                ),
+                                color = XboxNeonGreen,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = config.tr(
+                                    "Chỉ hiển thị game được Microsoft mở miễn phí hoàn toàn trên Cloud chỉ với tài khoản Microsoft (Fortnite). Các game miễn phí trên PC/Console khác như Overwatch 2, Warzone, Halo Infinite, Apex Legends đều bắt buộc mua Game Pass Ultimate khi chơi trên Xbox Cloud.",
+                                    "Only shows titles Microsoft streams completely free with a Microsoft account (Fortnite). Other PC/Console F2P titles like Overwatch 2, Warzone, Halo Infinite, and Apex Legends require Game Pass Ultimate on Xbox Cloud."
+                                ),
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 14.5.sp
+                            )
+                        }
+                    }
+                } else if (selectedTab == GameFilterTab.CONTINUE_PLAYING && selectedGenre == "ALL") {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = XboxSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("continue_playing_library_banner")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = config.tr(
+                                        "Danh sách game đã thực sự chơi trên Xbox",
+                                        "Games actually played on Xbox"
+                                    ),
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = config.tr(
+                                        "Tự động lấy thông tin từ đường link Xbox khi bạn bắt đầu vào luồng chơi game (không tính khi chỉ bấm xem thẻ game).",
+                                        "Automatically recorded from the Xbox URL when a game stream launches (tapping a card without playing won't add it)."
+                                    ),
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.5.sp
+                                )
+                            }
+                            if (playedGameIds.isNotEmpty()) {
+                                Text(
+                                    text = config.tr("Xóa hết", "Clear"),
+                                    color = JapanRed,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { GameLibraryRepository.clearPlayedGames() }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -636,7 +746,6 @@ fun GameLibraryScreen(
                                     onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
                                     onShowDetail = { selectedDetailGame = game },
                                     onPlay = {
-                                        GameLibraryRepository.recordLastPlayed(game.id)
                                         onLaunchGame(game.playUrl)
                                     },
                                     onDeleteCustom = if (game.id.startsWith("custom_")) {
@@ -674,7 +783,6 @@ fun GameLibraryScreen(
                 },
                 onLaunchDirect = { game ->
                     showAddDialog = false
-                    GameLibraryRepository.recordLastPlayed(game.id)
                     onLaunchGame(game.playUrl)
                 }
             )
@@ -689,7 +797,6 @@ fun GameLibraryScreen(
                 onDismiss = { selectedDetailGame = null },
                 onPlay = {
                     selectedDetailGame = null
-                    GameLibraryRepository.recordLastPlayed(detailGame.id)
                     onLaunchGame(detailGame.playUrl)
                 }
             )

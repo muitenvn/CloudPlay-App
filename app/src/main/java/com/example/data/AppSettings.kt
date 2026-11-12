@@ -1178,11 +1178,32 @@ object SettingsRepository {
             val rawRest = playSubMatch.groupValues[2].ifBlank { "" }
             return if (uiMode == XboxWebUiMode.CLASSIC) {
                 val productRouteMatch = Regex("""^/products/([^/?#]+)(?:/([^/?#]+))?""", RegexOption.IGNORE_CASE).find(rawRest)
+                val launchRouteMatch = Regex("""^/(?:play/)?(?:games|launch)/([^/?#]+)(?:/([^/?#]+))?""", RegexOption.IGNORE_CASE).find(rawRest)
                 val normalizedPath = when {
                     productRouteMatch != null -> {
-                        val productId = productRouteMatch.groupValues[1]
-                        val slug = productRouteMatch.groupValues[2]
-                        if (slug.isNotBlank()) "/play/games/$slug/$productId" else "/play/games/$productId"
+                        val productId = productRouteMatch.groupValues[1].uppercase()
+                        val rawSlug = productRouteMatch.groupValues[2]
+                        val resolvedSlug = rawSlug.ifBlank {
+                            GameLibraryRepository.games.value.firstOrNull {
+                                GameLibraryRepository.extractProductId(it.playUrl).equals(productId, ignoreCase = true)
+                            }?.let { GameLibraryRepository.extractSlug(it.playUrl) }.orEmpty().ifBlank { "xbox-game" }
+                        }
+                        "/play/games/$resolvedSlug/$productId"
+                    }
+                    launchRouteMatch != null -> {
+                        val seg1 = launchRouteMatch.groupValues[1]
+                        val seg2 = launchRouteMatch.groupValues[2]
+                        val isLaunch = rawRest.contains("/launch/", ignoreCase = true)
+                        val actionSeg = if (isLaunch) "launch" else "games"
+                        if (seg2.isNotBlank()) {
+                            "/play/$actionSeg/$seg1/${seg2.uppercase()}"
+                        } else {
+                            val pid = seg1.uppercase()
+                            val resolvedSlug = GameLibraryRepository.games.value.firstOrNull {
+                                GameLibraryRepository.extractProductId(it.playUrl).equals(pid, ignoreCase = true)
+                            }?.let { GameLibraryRepository.extractSlug(it.playUrl) }.orEmpty().ifBlank { "xbox-game" }
+                            "/play/$actionSeg/$resolvedSlug/$pid"
+                        }
                     }
                     rawRest.isBlank() || rawRest == "/" -> "/play"
                     rawRest.startsWith("/play") -> rawRest
@@ -1204,10 +1225,10 @@ object SettingsRepository {
                 if (rest.isBlank() || rest == "/play" || rest == "/play/") {
                     return "https://play.xbox.com/"
                 }
-                val classicGameMatch = Regex("""^/play/games/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
+                val classicGameMatch = Regex("""^/play/(?:games|launch)/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
                 if (classicGameMatch != null) {
                     val slug = classicGameMatch.groupValues[1]
-                    val productId = classicGameMatch.groupValues[2]
+                    val productId = classicGameMatch.groupValues[2].uppercase()
                     return "https://play.xbox.com/products/$productId/$slug"
                 }
             }
@@ -1223,10 +1244,10 @@ object SettingsRepository {
                 if (rest == "/play" || rest == "/play/") {
                     return "https://play.xbox.com/"
                 }
-                val classicGameMatch = Regex("""^/play/games/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
+                val classicGameMatch = Regex("""^/play/(?:games|launch)/([^/?#]+)/([^/?#]+)""", RegexOption.IGNORE_CASE).find(rest)
                 if (classicGameMatch != null) {
                     val slug = classicGameMatch.groupValues[1]
-                    val productId = classicGameMatch.groupValues[2]
+                    val productId = classicGameMatch.groupValues[2].uppercase()
                     return "https://play.xbox.com/products/$productId/$slug"
                 }
             }

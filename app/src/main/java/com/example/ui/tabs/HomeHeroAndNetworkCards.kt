@@ -293,6 +293,66 @@ internal fun HeroConsolePlayDeck(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Quick Switcher: Giao diện cũ (xbox.com/play) ⇄ Giao diện mới (play.xbox.com)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(COCKPIT_PILL_SHAPE)
+                    .background(Color(0xD9060A08), COCKPIT_PILL_SHAPE)
+                    .border(1.dp, XboxCardBorder, COCKPIT_PILL_SHAPE)
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .testTag("home_web_ui_mode_bar"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = config.tr("Giao diện Xbox:", "Xbox UI:"),
+                    color = TextSecondary,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
+                    val selected = config.xboxWebUiMode == uiMode
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .defaultMinSize(minHeight = 32.dp)
+                            .clip(COCKPIT_BTN_SHAPE)
+                            .background(
+                                if (selected) Color(0xFF16352A) else Color(0xFF0D1511),
+                                COCKPIT_BTN_SHAPE
+                            )
+                            .border(
+                                1.dp,
+                                if (selected) XboxNeonGreen else XboxCardBorder,
+                                COCKPIT_BTN_SHAPE
+                            )
+                            .clickable {
+                                SettingsRepository.updateXboxWebUiMode(uiMode)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .testTag("home_ui_mode_${uiMode.name.lowercase()}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                config.tr("Cũ (Ổn định)", "Classic UI")
+                            } else {
+                                config.tr("Mới (play.xbox)", "New UI")
+                            },
+                            color = if (selected) XboxNeonGreen else TextPrimary,
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
     }
 }

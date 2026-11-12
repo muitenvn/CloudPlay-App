@@ -99,15 +99,21 @@ class StreamController(private val context: Context) {
         title: String?,
         url: String,
         imageUrl: String?,
-        supportsTouch: Boolean?
+        supportsTouch: Boolean?,
+        isLaunch: Boolean = false
     ) {
         scope.launch {
+            val effectiveUrl = url.ifBlank { _uiState.value.currentUrl }
+            val shouldMarkPlayed = isLaunch ||
+                effectiveUrl.contains("/launch/", ignoreCase = true) ||
+                _uiState.value.isGameActive ||
+                _uiState.value.isStreamConnected
             val bookmark = com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
                 rawTitle = title,
-                rawUrl = url.ifBlank { _uiState.value.currentUrl },
+                rawUrl = effectiveUrl,
                 imageUrl = imageUrl,
                 supportsTouch = supportsTouch,
-                markAsLastPlayed = true
+                markAsLastPlayed = shouldMarkPlayed
             )
             if (bookmark != null && !bookmark.title.equals("Xbox Cloud Game", ignoreCase = true)) {
                 _uiState.value = _uiState.value.copy(gameTitle = bookmark.title)
@@ -443,15 +449,17 @@ class StreamController(private val context: Context) {
     fun onUrlChanged(url: String) {
         scope.launch {
             val prevUrl = _uiState.value.currentUrl
-            val wasInLaunch = prevUrl.contains("/launch/")
-            val nowInLaunch = url.contains("/launch/")
-            val isGamePage = url.contains("/play/games/") || nowInLaunch
+            val wasInLaunch = prevUrl.contains("/launch/", ignoreCase = true)
+            val nowInLaunch = url.contains("/launch/", ignoreCase = true)
+            val isGamePage = url.contains("/play/games/", ignoreCase = true) ||
+                url.contains("/products/", ignoreCase = true) ||
+                nowInLaunch
 
             val detectedBookmark = if (isGamePage) {
                 com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
                     rawTitle = null,
                     rawUrl = url,
-                    markAsLastPlayed = true
+                    markAsLastPlayed = nowInLaunch
                 )
             } else null
 

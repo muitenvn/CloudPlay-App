@@ -324,11 +324,15 @@ fun CloudBrowserScreen(
                     "Giữ nguyên lastXboxUrl ở CLASSIC ($prevLastSafe), bỏ qua ghi đè từ redirect giao diện mới: $newSafePath (ua=$uaMode)"
                 )
             }
-            if (targetUrl.contains("/play/games/") || targetUrl.contains("/play/launch/")) {
+            val isLaunchUrl = targetUrl.contains("/play/launch/", ignoreCase = true) ||
+                targetUrl.contains("/launch/", ignoreCase = true)
+            val isGameInfoUrl = targetUrl.contains("/play/games/", ignoreCase = true) ||
+                targetUrl.contains("/products/", ignoreCase = true)
+            if (isLaunchUrl || isGameInfoUrl) {
                 com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
                     rawTitle = webViewInstance?.title,
                     rawUrl = targetUrl,
-                    markAsLastPlayed = true
+                    markAsLastPlayed = isLaunchUrl
                 )
             }
         }
@@ -1468,6 +1472,28 @@ fun CloudBrowserScreen(
             },
             onToggleRecording = {
                 com.example.cloudplay.ZeroLagScreenRecorder.toggleRecording(context, webViewInstance)
+            },
+            xboxWebUiMode = config.xboxWebUiMode,
+            onSelectXboxWebUiMode = { uiMode ->
+                val rawCur = webViewInstance?.url ?: currentMainFrameUrl.ifBlank { lastXboxUrl }
+                SettingsRepository.updateXboxWebUiMode(uiMode)
+                val target = SettingsRepository.formatXboxUrlWithLocale(
+                    rawCur.ifBlank { config.targetRegionUrl },
+                    effectiveLocale,
+                    uiMode
+                )
+                pendingAppNavReason = "chuyển nhanh Giao diện web Xbox (${uiMode.name})"
+                com.example.data.AppLogger.info(
+                    "WEB-UI",
+                    "Chuyển nhanh Giao diện web Xbox: chế độ=${uiMode.name} | từ=${com.example.data.AppLogger.safeUrlHostPath(rawCur)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(target)}"
+                )
+                webViewInstance?.loadUrl(target)
+                val toastMsg = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                    config.tr("Đã chuyển sang Giao diện cũ (xbox.com/play)", "Switched to Classic UI (xbox.com/play)")
+                } else {
+                    config.tr("Đã chuyển sang Giao diện mới (play.xbox.com)", "Switched to New UI (play.xbox.com)")
+                }
+                android.widget.Toast.makeText(context, toastMsg, android.widget.Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -2250,7 +2276,9 @@ private fun IsolatedFloatingHud(
     videoTopRatio: Float,
     lowEndDeviceMode: Boolean,
     onSelectFortniteControlMode: (Boolean) -> Unit,
-    onToggleRecording: () -> Unit
+    onToggleRecording: () -> Unit,
+    xboxWebUiMode: com.example.data.XboxWebUiMode = com.example.data.XboxWebUiMode.CLASSIC,
+    onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {}
 ) {
     val vpnState by VpnManager.state.collectAsState()
     val translationInfo by XboxBridge.translationInfo.collectAsState()
@@ -2291,7 +2319,9 @@ private fun IsolatedFloatingHud(
         lowEndDeviceMode = lowEndDeviceMode,
         onSelectFortniteControlMode = onSelectFortniteControlMode,
         recorderState = recorderState,
-        onToggleRecording = onToggleRecording
+        onToggleRecording = onToggleRecording,
+        xboxWebUiMode = xboxWebUiMode,
+        onSelectXboxWebUiMode = onSelectXboxWebUiMode
     )
 }
 

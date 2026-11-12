@@ -156,6 +156,8 @@ fun FloatingHud(
     onSelectFortniteControlMode: (Boolean) -> Unit = {},
     recorderState: com.example.cloudplay.ScreenRecorderState = com.example.cloudplay.ScreenRecorderState(),
     onToggleRecording: () -> Unit = {},
+    xboxWebUiMode: com.example.data.XboxWebUiMode = com.example.data.XboxWebUiMode.CLASSIC,
+    onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -1311,6 +1313,97 @@ fun FloatingHud(
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1
                                         )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Chuyển nhanh Giao diện cũ (xbox.com/play) ⇄ Giao diện mới (play.xbox.com)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("hud_web_ui_mode_switcher"),
+                            shape = RoundedCornerShape(10.dp),
+                            color = XboxSurface,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = config.tr("Giao diện web Xbox", "Xbox Web UI"),
+                                        color = TextSecondary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                            "xbox.com/play"
+                                        } else {
+                                            "play.xbox.com"
+                                        },
+                                        color = XboxNeonGreen,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
+                                        val selected = xboxWebUiMode == uiMode
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 40.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable {
+                                                    markUserInteraction()
+                                                    onSelectXboxWebUiMode(uiMode)
+                                                }
+                                                .testTag("hud_ui_mode_${uiMode.name.lowercase()}"),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (selected) Color(0xFF16352A) else XboxSurfaceVariant,
+                                            border = androidx.compose.foundation.BorderStroke(
+                                                1.dp,
+                                                if (selected) XboxNeonGreen else XboxCardBorder
+                                            )
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                                        config.tr("Giao diện cũ", "Classic UI")
+                                                    } else {
+                                                        config.tr("Giao diện mới", "New UI")
+                                                    },
+                                                    color = if (selected) XboxNeonGreen else TextPrimary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1
+                                                )
+                                                Text(
+                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                                                        config.tr("Ổn định ở VN", "Stable")
+                                                    } else {
+                                                        config.tr("Mỹ/Nhật/VPN", "Preview")
+                                                    },
+                                                    color = TextSecondary,
+                                                    fontSize = 9.5.sp,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

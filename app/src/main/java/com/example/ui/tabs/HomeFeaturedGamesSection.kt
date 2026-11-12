@@ -80,132 +80,375 @@ internal fun FeaturedGamesSection(
     featuredGames: List<GameBookmark>,
     favoriteIds: Set<String>,
     lastPlayedGame: GameBookmark?,
-    @Suppress("UNUSED_PARAMETER") recentGames: List<GameBookmark> = emptyList(),
+    recentGames: List<GameBookmark> = emptyList(),
     onLaunchBookmark: (GameBookmark) -> Unit,
     onToggleFavorite: (GameBookmark) -> Unit,
-    onNavigateToLibrary: () -> Unit
+    onNavigateToLibrary: () -> Unit,
+    onRemovePlayedGame: (GameBookmark) -> Unit = {},
+    onClearPlayedGames: () -> Unit = {}
 ) {
     val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val context = LocalContext.current
 
-    val continueGame = lastPlayedGame ?: featuredGames.firstOrNull()
+    val orderedPlayedGames = remember(lastPlayedGame, recentGames) {
+        val list = ArrayList<GameBookmark>()
+        val seen = HashSet<String>()
+        if (lastPlayedGame != null && seen.add(lastPlayedGame.id.lowercase())) {
+            list.add(lastPlayedGame)
+        }
+        for (g in recentGames) {
+            if (seen.add(g.id.lowercase())) {
+                list.add(g)
+            }
+        }
+        list.toList()
+    }
+    val primaryContinueGame = orderedPlayedGames.firstOrNull()
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // 1. Thẻ "Chơi tiếp" (Continue card) với ảnh vuông bên trái + tên game ở giữa + nút "Tiếp" bên phải
-        if (continueGame != null) {
-            var thumbLoaded by remember(continueGame.id, continueGame.imageUrl) { mutableStateOf(false) }
+        // 1. Mục "Tiếp tục chơi" — danh sách riêng các game đã thực sự chơi trên Xbox (tự nhận diện từ đường link)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("home_continue_playing_section"),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(QUICK_RESUME_SHAPE)
-                    .background(XboxSurface, QUICK_RESUME_SHAPE)
-                    .border(1.dp, XboxCardBorder, QUICK_RESUME_SHAPE)
-                    .clickable { onLaunchBookmark(continueGame) }
-                    .padding(10.dp)
-                    .testTag("continue_last_game_button"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(QUICK_RESUME_ICON_SHAPE)
-                        .background(Color(0xFF1F4E5F), QUICK_RESUME_ICON_SHAPE)
-                        .border(1.dp, XboxCardBorder, QUICK_RESUME_ICON_SHAPE),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (!thumbLoaded) {
-                        Text(
-                            text = continueGame.monogram,
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                    if (!continueGame.imageUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = remember(continueGame.imageUrl) {
-                                ImageRequest.Builder(context)
-                                    .data(continueGame.imageUrl)
-                                    .size(160, 160)
-                                    .allowRgb565(true)
-                                    .crossfade(false)
-                                    .build()
-                            },
-                            contentDescription = continueGame.title,
-                            contentScale = ContentScale.Crop,
-                            onSuccess = { thumbLoaded = true },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else if (continueGame.drawableResId != null) {
-                        Image(
-                            painter = painterResource(id = continueGame.drawableResId),
-                            contentDescription = continueGame.title,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = if (lastPlayedGame != null) {
-                            config.tr("Chơi tiếp", "Continue playing")
-                        } else {
-                            config.tr("Vào nhanh", "Quick launch")
-                        },
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = continueGame.title,
+                        text = config.tr("Tiếp tục chơi", "Continue Playing"),
                         color = TextPrimary,
                         fontFamily = SpaceGroteskFontFamily,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 1
                     )
-                    Text(
-                        text = continueGame.localizedCategory(isEn),
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(GAME_BADGE_SHAPE)
+                            .background(
+                                if (orderedPlayedGames.isNotEmpty()) Color(0xFF16352A) else XboxSurfaceVariant,
+                                GAME_BADGE_SHAPE
+                            )
+                            .border(
+                                1.dp,
+                                if (orderedPlayedGames.isNotEmpty()) XboxNeonGreen else XboxCardBorder,
+                                GAME_BADGE_SHAPE
+                            )
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (orderedPlayedGames.isNotEmpty()) {
+                                "${orderedPlayedGames.size} game"
+                            } else {
+                                config.tr("Tự nhận diện link", "Auto-detect URL")
+                            },
+                            color = if (orderedPlayedGames.isNotEmpty()) XboxNeonGreen else TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
 
+                if (orderedPlayedGames.isNotEmpty()) {
+                    Text(
+                        text = config.tr("Xóa danh sách", "Clear list"),
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(VIEW_ALL_SHAPE)
+                            .clickable { onClearPlayedGames() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("clear_played_games_button")
+                    )
+                }
+            }
+
+            if (primaryContinueGame != null) {
+                // Thẻ nổi bật của game vừa chơi gần nhất trên Xbox
+                var thumbLoaded by remember(primaryContinueGame.id, primaryContinueGame.imageUrl) { mutableStateOf(false) }
                 Row(
                     modifier = Modifier
-                        .defaultMinSize(minHeight = 40.dp)
-                        .clip(RECENT_CHIP_SHAPE)
-                        .background(XboxNeonGreen, RECENT_CHIP_SHAPE)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .fillMaxWidth()
+                        .clip(QUICK_RESUME_SHAPE)
+                        .background(XboxSurface, QUICK_RESUME_SHAPE)
+                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.65f), QUICK_RESUME_SHAPE)
+                        .clickable { onLaunchBookmark(primaryContinueGame) }
+                        .padding(10.dp)
+                        .testTag("continue_last_game_button"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color(0xFF03140B),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = config.tr("Tiếp", "Play"),
-                        color = Color(0xFF03140B),
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(QUICK_RESUME_ICON_SHAPE)
+                            .background(Color(0xFF1F4E5F), QUICK_RESUME_ICON_SHAPE)
+                            .border(1.dp, XboxCardBorder, QUICK_RESUME_ICON_SHAPE),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!thumbLoaded) {
+                            Text(
+                                text = primaryContinueGame.monogram,
+                                color = TextPrimary,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        if (!primaryContinueGame.imageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = remember(primaryContinueGame.imageUrl) {
+                                    ImageRequest.Builder(context)
+                                        .data(primaryContinueGame.imageUrl)
+                                        .size(160, 160)
+                                        .allowRgb565(true)
+                                        .crossfade(false)
+                                        .build()
+                                },
+                                contentDescription = primaryContinueGame.title,
+                                contentScale = ContentScale.Crop,
+                                onSuccess = { thumbLoaded = true },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else if (primaryContinueGame.drawableResId != null) {
+                            Image(
+                                painter = painterResource(id = primaryContinueGame.drawableResId),
+                                contentDescription = primaryContinueGame.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = config.tr(
+                                "Đang chơi gần nhất • Tự nhận diện trên Xbox",
+                                "Last played • Auto-detected on Xbox"
+                            ),
+                            color = XboxNeonGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = primaryContinueGame.title,
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = primaryContinueGame.localizedCategory(isEn),
+                            color = TextSecondary,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = 40.dp)
+                            .clip(RECENT_CHIP_SHAPE)
+                            .background(XboxNeonGreen, RECENT_CHIP_SHAPE)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFF03140B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = config.tr("Chơi tiếp", "Resume"),
+                            color = Color(0xFF03140B),
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
+                // Danh sách riêng các game đã chơi (hiển thị đầy đủ cả khi có từ 1 game trở lên)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("home_continue_playing_list")
+                ) {
+                    items(orderedPlayedGames, key = { "played_${it.id}" }) { playedGame ->
+                        var itemThumbLoaded by remember(playedGame.id, playedGame.imageUrl) { mutableStateOf(false) }
+                        val isLatest = playedGame.id.equals(primaryContinueGame.id, ignoreCase = true)
+                        Row(
+                            modifier = Modifier
+                                .width(228.dp)
+                                .clip(QUICK_RESUME_SHAPE)
+                                .background(
+                                    if (isLatest) Color(0xFF102119) else XboxSurfaceVariant,
+                                    QUICK_RESUME_SHAPE
+                                )
+                                .border(
+                                    1.dp,
+                                    if (isLatest) XboxNeonGreen.copy(alpha = 0.5f) else XboxCardBorder,
+                                    QUICK_RESUME_SHAPE
+                                )
+                                .clickable { onLaunchBookmark(playedGame) }
+                                .padding(8.dp)
+                                .testTag("continue_played_item_${playedGame.id}"),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .clip(QUICK_RESUME_ICON_SHAPE)
+                                    .background(Color(0xFF1F4E5F), QUICK_RESUME_ICON_SHAPE)
+                                    .border(1.dp, XboxCardBorder, QUICK_RESUME_ICON_SHAPE),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!itemThumbLoaded) {
+                                    Text(
+                                        text = playedGame.monogram,
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                if (!playedGame.imageUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = remember(playedGame.imageUrl) {
+                                            ImageRequest.Builder(context)
+                                                .data(playedGame.imageUrl)
+                                                .size(120, 120)
+                                                .allowRgb565(true)
+                                                .crossfade(false)
+                                                .build()
+                                        },
+                                        contentDescription = playedGame.title,
+                                        contentScale = ContentScale.Crop,
+                                        onSuccess = { itemThumbLoaded = true },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(1.dp)
+                            ) {
+                                Text(
+                                    text = playedGame.title,
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (isLatest) {
+                                        config.tr("Vừa chơi gần nhất", "Most recent")
+                                    } else {
+                                        config.tr("Đã chơi trên Xbox", "Played on Xbox")
+                                    },
+                                    color = if (isLatest) XboxNeonGreen else TextSecondary,
+                                    fontSize = 10.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF0D1511), CircleShape)
+                                    .border(1.dp, XboxCardBorder, CircleShape)
+                                    .clickable { onRemovePlayedGame(playedGame) }
+                                    .testTag("remove_played_${playedGame.id}"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "×",
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Trạng thái khi chưa có game nào được chơi thật trên Xbox
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(QUICK_RESUME_SHAPE)
+                        .background(XboxSurface, QUICK_RESUME_SHAPE)
+                        .border(1.dp, XboxCardBorder, QUICK_RESUME_SHAPE)
+                        .padding(12.dp)
+                        .testTag("continue_playing_empty_card"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(QUICK_RESUME_ICON_SHAPE)
+                            .background(Color(0xFF142019), QUICK_RESUME_ICON_SHAPE)
+                            .border(1.dp, XboxCardBorder, QUICK_RESUME_ICON_SHAPE),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Gamepad,
+                            contentDescription = null,
+                            tint = XboxNeonGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = config.tr("Chưa có game trong Tiếp tục chơi", "No games in Continue Playing yet"),
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = config.tr(
+                                "Khi bạn vào Xbox và thực sự khởi chạy một game, ứng dụng sẽ tự lấy thông tin từ đường link và ghi vào danh sách này.",
+                                "When you enter Xbox and actually launch a game stream, the app automatically reads the URL and adds it here."
+                            ),
+                            color = TextSecondary,
+                            fontSize = 11.5.sp,
+                            lineHeight = 15.sp
+                        )
+                    }
                 }
             }
         }

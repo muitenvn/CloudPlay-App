@@ -66,15 +66,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-private val TermsBg = Color(0xFF0B1412)
-private val TermsSurface = Color(0xFF121E1B)
-private val TermsCardBg = Color(0xFF162420)
-private val TermsLine = Color(0xFF24352F)
-private val TermsInk = Color(0xFFE8F1EE)
-private val TermsMuted = Color(0xFF9DB2AB)
-private val TermsAccent = Color(0xFF3CCF91)
-private val TermsOnAccent = Color(0xFF05281A)
-private val TermsSoft = Color(0xFF17261F)
+private val TermsBg = Color(0xFF0D1511)
+private val TermsSurface = Color(0xFF142019)
+private val TermsCardBg = Color(0xFF142019)
+private val TermsLine = Color(0xFF1C2C24)
+private val TermsInk = Color(0xFFF3F8F5)
+private val TermsMuted = Color(0xFFA2B5AC)
+private val TermsAccent = Color(0xFF27D884)
+private val TermsOnAccent = Color(0xFF03140B)
+private val TermsSoft = Color(0xFF16352A)
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable

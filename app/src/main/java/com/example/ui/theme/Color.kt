@@ -2,16 +2,16 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Xbox Cloud Clean Flat Dark-Green Palette
+// Xbox Cloud Clean Flat Dark-Green Palette (Bản 4: phân tầng bằng nền, màu theo vai trò, bớt viền)
 val XboxGreen = Color(0xFF107C10)
-val XboxNeonGreen = Color(0xFF1FE27F)
+val XboxNeonGreen = Color(0xFF27D884)
 val XboxGreenLight = Color(0xFF3CCF91)
-val XboxDark = Color(0xFF060A08)
-val XboxSurface = Color(0xFF0C1410)
-val XboxSurfaceVariant = Color(0xFF132019)
-val XboxSurfaceElevated = Color(0xFF172823)
-val XboxCardBorder = Color(0xFF233B2E)
-val XboxCardBorderHighlight = Color(0xFF325943)
+val XboxDark = Color(0xFF070B09)
+val XboxSurface = Color(0xFF0D1511)
+val XboxSurfaceVariant = Color(0xFF142019)
+val XboxSurfaceElevated = Color(0xFF16352A)
+val XboxCardBorder = Color(0xFF1C2C24)
+val XboxCardBorderHighlight = Color(0xFF27D884)
 
 val JapanRed = Color(0xFFF0706B)
 val DirectCyan = Color(0xFF3FD8EE)
@@ -24,7 +24,7 @@ val GoldStar = Color(0xFFE3B341)
 
 val TextPrimary = Color(0xFFF4F9F6)
 val TextSecondary = Color(0xFFA5B8AE)
-val TextTertiary = Color(0xFF6F8780)
+val TextTertiary = Color(0xFF6B8177)
 
 // High-end glassmorphism & glow tokens (UI 3.0 Cyber-Console)
 val XboxGlassSurface = Color(0xE60B130F)

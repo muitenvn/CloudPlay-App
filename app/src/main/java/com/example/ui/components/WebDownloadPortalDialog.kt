@@ -131,19 +131,13 @@ fun WebDownloadPortalDialog(
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.88f)
                 .clip(RoundedCornerShape(22.dp))
-                .border(
-                    1.2.dp,
-                    Brush.linearGradient(listOf(XboxNeonGreen, DirectCyan)),
-                    RoundedCornerShape(22.dp)
-                )
                 .testTag("web_download_portal_dialog"),
-            color = XboxDark
+            color = XboxSurfaceVariant
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
                 Surface(
-                    color = XboxSurface,
-                    border = androidx.compose.foundation.BorderStroke(0.8.dp, XboxCardBorder)
+                    color = XboxSurfaceVariant
                 ) {
                     Row(
                         modifier = Modifier
@@ -478,13 +472,17 @@ fun WebDownloadPortalDialog(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .testTag("share_apk_portal_btn"),
-                                                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                                                shape = RoundedCornerShape(10.dp)
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = XboxNeonGreen,
+                                                    contentColor = Color(0xFF03140B)
+                                                ),
+                                                shape = RoundedCornerShape(12.dp)
                                             ) {
-                                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF03140B), modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.size(6.dp))
                                                 Text(
-                                                    text = config.tr("Chia sẻ Link", "Share Link"),
+                                                    text = config.tr("Chia sẻ đường dẫn", "Share Link"),
+                                                    color = Color(0xFF03140B),
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )

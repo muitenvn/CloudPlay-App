@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -239,13 +240,14 @@ internal fun CustomProxyDialog(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant)
+                        .defaultMinSize(minHeight = 46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = XboxSurface)
                 ) {
                     if (isTesting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), color = XboxNeonGreen, strokeWidth = 2.dp)
                     } else {
-                        Text(if (isEn) "Test Connection" else "Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 12.5.sp)
+                        Text(if (isEn) "Test Connection" else "Kiểm tra kết nối", color = XboxNeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -284,21 +286,26 @@ internal fun CustomProxyDialog(
                     onAddServer(server)
                 },
                 enabled = trimmedHost.isNotBlank() && !isPrivateIp,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XboxNeonGreen,
+                    contentColor = androidx.compose.ui.graphics.Color(0xFF03140B)
+                )
             ) {
-                Text(if (isEn) "Save & Use" else "Lưu & Sử Dụng", fontSize = 12.5.sp)
+                Text(if (isEn) "Save & Use" else "Lưu và dùng", color = androidx.compose.ui.graphics.Color(0xFF03140B), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
             ) {
-                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontSize = 12.5.sp)
+                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         },
-        containerColor = XboxSurface
+        shape = RoundedCornerShape(22.dp),
+        containerColor = XboxSurfaceVariant
     )
 }
 
@@ -329,7 +336,7 @@ internal fun ServerDetailDialog(
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 17.sp
             )
         },
         text = {
@@ -338,40 +345,46 @@ internal fun ServerDetailDialog(
                     text = "${if (isEn) "Address & Port" else "Địa chỉ & Cổng"}: ${server.ip}:${server.port} (${server.protocol.uppercase()})",
                     color = TextPrimary,
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 12.sp
+                    fontSize = 12.5.sp
                 )
                 Text(
                     text = "${if (isEn) "Measured Latency" else "Độ trễ đo thực tế"}: $detailBadge",
                     color = XboxNeonGreen,
                     fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "${if (isEn) "Region Unlock Status" else "Trạng thái mở khóa vùng"}: $unlockText",
                     color = TextSecondary,
-                    fontSize = 12.sp
+                    fontSize = 12.5.sp
                 )
                 Text(
                     text = "${if (isEn) "Check Status" else "Trạng thái kiểm tra"}: ${server.localizedSafetyBadge(isEn)}",
                     color = TextSecondary,
-                    fontSize = 12.sp
+                    fontSize = 12.5.sp
                 )
                 Text(
                     text = "${if (isEn) "Description" else "Mô tả"}: ${server.localizedDescription(isEn)}",
                     color = TextSecondary,
-                    fontSize = 12.sp
+                    fontSize = 12.5.sp
                 )
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XboxNeonGreen,
+                    contentColor = androidx.compose.ui.graphics.Color(0xFF03140B)
+                )
             ) {
-                Text(config.tr("Đóng", "Close"), color = XboxNeonGreen, fontSize = 12.5.sp)
+                Text(config.tr("Đóng", "Close"), color = androidx.compose.ui.graphics.Color(0xFF03140B), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         },
-        containerColor = XboxSurface
+        shape = RoundedCornerShape(22.dp),
+        containerColor = XboxSurfaceVariant
     )
 }

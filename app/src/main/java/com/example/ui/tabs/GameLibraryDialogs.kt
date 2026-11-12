@@ -149,52 +149,57 @@ internal fun XboxGameDetailDialog(
                     }
                 }
 
-                Row(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(8.dp),
+                    color = XboxSurface
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = XboxSurfaceVariant,
-                        border = androidx.compose.foundation.BorderStroke(0.7.dp, GoldStar.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "★ ${game.rating}",
-                            color = GoldStar,
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = XboxSurfaceVariant,
-                        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder)
-                    ) {
-                        Text(
-                            text = game.localizedCategory(isEn),
-                            color = TextPrimary,
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    if (productId.isNotBlank()) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = DirectCyan.copy(alpha = 0.12f),
-                            border = androidx.compose.foundation.BorderStroke(0.7.dp, DirectCyan.copy(alpha = 0.45f))
+                            color = Color(0xFF2E2408)
                         ) {
                             Text(
-                                text = "ID: $productId",
-                                color = DirectCyan,
+                                text = "★ ${game.rating}",
+                                color = GoldStar,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 9.5.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = XboxSurfaceVariant
+                        ) {
+                            Text(
+                                text = game.localizedCategory(isEn),
+                                color = TextPrimary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        if (productId.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = DirectCyan.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    text = "ID: $productId",
+                                    color = DirectCyan,
+                                    fontFamily = JetBrainsMonoFontFamily,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -206,7 +211,7 @@ internal fun XboxGameDetailDialog(
                         "Tựa game chính thức liên kết trực tiếp từ máy chủ Microsoft Xbox Cloud Gaming. Hỗ trợ chơi ngay trên đám mây không cần tải về."
                     },
                     color = TextSecondary,
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     maxLines = 5,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -215,14 +220,18 @@ internal fun XboxGameDetailDialog(
         confirmButton = {
             Button(
                 onClick = onPlay,
-                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XboxNeonGreen,
+                    contentColor = Color(0xFF03140B)
+                )
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF03140B), modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = config.tr("Chơi trên Xbox Cloud", "Play on Xbox Cloud"),
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold
+                    text = config.tr("Chơi ngay", "Play now"),
+                    color = Color(0xFF03140B),
+                    fontWeight = FontWeight.Bold
                 )
             }
         },
@@ -235,15 +244,17 @@ internal fun XboxGameDetailDialog(
                         } else {
                             config.tr("♡ Yêu thích", "♡ Favorite")
                         },
-                        color = if (isFavorite) JapanRed else XboxNeonGreen
+                        color = if (isFavorite) JapanRed else XboxNeonGreen,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 TextButton(onClick = onDismiss) {
-                    Text(config.tr("Đóng", "Close"), color = TextSecondary)
+                    Text(config.tr("Đóng", "Close"), color = TextSecondary, fontWeight = FontWeight.Bold)
                 }
             }
         },
-        containerColor = XboxSurface
+        shape = RoundedCornerShape(22.dp),
+        containerColor = XboxSurfaceVariant
     )
 }
 
@@ -264,23 +275,23 @@ internal fun AddGameDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (isEn) "Link / Add Xbox Cloud Game" else "Liên Kết / Thêm Game Xbox Cloud",
+                text = if (isEn) "Add Xbox Cloud Game" else "Thêm game vào thư viện",
                 color = TextPrimary,
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 17.sp
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (isEn) {
-                        "Type any game name to fetch game info & link from Microsoft Xbox Store (metadata only, no image downloads to save 4G/Wi-Fi data)."
+                        "Type a game name to search on Xbox Store or paste a game URL."
                     } else {
-                        "Gõ tên game bất kỳ rồi bấm 'Tìm Xbox' để tự động lấy thông tin và link chuẩn từ Microsoft (chỉ tải thông tin game, không tải ảnh để tiết kiệm 4G/Wi-Fi)."
+                        "Gõ tên game rồi bấm Tìm trên Xbox để tự lấy đường dẫn, hoặc dán đường dẫn có sẵn."
                     },
                     color = TextSecondary,
-                    fontSize = 11.5.sp
+                    fontSize = 12.5.sp
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -291,11 +302,14 @@ internal fun AddGameDialog(
                         value = title,
                         onValueChange = { title = it },
                         modifier = Modifier.weight(1f),
-                        label = { Text(if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên Game (VD: Black Ops 6)") },
+                        label = { Text(if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên game (VD: Black Ops 6)") },
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = XboxNeonGreen,
                             unfocusedBorderColor = XboxCardBorder,
+                            focusedContainerColor = XboxSurface,
+                            unfocusedContainerColor = XboxSurface,
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         )
@@ -313,40 +327,42 @@ internal fun AddGameDialog(
                             }
                         },
                         enabled = !isSearchingLiveXbox && title.trim().length >= 2,
-                        colors = ButtonDefaults.buttonColors(containerColor = DirectCyan.copy(alpha = 0.2f)),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 12.dp),
-                        shape = RoundedCornerShape(10.dp)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = XboxSurface,
+                            contentColor = XboxNeonGreen
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
-                            text = if (isSearchingLiveXbox) "..." else if (isEn) "Find Xbox" else "Tìm Xbox",
-                            color = DirectCyan,
+                            text = if (isSearchingLiveXbox) "..." else if (isEn) "Find Xbox" else "Tìm trên Xbox",
+                            color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 11.sp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
                 }
 
                 if (liveResults.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = if (isEn) "Imported from Microsoft Xbox Store (tap to launch):" else "Đã tự động thêm từ Microsoft Xbox Store (chạm để chơi ngay):",
+                            text = if (isEn) "Found on Xbox Store (tap to launch):" else "Đã tìm thấy trên Xbox Store (chạm để mở ngay):",
                             color = XboxNeonGreen,
-                            fontSize = 10.5.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                         liveResults.forEach { item ->
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = XboxSurfaceVariant,
-                                border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder),
+                                shape = RoundedCornerShape(12.dp),
+                                color = XboxSurface,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .clickable { onLaunchDirect(item) }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -355,7 +371,7 @@ internal fun AddGameDialog(
                                             text = item.title,
                                             color = TextPrimary,
                                             fontFamily = SpaceGroteskFontFamily,
-                                            fontSize = 12.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -363,16 +379,16 @@ internal fun AddGameDialog(
                                         Text(
                                             text = item.publisher ?: item.localizedCategory(isEn),
                                             color = TextSecondary,
-                                            fontSize = 10.sp,
+                                            fontSize = 11.sp,
                                             maxLines = 1
                                         )
                                     }
                                     Text(
-                                        text = if (isEn) "PLAY ▶" else "CHƠI ▶",
+                                        text = if (isEn) "Play ▶" else "Chơi ▶",
                                         color = XboxNeonGreen,
                                         fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.ExtraBold
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
@@ -383,11 +399,15 @@ internal fun AddGameDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text(if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud URL") },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud") },
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = XboxNeonGreen,
                         unfocusedBorderColor = XboxCardBorder,
+                        focusedContainerColor = XboxSurface,
+                        unfocusedContainerColor = XboxSurface,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary
                     )
@@ -401,16 +421,21 @@ internal fun AddGameDialog(
                         onAdd(title.trim(), url.trim())
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XboxNeonGreen,
+                    contentColor = Color(0xFF03140B)
+                )
             ) {
-                Text(if (isEn) "Add Game" else "Thêm Game", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (isEn) "Add Game" else "Thêm game", color = Color(0xFF03140B), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary)
+                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontWeight = FontWeight.Bold)
             }
         },
-        containerColor = XboxSurface
+        shape = RoundedCornerShape(22.dp),
+        containerColor = XboxSurfaceVariant
     )
 }

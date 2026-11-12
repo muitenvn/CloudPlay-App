@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,21 +14,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.data.GameLibraryRepository
 import com.example.data.PlaySessionRecord
 import com.example.data.SessionHistoryRepository
@@ -53,7 +55,6 @@ import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
@@ -63,7 +64,8 @@ import com.example.ui.theme.xboxPressScale
 private enum class HistoryFilterMode {
     ALL,
     SMOOTH,
-    ALERTS
+    ALERTS,
+    THIS_WEEK
 }
 
 @Composable
@@ -84,11 +86,16 @@ fun SessionHistoryScreen(
     var showClearConfirmDialog by remember { mutableStateOf(false) }
     var filterMode by remember { mutableStateOf(HistoryFilterMode.ALL) }
 
-    val filteredSessions = remember(sessions, filterMode) {
+    val oneWeekAgoMs = remember(sessions) {
+        System.currentTimeMillis() - 7L * 24L * 3600L * 1000L
+    }
+
+    val filteredSessions = remember(sessions, filterMode, oneWeekAgoMs) {
         when (filterMode) {
             HistoryFilterMode.ALL -> sessions
             HistoryFilterMode.SMOOTH -> sessions.filter { it.avgFps >= 55 && !it.isSlowDecode && !it.isThermalHot }
             HistoryFilterMode.ALERTS -> sessions.filter { it.isSlowDecode || it.isThermalHot || it.avgPingMs > 110 }
+            HistoryFilterMode.THIS_WEEK -> sessions.filter { it.startTimeMillis >= oneWeekAgoMs }
         }
     }
 
@@ -106,17 +113,12 @@ fun SessionHistoryScreen(
         }
     }
 
-    val oneWeekAgoMs = remember(sessions) {
-        System.currentTimeMillis() - 7L * 24L * 3600L * 1000L
+    val totalSessionsCount = filteredSessions.size
+    val totalDurationSeconds = remember(filteredSessions) {
+        filteredSessions.sumOf { it.durationSeconds }
     }
-    val weeklySessions = remember(sessions, oneWeekAgoMs) {
-        sessions.filter { it.startTimeMillis >= oneWeekAgoMs }
-    }
-    val weeklyTotalSeconds = remember(weeklySessions) {
-        weeklySessions.sumOf { it.durationSeconds }
-    }
-    val weeklyAvgPing = remember(weeklySessions) {
-        val valid = weeklySessions.filter { it.avgPingMs > 0 }
+    val weeklyAvgPing = remember(filteredSessions) {
+        val valid = filteredSessions.filter { it.avgPingMs > 0 }
         if (valid.isNotEmpty()) valid.sumOf { it.avgPingMs } / valid.size else 0
     }
 
@@ -128,67 +130,57 @@ fun SessionHistoryScreen(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // 1. Thẻ tổng quan "Tuần này"
+        // 1. 2 ô tổng quan (Số phiên | Tổng thời gian) chuẩn #libHist
         WeeklySummaryCard(
-            totalDurationSec = weeklyTotalSeconds,
-            sessionCount = weeklySessions.size,
+            totalDurationSec = totalDurationSeconds,
+            sessionCount = totalSessionsCount,
             avgPingMs = weeklyAvgPing,
             hasAnyHistory = sessions.isNotEmpty(),
             isEn = isEn,
             onClearAllClick = { showClearConfirmDialog = true }
         )
 
-        // Bộ lọc nhanh khi có lịch sử
-        if (sessions.isNotEmpty()) {
-            val smoothCount = remember(sessions) {
-                sessions.count { it.avgFps >= 55 && !it.isSlowDecode && !it.isThermalHot }
-            }
-            val alertCount = remember(sessions) {
-                sessions.count { it.isSlowDecode || it.isThermalHot || it.avgPingMs > 110 }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val filterItems = listOf(
-                    HistoryFilterMode.ALL to (if (isEn) "All (${sessions.size})" else "Tất cả (${sessions.size})"),
-                    HistoryFilterMode.SMOOTH to (if (isEn) "Smooth ($smoothCount)" else "Mượt ($smoothCount)"),
-                    HistoryFilterMode.ALERTS to (if (isEn) "Alerts ($alertCount)" else "Cần lưu ý ($alertCount)")
+        // 2. Hàng chip lọc: Tất cả, Mượt, Cần lưu ý, Tuần này
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val filterItems = listOf(
+                HistoryFilterMode.ALL to (if (isEn) "All" else "Tất cả"),
+                HistoryFilterMode.SMOOTH to (if (isEn) "Smooth" else "Mượt"),
+                HistoryFilterMode.ALERTS to (if (isEn) "Needs Attention" else "Cần lưu ý"),
+                HistoryFilterMode.THIS_WEEK to (if (isEn) "This Week" else "Tuần này")
+            )
+            filterItems.forEach { (mode, label) ->
+                val isSelected = filterMode == mode
+                val filterChipBg by animateColorAsState(
+                    targetValue = if (isSelected) Color(0xFF16352A) else XboxSurface,
+                    animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
+                    label = "history_filter_bg"
                 )
-                filterItems.forEach { (mode, label) ->
-                    val isSelected = filterMode == mode
-                    val filterChipBg by animateColorAsState(
-                        targetValue = if (isSelected) XboxGreen.copy(alpha = 0.28f) else XboxSurfaceVariant.copy(alpha = 0.85f),
-                        animationSpec = tween(durationMillis = if (motionEnabled) 150 else 0),
-                        label = "history_filter_bg"
-                    )
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable { filterMode = mode }
-                            .testTag("history_filter_${mode.name.lowercase()}"),
-                        shape = RoundedCornerShape(10.dp),
-                        color = filterChipBg,
-                        border = BorderStroke(
-                            0.9.dp,
-                            if (isSelected) XboxNeonGreen else XboxCardBorder
-                        )
+                Surface(
+                    modifier = Modifier
+                        .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
+                        .clip(CircleShape)
+                        .clickable { filterMode = mode }
+                        .testTag("history_filter_${mode.name.lowercase()}"),
+                    shape = CircleShape,
+                    color = filterChipBg
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 13.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (isSelected) XboxNeonGreen else TextSecondary,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.5.sp,
-                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                maxLines = 1
-                            )
-                        }
+                        Text(
+                            text = label,
+                            color = if (isSelected) XboxNeonGreen else TextSecondary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -199,7 +191,7 @@ fun SessionHistoryScreen(
             SmartSuggestionBanner(text = globalSmartTip)
         }
 
-        // 2. Danh sách phiên chơi hoặc trạng thái trống
+        // 3. Danh sách phiên chơi hoặc trạng thái trống
         if (sessions.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -217,8 +209,7 @@ fun SessionHistoryScreen(
                         modifier = Modifier
                             .size(64.dp)
                             .clip(CircleShape)
-                            .background(XboxSurfaceVariant.copy(alpha = 0.85f))
-                            .border(1.dp, XboxCardBorder, CircleShape),
+                            .background(XboxSurface),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -249,7 +240,7 @@ fun SessionHistoryScreen(
                     .weight(1f)
                     .testTag("session_history_list"),
                 contentPadding = PaddingValues(bottom = 84.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(filteredSessions, key = { it.id }) { session ->
                     val matchedBookmark = remember(session.gameTitle, allGames) {
@@ -271,6 +262,46 @@ fun SessionHistoryScreen(
                             { onLaunchGame(resolvePlayUrlForSession(session)) }
                         } else null
                     )
+                }
+
+                item(key = "clear_all_history_footer") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { showClearConfirmDialog = true }
+                                .testTag("clear_all_history_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            color = XboxSurfaceVariant
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = if (isEn) "Clear All History" else "Xóa tất cả lịch sử",
+                                    color = JapanRed,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = if (isEn) {
+                                "Tap a session to view details and lag diagnosis."
+                            } else {
+                                "Chạm vào một phiên để xem chi tiết và vì sao có lag."
+                            },
+                            color = TextSecondary,
+                            fontSize = 12.5.sp
+                        )
+                    }
                 }
             }
         }
@@ -300,54 +331,83 @@ fun SessionHistoryScreen(
         )
     }
 
-    // Hộp xác nhận xóa tất cả lịch sử
+    // Hộp xác nhận xóa tất cả lịch sử theo khuôn .dlg
     if (showClearConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearConfirmDialog = false },
-            title = {
-                Text(
-                    text = if (isEn) "Clear all history?" else "Xóa tất cả lịch sử?",
-                    color = TextPrimary,
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = if (isEn) {
-                        "All recorded play sessions will be permanently removed."
-                    } else {
-                        "Toàn bộ lịch sử các phiên chơi đã lưu sẽ bị xóa."
-                    },
-                    color = TextSecondary,
-                    fontSize = 12.5.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        SessionHistoryRepository.clearAllSessions()
-                        showClearConfirmDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = JapanRed),
-                    modifier = Modifier.testTag("confirm_clear_history_button")
+        Dialog(onDismissRequest = { showClearConfirmDialog = false }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .testTag("clear_history_confirm_dialog"),
+                shape = RoundedCornerShape(22.dp),
+                color = XboxSurfaceVariant
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = if (isEn) "Delete All" else "Xóa tất cả",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
+                        text = if (isEn) "Clear all history?" else "Xóa tất cả lịch sử?",
+                        color = TextPrimary,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
                     )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearConfirmDialog = false }) {
                     Text(
-                        text = if (isEn) "Cancel" else "Hủy",
-                        color = TextSecondary
+                        text = if (isEn) {
+                            "All recorded play sessions will be permanently removed."
+                        } else {
+                            "Toàn bộ lịch sử các phiên chơi đã lưu sẽ bị xóa."
+                        },
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showClearConfirmDialog = false },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = XboxSurface,
+                                contentColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                        ) {
+                            Text(
+                                text = if (isEn) "Cancel" else "Hủy",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                SessionHistoryRepository.clearAllSessions()
+                                showClearConfirmDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = JapanRed,
+                                contentColor = Color(0xFF2A0A09)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(46.dp)
+                                .testTag("confirm_clear_history_button")
+                        ) {
+                            Text(
+                                text = if (isEn) "Delete All" else "Xóa tất cả",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
                 }
-            },
-            containerColor = XboxSurface
-        )
+            }
+        }
     }
 }

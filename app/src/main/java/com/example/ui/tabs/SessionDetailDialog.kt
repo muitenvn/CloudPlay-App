@@ -103,14 +103,8 @@ internal fun SessionDetailDialog(
                     initialScale = 0.96f
                 )
                 .clip(RoundedCornerShape(22.dp))
-                .border(
-                    1.2.dp,
-                    Brush.verticalGradient(listOf(XboxNeonGreen, DirectCyan, XboxCardBorder)),
-                    RoundedCornerShape(22.dp)
-                )
                 .testTag("session_detail_dialog"),
-            color = XboxDark.copy(alpha = 0.98f),
-            shadowElevation = 16.dp
+            color = XboxSurfaceVariant
         ) {
             Column(
                 modifier = Modifier
@@ -130,14 +124,14 @@ internal fun SessionDetailDialog(
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.Black,
-                            fontSize = 16.sp,
+                            fontSize = 17.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${formatSessionDateTime(session.startTimeMillis)} • ${session.formattedNetworkLabel(isEn)}",
                             color = TextSecondary,
-                            fontSize = 11.sp
+                            fontSize = 12.sp
                         )
                     }
 
@@ -145,15 +139,14 @@ internal fun SessionDetailDialog(
                         onClick = onDismiss,
                         modifier = Modifier
                             .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.12f))
-                            .border(1.dp, XboxCardBorder, CircleShape)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(XboxSurface)
                             .testTag("session_detail_close_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = if (isEn) "Close" else "Đóng",
-                            tint = TextPrimary,
+                            tint = TextSecondary,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -315,8 +308,7 @@ internal fun SessionDetailDialog(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    color = XboxSurfaceVariant.copy(alpha = 0.9f),
-                    border = BorderStroke(1.dp, XboxCardBorder)
+                    color = XboxSurface
                 ) {
                     Column(
                         modifier = Modifier.padding(10.dp),
@@ -513,30 +505,33 @@ internal fun SessionDetailDialog(
                     SmartSuggestionBanner(text = smartTip)
                 }
 
-                // Nút Chơi lại, Xóa phiên và Đóng
+                // Nút Chơi lại, Xóa phiên và Đóng theo khuôn .dlg-btns
                 if (onPlayAgain != null) {
                     Button(
                         onClick = onPlayAgain,
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = XboxNeonGreen,
+                            contentColor = Color(0xFF03140B)
+                        ),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .height(46.dp)
                             .testTag("detail_play_again_button")
                     ) {
                         Icon(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = Color.White,
+                            tint = Color(0xFF03140B),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (isEn) "Play Again: ${session.gameTitle}" else "Chơi lại: ${session.gameTitle}",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF03140B),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -545,17 +540,16 @@ internal fun SessionDetailDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = onDelete,
-                        colors = ButtonDefaults.buttonColors(containerColor = JapanRed.copy(alpha = 0.2f)),
-                        border = BorderStroke(1.dp, JapanRed.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF361B1A)),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
+                            .height(44.dp)
                             .testTag("delete_session_button")
                     ) {
                         Icon(
@@ -566,9 +560,9 @@ internal fun SessionDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = if (isEn) "Delete Session" else "Xóa phiên này",
+                            text = if (isEn) "Delete Session" else "Xóa phiên",
                             color = JapanRed,
-                            fontSize = 12.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -577,18 +571,17 @@ internal fun SessionDetailDialog(
 
                     Button(
                         onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurfaceVariant),
-                        border = BorderStroke(1.dp, XboxCardBorder),
+                        colors = ButtonDefaults.buttonColors(containerColor = XboxSurface),
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp)
+                            .height(44.dp)
                     ) {
                         Text(
                             text = if (isEn) "Close" else "Đóng",
-                            color = Color.White,
-                            fontSize = 12.sp,
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis

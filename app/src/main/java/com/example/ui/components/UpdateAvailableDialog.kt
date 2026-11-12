@@ -81,16 +81,15 @@ fun UpdateAvailableDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .border(1.5.dp, XboxNeonGreen.copy(alpha = 0.65f), RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(22.dp))
                 .testTag("update_available_dialog"),
-            colors = CardDefaults.cardColors(containerColor = XboxSurface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+            colors = CardDefaults.cardColors(containerColor = XboxSurfaceVariant),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
@@ -101,7 +100,7 @@ fun UpdateAvailableDialog(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(XboxNeonGreen.copy(alpha = 0.16f)),
+                            .background(Color(0xFF16352A)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -113,11 +112,11 @@ fun UpdateAvailableDialog(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = config.tr("Đã có phiên bản mới", "New Update Available"),
+                            text = config.tr("Đã có bản cập nhật mới", "New Update Available"),
                             color = TextPrimary,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = if (isEn) {
@@ -127,7 +126,7 @@ fun UpdateAvailableDialog(
                             },
                             color = XboxNeonGreen,
                             fontFamily = JetBrainsMonoFontFamily,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -135,7 +134,7 @@ fun UpdateAvailableDialog(
 
                 if (updateInfo.releaseNotes.isNotBlank()) {
                     Surface(
-                        color = XboxSurfaceVariant.copy(alpha = 0.75f),
+                        color = XboxSurface,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -150,15 +149,15 @@ fun UpdateAvailableDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = config.tr("🤖 Mô tả bản cập nhật (AI)", "🤖 AI Update Summary"),
+                                text = config.tr("Nội dung cập nhật", "What's New"),
                                 color = XboxNeonGreen,
                                 fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = updateInfo.releaseNotes,
                                 color = TextPrimary,
-                                fontSize = 11.5.sp,
+                                fontSize = 12.sp,
                                 lineHeight = 17.sp
                             )
                         }
@@ -451,17 +450,20 @@ fun UpdateAvailableDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("update_dialog_fast_cdn_btn"),
-                        colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = XboxNeonGreen,
+                            contentColor = Color(0xFF03140B)
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(
                             text = if (selectedNodeName != null) {
-                                if (isEn) "⚡ Download via $selectedNodeName (Auto-failover)" else "⚡ Tải qua máy chủ phụ: $selectedNodeName"
+                                if (isEn) "⚡ Download via $selectedNodeName" else "⚡ Tải qua máy chủ phụ: $selectedNodeName"
                             } else {
-                                if (isEn) "⚡ Fast download via mirror (Auto-failover)" else "⚡ Tải nhanh qua máy chủ phụ (Tự đổi khi lỗi)"
+                                if (isEn) "⚡ Fast download via mirror" else "⚡ Tải nhanh qua máy chủ phụ"
                             },
-                            color = Color.White,
-                            fontSize = 12.sp,
+                            color = Color(0xFF03140B),
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }

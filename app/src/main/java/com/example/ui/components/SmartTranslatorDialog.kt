@@ -114,19 +114,12 @@ fun SmartTranslatorDialog(
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.88f)
                 .clip(RoundedCornerShape(22.dp))
-                .border(
-                    1.5.dp,
-                    Brush.verticalGradient(
-                        listOf(XboxNeonGreen.copy(alpha = 0.8f), DirectCyan.copy(alpha = 0.5f), Color(0xFF14221A))
-                    ),
-                    RoundedCornerShape(22.dp)
-                )
                 .testTag("smart_translator_dialog"),
-            color = XboxSurface.copy(alpha = 0.98f)
+            color = XboxSurfaceVariant
         ) {
             Column(
                 modifier = Modifier
-                    .padding(18.dp)
+                    .padding(16.dp)
                     .fillMaxHeight()
             ) {
                 // Header Bar

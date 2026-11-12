@@ -102,7 +102,8 @@ fun AppLogDialog(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("app_log_dialog"),
-        containerColor = XboxSurface,
+        shape = RoundedCornerShape(22.dp),
+        containerColor = XboxSurfaceVariant,
         title = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -223,8 +224,7 @@ fun AppLogDialog(
                         .fillMaxWidth()
                         .heightIn(min = 240.dp, max = 380.dp),
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFF070D0A),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                    color = XboxSurface
                 ) {
                     if (filteredLogs.isEmpty()) {
                         Box(
@@ -427,13 +427,16 @@ fun AppLogDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XboxNeonGreen,
+                    contentColor = Color(0xFF03140B)
+                ),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.testTag("close_app_log_btn")
             ) {
                 Text(
                     text = if (isEn) "Close" else "Đóng",
-                    color = Color.White,
+                    color = Color(0xFF03140B),
                     fontWeight = FontWeight.Bold
                 )
             }

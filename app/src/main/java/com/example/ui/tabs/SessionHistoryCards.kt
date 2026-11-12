@@ -71,110 +71,69 @@ import com.example.ui.theme.xboxSlideFadeIn
 internal fun WeeklySummaryCard(
     totalDurationSec: Long,
     sessionCount: Int,
-    avgPingMs: Int,
-    hasAnyHistory: Boolean,
+    @Suppress("UNUSED_PARAMETER") avgPingMs: Int,
+    @Suppress("UNUSED_PARAMETER") hasAnyHistory: Boolean,
     isEn: Boolean,
-    onClearAllClick: () -> Unit
+    @Suppress("UNUSED_PARAMETER") onClearAllClick: () -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
     val motionEnabled = rememberXboxMotionEnabled(
         lowEndDeviceMode = config.lowEndDeviceMode,
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
-    val animatedAvgPing by animateXboxIntAsState(
-        targetValue = if (avgPingMs > 0) avgPingMs else 0,
-        motionEnabled = motionEnabled,
-        label = "weekly_avg_ping"
-    )
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .xboxSlideFadeIn(enabled = motionEnabled, key = "weekly_summary_card", durationMillis = 170)
             .testTag("weekly_summary_card"),
-        shape = RoundedCornerShape(16.dp),
-        color = XboxSurface.copy(alpha = 0.95f),
-        border = BorderStroke(
-            1.dp,
-            Brush.horizontalGradient(
-                listOf(XboxNeonGreen.copy(alpha = 0.45f), XboxCardBorder, DirectCyan.copy(alpha = 0.45f))
-            )
-        )
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Surface(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(12.dp),
+            color = XboxSurface
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = if (isEn) "THIS WEEK" else "TUẦN NÀY",
-                    color = XboxNeonGreen,
+                    text = if (isEn) "Sessions" else "Số phiên",
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "$sessionCount",
+                    color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.8.sp
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
                 )
-
-                if (hasAnyHistory) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = JapanRed.copy(alpha = 0.14f),
-                        border = BorderStroke(0.8.dp, JapanRed.copy(alpha = 0.45f)),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onClearAllClick() }
-                            .testTag("clear_all_history_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = null,
-                                tint = JapanRed,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = if (isEn) "Clear All" else "Xóa tất cả lịch sử",
-                                color = JapanRed,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
             }
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Surface(
+            modifier = Modifier.weight(1f),
+            shape = RoundedCornerShape(12.dp),
+            color = XboxSurface
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                SummaryStatTile(
-                    label = if (isEn) "Play Time" else "Tổng thời gian",
-                    value = formatDurationCompact(totalDurationSec, isEn),
-                    valueColor = TextPrimary,
-                    modifier = Modifier.weight(1f)
+                Text(
+                    text = if (isEn) "Play Time" else "Tổng thời gian",
+                    color = TextSecondary,
+                    fontSize = 12.sp
                 )
-                SummaryStatTile(
-                    label = if (isEn) "Sessions" else "Số phiên",
-                    value = "$sessionCount",
-                    valueColor = DirectCyan,
-                    modifier = Modifier.weight(1f)
-                )
-                SummaryStatTile(
-                    label = if (isEn) "Network latency" else "Độ trễ mạng",
-                    value = if (avgPingMs > 0) "${animatedAvgPing}ms" else "--",
-                    valueColor = if (avgPingMs > 0) pingMetricColor(avgPingMs) else TextSecondary,
-                    statusBadgeText = if (avgPingMs > 0) pingStatusLabel(avgPingMs, isEn) else null,
-                    modifier = Modifier.weight(1f)
+                Text(
+                    text = formatDurationCompact(totalDurationSec, isEn),
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -206,11 +165,10 @@ internal fun SummaryStatTile(
                 if (testTagName != null) Modifier.testTag(testTagName) else Modifier
             ),
         shape = RoundedCornerShape(12.dp),
-        color = XboxSurfaceVariant.copy(alpha = 0.85f),
-        border = BorderStroke(0.8.dp, XboxCardBorder)
+        color = XboxSurface
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
@@ -221,7 +179,7 @@ internal fun SummaryStatTile(
                 Text(
                     text = label,
                     color = TextSecondary,
-                    fontSize = 10.sp,
+                    fontSize = 11.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -233,7 +191,7 @@ internal fun SummaryStatTile(
                         text = statusBadgeText,
                         color = valueColor,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         softWrap = false,
                         maxLines = 1
@@ -244,7 +202,7 @@ internal fun SummaryStatTile(
                 text = value,
                 color = valueColor,
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = 13.5.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -260,24 +218,23 @@ internal fun SmartSuggestionBanner(text: String) {
             .fillMaxWidth()
             .testTag("history_smart_suggestion"),
         shape = RoundedCornerShape(12.dp),
-        color = DirectCyan.copy(alpha = 0.10f),
-        border = BorderStroke(0.8.dp, DirectCyan.copy(alpha = 0.4f))
+        color = Color(0xFF16352A)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Lightbulb,
                 contentDescription = null,
-                tint = DirectCyan,
+                tint = XboxNeonGreen,
                 modifier = Modifier.size(16.dp)
             )
             Text(
                 text = text,
-                color = TextPrimary,
-                fontSize = 11.5.sp,
+                color = XboxNeonGreen,
+                fontSize = 12.5.sp,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -299,16 +256,15 @@ internal fun SessionHistoryItemCard(
         lowEndDeviceMode = config.lowEndDeviceMode,
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .testTag("session_card_${session.id}"),
-        colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.95f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(16.dp),
+        color = XboxSurface
     ) {
         Row(
             modifier = Modifier
@@ -317,39 +273,33 @@ internal fun SessionHistoryItemCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Ảnh bìa game (tạm dừng tải trong lúc đang nhập kho game để không nghẽn mạng)
             val isImportingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(0.8.dp, Color(accentColorHex).copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                    .size(52.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(accentColorHex).copy(alpha = 0.85f), XboxDark)
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(accentColorHex).copy(alpha = 0.7f), XboxDark)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Gamepad,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Gamepad,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
                 if (!isImportingCatalog && !coverImageUrl.isNullOrBlank()) {
                     val context = LocalContext.current
                     AsyncImage(
                         model = remember(coverImageUrl) {
                             ImageRequest.Builder(context)
                                 .data(coverImageUrl)
-                                .crossfade(true)
+                                .size(144, 144)
+                                .allowRgb565(true)
+                                .crossfade(false)
                                 .build()
                         },
                         contentDescription = session.gameTitle,
@@ -368,116 +318,88 @@ internal fun SessionHistoryItemCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                // Hàng tiêu đề + thời lượng + nút Chơi lại gọn gàng (không bị ép thành vạch dọc bên phải)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = session.gameTitle,
-                        color = TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = formatDurationCompact(session.durationSeconds, isEn),
-                        color = XboxNeonGreen,
-                        fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                    if (onPlayAgain != null) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(7.dp),
-                            color = XboxGreen.copy(alpha = 0.25f),
-                            border = BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.55f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .clickable { onPlayAgain() }
-                                .testTag("session_play_again_${session.id}")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = if (isEn) "Play Again" else "Chơi lại",
-                                    tint = XboxNeonGreen,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Text(
-                                    text = if (isEn) "Play" else "Chơi lại",
-                                    color = XboxNeonGreen,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Ngày giờ + máy chủ/mạng
                 Text(
-                    text = "${formatSessionDateTime(session.startTimeMillis)} • ${session.formattedNetworkLabel(isEn)}",
-                    color = TextSecondary,
-                    fontSize = 10.5.sp,
+                    text = session.gameTitle,
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // 3 chip số liệu (Độ trễ mạng / FPS / Thời gian giải mã) kèm nhãn chữ 3 mức (Tốt / Trung bình / Cao)
+                Text(
+                    text = "${formatSessionDateTime(session.startTimeMillis)} · ${formatDurationCompact(session.durationSeconds, isEn)}",
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val pingTag = pingStatusLabel(session.avgPingMs, isEn)
-                    MetricChip(
-                        text = if (isEn) "Latency ${session.avgPingMs}ms ($pingTag)" else "Độ trễ ${session.avgPingMs}ms ($pingTag)",
-                        color = pingMetricColor(session.avgPingMs)
+                    val pingCol = pingMetricColor(session.avgPingMs)
+                    Text(
+                        text = if (isEn) {
+                            "● Latency ${session.avgPingMs}ms · $pingTag"
+                        } else {
+                            "● Độ trễ ${session.avgPingMs}ms · $pingTag"
+                        },
+                        color = pingCol,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    MetricChip(
-                        text = "${session.avgFps} FPS",
-                        color = fpsMetricColor(session.avgFps)
-                    )
-                    val decTag = decodeStatusLabel(session.avgDecodeMs, isEn)
-                    MetricChip(
-                        text = if (isEn) "Decode ${session.avgDecodeMs}ms ($decTag)" else "Giải mã ${session.avgDecodeMs}ms ($decTag)",
-                        color = decodeMetricColor(session.avgDecodeMs)
+
+                    val secondTag = when {
+                        session.isThermalHot -> if (isEn) "● Device Hot" else "● Máy nóng"
+                        session.isSlowDecode -> if (isEn) "● Slow Decode (${session.avgDecodeMs}ms)" else "● Giải mã chậm (${session.avgDecodeMs}ms)"
+                        else -> if (isEn) "● Decode ${session.avgDecodeMs}ms" else "● Giải mã ${session.avgDecodeMs}ms"
+                    }
+                    val secondCol = when {
+                        session.isThermalHot -> JapanRed
+                        session.isSlowDecode -> WarningAmber
+                        else -> DirectCyan
+                    }
+                    Text(
+                        text = secondTag,
+                        color = secondCol,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+            }
 
-                if (session.isThermalHot || session.isSlowDecode) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            if (onPlayAgain != null) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = XboxSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onPlayAgain() }
+                        .testTag("session_play_again_${session.id}")
+                ) {
+                    Box(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (session.isThermalHot) {
-                            WarningBadgePill(
-                                text = if (isEn) "Device Hot" else "Máy nóng",
-                                color = JapanRed
-                            )
-                        }
-                        if (session.isSlowDecode) {
-                            WarningBadgePill(
-                                text = if (isEn) "Slow Decode" else "Giải mã chậm",
-                                color = WarningAmber
-                            )
-                        }
+                        Text(
+                            text = if (isEn) "Play" else "Chơi lại",
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
                     }
                 }
             }

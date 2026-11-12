@@ -99,21 +99,15 @@ fun HowToUseGuideDialog(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
                 .padding(vertical = 20.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(
-                    1.5.dp,
-                    Brush.verticalGradient(listOf(XboxNeonGreen, DirectCyan, XboxCardBorder)),
-                    RoundedCornerShape(24.dp)
-                )
+                .clip(RoundedCornerShape(22.dp))
                 .testTag("how_to_use_guide_dialog"),
-            color = XboxDark.copy(alpha = 0.98f),
-            shadowElevation = 16.dp
+            color = XboxSurfaceVariant
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Dialog Header
                 Row(
@@ -177,8 +171,8 @@ fun HowToUseGuideDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(XboxSurfaceVariant.copy(alpha = 0.8f))
-                        .padding(4.dp),
+                        .background(XboxSurface)
+                        .padding(3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     visibleSections.forEach { section ->
@@ -193,11 +187,11 @@ fun HowToUseGuideDialog(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(9.dp))
                                 .clickable { selectedSection = section }
                                 .padding(1.dp),
-                            color = if (isSelected) XboxGreen else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
+                            color = if (isSelected) Color(0xFF16352A) else Color.Transparent,
+                            shape = RoundedCornerShape(9.dp)
                         ) {
                             Column(
                                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 2.dp),
@@ -207,12 +201,12 @@ fun HowToUseGuideDialog(
                                 Icon(
                                     imageVector = section.icon,
                                     contentDescription = null,
-                                    tint = if (isSelected) Color.White else TextSecondary,
+                                    tint = if (isSelected) XboxNeonGreen else TextSecondary,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Text(
                                     text = tabTitle,
-                                    color = if (isSelected) Color.White else TextSecondary,
+                                    color = if (isSelected) XboxNeonGreen else TextSecondary,
                                     fontSize = 10.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     maxLines = 1
@@ -359,15 +353,18 @@ fun HowToUseGuideDialog(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
+                        .height(46.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = XboxNeonGreen,
+                        contentColor = Color(0xFF03140B)
+                    ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = config.tr("Đã hiểu • Bắt đầu chơi 🎮", "Got It • Start Playing 🎮"),
-                        fontSize = 13.sp,
+                        text = config.tr("Đã hiểu", "Got It"),
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color(0xFF03140B)
                     )
                 }
             }

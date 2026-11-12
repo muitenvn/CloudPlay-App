@@ -262,28 +262,21 @@ fun DashboardScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Row(
                                     modifier = Modifier
-                                        .defaultMinSize(minWidth = 40.dp, minHeight = 40.dp)
+                                        .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp)
                                         .clip(TOP_PILL_SHAPE)
                                         .background(Color.Transparent, TOP_PILL_SHAPE)
-                                        .border(1.dp, XboxCardBorder, TOP_PILL_SHAPE)
                                         .clickable { showLanguageMenu = true }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                         .testTag("topbar_language_button"),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Language,
-                                        contentDescription = stringResource(R.string.current_language),
-                                        tint = TextPrimary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
                                     Text(
                                         text = currentLangLabel,
                                         color = TextPrimary,
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         softWrap = false
                                     )
@@ -293,7 +286,7 @@ fun DashboardScreen(
                                     expanded = showLanguageMenu,
                                     onDismissRequest = { showLanguageMenu = false },
                                     modifier = Modifier
-                                        .background(XboxSurface)
+                                        .background(XboxSurfaceVariant)
                                         .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
                                 ) {
                                     com.example.data.AppLanguage.entries.forEach { langOption ->
@@ -333,15 +326,10 @@ fun DashboardScreen(
                             val isTranslateOn = config.isEffectiveTranslateEnabled()
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(42.dp)
                                     .clip(TOP_PILL_SHAPE)
                                     .background(
-                                        if (isTranslateOn) Color(0xFF0F2C1D) else Color.Transparent,
-                                        TOP_PILL_SHAPE
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isTranslateOn) XboxNeonGreen.copy(alpha = 0.6f) else XboxCardBorder,
+                                        if (isTranslateOn) Color(0xFF16352A) else Color.Transparent,
                                         TOP_PILL_SHAPE
                                     )
                                     .clickable {
@@ -354,7 +342,7 @@ fun DashboardScreen(
                                 Icon(
                                     imageVector = Icons.Default.Translate,
                                     contentDescription = config.tr("Dịch tự động", "Auto Translate"),
-                                    tint = if (isTranslateOn) XboxNeonGreen else TextPrimary,
+                                    tint = if (isTranslateOn) XboxNeonGreen else TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -363,10 +351,9 @@ fun DashboardScreen(
                             Box(contentAlignment = Alignment.Center) {
                                 Box(
                                     modifier = Modifier
-                                        .size(40.dp)
+                                        .size(42.dp)
                                         .clip(TOP_PILL_SHAPE)
                                         .background(Color.Transparent, TOP_PILL_SHAPE)
-                                        .border(1.dp, XboxCardBorder, TOP_PILL_SHAPE)
                                         .clickable { showOverflowMenu = true }
                                         .testTag("topbar_overflow_menu_button"),
                                     contentAlignment = Alignment.Center
@@ -374,7 +361,7 @@ fun DashboardScreen(
                                     Icon(
                                         imageVector = Icons.Default.MoreVert,
                                         contentDescription = config.tr("Thêm tùy chọn", "More options"),
-                                        tint = TextPrimary,
+                                        tint = TextSecondary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -383,7 +370,7 @@ fun DashboardScreen(
                                     expanded = showOverflowMenu,
                                     onDismissRequest = { showOverflowMenu = false },
                                     modifier = Modifier
-                                        .background(XboxSurface)
+                                        .background(XboxSurfaceVariant)
                                         .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
                                 ) {
                                     DropdownMenuItem(
@@ -615,12 +602,11 @@ private fun ConsoleFloatingNavigationDock(
         )
     }
 
-    val navBarBg = Color(0xFF060A08)
-    val navBarLine = Color(0xFF233B2E)
-    val navSelectedBg = Color(0xFF0F2C1D)
-    val navAccent = Color(0xFF1FE27F)
-    val navOnAccent = Color(0xFF1FE27F)
-    val navMuted = Color(0xFFA5B8AE)
+    val navBarBg = XboxSurface
+    val navBarLine = XboxCardBorder
+    val navBadgeBg = Color(0xFF16352A)
+    val navAccent = XboxNeonGreen
+    val navMuted = TextSecondary
 
     Column(
         modifier = Modifier
@@ -638,7 +624,7 @@ private fun ConsoleFloatingNavigationDock(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -648,20 +634,26 @@ private fun ConsoleFloatingNavigationDock(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .defaultMinSize(minHeight = 54.dp)
+                        .defaultMinSize(minHeight = 56.dp)
                         .clip(NAV_TAB_SHAPE)
-                        .background(
-                            if (isSelected) navSelectedBg else Color.Transparent,
-                            NAV_TAB_SHAPE
-                        )
                         .clickable { onSelectTab(tab) }
                         .testTag("nav_tab_${tab.name.lowercase()}")
-                        .padding(vertical = 5.dp, horizontal = 2.dp),
+                        .padding(vertical = 6.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .width(22.dp)
+                                .height(3.dp)
+                                .clip(CircleShape)
+                                .background(navAccent)
+                        )
+                    }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -680,15 +672,14 @@ private fun ConsoleFloatingNavigationDock(
                                     text = if (gamesCount > 99) "99+" else "$gamesCount",
                                     color = navAccent,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 9.5.sp,
+                                    fontSize = 10.sp,
                                     lineHeight = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     softWrap = false,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .background(Color(0xFF0F2C1D), CircleShape)
-                                        .border(1.dp, navBarLine, CircleShape)
+                                        .background(navBadgeBg, CircleShape)
                                         .padding(horizontal = 5.dp, vertical = 1.dp)
                                 )
                             } else if (tab == DashboardTab.SERVERS && isVpnActive) {

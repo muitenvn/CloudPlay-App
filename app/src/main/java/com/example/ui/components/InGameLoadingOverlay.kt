@@ -88,11 +88,11 @@ import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import kotlinx.coroutines.delay
 
-private val ConsoleDeepBg = Color(0xFF070D0A)
-private val ConsoleCardSurface = Color(0xEB101B15)
-private val ConsoleCardElevated = Color(0xF515231B)
-private val ConsoleSubtleBorder = Color(0xFF263B2F)
-private val ConsoleAccentBorder = Color(0xFF2E573C)
+private val ConsoleDeepBg = Color(0xFF070B09)
+private val ConsoleCardSurface = Color(0xFF0D1511)
+private val ConsoleCardElevated = Color(0xFF142019)
+private val ConsoleSubtleBorder = Color(0xFF1C2C24)
+private val ConsoleAccentBorder = Color(0xFF16352A)
 
 @Composable
 fun InGameLoadingOverlay(
@@ -109,8 +109,8 @@ fun InGameLoadingOverlay(
 ) {
     AnimatedVisibility(
         visible = isLoading,
-        enter = fadeIn(tween(if (lowEndDeviceMode) 0 else 240)),
-        exit = fadeOut(tween(if (lowEndDeviceMode) 0 else 280)),
+        enter = fadeIn(tween(if (lowEndDeviceMode) 0 else 200)),
+        exit = fadeOut(tween(if (lowEndDeviceMode) 0 else 220)),
         modifier = modifier
     ) {
         val config by com.example.data.SettingsRepository.config.collectAsState()
@@ -133,7 +133,7 @@ fun InGameLoadingOverlay(
         val pingColor = when {
             !hasValidPing -> TextSecondary
             realLatencyMs < 80 -> XboxNeonGreen
-            realLatencyMs < 130 -> Color(0xFFFFB300)
+            realLatencyMs < 130 -> Color(0xFFE3B341)
             else -> JapanRed
         }
         val pingRating = when {
@@ -147,25 +147,11 @@ fun InGameLoadingOverlay(
         val rawProgress = progress.coerceIn(0.08f, 1f)
         val animatedProgress by animateFloatAsState(
             targetValue = rawProgress,
-            animationSpec = tween(durationMillis = if (lowEndDeviceMode) 0 else 340, easing = FastOutSlowInEasing),
+            animationSpec = tween(durationMillis = if (lowEndDeviceMode) 0 else 280, easing = FastOutSlowInEasing),
             label = "smooth_progress"
         )
 
-        val pulseAlpha = if (lowEndDeviceMode) {
-            0.85f
-        } else {
-            val infiniteTransition = rememberInfiniteTransition(label = "console_pulse")
-            val animated by infiniteTransition.animateFloat(
-                initialValue = 0.45f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1100, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse
-                ),
-                label = "pulse_alpha"
-            )
-            animated
-        }
+        val pulseAlpha = 1f
 
         val phaseStatusText = when {
             animatedProgress < 0.25f -> if (isEn) "Connecting to Xbox Cloud Console..." else "Đang kết nối hệ thống Xbox Cloud..."
@@ -1038,25 +1024,25 @@ private fun SkipLoadingButton(
     Button(
         onClick = onSkip,
         colors = ButtonDefaults.buttonColors(
-            containerColor = XboxGreen,
-            contentColor = Color.White
+            containerColor = XboxNeonGreen,
+            contentColor = Color(0xFF03140B)
         ),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-        shape = RoundedCornerShape(13.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = modifier
             .height(46.dp)
-            .border(1.dp, XboxNeonGreen.copy(alpha = 0.6f), RoundedCornerShape(13.dp))
             .testTag("skip_loading_button")
     ) {
         Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = null,
-            tint = Color.White,
+            tint = Color(0xFF03140B),
             modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = if (isEn) "ENTER GAME NOW" else "VÀO TRẬN NGAY",
+            color = Color(0xFF03140B),
             fontFamily = SpaceGroteskFontFamily,
             fontSize = 13.5.sp,
             fontWeight = FontWeight.ExtraBold,

@@ -608,7 +608,7 @@ internal fun FeaturedGameCard(
             .clickable { onLaunch() }
             .testTag("featured_game_${game.id}")
     ) {
-        if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
+        if ((game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -623,7 +623,7 @@ internal fun FeaturedGameCard(
             }
         }
 
-        if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
+        if (!game.imageUrl.isNullOrBlank()) {
             val context = LocalContext.current
             AsyncImage(
                 model = remember(game.imageUrl) {

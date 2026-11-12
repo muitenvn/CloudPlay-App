@@ -78,6 +78,7 @@ class StreamController(private val context: Context) {
      * Cancels active coroutines when WebView or Activity is destroyed to prevent memory leaks.
      */
     fun release() {
+        NetworkOptimizer.setStreamActive(false)
         finalizeActiveSessionIfNeeded()
         countdownJob?.cancel()
         countdownJob = null
@@ -478,6 +479,7 @@ class StreamController(private val context: Context) {
                 // Player exited running game stream back to catalog/home
                 launchFallbackJob?.cancel()
                 countdownJob?.cancel()
+                NetworkOptimizer.setStreamActive(false)
                 finalizeActiveSessionIfNeeded()
                 _uiState.value = _uiState.value.copy(
                     isGameActive = false,

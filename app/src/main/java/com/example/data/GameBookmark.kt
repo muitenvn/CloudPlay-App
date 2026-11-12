@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -194,6 +196,8 @@ object GameLibraryRepository {
      */
     @Volatile
     private var initStarted = false
+    @Volatile
+    private var initialDiskLoadCompleted = false
 
     fun init(context: Context) {
         if (!initStarted) {
@@ -268,30 +272,39 @@ object GameLibraryRepository {
                 val syncedList: List<GameBookmark>
                 try {
                     val tParseStart = android.os.SystemClock.elapsedRealtime()
+                    val earlyDiscovered = _games.value.filter { !it.id.startsWith("custom_") }
                     customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
-                    syncedList = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
+                    val diskSynced = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
+                    syncedList = (diskSynced + earlyDiscovered)
+                        .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
                     val tParseEnd = android.os.SystemClock.elapsedRealtime()
                     rebuildMergedGames(customList, syncedList)
+                    initialDiskLoadCompleted = true
                     val tMergeEnd = android.os.SystemClock.elapsedRealtime()
                     PerformanceMonitor.recordInitMilestone(
                         "GameLibraryRepository (IO): xmlLoad=${tAfterPrefsAwait - t0}ms, jsonParse=${tParseEnd - tParseStart}ms, merge=${tMergeEnd - tParseEnd}ms (tổng=${_games.value.size} game)"
                     )
                 } finally {
+                    initialDiskLoadCompleted = true
                     _isLoadingInitialCatalog.value = false
                 }
 
                 val now = System.currentTimeMillis()
                 val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
-                val targetMinSynced = (savedTotalCloud.coerceAtMost(500) - 20).coerceAtLeast(0)
+                val targetMinSynced = (savedTotalCloud.coerceAtMost(550) - 20).coerceAtLeast(0)
+                val isCatalogTooSmall = syncedList.size < 120
                 val needsAutoFullScan = syncedList.isEmpty() ||
                     missingCoverArt ||
+                    isCatalogTooSmall ||
                     (targetMinSynced > 0 && syncedList.size < targetMinSynced) ||
-                    syncedList.size < 120 ||
                     (now - lastSyncMs) > 6 * 3600 * 1000L
                 if (needsAutoFullScan) {
-                    kotlinx.coroutines.delay(4_500L)
+                    kotlinx.coroutines.delay(if (isCatalogTooSmall) 300L else 3_500L)
                     if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
-                        syncLiveXboxCatalog(force = missingCoverArt)
+                        syncLiveXboxCatalog(
+                            force = missingCoverArt || isCatalogTooSmall,
+                            maxCatalogGames = 600
+                        )
                     }
                 }
             }
@@ -801,20 +814,42 @@ object GameLibraryRepository {
      * hoàn toàn không tải ảnh bìa để tiết kiệm dữ liệu mạng.
      * Tự động tạm dừng ngay khi người dùng đang trong luồng chơi game để nhường 100% băng thông và tốc độ giải mã video.
      */
-    fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 500) {
-        if ((_isSyncingCatalog.value && !force) || isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return
+    fun syncLiveXboxCatalog(force: Boolean = false, maxCatalogGames: Int = 600) {
+        if (!force && (_isSyncingCatalog.value || isStreamActive || com.example.vpn.VpnManager.isStreamActive())) return
+        if (force) {
+            isStreamActive = false
+        }
         catalogSyncJob?.cancel()
         catalogSyncJob = ioScope.launch {
             _isSyncingCatalog.value = true
             val startPingMs = System.currentTimeMillis()
+            var anyBatchAdded = false
             try {
-                if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
-                val allCloudIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = 500)
-                if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) return@launch
+                if (!force && (isStreamActive || com.example.vpn.VpnManager.isStreamActive())) return@launch
+
+                val (allCloudIds, touchIds, popularIds, recentIds) = coroutineScope {
+                    val allDeferred = async {
+                        fetchSiglProductIdsSafe(CLOUD_CATALOG_SIGL_URL, maxCount = 650)
+                    }
+                    val touchDeferred = async {
+                        fetchSiglProductIdsSafe(TOUCH_CATALOG_SIGL_URL, maxCount = 350).toSet()
+                    }
+                    val popDeferred = async {
+                        fetchSiglProductIdsSafe(POPULAR_CLOUD_SIGL_URL, maxCount = 150).toSet()
+                    }
+                    val recDeferred = async {
+                        fetchSiglProductIdsSafe(RECENTLY_ADDED_SIGL_URL, maxCount = 100).toSet()
+                    }
+                    Quadruple(
+                        allDeferred.await(),
+                        touchDeferred.await(),
+                        popDeferred.await(),
+                        recDeferred.await()
+                    )
+                }
+
+                if (!force && isStreamActive) return@launch
                 val catalogRtt = (System.currentTimeMillis() - startPingMs).toInt().coerceIn(15, 2500)
-                val touchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 300).toSet()
-                val popularIds = fetchSiglProductIds(POPULAR_CLOUD_SIGL_URL, maxCount = 100).toSet()
-                val recentIds = fetchSiglProductIds(RECENTLY_ADDED_SIGL_URL, maxCount = 80).toSet()
 
                 if (allCloudIds.isNotEmpty()) {
                     cachedAllCloudProductIds = allCloudIds
@@ -823,21 +858,28 @@ object GameLibraryRepository {
                 if (popularIds.isNotEmpty()) cachedPopularIds = popularIds
                 if (recentIds.isNotEmpty()) cachedRecentIds = recentIds
 
-                val prioritizedCloudIds = (listOf(FORTNITE_PRODUCT_ID) + popularIds.toList() + recentIds.toList() + allCloudIds)
+                val effectiveAllIds = if (allCloudIds.isNotEmpty()) allCloudIds else cachedAllCloudProductIds
+                val prioritizedCloudIds = (
+                    listOf(FORTNITE_PRODUCT_ID) +
+                        popularIds.toList() +
+                        recentIds.toList() +
+                        effectiveAllIds +
+                        touchIds.toList()
+                    )
                     .map { it.uppercase(Locale.ROOT) }
                     .distinct()
-                    .take(maxCatalogGames)
+                    .take(maxCatalogGames.coerceAtLeast(600))
 
                 if (prioritizedCloudIds.isEmpty()) {
                     _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = false)
                     return@launch
                 }
 
-                val totalCloud = prioritizedCloudIds.size.coerceAtLeast(allCloudIds.size)
+                val totalCloud = prioritizedCloudIds.size.coerceAtLeast(effectiveAllIds.size)
                 _xboxStatus.value = _xboxStatus.value.copy(
                     cloudServiceOnline = true,
                     cloudLatencyMs = catalogRtt,
-                    totalCloudCatalogCount = totalCloud
+                    totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size)
                 )
 
                 val sharedPrefs = prefs
@@ -849,75 +891,104 @@ object GameLibraryRepository {
                 } else {
                     emptyList()
                 }
-                val existingSynced = if (inMemoryGames.isNotEmpty()) {
-                    inMemoryGames.filter { !it.id.startsWith("custom_") }
-                } else if (sharedPrefs != null) {
+                val diskSynced = if (sharedPrefs != null) {
                     loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
-                } else emptyList()
+                } else {
+                    emptyList()
+                }
+                val memorySynced = inMemoryGames.filter { !it.id.startsWith("custom_") }
+                val existingSynced = (diskSynced + memorySynced)
+                    .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
 
                 val existingWithImages = existingSynced.filter { !it.imageUrl.isNullOrBlank() }
+                if (existingWithImages.size > memorySynced.size) {
+                    rebuildMergedGames(customList, existingWithImages)
+                }
+
                 val existingPids = existingWithImages
                     .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
                     .toSet()
 
-                val idsToFetch = if (force) {
+                val missingIds = prioritizedCloudIds.filter { it !in existingPids }
+                val idsToFetch = if (missingIds.isNotEmpty()) {
+                    missingIds
+                } else if (force) {
                     prioritizedCloudIds
                 } else {
-                    prioritizedCloudIds.filter { it !in existingPids }
+                    emptyList()
                 }
 
                 val runningSynced = existingWithImages.toMutableList()
-                var emittedFirstPreviewBatch = runningSynced.isNotEmpty()
+                var completedBatches = 0
                 for (batch in idsToFetch.chunked(40)) {
-                    if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) break
-                    val batchResults = fetchDisplayCatalogProducts(
+                    if (!force && isStreamActive) break
+                    val batchResults = fetchDisplayCatalogProductsSafe(
                         bigIds = batch,
                         touchIds = cachedTouchIds,
                         popularIds = cachedPopularIds,
                         recentIds = cachedRecentIds
                     )
-                    if (isStreamActive || com.example.vpn.VpnManager.isStreamActive()) break
+                    if (!force && isStreamActive) break
                     if (batchResults.isNotEmpty()) {
+                        anyBatchAdded = true
                         runningSynced.addAll(batchResults)
-                        if (!emittedFirstPreviewBatch) {
-                            emittedFirstPreviewBatch = true
-                            val previewDeduped = runningSynced
-                                .filter { !it.imageUrl.isNullOrBlank() }
-                                .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
-                            rebuildMergedGames(customList, previewDeduped)
+                        val progressiveDeduped = runningSynced
+                            .filter { !it.imageUrl.isNullOrBlank() }
+                            .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                        rebuildMergedGames(customList, progressiveDeduped)
+                        val currentCount = _games.value.size
+                        _xboxStatus.value = _xboxStatus.value.copy(
+                            cloudServiceOnline = true,
+                            cloudLatencyMs = catalogRtt,
+                            totalCloudCatalogCount = totalCloud.coerceAtLeast(currentCount),
+                            syncedCatalogCount = currentCount
+                        )
+                        completedBatches++
+                        if (completedBatches % 3 == 0) {
+                            saveSyncedGames(_games.value)
                         }
                     }
                 }
 
-                if (runningSynced.isNotEmpty() && !isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
+                if (runningSynced.isNotEmpty()) {
                     val finalDeduped = runningSynced
                         .filter { !it.imageUrl.isNullOrBlank() }
                         .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
                     rebuildMergedGames(customList, finalDeduped)
                 }
 
-                if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
-                    saveSyncedGames(_games.value)
-                    val nowMs = System.currentTimeMillis()
-                    _xboxStatus.value = _xboxStatus.value.copy(
-                        cloudServiceOnline = true,
-                        cloudLatencyMs = catalogRtt,
-                        totalCloudCatalogCount = totalCloud.coerceAtLeast(_games.value.size),
-                        syncedCatalogCount = _games.value.size,
-                        lastSyncTimeMs = nowMs
-                    )
-                    sharedPrefs?.edit()
-                        ?.putLong(KEY_LAST_CATALOG_SYNC_MS, nowMs)
-                        ?.putInt(KEY_XBOX_TOTAL_CLOUD, totalCloud.coerceAtLeast(_games.value.size))
-                        ?.apply()
-                }
+                saveSyncedGames(_games.value)
+                val nowMs = System.currentTimeMillis()
+                val finalCount = _games.value.size
+                _xboxStatus.value = _xboxStatus.value.copy(
+                    cloudServiceOnline = true,
+                    cloudLatencyMs = catalogRtt,
+                    totalCloudCatalogCount = totalCloud.coerceAtLeast(finalCount),
+                    syncedCatalogCount = finalCount,
+                    lastSyncTimeMs = nowMs
+                )
+                sharedPrefs?.edit()
+                    ?.putLong(KEY_LAST_CATALOG_SYNC_MS, nowMs)
+                    ?.putInt(KEY_XBOX_TOTAL_CLOUD, totalCloud.coerceAtLeast(finalCount))
+                    ?.apply()
             } catch (_: Exception) {
-                _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = false)
+                if (anyBatchAdded) {
+                    saveSyncedGames(_games.value)
+                } else {
+                    _xboxStatus.value = _xboxStatus.value.copy(cloudServiceOnline = _games.value.size > 2)
+                }
             } finally {
                 _isSyncingCatalog.value = false
             }
         }
     }
+
+    private data class Quadruple<A, B, C, D>(
+        val first: A,
+        val second: B,
+        val third: C,
+        val fourth: D
+    )
 
     /**
      * Loads the next batch of unsynced Xbox Cloud games from Microsoft's full Cloud SIGL feed.
@@ -928,10 +999,10 @@ object GameLibraryRepository {
             _isSyncingCatalog.value = true
             try {
                 if (cachedAllCloudProductIds.isEmpty()) {
-                    cachedAllCloudProductIds = fetchSiglProductIds(CLOUD_CATALOG_SIGL_URL, maxCount = 450)
+                    cachedAllCloudProductIds = fetchSiglProductIdsSafe(CLOUD_CATALOG_SIGL_URL, maxCount = 650)
                 }
                 if (cachedTouchIds.isEmpty()) {
-                    cachedTouchIds = fetchSiglProductIds(TOUCH_CATALOG_SIGL_URL, maxCount = 250).toSet()
+                    cachedTouchIds = fetchSiglProductIdsSafe(TOUCH_CATALOG_SIGL_URL, maxCount = 350).toSet()
                 }
                 val existingPids = _games.value
                     .mapNotNull { extractProductId(it.playUrl).takeIf { id -> id.isNotBlank() }?.uppercase(Locale.ROOT) }
@@ -942,14 +1013,14 @@ object GameLibraryRepository {
                     .take(batchSize)
 
                 if (nextBatchIds.isEmpty()) {
-                    syncLiveXboxCatalog(force = true, maxCatalogGames = (_games.value.size + batchSize).coerceAtMost(240))
+                    syncLiveXboxCatalog(force = true, maxCatalogGames = 600)
                     return@launch
                 }
 
                 val newBookmarks = mutableListOf<GameBookmark>()
                 nextBatchIds.chunked(20).forEach { chunk ->
                     newBookmarks.addAll(
-                        fetchDisplayCatalogProducts(
+                        fetchDisplayCatalogProductsSafe(
                             bigIds = chunk,
                             touchIds = cachedTouchIds,
                             popularIds = cachedPopularIds,
@@ -1087,10 +1158,24 @@ object GameLibraryRepository {
         }
     }
 
+    private suspend fun fetchSiglProductIdsSafe(siglUrl: String, maxCount: Int): List<String> {
+        for (attempt in 0..1) {
+            try {
+                val list = fetchSiglProductIds(siglUrl, maxCount)
+                if (list.isNotEmpty()) return list
+            } catch (_: Exception) {
+            }
+            if (attempt == 0) {
+                kotlinx.coroutines.delay(350L)
+            }
+        }
+        return emptyList()
+    }
+
     private fun fetchSiglProductIds(siglUrl: String, maxCount: Int): List<String> {
         val conn = (URL(siglUrl).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 6000
-            readTimeout = 6000
+            connectTimeout = 8000
+            readTimeout = 8000
             requestMethod = "GET"
             setRequestProperty("Accept", "application/json")
         }
@@ -1111,6 +1196,31 @@ object GameLibraryRepository {
         } finally {
             conn.disconnect()
         }
+    }
+
+    private suspend fun fetchDisplayCatalogProductsSafe(
+        bigIds: List<String>,
+        touchIds: Set<String>,
+        popularIds: Set<String> = emptySet(),
+        recentIds: Set<String> = emptySet()
+    ): List<GameBookmark> {
+        if (bigIds.isEmpty()) return emptyList()
+        for (attempt in 0..1) {
+            try {
+                val items = fetchDisplayCatalogProducts(
+                    bigIds = bigIds,
+                    touchIds = touchIds,
+                    popularIds = popularIds,
+                    recentIds = recentIds
+                )
+                if (items.isNotEmpty()) return items
+            } catch (_: Exception) {
+            }
+            if (attempt == 0) {
+                kotlinx.coroutines.delay(350L)
+            }
+        }
+        return emptyList()
     }
 
     private fun fetchDisplayCatalogProducts(
@@ -1415,12 +1525,30 @@ object GameLibraryRepository {
     }
 
     private fun saveSyncedGames(allGames: List<GameBookmark>) {
+        if (!initialDiskLoadCompleted) return
         val syncedGames = allGames
             .filter { !it.id.startsWith("custom_") && !it.imageUrl.isNullOrBlank() }
-            .take(550)
+            .take(650)
+        if (syncedGames.isEmpty()) return
         ioScope.launch {
-            val jsonStr = serializeGamesListToJson(syncedGames) ?: return@launch
             val cacheFile = syncedGamesCacheFile
+            val finalToSave = if (syncedGames.size < 100 && cacheFile != null && cacheFile.exists() && cacheFile.length() > 2L) {
+                val existingOnDisk = try {
+                    val fileJson = synchronized(cacheFileLock) {
+                        cacheFile.readText(Charsets.UTF_8)
+                    }
+                    parseGamesJsonArray(fileJson)
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                (syncedGames + existingOnDisk)
+                    .filter { !it.id.startsWith("custom_") && !it.imageUrl.isNullOrBlank() }
+                    .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                    .take(650)
+            } else {
+                syncedGames
+            }
+            val jsonStr = serializeGamesListToJson(finalToSave) ?: return@launch
             if (cacheFile != null) {
                 try {
                     writeTextAtomically(cacheFile, jsonStr)

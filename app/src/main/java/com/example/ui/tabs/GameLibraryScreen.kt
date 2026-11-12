@@ -117,6 +117,7 @@ fun GameLibraryScreen(
     val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
     val playedGameIds by GameLibraryRepository.playedGameIds.collectAsState()
     val isSyncingCatalog by GameLibraryRepository.isSyncingCatalog.collectAsState()
+    val isLoadingInitialCatalog by GameLibraryRepository.isLoadingInitialCatalog.collectAsState()
     val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
     val xboxStatus by GameLibraryRepository.xboxStatus.collectAsState()
     val isEn = config.isEnglishUI()
@@ -130,6 +131,12 @@ fun GameLibraryScreen(
     var selectedGenre by remember { mutableStateOf("ALL") }
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedDetailGame by remember { mutableStateOf<GameBookmark?>(null) }
+
+    androidx.compose.runtime.LaunchedEffect(games.size, isLoadingInitialCatalog) {
+        if (!isLoadingInitialCatalog && !isSyncingCatalog && games.size < 120) {
+            GameLibraryRepository.syncLiveXboxCatalog(force = true, maxCatalogGames = 600)
+        }
+    }
 
     val computedLibraryState by androidx.compose.runtime.produceState(
         initialValue = Pair(games, intArrayOf(0, 0, 0, 0, 0)),

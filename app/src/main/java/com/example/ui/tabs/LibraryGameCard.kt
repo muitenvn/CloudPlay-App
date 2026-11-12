@@ -113,7 +113,7 @@ internal fun LibraryGameCard(
                 .background(fallbackBgBrush),
             contentAlignment = Alignment.Center
         ) {
-            if (isImportingCatalog || (game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
+            if ((game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
                 Text(
                     text = monogram,
                     color = TextPrimary,
@@ -126,7 +126,7 @@ internal fun LibraryGameCard(
         }
 
         // Cover Art
-        if (!isImportingCatalog && !game.imageUrl.isNullOrBlank()) {
+        if (!game.imageUrl.isNullOrBlank()) {
             val context = LocalContext.current
             AsyncImage(
                 model = remember(game.imageUrl) {

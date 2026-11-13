@@ -441,12 +441,16 @@ private fun SingleNodePopoverBody(
     onHideOrDeleteNode: () -> Unit,
     onResetNode: () -> Unit
 ) {
-    var showComboSelector by remember(nodeId) { mutableStateOf(nodeBehavior.extraButtons.isNotEmpty()) }
+    val isStick = nodeId == "left_stick" || nodeId == "right_stick"
+    val isCluster = nodeId == "abxy" || nodeId == "dpad"
 
-    // 1. Size Stepper ("Cỡ")
+    var showComboSelector by remember(nodeId) { mutableStateOf(nodeBehavior.extraButtons.isNotEmpty()) }
+    var showCustomDimensionMenu by remember(nodeId) { mutableStateOf(nodeBehavior.hasCustomDimensions()) }
+
+    // 1. Uniform Size Stepper ("Cỡ")
     HudSurfaceRow(minHeight = 34.dp, bgColor = HudSurface) {
         Text(
-            text = config.tr("Cỡ", "Size"),
+            text = config.tr("Cỡ chung nút", "Size"),
             color = HudInk,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold
@@ -459,6 +463,75 @@ private fun SingleNodePopoverBody(
             decTag = "virtual_gamepad_btn_scale_minus",
             incTag = "virtual_gamepad_btn_scale_plus"
         )
+    }
+
+    // 1b. Dedicated Sub-Menu for Free Width & Height ("Tùy chỉnh bề ngang · bề dọc")
+    if (!isStick && !isCluster) {
+        val wPct = (nodeBehavior.widthScale * 100).roundToInt()
+        val hPct = (nodeBehavior.heightScale * 100).roundToInt()
+        val hasCustomDim = nodeBehavior.hasCustomDimensions()
+        val arrowPrefix = if (showCustomDimensionMenu) "▾" else "▸"
+        val dimSubTitle = if (hasCustomDim) {
+            config.tr(
+                "$arrowPrefix Chỉnh bề ngang · dọc ($wPct% × $hPct%)",
+                "$arrowPrefix Width · Height ($wPct% × $hPct%)"
+            )
+        } else {
+            config.tr(
+                "$arrowPrefix Tùy chỉnh bề ngang · bề dọc",
+                "$arrowPrefix Custom Width & Height"
+            )
+        }
+
+        HudButton(
+            text = dimSubTitle,
+            onClick = { showCustomDimensionMenu = !showCustomDimensionMenu },
+            minHeight = 32.dp,
+            fontSize = 11.5.sp,
+            containerOverride = if (showCustomDimensionMenu || hasCustomDim) HudSelBg else HudSurface,
+            contentOverride = if (showCustomDimensionMenu || hasCustomDim) HudAccent else HudMuted,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("virtual_gamepad_custom_dimensions_toggle")
+        )
+
+        if (showCustomDimensionMenu) {
+            HudSliderRow(
+                label = config.tr("Bề ngang", "Width"),
+                valueText = "$wPct%",
+                value = nodeBehavior.widthScale,
+                valueRange = 0.50f..2.50f,
+                onValueChange = { nextW ->
+                    onBehaviorChange(nodeBehavior.copy(widthScale = nextW.coerceIn(0.50f, 2.50f)))
+                },
+                bgColor = HudSurface
+            )
+
+            HudSliderRow(
+                label = config.tr("Bề dọc", "Height"),
+                valueText = "$hPct%",
+                value = nodeBehavior.heightScale,
+                valueRange = 0.50f..2.50f,
+                onValueChange = { nextH ->
+                    onBehaviorChange(nodeBehavior.copy(heightScale = nextH.coerceIn(0.50f, 2.50f)))
+                },
+                bgColor = HudSurface
+            )
+
+            if (hasCustomDim) {
+                HudButton(
+                    text = config.tr("↺ Đặt lại ngang · dọc (100%)", "↺ Reset Width · Height"),
+                    onClick = {
+                        onBehaviorChange(nodeBehavior.copy(widthScale = 1.0f, heightScale = 1.0f))
+                    },
+                    minHeight = 28.dp,
+                    fontSize = 11.sp,
+                    containerOverride = HudSurface,
+                    contentOverride = HudCyan,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 
     // 2. Per-button Opacity Slider ("Độ đậm mờ")
@@ -508,9 +581,6 @@ private fun SingleNodePopoverBody(
             }
         }
     }
-
-    val isStick = nodeId == "left_stick" || nodeId == "right_stick"
-    val isCluster = nodeId == "abxy" || nodeId == "dpad"
 
     if (isStick) {
         val isLeft = nodeId == "left_stick"
@@ -601,19 +671,43 @@ private fun SingleNodePopoverBody(
     } else {
         // Custom Blank Button shape & target Xbox buttons selector
         if (customButtonDef != null) {
+            val shapeSelectedIdx = when {
+                showCustomDimensionMenu || nodeBehavior.hasCustomDimensions() -> 2
+                customButtonDef.isRound -> 0
+                else -> 1
+            }
             HudSectionLabel(text = config.tr("Hình dáng nút", "Button Shape"))
             HudSegmentedControl(
                 options = listOf(
                     config.tr("Tròn", "Round"),
-                    config.tr("Viên thuốc", "Pill")
+                    config.tr("Viên thuốc", "Pill"),
+                    config.tr("Tự chỉnh", "Custom")
                 ),
-                selectedIndex = if (customButtonDef.isRound) 0 else 1,
+                selectedIndex = shapeSelectedIdx,
                 onSelect = { idx ->
-                    onCustomButtonDefChange(customButtonDef.copy(isRound = idx == 0))
+                    when (idx) {
+                        0 -> {
+                            showCustomDimensionMenu = false
+                            onCustomButtonDefChange(customButtonDef.copy(isRound = true))
+                            if (nodeBehavior.hasCustomDimensions()) {
+                                onBehaviorChange(nodeBehavior.copy(widthScale = 1.0f, heightScale = 1.0f))
+                            }
+                        }
+                        1 -> {
+                            showCustomDimensionMenu = false
+                            onCustomButtonDefChange(customButtonDef.copy(isRound = false))
+                            if (nodeBehavior.hasCustomDimensions()) {
+                                onBehaviorChange(nodeBehavior.copy(widthScale = 1.0f, heightScale = 1.0f))
+                            }
+                        }
+                        2 -> {
+                            showCustomDimensionMenu = true
+                        }
+                    }
                 },
                 bgColor = HudSurface,
                 minButtonHeight = 30.dp,
-                fontSize = 11.5.sp
+                fontSize = 11.sp
             )
 
             HudSectionLabel(

@@ -68,13 +68,20 @@ data class GamepadButtonBehavior(
     val pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     val turboHz: Int = 10,
     val analogSwipe: Boolean? = null,
-    val extraButtons: Set<Int> = emptySet()
+    val extraButtons: Set<Int> = emptySet(),
+    val widthScale: Float = 1.0f,
+    val heightScale: Float = 1.0f
 ) {
+    fun hasCustomDimensions(): Boolean {
+        return abs(widthScale - 1.0f) >= 0.02f || abs(heightScale - 1.0f) >= 0.02f
+    }
+
     fun isDefault(): Boolean {
         return pressMode == GamepadButtonPressMode.NORMAL &&
             turboHz == 10 &&
             analogSwipe == null &&
-            extraButtons.isEmpty()
+            extraButtons.isEmpty() &&
+            !hasCustomDimensions()
     }
 }
 
@@ -231,7 +238,9 @@ internal fun parseButtonBehaviors(raw: String): Map<String, GamepadButtonBehavio
                     ?.filter { it in 0..16 }
                     ?.toSet()
                     ?: emptySet()
-                val b = GamepadButtonBehavior(mode, hz, analog, extras)
+                val wScale = (fields.getOrNull(4)?.toFloatOrNull() ?: 1.0f).coerceIn(0.50f, 2.50f)
+                val hScale = (fields.getOrNull(5)?.toFloatOrNull() ?: 1.0f).coerceIn(0.50f, 2.50f)
+                val b = GamepadButtonBehavior(mode, hz, analog, extras, wScale, hScale)
                 if (!b.isDefault()) {
                     result[nodeId] = b
                 }
@@ -251,7 +260,9 @@ internal fun serializeButtonBehaviors(map: Map<String, GamepadButtonBehavior>): 
                 null -> "_"
             }
             val extrasCode = v.extraButtons.sorted().joinToString(",")
-            "$k:${v.pressMode.name}|${v.turboHz.coerceIn(5, 20)}|$analogCode|$extrasCode"
+            val wCode = ((v.widthScale.coerceIn(0.50f, 2.50f) * 100f).roundToInt() / 100f).toString()
+            val hCode = ((v.heightScale.coerceIn(0.50f, 2.50f) * 100f).roundToInt() / 100f).toString()
+            "$k:${v.pressMode.name}|${v.turboHz.coerceIn(5, 20)}|$analogCode|$extrasCode|$wCode|$hCode"
         }
 }
 

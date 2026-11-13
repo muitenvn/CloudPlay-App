@@ -541,14 +541,16 @@ internal fun StandaloneDpadButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
     GamepadConfigurableButtonBox(
-        widthDp = 38.dp * scale,
-        heightDp = 38.dp * scale,
+        widthDp = 38.dp * scale * widthScale,
+        heightDp = 38.dp * scale * heightScale,
         shape = RoundedCornerShape(10.dp),
         opacity = opacity,
         accentColor = HudAccent,
@@ -611,6 +613,8 @@ internal fun GamepadTriggerButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     analogDragMode: Boolean,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
@@ -677,7 +681,7 @@ internal fun GamepadTriggerButton(
 
     Box(
         modifier = Modifier
-            .size(width = (64.dp * scale), height = (38.dp * scale))
+            .size(width = (64.dp * scale * widthScale), height = (38.dp * scale * heightScale))
             .clip(RoundedCornerShape(12.dp))
             .background(
                 if (isPressedVisual) {
@@ -779,14 +783,16 @@ internal fun GamepadShoulderButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onStateChange: (Boolean) -> Unit
 ) {
     GamepadConfigurableButtonBox(
-        widthDp = 58.dp * scale,
-        heightDp = 38.dp * scale,
+        widthDp = 58.dp * scale * widthScale,
+        heightDp = 38.dp * scale * heightScale,
         shape = RoundedCornerShape(12.dp),
         opacity = opacity,
         accentColor = HudAccent,
@@ -814,14 +820,16 @@ internal fun GamepadThumbClickMiniButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onStateChange: (Boolean) -> Unit
 ) {
     GamepadConfigurableButtonBox(
-        widthDp = 42.dp * scale,
-        heightDp = 34.dp * scale,
+        widthDp = 42.dp * scale * widthScale,
+        heightDp = 34.dp * scale * heightScale,
         shape = RoundedCornerShape(10.dp),
         opacity = opacity,
         accentColor = HudAccent,
@@ -849,22 +857,25 @@ internal fun GamepadSmallButton(
     index: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
+    val hasCustomDim = abs(widthScale - 1.0f) >= 0.02f || abs(heightScale - 1.0f) >= 0.02f
     GamepadConfigurableButtonBox(
-        widthDp = null,
-        heightDp = null,
+        widthDp = if (hasCustomDim) (64.dp * scale * widthScale) else null,
+        heightDp = if (hasCustomDim) (30.dp * scale * heightScale) else null,
         shape = RoundedCornerShape(12.dp),
         opacity = opacity,
         accentColor = HudAccent,
         pressMode = pressMode,
         turboHz = turboHz,
         isEditMode = isEditMode,
-        innerPaddingH = 10.dp * scale,
-        innerPaddingV = 6.dp * scale,
+        innerPaddingH = if (hasCustomDim) 4.dp else (10.dp * scale),
+        innerPaddingV = if (hasCustomDim) 2.dp else (6.dp * scale),
         onStateChange = onButton
     ) { isActive, isLatched ->
         Text(
@@ -884,15 +895,17 @@ internal fun GamepadSmallButton(
 internal fun GamepadXboxNexusButton(
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
     GamepadConfigurableButtonBox(
-        widthDp = 34.dp * scale,
-        heightDp = 34.dp * scale,
-        shape = CircleShape,
+        widthDp = 34.dp * scale * widthScale,
+        heightDp = 34.dp * scale * heightScale,
+        shape = RoundedCornerShape(percent = 50),
         opacity = opacity,
         accentColor = HudAccent,
         idleBorderOverride = HudAccent.copy(alpha = opacity.coerceIn(0.30f, 1.0f)),
@@ -917,15 +930,17 @@ internal fun StandaloneAbxyButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
     GamepadConfigurableButtonBox(
-        widthDp = 46.dp * scale,
-        heightDp = 46.dp * scale,
-        shape = CircleShape,
+        widthDp = 46.dp * scale * widthScale,
+        heightDp = 46.dp * scale * heightScale,
+        shape = RoundedCornerShape(percent = 50),
         opacity = opacity,
         accentColor = accentColor,
         pressMode = pressMode,
@@ -952,19 +967,22 @@ internal fun CustomVirtualGamepadButton(
     isRound: Boolean,
     scale: Float,
     opacity: Float,
+    widthScale: Float = 1.0f,
+    heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode,
     turboHz: Int,
     isEditMode: Boolean,
     onStateChange: (Boolean) -> Unit
 ) {
-    val shape = if (isRound) CircleShape else RoundedCornerShape(12.dp)
-    val widthDp = if (isRound) (46.dp * scale) else null
-    val heightDp = if (isRound) (46.dp * scale) else (36.dp * scale)
+    val shape = if (isRound) RoundedCornerShape(percent = 50) else RoundedCornerShape(12.dp)
+    val baseW = if (isRound) 46.dp else 62.dp
+    val baseH = if (isRound) 46.dp else 36.dp
+    val widthDp = baseW * scale * widthScale
+    val heightDp = baseH * scale * heightScale
 
     GamepadConfigurableButtonBox(
         widthDp = widthDp,
         heightDp = heightDp,
-        minWidthDp = if (isRound) null else (54.dp * scale),
         shape = shape,
         opacity = opacity,
         accentColor = HudCyan,
@@ -972,7 +990,7 @@ internal fun CustomVirtualGamepadButton(
         pressMode = pressMode,
         turboHz = turboHz,
         isEditMode = isEditMode,
-        innerPaddingH = if (isRound) 2.dp else (10.dp * scale),
+        innerPaddingH = 4.dp,
         innerPaddingV = 2.dp,
         onStateChange = onStateChange
     ) { isActive, isLatched ->

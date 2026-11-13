@@ -28,8 +28,12 @@ import com.example.data.AppConfig
 internal fun AddOrManageButtonsModal(
     config: AppConfig,
     hiddenButtons: Set<String>,
+    customButtons: List<CustomGamepadButtonDef>,
     abxySplitMode: Boolean,
     dpadSplitMode: Boolean,
+    onAddBlankCustomButton: () -> Unit,
+    onSelectCustomButton: (String) -> Unit,
+    onDeleteCustomButton: (String) -> Unit,
     onToggleButtonVisibility: (String) -> Unit,
     onRestoreAll: () -> Unit,
     onClose: () -> Unit,
@@ -46,6 +50,7 @@ internal fun AddOrManageButtonsModal(
             }
         }
     }
+    val isEn = config.isSettingsEnglishUI()
 
     Surface(
         modifier = modifier
@@ -93,10 +98,72 @@ internal fun AddOrManageButtonsModal(
                 }
             }
 
+            // Prominent button to create unlimited blank custom buttons
+            HudButton(
+                text = config.tr(
+                    "＋ Thêm nút trống tùy chỉnh (không giới hạn)",
+                    "＋ Add Blank Custom Button (Unlimited)"
+                ),
+                onClick = onAddBlankCustomButton,
+                style = HudButtonStyle.MAIN,
+                minHeight = 38.dp,
+                fontSize = 12.5.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("virtual_gamepad_create_blank_button")
+            )
+
+            if (customButtons.isNotEmpty()) {
+                HudSectionLabel(
+                    text = config.tr(
+                        "Nút trống đã tạo (${customButtons.size}) — chạm để chỉnh, ✕ để xóa:",
+                        "Custom buttons (${customButtons.size}) — tap to edit, ✕ to delete:"
+                    )
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    customButtons.forEach { customDef ->
+                        val badge = customDef.resolvedBadge(isEn)
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = HudSurface,
+                            border = BorderStroke(1.dp, HudCyan),
+                            shadowElevation = 0.dp
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 5.dp, bottom = 5.dp)
+                            ) {
+                                Text(
+                                    text = "✥ $badge",
+                                    color = HudCyan,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clickable { onSelectCustomButton(customDef.id) }
+                                )
+                                Text(
+                                    text = "✕",
+                                    color = HudDanger,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier
+                                        .clickable { onDeleteCustomButton(customDef.id) }
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             Text(
                 text = config.tr(
-                    "Chạm vào nút bên dưới để hiện lại (+) lên màn hình hoặc ẩn (✓):",
-                    "Tap a button below to add (+) it back to screen or hide (✓):"
+                    "Nút mặc định — chạm để hiện lại (+) hoặc ẩn (✓):",
+                    "Standard buttons — tap to show (+) or hide (✓):"
                 ),
                 color = HudMuted,
                 fontSize = 12.sp

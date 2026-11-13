@@ -33,8 +33,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -120,6 +123,8 @@ fun VirtualGamepadOverlay(
     val effectiveOpacitiesRaw = perGameLayout?.opacities ?: config.gamepadButtonOpacities
     val effectiveHapticsRaw = perGameLayout?.haptics ?: config.gamepadButtonHaptics
     val effectiveHiddenRaw = perGameLayout?.hiddenButtons ?: config.gamepadHiddenButtons
+    val effectiveBehaviorsRaw = perGameLayout?.behaviors ?: config.gamepadButtonBehaviors
+    val effectiveCustomButtonsRaw = perGameLayout?.customButtons ?: config.gamepadCustomButtons
     val abxySplitMode = perGameLayout?.abxySplit ?: config.gamepadAbxySplitMode
     val dpadSplitMode = perGameLayout?.dpadSplit ?: config.gamepadDpadSplitMode
 
@@ -169,8 +174,39 @@ fun VirtualGamepadOverlay(
         }
     }
 
+    val customButtonBehaviors = remember(effectiveBehaviorsRaw, normGameKey, config.usePerGameGamepadLayout) {
+        mutableStateMapOf<String, GamepadButtonBehavior>().apply {
+            putAll(parseButtonBehaviors(effectiveBehaviorsRaw))
+        }
+    }
+
+    val customButtonsList = remember(effectiveCustomButtonsRaw, normGameKey, config.usePerGameGamepadLayout) {
+        mutableStateListOf<CustomGamepadButtonDef>().apply {
+            addAll(parseCustomButtons(effectiveCustomButtonsRaw))
+        }
+    }
+
     val hiddenButtons = remember(effectiveHiddenRaw, normGameKey, config.usePerGameGamepadLayout) {
         parseHiddenButtons(effectiveHiddenRaw)
+    }
+
+    fun releaseAllVirtualInputs() {
+        webView?.evaluateJavascript(
+            "if(window.__cpReleaseAll){window.__cpReleaseAll();}",
+            null
+        )
+    }
+
+    LaunchedEffect(isEditPositionMode) {
+        if (isEditPositionMode) {
+            releaseAllVirtualInputs()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            releaseAllVirtualInputs()
+        }
     }
 
     fun saveCustomOffsets() {
@@ -187,6 +223,14 @@ fun VirtualGamepadOverlay(
 
     fun saveButtonHaptics() {
         SettingsRepository.updateGamepadButtonHaptics(serializeButtonHaptics(customButtonHaptics), normGameKey)
+    }
+
+    fun saveButtonBehaviors() {
+        SettingsRepository.updateGamepadButtonBehaviors(serializeButtonBehaviors(customButtonBehaviors), normGameKey)
+    }
+
+    fun saveCustomButtonsList() {
+        SettingsRepository.updateGamepadCustomButtons(serializeCustomButtons(customButtonsList), normGameKey)
     }
 
     fun setButtonScale(nodeId: String, newMultiplier: Float) {
@@ -206,7 +250,66 @@ fun VirtualGamepadOverlay(
         saveButtonHaptics()
     }
 
+    fun setButtonBehavior(nodeId: String, behavior: GamepadButtonBehavior) {
+        customButtonBehaviors[nodeId] = behavior
+        saveButtonBehaviors()
+    }
+
+    fun updateCustomButtonDef(updatedDef: CustomGamepadButtonDef) {
+        val idx = customButtonsList.indexOfFirst { it.id == updatedDef.id }
+        if (idx >= 0) {
+            customButtonsList[idx] = updatedDef
+            saveCustomButtonsList()
+        }
+    }
+
+    fun addBlankCustomButton() {
+        var nextIndex = 1
+        val existingIds = customButtonsList.map { it.id }.toSet()
+        while ("custom_$nextIndex" in existingIds) {
+            nextIndex++
+        }
+        val newId = "custom_$nextIndex"
+        val staggerX = (((nextIndex - 1) % 5) - 2) * 38f
+        val staggerY = (((nextIndex - 1) / 5) % 3 - 1) * 36f
+        if (staggerX != 0f || staggerY != 0f) {
+            customOffsets[newId] = staggerX to staggerY
+            saveCustomOffsets()
+        }
+        customButtonsList.add(
+            CustomGamepadButtonDef(
+                id = newId,
+                isRound = true,
+                targetButtons = setOf(0)
+            )
+        )
+        saveCustomButtonsList()
+        showAddButtonModal = false
+        selectedButtonId = newId
+        activePopoverNodeId = newId
+    }
+
+    fun removeCustomButton(nodeId: String) {
+        customButtonsList.removeAll { it.id == nodeId }
+        customOffsets.remove(nodeId)
+        customButtonScales.remove(nodeId)
+        customButtonOpacities.remove(nodeId)
+        customButtonHaptics.remove(nodeId)
+        customButtonBehaviors.remove(nodeId)
+        nodeBoundsMap.remove(nodeId)
+        saveCustomButtonsList()
+        saveCustomOffsets()
+        saveButtonScales()
+        saveButtonOpacities()
+        saveButtonHaptics()
+        saveButtonBehaviors()
+    }
+
     fun deleteButton(nodeId: String) {
+        if (isCustomNodeId(nodeId)) {
+            removeCustomButton(nodeId)
+            return
+        }
         val updated = hiddenButtons.toMutableSet()
         updated.add(nodeId)
         SettingsRepository.updateGamepadHiddenButtons(serializeHiddenButtons(updated), normGameKey)
@@ -224,10 +327,23 @@ fun VirtualGamepadOverlay(
         customButtonScales.remove(nodeId)
         customButtonOpacities.remove(nodeId)
         customButtonHaptics.remove(nodeId)
+        customButtonBehaviors.remove(nodeId)
+        if (isCustomNodeId(nodeId)) {
+            val idx = customButtonsList.indexOfFirst { it.id == nodeId }
+            if (idx >= 0) {
+                customButtonsList[idx] = CustomGamepadButtonDef(
+                    id = nodeId,
+                    isRound = true,
+                    targetButtons = setOf(0)
+                )
+                saveCustomButtonsList()
+            }
+        }
         saveCustomOffsets()
         saveButtonScales()
         saveButtonOpacities()
         saveButtonHaptics()
+        saveButtonBehaviors()
     }
 
     fun resetAllCustomizations() {
@@ -235,6 +351,8 @@ fun VirtualGamepadOverlay(
         customButtonScales.clear()
         customButtonOpacities.clear()
         customButtonHaptics.clear()
+        customButtonBehaviors.clear()
+        customButtonsList.clear()
         SettingsRepository.resetGamepadCustomOffsets(normGameKey)
     }
 
@@ -253,6 +371,10 @@ fun VirtualGamepadOverlay(
 
     fun nodeHaptic(nodeId: String): GamepadHapticLevel {
         return customButtonHaptics[nodeId] ?: config.gamepadHapticLevel
+    }
+
+    fun nodeBehavior(nodeId: String): GamepadButtonBehavior {
+        return customButtonBehaviors[nodeId] ?: GamepadButtonBehavior()
     }
 
     fun vibrateWithLevel(level: GamepadHapticLevel, stronger: Boolean = false) {
@@ -307,19 +429,40 @@ fun VirtualGamepadOverlay(
         vibrateWithLevel(level, stronger)
     }
 
-    fun sendButtonEvent(
-        buttonIndex: Int,
-        pressed: Boolean,
-        analogValue: Float? = null,
-        nodeId: String? = null
-    ) {
-        if (pressed) vibrate(nodeId = nodeId, stronger = buttonIndex in setOf(6, 7, 10, 11))
+    fun dispatchRawButtonJs(buttonIndex: Int, pressed: Boolean, analogValue: Float? = null) {
         val v = analogValue ?: if (pressed) 1f else 0f
         val rv = (v * 100f).roundToInt() / 100f
         webView?.evaluateJavascript(
             "if(window.__cpBtn){window.__cpBtn($buttonIndex,$pressed,$rv);}else if(window.dispatchEvent){window.dispatchEvent(new CustomEvent('virtual_gamepad_button',{detail:{index:$buttonIndex,pressed:$pressed,value:$rv}}));}",
             null
         )
+    }
+
+    fun sendButtonEvent(
+        buttonIndex: Int,
+        pressed: Boolean,
+        analogValue: Float? = null,
+        nodeId: String? = null
+    ) {
+        val extraTargets = if (nodeId != null) nodeBehavior(nodeId).extraButtons else emptySet()
+        val anyHeavy = buttonIndex in setOf(6, 7, 10, 11) || extraTargets.any { it in setOf(6, 7, 10, 11) }
+        if (pressed) vibrate(nodeId = nodeId, stronger = anyHeavy)
+        dispatchRawButtonJs(buttonIndex, pressed, analogValue)
+        extraTargets.forEach { extraIdx ->
+            if (extraIdx != buttonIndex && extraIdx in 0..16) {
+                dispatchRawButtonJs(extraIdx, pressed, if (pressed) 1f else 0f)
+            }
+        }
+    }
+
+    fun sendCustomButtonEvent(customDef: CustomGamepadButtonDef, pressed: Boolean) {
+        val targets = customDef.targetButtons.filter { it in 0..16 }
+        if (targets.isEmpty()) return
+        val anyHeavy = targets.any { it in setOf(6, 7, 10, 11) }
+        if (pressed) vibrate(nodeId = customDef.id, stronger = anyHeavy)
+        targets.forEach { targetIdx ->
+            dispatchRawButtonJs(targetIdx, pressed, if (pressed) 1f else 0f)
+        }
     }
 
     fun sendStickAxesPair(xAxisIndex: Int, xVal: Float, yAxisIndex: Int, yVal: Float) {
@@ -470,13 +613,18 @@ fun VirtualGamepadOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if ("btn_lt" !in hiddenButtons) {
+                    val ltBehavior = nodeBehavior("btn_lt")
+                    val ltAnalogDrag = ltBehavior.analogSwipe
+                        ?: (config.gamepadLayoutPreset == GamepadLayoutPreset.RACING)
                     Box(modifier = Modifier.draggableGamepadNode("btn_lt")) {
                         GamepadTriggerButton(
                             label = "LT",
                             buttonIndex = 6,
                             scale = nodeScale("btn_lt"),
                             opacity = nodeOpacity("btn_lt"),
-                            analogDragMode = config.gamepadLayoutPreset == GamepadLayoutPreset.RACING,
+                            analogDragMode = ltAnalogDrag,
+                            pressMode = ltBehavior.pressMode,
+                            turboHz = ltBehavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { pressed, analogVal ->
                                 sendButtonEvent(6, pressed, analogVal, nodeId = "btn_lt")
@@ -485,24 +633,30 @@ fun VirtualGamepadOverlay(
                     }
                 }
                 if ("btn_lb" !in hiddenButtons) {
+                    val lbBehavior = nodeBehavior("btn_lb")
                     Box(modifier = Modifier.draggableGamepadNode("btn_lb")) {
                         GamepadShoulderButton(
                             label = "LB",
                             buttonIndex = 4,
                             scale = nodeScale("btn_lb"),
                             opacity = nodeOpacity("btn_lb"),
+                            pressMode = lbBehavior.pressMode,
+                            turboHz = lbBehavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { sendButtonEvent(4, it, nodeId = "btn_lb") }
                         )
                     }
                 }
                 if ("btn_l3" !in hiddenButtons) {
+                    val l3Behavior = nodeBehavior("btn_l3")
                     Box(modifier = Modifier.draggableGamepadNode("btn_l3")) {
                         GamepadThumbClickMiniButton(
                             label = "L3",
                             buttonIndex = 10,
                             scale = nodeScale("btn_l3"),
                             opacity = nodeOpacity("btn_l3"),
+                            pressMode = l3Behavior.pressMode,
+                            turboHz = l3Behavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { sendButtonEvent(10, it, nodeId = "btn_l3") }
                         )
@@ -516,37 +670,48 @@ fun VirtualGamepadOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if ("btn_r3" !in hiddenButtons) {
+                    val r3Behavior = nodeBehavior("btn_r3")
                     Box(modifier = Modifier.draggableGamepadNode("btn_r3")) {
                         GamepadThumbClickMiniButton(
                             label = "R3",
                             buttonIndex = 11,
                             scale = nodeScale("btn_r3"),
                             opacity = nodeOpacity("btn_r3"),
+                            pressMode = r3Behavior.pressMode,
+                            turboHz = r3Behavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { sendButtonEvent(11, it, nodeId = "btn_r3") }
                         )
                     }
                 }
                 if ("btn_rb" !in hiddenButtons) {
+                    val rbBehavior = nodeBehavior("btn_rb")
                     Box(modifier = Modifier.draggableGamepadNode("btn_rb")) {
                         GamepadShoulderButton(
                             label = "RB",
                             buttonIndex = 5,
                             scale = nodeScale("btn_rb"),
                             opacity = nodeOpacity("btn_rb"),
+                            pressMode = rbBehavior.pressMode,
+                            turboHz = rbBehavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { sendButtonEvent(5, it, nodeId = "btn_rb") }
                         )
                     }
                 }
                 if ("btn_rt" !in hiddenButtons) {
+                    val rtBehavior = nodeBehavior("btn_rt")
+                    val rtAnalogDrag = rtBehavior.analogSwipe
+                        ?: (config.gamepadLayoutPreset == GamepadLayoutPreset.RACING)
                     Box(modifier = Modifier.draggableGamepadNode("btn_rt")) {
                         GamepadTriggerButton(
                             label = "RT",
                             buttonIndex = 7,
                             scale = nodeScale("btn_rt"),
                             opacity = nodeOpacity("btn_rt"),
-                            analogDragMode = config.gamepadLayoutPreset == GamepadLayoutPreset.RACING,
+                            analogDragMode = rtAnalogDrag,
+                            pressMode = rtBehavior.pressMode,
+                            turboHz = rtBehavior.turboHz,
                             isEditMode = isEditPositionMode,
                             onStateChange = { pressed, analogVal ->
                                 sendButtonEvent(7, pressed, analogVal, nodeId = "btn_rt")
@@ -566,32 +731,41 @@ fun VirtualGamepadOverlay(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if ("btn_view" !in hiddenButtons) {
+                val viewBehavior = nodeBehavior("btn_view")
                 Box(modifier = Modifier.draggableGamepadNode("btn_view")) {
                     GamepadSmallButton(
                         label = "⧉ View",
                         index = 8,
                         scale = customButtonScales["btn_view"] ?: 1.0f,
                         opacity = nodeOpacity("btn_view"),
+                        pressMode = viewBehavior.pressMode,
+                        turboHz = viewBehavior.turboHz,
                         isEditMode = isEditPositionMode
                     ) { sendButtonEvent(8, it, nodeId = "btn_view") }
                 }
             }
             if ("btn_xbox" !in hiddenButtons) {
+                val xboxBehavior = nodeBehavior("btn_xbox")
                 Box(modifier = Modifier.draggableGamepadNode("btn_xbox")) {
                     GamepadXboxNexusButton(
                         scale = customButtonScales["btn_xbox"] ?: 1.0f,
                         opacity = nodeOpacity("btn_xbox"),
+                        pressMode = xboxBehavior.pressMode,
+                        turboHz = xboxBehavior.turboHz,
                         isEditMode = isEditPositionMode
                     ) { sendButtonEvent(16, it, nodeId = "btn_xbox") }
                 }
             }
             if ("btn_menu" !in hiddenButtons) {
+                val menuBehavior = nodeBehavior("btn_menu")
                 Box(modifier = Modifier.draggableGamepadNode("btn_menu")) {
                     GamepadSmallButton(
                         label = "☰ Menu",
                         index = 9,
                         scale = customButtonScales["btn_menu"] ?: 1.0f,
                         opacity = nodeOpacity("btn_menu"),
+                        pressMode = menuBehavior.pressMode,
+                        turboHz = menuBehavior.turboHz,
                         isEditMode = isEditPositionMode
                     ) { sendButtonEvent(9, it, nodeId = "btn_menu") }
                 }
@@ -654,7 +828,8 @@ fun VirtualGamepadOverlay(
                         scale = nodeScale("left_stick"),
                         innerDeadzone = config.leftStickInnerDeadzone,
                         outerDeadzone = config.leftStickOuterDeadzone,
-                        sensitivity = config.gamepadSensitivity,
+                        sensitivity = config.leftStickSensitivity,
+                        responseCurve = config.leftStickCurve,
                         label = "L",
                         enableAutoSprintL3 = config.gamepadSprintLockEnabled,
                         isEditMode = isEditPositionMode,
@@ -683,6 +858,7 @@ fun VirtualGamepadOverlay(
                 val splitBaseSize = 104.dp * effectiveScale
                 Box(modifier = Modifier.size(splitBaseSize)) {
                     if ("dpad_up" !in hiddenButtons) {
+                        val b = nodeBehavior("dpad_up")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
@@ -693,12 +869,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 12,
                                 scale = nodeScale("dpad_up"),
                                 opacity = nodeOpacity("dpad_up"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(12, it, nodeId = "dpad_up") }
                             )
                         }
                     }
                     if ("dpad_down" !in hiddenButtons) {
+                        val b = nodeBehavior("dpad_down")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -709,12 +888,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 13,
                                 scale = nodeScale("dpad_down"),
                                 opacity = nodeOpacity("dpad_down"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(13, it, nodeId = "dpad_down") }
                             )
                         }
                     }
                     if ("dpad_left" !in hiddenButtons) {
+                        val b = nodeBehavior("dpad_left")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -725,12 +907,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 14,
                                 scale = nodeScale("dpad_left"),
                                 opacity = nodeOpacity("dpad_left"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(14, it, nodeId = "dpad_left") }
                             )
                         }
                     }
                     if ("dpad_right" !in hiddenButtons) {
+                        val b = nodeBehavior("dpad_right")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
@@ -741,6 +926,8 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 15,
                                 scale = nodeScale("dpad_right"),
                                 opacity = nodeOpacity("dpad_right"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(15, it, nodeId = "dpad_right") }
                             )
@@ -765,7 +952,8 @@ fun VirtualGamepadOverlay(
                         scale = nodeScale("right_stick", rightStickBaseScale),
                         innerDeadzone = config.rightStickInnerDeadzone,
                         outerDeadzone = config.rightStickOuterDeadzone,
-                        sensitivity = config.gamepadSensitivity,
+                        sensitivity = config.rightStickSensitivity,
+                        responseCurve = config.rightStickCurve,
                         label = "R",
                         enableAutoSprintL3 = false,
                         isEditMode = isEditPositionMode,
@@ -794,6 +982,7 @@ fun VirtualGamepadOverlay(
                 val splitAbxyBoxSize = 132.dp * effectiveScale
                 Box(modifier = Modifier.size(splitAbxyBoxSize)) {
                     if ("btn_y" !in hiddenButtons) {
+                        val b = nodeBehavior("btn_y")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
@@ -805,12 +994,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 3,
                                 scale = nodeScale("btn_y"),
                                 opacity = nodeOpacity("btn_y"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(3, it, nodeId = "btn_y") }
                             )
                         }
                     }
                     if ("btn_a" !in hiddenButtons) {
+                        val b = nodeBehavior("btn_a")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -822,12 +1014,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 0,
                                 scale = nodeScale("btn_a"),
                                 opacity = nodeOpacity("btn_a"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(0, it, nodeId = "btn_a") }
                             )
                         }
                     }
                     if ("btn_x" !in hiddenButtons) {
+                        val b = nodeBehavior("btn_x")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -839,12 +1034,15 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 2,
                                 scale = nodeScale("btn_x"),
                                 opacity = nodeOpacity("btn_x"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(2, it, nodeId = "btn_x") }
                             )
                         }
                     }
                     if ("btn_b" !in hiddenButtons) {
+                        val b = nodeBehavior("btn_b")
                         Box(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
@@ -856,12 +1054,37 @@ fun VirtualGamepadOverlay(
                                 buttonIndex = 1,
                                 scale = nodeScale("btn_b"),
                                 opacity = nodeOpacity("btn_b"),
+                                pressMode = b.pressMode,
+                                turboHz = b.turboHz,
                                 isEditMode = isEditPositionMode,
                                 onButton = { sendButtonEvent(1, it, nodeId = "btn_b") }
                             )
                         }
                     }
                 }
+            }
+        }
+
+        // Unlimited User-Created Custom Blank Buttons
+        customButtonsList.forEach { customDef ->
+            val customBehavior = nodeBehavior(customDef.id)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .draggableGamepadNode(customDef.id)
+            ) {
+                CustomVirtualGamepadButton(
+                    badge = customDef.resolvedBadge(),
+                    isRound = customDef.isRound,
+                    scale = nodeScale(customDef.id),
+                    opacity = nodeOpacity(customDef.id),
+                    pressMode = customBehavior.pressMode,
+                    turboHz = customBehavior.turboHz,
+                    isEditMode = isEditPositionMode,
+                    onStateChange = { pressed ->
+                        sendCustomButtonEvent(customDef, pressed)
+                    }
+                )
             }
         }
 
@@ -994,7 +1217,7 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Modal Drawer to Add / Restore or Hide Any Button
+        // Modal Drawer to Add / Restore or Hide Any Button + Add Unlimited Blank Custom Buttons
         if (showAddButtonModal) {
             Box(
                 modifier = Modifier
@@ -1009,8 +1232,23 @@ fun VirtualGamepadOverlay(
                 AddOrManageButtonsModal(
                     config = config,
                     hiddenButtons = hiddenButtons,
+                    customButtons = customButtonsList,
                     abxySplitMode = abxySplitMode,
                     dpadSplitMode = dpadSplitMode,
+                    onAddBlankCustomButton = {
+                        vibrate()
+                        addBlankCustomButton()
+                    },
+                    onSelectCustomButton = { customId ->
+                        vibrate(customId)
+                        showAddButtonModal = false
+                        selectedButtonId = customId
+                        activePopoverNodeId = customId
+                    },
+                    onDeleteCustomButton = { customId ->
+                        vibrate(customId, stronger = true)
+                        removeCustomButton(customId)
+                    },
                     onToggleButtonVisibility = { nodeId ->
                         vibrate(nodeId)
                         if (nodeId in hiddenButtons) {
@@ -1039,7 +1277,7 @@ fun VirtualGamepadOverlay(
         if (popNodeId != null) {
             val anchorRect = nodeBoundsMap[popNodeId]
             val popWidthPx = with(density) { 246.dp.toPx() }
-            val popMaxHeightPx = with(density) { 340.dp.toPx() }
+            val popMaxHeightPx = with(density) { 360.dp.toPx() }
             val marginPx = with(density) { 10.dp.toPx() }
             val viewportW = rootSizePx.width.toFloat().coerceAtLeast(popWidthPx + marginPx * 2f)
             val viewportH = rootSizePx.height.toFloat().coerceAtLeast(popMaxHeightPx + marginPx * 2f)
@@ -1084,6 +1322,7 @@ fun VirtualGamepadOverlay(
                             indication = null
                         ) {}
                 ) {
+                    val activeCustomDef = customButtonsList.firstOrNull { it.id == popNodeId }
                     GamepadNodePopover(
                         nodeId = popNodeId,
                         config = config,
@@ -1095,6 +1334,8 @@ fun VirtualGamepadOverlay(
                         nodeScaleMult = customButtonScales[popNodeId] ?: 1.0f,
                         nodeOpacity = nodeOpacity(popNodeId),
                         nodeHaptic = nodeHaptic(popNodeId),
+                        nodeBehavior = nodeBehavior(popNodeId),
+                        customButtonDef = activeCustomDef,
                         abxySplitMode = abxySplitMode,
                         dpadSplitMode = dpadSplitMode,
                         onScaleChange = { setButtonScale(popNodeId, it) },
@@ -1103,13 +1344,19 @@ fun VirtualGamepadOverlay(
                             vibrateWithLevel(it)
                             setButtonHaptic(popNodeId, it)
                         },
+                        onBehaviorChange = { nextBehavior ->
+                            setButtonBehavior(popNodeId, nextBehavior)
+                        },
+                        onCustomButtonDefChange = { nextCustomDef ->
+                            updateCustomButtonDef(nextCustomDef)
+                        },
                         onNudge = { dx, dy ->
                             vibrate(popNodeId)
                             val cur = customOffsets[popNodeId] ?: (0f to 0f)
                             customOffsets[popNodeId] = (cur.first + dx) to (cur.second + dy)
                             saveCustomOffsets()
                         },
-                        onHideNode = {
+                        onHideOrDeleteNode = {
                             vibrate(popNodeId, stronger = true)
                             deleteButton(popNodeId)
                             if (selectedButtonId == popNodeId) selectedButtonId = null
@@ -1122,6 +1369,38 @@ fun VirtualGamepadOverlay(
                         onToggleAbxySplit = {
                             vibrate(popNodeId)
                             val nextSplit = !abxySplitMode
+                            val childIds = listOf("btn_a", "btn_b", "btn_x", "btn_y")
+                            if (nextSplit) {
+                                customButtonOpacities["abxy"]?.let { clusterOp ->
+                                    childIds.forEach { cid ->
+                                        if (!customButtonOpacities.containsKey(cid)) {
+                                            customButtonOpacities[cid] = clusterOp
+                                        }
+                                    }
+                                    saveButtonOpacities()
+                                }
+                                customButtonHaptics["abxy"]?.let { clusterHap ->
+                                    childIds.forEach { cid ->
+                                        if (!customButtonHaptics.containsKey(cid)) {
+                                            customButtonHaptics[cid] = clusterHap
+                                        }
+                                    }
+                                    saveButtonHaptics()
+                                }
+                            } else {
+                                if (!customButtonOpacities.containsKey("abxy")) {
+                                    childIds.firstNotNullOfOrNull { customButtonOpacities[it] }?.let { op ->
+                                        customButtonOpacities["abxy"] = op
+                                        saveButtonOpacities()
+                                    }
+                                }
+                                if (!customButtonHaptics.containsKey("abxy")) {
+                                    childIds.firstNotNullOfOrNull { customButtonHaptics[it] }?.let { hap ->
+                                        customButtonHaptics["abxy"] = hap
+                                        saveButtonHaptics()
+                                    }
+                                }
+                            }
                             SettingsRepository.updateGamepadAbxySplitMode(nextSplit, normGameKey)
                             val nextId = if (nextSplit) "btn_a" else "abxy"
                             selectedButtonId = nextId
@@ -1130,6 +1409,38 @@ fun VirtualGamepadOverlay(
                         onToggleDpadSplit = {
                             vibrate(popNodeId)
                             val nextSplit = !dpadSplitMode
+                            val childIds = listOf("dpad_up", "dpad_down", "dpad_left", "dpad_right")
+                            if (nextSplit) {
+                                customButtonOpacities["dpad"]?.let { clusterOp ->
+                                    childIds.forEach { cid ->
+                                        if (!customButtonOpacities.containsKey(cid)) {
+                                            customButtonOpacities[cid] = clusterOp
+                                        }
+                                    }
+                                    saveButtonOpacities()
+                                }
+                                customButtonHaptics["dpad"]?.let { clusterHap ->
+                                    childIds.forEach { cid ->
+                                        if (!customButtonHaptics.containsKey(cid)) {
+                                            customButtonHaptics[cid] = clusterHap
+                                        }
+                                    }
+                                    saveButtonHaptics()
+                                }
+                            } else {
+                                if (!customButtonOpacities.containsKey("dpad")) {
+                                    childIds.firstNotNullOfOrNull { customButtonOpacities[it] }?.let { op ->
+                                        customButtonOpacities["dpad"] = op
+                                        saveButtonOpacities()
+                                    }
+                                }
+                                if (!customButtonHaptics.containsKey("dpad")) {
+                                    childIds.firstNotNullOfOrNull { customButtonHaptics[it] }?.let { hap ->
+                                        customButtonHaptics["dpad"] = hap
+                                        saveButtonHaptics()
+                                    }
+                                }
+                            }
                             SettingsRepository.updateGamepadDpadSplitMode(nextSplit, normGameKey)
                             val nextId = if (nextSplit) "dpad_up" else "dpad"
                             selectedButtonId = nextId

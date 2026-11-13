@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,8 +35,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppConfig
+import com.example.data.GamepadButtonPressMode
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
+import com.example.data.GamepadStickCurve
 import com.example.data.SettingsRepository
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import kotlin.math.roundToInt
@@ -51,13 +55,17 @@ internal fun GamepadNodePopover(
     nodeScaleMult: Float,
     nodeOpacity: Float,
     nodeHaptic: GamepadHapticLevel,
+    nodeBehavior: GamepadButtonBehavior,
+    customButtonDef: CustomGamepadButtonDef?,
     abxySplitMode: Boolean,
     dpadSplitMode: Boolean,
     onScaleChange: (Float) -> Unit,
     onOpacityChange: (Float) -> Unit,
     onHapticChange: (GamepadHapticLevel) -> Unit,
+    onBehaviorChange: (GamepadButtonBehavior) -> Unit,
+    onCustomButtonDefChange: (CustomGamepadButtonDef) -> Unit,
     onNudge: (Float, Float) -> Unit,
-    onHideNode: () -> Unit,
+    onHideOrDeleteNode: () -> Unit,
     onResetNode: () -> Unit,
     onToggleAbxySplit: () -> Unit,
     onToggleDpadSplit: () -> Unit,
@@ -87,8 +95,8 @@ internal fun GamepadNodePopover(
             text = {
                 Text(
                     text = config.tr(
-                        "Khôi phục toàn bộ vị trí, cỡ, độ mờ, rung và các nút ẩn về mặc định?",
-                        "Restore all button positions, sizes, opacity, haptics, and hidden buttons to default?"
+                        "Khôi phục toàn bộ vị trí, cỡ, độ mờ, kiểu bấm, nút trống và các nút ẩn về mặc định?",
+                        "Restore all button positions, sizes, opacity, press modes, custom buttons, and hidden buttons to default?"
                     ),
                     fontSize = 13.5.sp
                 )
@@ -127,14 +135,18 @@ internal fun GamepadNodePopover(
     val nodeInfo = remember(nodeId) { ALL_GAMEPAD_NODES.find { it.id == nodeId } }
     val title = when {
         nodeId == "all" -> config.tr("Cả tay cầm", "All Gamepad")
+        customButtonDef != null -> {
+            val badge = customButtonDef.resolvedBadge(isEnUi)
+            config.tr("Nút tùy chỉnh ($badge)", "Custom Button ($badge)")
+        }
         nodeInfo != null -> config.tr(nodeInfo.labelVi, nodeInfo.labelEn)
         else -> nodeId
     }
 
     Surface(
         modifier = modifier
-            .width(246.dp)
-            .heightIn(max = 340.dp)
+            .width(256.dp)
+            .heightIn(max = 356.dp)
             .testTag(if (nodeId == "all") "virtual_gamepad_tuner_panel" else "virtual_gamepad_node_popover"),
         shape = RoundedCornerShape(18.dp),
         color = HudSurface2,
@@ -203,19 +215,24 @@ internal fun GamepadNodePopover(
                     SingleNodePopoverBody(
                         nodeId = nodeId,
                         config = config,
+                        nodeInfo = nodeInfo,
                         nodeOffset = nodeOffset,
                         nodeScaleMult = nodeScaleMult,
                         nodeOpacity = nodeOpacity,
                         nodeHaptic = nodeHaptic,
+                        nodeBehavior = nodeBehavior,
+                        customButtonDef = customButtonDef,
                         abxySplitMode = abxySplitMode,
                         dpadSplitMode = dpadSplitMode,
                         onScaleChange = onScaleChange,
                         onOpacityChange = onOpacityChange,
                         onHapticChange = onHapticChange,
+                        onBehaviorChange = onBehaviorChange,
+                        onCustomButtonDefChange = onCustomButtonDefChange,
                         onNudge = onNudge,
                         onToggleAbxySplit = onToggleAbxySplit,
                         onToggleDpadSplit = onToggleDpadSplit,
-                        onHideNode = onHideNode,
+                        onHideOrDeleteNode = onHideOrDeleteNode,
                         onResetNode = onResetNode
                     )
                 }
@@ -399,25 +416,33 @@ private fun GlobalPopoverBody(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SingleNodePopoverBody(
     nodeId: String,
     config: AppConfig,
+    nodeInfo: GamepadEditableNodeInfo?,
     nodeOffset: Pair<Float, Float>,
     nodeScaleMult: Float,
     nodeOpacity: Float,
     nodeHaptic: GamepadHapticLevel,
+    nodeBehavior: GamepadButtonBehavior,
+    customButtonDef: CustomGamepadButtonDef?,
     abxySplitMode: Boolean,
     dpadSplitMode: Boolean,
     onScaleChange: (Float) -> Unit,
     onOpacityChange: (Float) -> Unit,
     onHapticChange: (GamepadHapticLevel) -> Unit,
+    onBehaviorChange: (GamepadButtonBehavior) -> Unit,
+    onCustomButtonDefChange: (CustomGamepadButtonDef) -> Unit,
     onNudge: (Float, Float) -> Unit,
     onToggleAbxySplit: () -> Unit,
     onToggleDpadSplit: () -> Unit,
-    onHideNode: () -> Unit,
+    onHideOrDeleteNode: () -> Unit,
     onResetNode: () -> Unit
 ) {
+    var showComboSelector by remember(nodeId) { mutableStateOf(nodeBehavior.extraButtons.isNotEmpty()) }
+
     // 1. Size Stepper ("Cỡ")
     HudSurfaceRow(minHeight = 34.dp, bgColor = HudSurface) {
         Text(
@@ -485,18 +510,53 @@ private fun SingleNodePopoverBody(
     }
 
     val isStick = nodeId == "left_stick" || nodeId == "right_stick"
+    val isCluster = nodeId == "abxy" || nodeId == "dpad"
+
     if (isStick) {
         val isLeft = nodeId == "left_stick"
+        val stickSens = if (isLeft) config.leftStickSensitivity else config.rightStickSensitivity
+        val stickCurve = if (isLeft) config.leftStickCurve else config.rightStickCurve
         val innerDz = if (isLeft) config.leftStickInnerDeadzone else config.rightStickInnerDeadzone
         val outerDz = if (isLeft) config.leftStickOuterDeadzone else config.rightStickOuterDeadzone
 
         HudSliderRow(
-            label = config.tr("Độ nhạy", "Sensitivity"),
-            valueText = "${(config.gamepadSensitivity * 100).roundToInt()}%",
-            value = config.gamepadSensitivity,
+            label = if (isLeft) {
+                config.tr("Độ nhạy cần trái", "Left Stick Sens")
+            } else {
+                config.tr("Độ nhạy cần phải", "Right Stick Sens")
+            },
+            valueText = "${(stickSens * 100).roundToInt()}%",
+            value = stickSens,
             valueRange = 0.60f..1.60f,
-            onValueChange = { SettingsRepository.updateGamepadSensitivity(it) },
+            onValueChange = { next ->
+                if (isLeft) {
+                    SettingsRepository.updateLeftStickSensitivity(next)
+                } else {
+                    SettingsRepository.updateRightStickSensitivity(next)
+                }
+            },
             bgColor = HudSurface
+        )
+
+        val curveOptions = remember(config.appLanguage) {
+            GamepadStickCurve.entries.map { config.tr(it.titleVi, it.titleEn) }
+        }
+        HudSectionLabel(text = config.tr("Cảm giác phản hồi", "Response Curve"))
+        HudSegmentedControl(
+            options = curveOptions,
+            selectedIndex = GamepadStickCurve.entries.indexOf(stickCurve).coerceAtLeast(0),
+            onSelect = { idx ->
+                GamepadStickCurve.entries.getOrNull(idx)?.let { nextCurve ->
+                    if (isLeft) {
+                        SettingsRepository.updateLeftStickCurve(nextCurve)
+                    } else {
+                        SettingsRepository.updateRightStickCurve(nextCurve)
+                    }
+                }
+            },
+            bgColor = HudSurface,
+            minButtonHeight = 30.dp,
+            fontSize = 11.sp
         )
 
         HudSliderRow(
@@ -532,12 +592,165 @@ private fun SingleNodePopoverBody(
         if (isLeft) {
             HudSwitchRow(
                 title = config.tr("Tự chạy nhanh (L3)", "Auto Sprint (L3)"),
+                subtitle = config.tr("Vuốt vượt đỉnh cần để bật L3", "Swipe past top rim to sprint"),
                 checked = config.gamepadSprintLockEnabled,
                 onCheckedChange = { SettingsRepository.updateGamepadSprintLockEnabled(it) },
                 bgColor = HudSurface
             )
         }
     } else {
+        // Custom Blank Button shape & target Xbox buttons selector
+        if (customButtonDef != null) {
+            HudSectionLabel(text = config.tr("Hình dáng nút", "Button Shape"))
+            HudSegmentedControl(
+                options = listOf(
+                    config.tr("Tròn", "Round"),
+                    config.tr("Viên thuốc", "Pill")
+                ),
+                selectedIndex = if (customButtonDef.isRound) 0 else 1,
+                onSelect = { idx ->
+                    onCustomButtonDefChange(customButtonDef.copy(isRound = idx == 0))
+                },
+                bgColor = HudSurface,
+                minButtonHeight = 30.dp,
+                fontSize = 11.5.sp
+            )
+
+            HudSectionLabel(
+                text = config.tr(
+                    "Gán nút Xbox (chọn 1 hoặc nhiều):",
+                    "Assign Xbox Buttons (1 or multiple):"
+                )
+            )
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                XBOX_TARGET_BUTTON_CHOICES.forEach { choice ->
+                    val selected = choice.index in customButtonDef.targetButtons
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (selected) HudSelBg else HudSurface,
+                        border = BorderStroke(1.dp, if (selected) HudAccent else HudLine),
+                        modifier = Modifier.clickable {
+                            val nextSet = customButtonDef.targetButtons.toMutableSet()
+                            if (selected) nextSet.remove(choice.index) else nextSet.add(choice.index)
+                            onCustomButtonDefChange(customButtonDef.copy(targetButtons = nextSet))
+                        },
+                        shadowElevation = 0.dp
+                    ) {
+                        Text(
+                            text = choice.badge,
+                            color = if (selected) HudAccent else HudMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Single-button Press Mode ("Bấm thả" / "Chạm khóa" / "Nhấp nhanh")
+        if (!isCluster) {
+            val pressModeLabels = remember(config.appLanguage) {
+                GamepadButtonPressMode.entries.map { config.tr(it.titleVi, it.titleEn) }
+            }
+            HudSectionLabel(text = config.tr("Cách bấm", "Press Mode"))
+            HudSegmentedControl(
+                options = pressModeLabels,
+                selectedIndex = GamepadButtonPressMode.entries.indexOf(nodeBehavior.pressMode).coerceAtLeast(0),
+                onSelect = { idx ->
+                    GamepadButtonPressMode.entries.getOrNull(idx)?.let { mode ->
+                        onBehaviorChange(nodeBehavior.copy(pressMode = mode))
+                    }
+                },
+                bgColor = HudSurface,
+                minButtonHeight = 30.dp,
+                fontSize = 11.sp
+            )
+
+            if (nodeBehavior.pressMode == GamepadButtonPressMode.TURBO) {
+                HudSliderRow(
+                    label = config.tr("Tốc độ nhấp", "Turbo Speed"),
+                    valueText = "${nodeBehavior.turboHz} /s",
+                    value = nodeBehavior.turboHz.toFloat(),
+                    valueRange = 5f..20f,
+                    onValueChange = { onBehaviorChange(nodeBehavior.copy(turboHz = it.roundToInt().coerceIn(5, 20))) },
+                    bgColor = HudSurface
+                )
+            }
+
+            // Individual Analog Trigger Swipe toggle for LT / RT
+            if (nodeId == "btn_lt" || nodeId == "btn_rt") {
+                val effectiveAnalog = nodeBehavior.analogSwipe
+                    ?: (config.gamepadLayoutPreset == GamepadLayoutPreset.RACING)
+                HudSwitchRow(
+                    title = config.tr("Vuốt chỉnh lực cò", "Analog Trigger Swipe"),
+                    subtitle = config.tr("Vuốt xuống để rà ga/phanh 0–100%", "Swipe down for 0–100% throttle/brake"),
+                    checked = effectiveAnalog,
+                    onCheckedChange = { enabled ->
+                        onBehaviorChange(nodeBehavior.copy(analogSwipe = enabled))
+                    },
+                    bgColor = HudSurface
+                )
+            }
+
+            // Optional Combo Button Picker for standard single buttons
+            if (customButtonDef == null && nodeInfo?.primaryButtonIndex != null) {
+                val primaryIdx = nodeInfo.primaryButtonIndex
+                val comboCount = nodeBehavior.extraButtons.size
+                HudButton(
+                    text = if (comboCount > 0) {
+                        val names = nodeBehavior.extraButtons.sorted().mapNotNull { idx ->
+                            XBOX_TARGET_BUTTON_CHOICES.find { it.index == idx }?.badge
+                        }.joinToString("+")
+                        config.tr("＋ Bấm kèm: $names", "＋ Combo: $names")
+                    } else {
+                        config.tr("＋ Gán nút bấm kèm (tổ hợp)", "＋ Add Combo Button")
+                    },
+                    onClick = { showComboSelector = !showComboSelector },
+                    minHeight = 32.dp,
+                    fontSize = 11.5.sp,
+                    containerOverride = if (comboCount > 0) HudSelBg else HudSurface,
+                    contentOverride = if (comboCount > 0) HudAccent else HudMuted,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (showComboSelector) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        XBOX_TARGET_BUTTON_CHOICES.filter { it.index != primaryIdx }.forEach { choice ->
+                            val selected = choice.index in nodeBehavior.extraButtons
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (selected) HudSelBg else HudSurface,
+                                border = BorderStroke(1.dp, if (selected) HudAccent else HudLine),
+                                modifier = Modifier.clickable {
+                                    val nextExtras = nodeBehavior.extraButtons.toMutableSet()
+                                    if (selected) nextExtras.remove(choice.index) else nextExtras.add(choice.index)
+                                    onBehaviorChange(nodeBehavior.copy(extraButtons = nextExtras))
+                                },
+                                shadowElevation = 0.dp
+                            ) {
+                                Text(
+                                    text = choice.badge,
+                                    color = if (selected) HudAccent else HudMuted,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Button / Cluster Haptics ("Rung khi bấm")
         val hapticLabels = remember(config.appLanguage) {
             GamepadHapticLevel.entries.map { config.tr(it.titleVi, it.titleEn) }
@@ -591,17 +804,22 @@ private fun SingleNodePopoverBody(
         }
     }
 
-    // Footer: "Ẩn nút" & "↺ Nút này"
+    // Footer: "Ẩn nút" (or "Xóa nút" for custom blank button) & "↺ Nút này"
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         HudButton(
-            text = config.tr("Ẩn nút", "Hide"),
-            onClick = onHideNode,
+            text = if (customButtonDef != null) {
+                config.tr("Xóa nút này", "Delete")
+            } else {
+                config.tr("Ẩn nút", "Hide")
+            },
+            onClick = onHideOrDeleteNode,
             minHeight = 34.dp,
             fontSize = 11.5.sp,
             containerOverride = HudSurface,
+            contentOverride = if (customButtonDef != null) HudDanger else HudInk,
             modifier = Modifier
                 .weight(1f)
                 .testTag("virtual_gamepad_delete_button")

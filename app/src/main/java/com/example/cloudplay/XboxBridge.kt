@@ -2086,6 +2086,18 @@ class XboxBridge(
                         virtualGamepadState.timestamp = nowTs();
                     };
 
+                    window.__cpReleaseAll = function() {
+                        virtViewDownAt = 0;
+                        virtShortcutLatched = {};
+                        for (let i = 0; i < 4; i++) virtualGamepadState.axes[i] = 0;
+                        for (let b = 0; b < 17; b++) {
+                            virtualGamepadState.buttons[b].pressed = false;
+                            virtualGamepadState.buttons[b].touched = false;
+                            virtualGamepadState.buttons[b].value = 0;
+                        }
+                        virtualGamepadState.timestamp = nowTs();
+                    };
+
                     window.addEventListener('virtual_gamepad_button', function(e) {
                         if (e && e.detail) {
                             window.__cpBtn(e.detail.index, e.detail.pressed, e.detail.value);
@@ -2309,7 +2321,7 @@ class XboxBridge(
                                 outButtons = mergedButtons;
                             }
 
-                            pads[padIdx] = {
+                            const mergedPadObj = {
                                 id: physPad.id || virtualGamepadState.id,
                                 index: padIdx,
                                 connected: true,
@@ -2317,9 +2329,13 @@ class XboxBridge(
                                 mapping: physPad.mapping || "standard",
                                 axes: outAxes,
                                 buttons: outButtons,
-                                vibrationActuator: physPad.vibrationActuator || null,
+                                vibrationActuator: physPad.vibrationActuator || virtualVibrationActuator,
                                 hapticActuators: physPad.hapticActuators
                             };
+                            pads[padIdx] = mergedPadObj;
+                            if (padIdx !== 0 && !pads[0]) {
+                                pads[0] = Object.assign({}, mergedPadObj, { index: 0 });
+                            }
                             return pads;
                         };
                     } catch(e) {}

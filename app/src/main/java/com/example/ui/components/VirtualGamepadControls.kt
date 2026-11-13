@@ -5,11 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +40,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.GamepadButtonPressMode
+import com.example.data.GamepadStickCurve
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -52,6 +58,7 @@ internal fun VirtualAnalogStick(
     innerDeadzone: Float,
     outerDeadzone: Float = 0.95f,
     sensitivity: Float,
+    responseCurve: GamepadStickCurve = GamepadStickCurve.STANDARD,
     label: String,
     enableAutoSprintL3: Boolean,
     isEditMode: Boolean,
@@ -73,7 +80,36 @@ internal fun VirtualAnalogStick(
     val currentInnerDeadzone by rememberUpdatedState(innerDeadzone)
     val currentOuterDeadzone by rememberUpdatedState(outerDeadzone)
     val currentSensitivity by rememberUpdatedState(sensitivity)
+    val currentCurve by rememberUpdatedState(responseCurve)
     val currentAutoSprint by rememberUpdatedState(enableAutoSprintL3)
+    val currentOnMove by rememberUpdatedState(onMove)
+    val currentOnSprintChange by rememberUpdatedState(onSprintStateChange)
+
+    LaunchedEffect(isEditMode) {
+        if (isEditMode) {
+            if (isTouching || stickX != 0f || stickY != 0f) {
+                isTouching = false
+                stickX = 0f
+                stickY = 0f
+                currentOnMove(0f, 0f)
+            }
+            if (isAutoSprinting) {
+                isAutoSprinting = false
+                currentOnSprintChange(false)
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isTouching || stickX != 0f || stickY != 0f) {
+                currentOnMove(0f, 0f)
+            }
+            if (isAutoSprinting) {
+                currentOnSprintChange(false)
+            }
+        }
+    }
 
     fun applyDeadzoneAndCurve(rawNorm: Float): Float {
         val absVal = abs(rawNorm)
@@ -81,8 +117,13 @@ internal fun VirtualAnalogStick(
         val effOuter = currentOuterDeadzone.coerceIn((effInner + 0.10f).coerceAtMost(1f), 1f)
         if (absVal <= effInner) return 0f
         val rescaled = ((absVal - effInner) / (effOuter - effInner)).coerceIn(0f, 1f)
-        val exponent = (1f / currentSensitivity.coerceIn(0.6f, 1.6f)).coerceIn(0.55f, 1.75f)
-        return sign(rawNorm) * rescaled.pow(exponent)
+        val sens = currentSensitivity.coerceIn(0.6f, 1.6f)
+        val baseExp = when (currentCurve) {
+            GamepadStickCurve.LINEAR -> (1f / sens).coerceIn(0.65f, 1.45f)
+            GamepadStickCurve.STANDARD -> (1.12f / sens).coerceIn(0.55f, 1.75f)
+            GamepadStickCurve.PRECISION -> (1.58f / sens).coerceIn(0.85f, 2.25f)
+        }
+        return sign(rawNorm) * rescaled.pow(baseExp)
     }
 
     val idleBorder = Color.White.copy(alpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f))
@@ -160,13 +201,23 @@ internal fun VirtualAnalogStick(
                                     }
                                 }
 
-                                // Auto-Sprint L3 when Left Stick is pushed strongly forward
+                                // Auto-Sprint L3: only activates when finger swipes PAST the top rim (> 128% radius),
+                                // then stays latched while the stick remains pushed forward (< -60% Y) so finger can relax.
                                 if (currentAutoSprint) {
-                                    val shouldSprint = rawY < -0.88f && abs(rawX) < 0.48f
+                                    val rawUnclampedX = dx / maxRadiusPx
+                                    val rawUnclampedY = dy / maxRadiusPx
+                                    val shouldSprint = if (!isAutoSprinting) {
+                                        rawUnclampedY < -1.28f && abs(rawUnclampedX) < 0.56f
+                                    } else {
+                                        rawY < -0.60f && abs(rawX) < 0.68f
+                                    }
                                     if (shouldSprint != isAutoSprinting) {
                                         isAutoSprinting = shouldSprint
                                         onSprintStateChange(shouldSprint)
                                     }
+                                } else if (isAutoSprinting) {
+                                    isAutoSprinting = false
+                                    onSprintStateChange(false)
                                 }
                             }
 
@@ -223,10 +274,10 @@ internal fun VirtualAnalogStick(
             }
         }
 
-        if (isAutoSprinting) {
+        if (isAutoSprinting || (enableAutoSprintL3 && isTouching)) {
             Text(
-                text = "🏃 L3",
-                color = HudCyan,
+                text = if (isAutoSprinting) "🏃 L3" else "▲ L3",
+                color = if (isAutoSprinting) HudCyan else HudMuted.copy(alpha = 0.65f),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Black,
                 modifier = Modifier
@@ -283,23 +334,36 @@ internal fun VirtualDpadCross(
     var downPressed by remember { mutableStateOf(false) }
     var leftPressed by remember { mutableStateOf(false) }
     var rightPressed by remember { mutableStateOf(false) }
+    val currentOnButton by rememberUpdatedState(onButton)
 
     fun updateDirections(newUp: Boolean, newDown: Boolean, newLeft: Boolean, newRight: Boolean) {
         if (newUp != upPressed) {
             upPressed = newUp
-            onButton(12, newUp)
+            currentOnButton(12, newUp)
         }
         if (newDown != downPressed) {
             downPressed = newDown
-            onButton(13, newDown)
+            currentOnButton(13, newDown)
         }
         if (newLeft != leftPressed) {
             leftPressed = newLeft
-            onButton(14, newLeft)
+            currentOnButton(14, newLeft)
         }
         if (newRight != rightPressed) {
             rightPressed = newRight
-            onButton(15, newRight)
+            currentOnButton(15, newRight)
+        }
+    }
+
+    LaunchedEffect(isEditMode) {
+        if (isEditMode) {
+            updateDirections(false, false, false, false)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            updateDirections(false, false, false, false)
         }
     }
 
@@ -377,58 +441,125 @@ internal fun VirtualDpadCross(
     }
 }
 
+/**
+ * Shared state + gesture controller supporting:
+ * - NORMAL ("Bấm thả"): active while finger is touching
+ * - TOGGLE_HOLD ("Chạm khóa"): single tap latches on/off
+ * - TURBO ("Nhấp nhanh"): rapid pulse at [turboHz] while finger is touching
+ */
+@Composable
+private fun rememberPressModeController(
+    pressMode: GamepadButtonPressMode,
+    turboHz: Int,
+    isEditMode: Boolean,
+    onOutputState: (Boolean) -> Unit
+): Pair<Boolean, () -> Unit> {
+    var fingerDown by remember { mutableStateOf(false) }
+    var latched by remember { mutableStateOf(false) }
+    var emittedState by remember { mutableStateOf(false) }
+    val currentOnOutput by rememberUpdatedState(onOutputState)
+
+    fun emit(next: Boolean) {
+        if (emittedState != next) {
+            emittedState = next
+            currentOnOutput(next)
+        }
+    }
+
+    LaunchedEffect(isEditMode, pressMode) {
+        if (isEditMode) {
+            fingerDown = false
+            latched = false
+            emit(false)
+        } else if (pressMode != GamepadButtonPressMode.TOGGLE_HOLD && latched) {
+            latched = false
+            if (!fingerDown) emit(false)
+        }
+    }
+
+    LaunchedEffect(fingerDown, pressMode, turboHz, isEditMode) {
+        if (isEditMode) return@LaunchedEffect
+        if (pressMode == GamepadButtonPressMode.TURBO && fingerDown) {
+            val halfPeriodMs = (500L / turboHz.coerceIn(5, 20)).coerceAtLeast(22L)
+            while (fingerDown) {
+                emit(true)
+                delay(halfPeriodMs)
+                emit(false)
+                delay(halfPeriodMs)
+            }
+            emit(false)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (emittedState) {
+                currentOnOutput(false)
+            }
+        }
+    }
+
+    val isVisualActive = when (pressMode) {
+        GamepadButtonPressMode.NORMAL -> fingerDown
+        GamepadButtonPressMode.TOGGLE_HOLD -> latched
+        GamepadButtonPressMode.TURBO -> fingerDown || emittedState
+    }
+
+    val onPointerEvent: (Boolean) -> Unit = { down ->
+        if (!isEditMode) {
+            when (pressMode) {
+                GamepadButtonPressMode.NORMAL -> {
+                    fingerDown = down
+                    emit(down)
+                }
+                GamepadButtonPressMode.TOGGLE_HOLD -> {
+                    if (down && !fingerDown) {
+                        fingerDown = true
+                        latched = !latched
+                        emit(latched)
+                    } else if (!down) {
+                        fingerDown = false
+                    }
+                }
+                GamepadButtonPressMode.TURBO -> {
+                    fingerDown = down
+                    if (!down) emit(false)
+                }
+            }
+        }
+    }
+
+    return isVisualActive to {
+        // Not used directly, we expose gesture modifier below
+        onPointerEvent(false)
+    }
+}
+
 @Composable
 internal fun StandaloneDpadButton(
     symbol: String,
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val sizeDp = (38.dp * scale)
-    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
-    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
-
-    Box(
-        modifier = Modifier
-            .size(sizeDp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isPressed) {
-                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
-                } else {
-                    HudSurface.copy(alpha = bgAlpha)
-                }
-            )
-            .border(
-                width = if (isPressed) 1.5.dp else 1.dp,
-                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .then(
-                if (isEditMode) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(buttonIndex, scale) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                onButton(true)
-                                tryAwaitRelease()
-                                isPressed = false
-                                onButton(false)
-                            }
-                        )
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+    GamepadConfigurableButtonBox(
+        widthDp = 38.dp * scale,
+        heightDp = 38.dp * scale,
+        shape = RoundedCornerShape(10.dp),
+        opacity = opacity,
+        accentColor = HudAccent,
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        onStateChange = onButton
+    ) { isActive, isLatched ->
         Text(
-            text = symbol,
-            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            text = if (isLatched) "$symbol•" else symbol,
+            color = if (isActive) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontSize = (13f * scale).sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -481,11 +612,66 @@ internal fun GamepadTriggerButton(
     scale: Float,
     opacity: Float,
     analogDragMode: Boolean,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onStateChange: (Boolean, Float) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
+    var fingerDown by remember { mutableStateOf(false) }
+    var latched by remember { mutableStateOf(false) }
     var analogLevel by remember { mutableFloatStateOf(0f) }
+    var emittedPressed by remember { mutableStateOf(false) }
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
+
+    fun emit(pressed: Boolean, level: Float) {
+        emittedPressed = pressed
+        currentOnStateChange(pressed, if (pressed) level.coerceIn(0.1f, 1f) else 0f)
+    }
+
+    LaunchedEffect(isEditMode, pressMode) {
+        if (isEditMode) {
+            if (fingerDown || latched || emittedPressed) {
+                fingerDown = false
+                latched = false
+                analogLevel = 0f
+                emit(false, 0f)
+            }
+        } else if (pressMode != GamepadButtonPressMode.TOGGLE_HOLD && latched) {
+            latched = false
+            analogLevel = 0f
+            emit(false, 0f)
+        }
+    }
+
+    LaunchedEffect(fingerDown, pressMode, turboHz, isEditMode) {
+        if (isEditMode) return@LaunchedEffect
+        if (pressMode == GamepadButtonPressMode.TURBO && fingerDown) {
+            val halfPeriodMs = (500L / turboHz.coerceIn(5, 20)).coerceAtLeast(22L)
+            while (fingerDown) {
+                val lvl = if (analogDragMode && analogLevel > 0f) analogLevel else 1f
+                emit(true, lvl)
+                delay(halfPeriodMs)
+                emit(false, 0f)
+                delay(halfPeriodMs)
+            }
+            emit(false, 0f)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (emittedPressed) {
+                currentOnStateChange(false, 0f)
+            }
+        }
+    }
+
+    val isPressedVisual = when (pressMode) {
+        GamepadButtonPressMode.NORMAL -> fingerDown
+        GamepadButtonPressMode.TOGGLE_HOLD -> latched
+        GamepadButtonPressMode.TURBO -> fingerDown || emittedPressed
+    }
+
     val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
     val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
 
@@ -494,28 +680,46 @@ internal fun GamepadTriggerButton(
             .size(width = (64.dp * scale), height = (38.dp * scale))
             .clip(RoundedCornerShape(12.dp))
             .background(
-                if (isPressed) {
+                if (isPressedVisual) {
                     HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
                     HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 1.5.dp else 1.dp,
-                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                width = if (isPressedVisual) 1.5.dp else 1.dp,
+                color = when {
+                    latched -> HudCyan
+                    isPressedVisual -> HudAccent
+                    else -> Color.White.copy(alpha = borderAlpha)
+                },
                 shape = RoundedCornerShape(12.dp)
             )
             .then(
                 if (isEditMode) {
                     Modifier
                 } else {
-                    Modifier.pointerInput(buttonIndex, analogDragMode) {
+                    Modifier.pointerInput(buttonIndex, analogDragMode, pressMode, turboHz) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             down.consume()
-                            isPressed = true
-                            analogLevel = if (analogDragMode) 0.35f else 1f
-                            onStateChange(true, analogLevel)
+                            fingerDown = true
+                            val initLevel = if (analogDragMode) 0.35f else 1f
+                            analogLevel = initLevel
+
+                            when (pressMode) {
+                                GamepadButtonPressMode.NORMAL -> emit(true, initLevel)
+                                GamepadButtonPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    if (latched) {
+                                        emit(true, if (analogDragMode) 1f else 1f)
+                                    } else {
+                                        analogLevel = 0f
+                                        emit(false, 0f)
+                                    }
+                                }
+                                GamepadButtonPressMode.TURBO -> {}
+                            }
 
                             do {
                                 val event = awaitPointerEvent()
@@ -525,20 +729,24 @@ internal fun GamepadTriggerButton(
                                     val dy = (ch.position.y - down.position.y).coerceIn(0f, 80f)
                                     val computed = (0.35f + (dy / 80f) * 0.65f).coerceIn(0.2f, 1f)
                                     analogLevel = computed
-                                    onStateChange(true, computed)
+                                    if (pressMode == GamepadButtonPressMode.NORMAL || (pressMode == GamepadButtonPressMode.TOGGLE_HOLD && latched)) {
+                                        emit(true, computed)
+                                    }
                                 }
                             } while (event.changes.any { it.pressed })
 
-                            isPressed = false
-                            analogLevel = 0f
-                            onStateChange(false, 0f)
+                            fingerDown = false
+                            if (pressMode == GamepadButtonPressMode.NORMAL) {
+                                analogLevel = 0f
+                                emit(false, 0f)
+                            }
                         }
                     }
                 }
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (analogDragMode && isPressed) {
+        if (analogDragMode && isPressedVisual) {
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -547,9 +755,18 @@ internal fun GamepadTriggerButton(
                     .background(HudAccent.copy(alpha = 0.25f))
             )
         }
+        val displayText = when {
+            analogDragMode && isPressedVisual -> "$label ${(analogLevel * 100).roundToInt()}%"
+            latched -> "$label •"
+            else -> label
+        }
         Text(
-            text = if (analogDragMode && isPressed) "$label ${(analogLevel * 100).roundToInt()}%" else label,
-            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            text = displayText,
+            color = when {
+                latched -> HudCyan
+                isPressedVisual -> HudAccent
+                else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+            },
             fontWeight = FontWeight.ExtraBold,
             fontSize = (12f * scale).sp
         )
@@ -562,51 +779,29 @@ internal fun GamepadShoulderButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onStateChange: (Boolean) -> Unit
 ) {
-    var isHeld by remember { mutableStateOf(false) }
-    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
-    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
-
-    Box(
-        modifier = Modifier
-            .size(width = (58.dp * scale), height = (38.dp * scale))
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isHeld) {
-                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
-                } else {
-                    HudSurface.copy(alpha = bgAlpha)
-                }
-            )
-            .border(
-                width = if (isHeld) 1.5.dp else 1.dp,
-                color = if (isHeld) HudAccent else Color.White.copy(alpha = borderAlpha),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .then(
-                if (isEditMode) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(buttonIndex) {
-                        detectTapGestures(
-                            onPress = {
-                                isHeld = true
-                                onStateChange(true)
-                                tryAwaitRelease()
-                                isHeld = false
-                                onStateChange(false)
-                            }
-                        )
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+    GamepadConfigurableButtonBox(
+        widthDp = 58.dp * scale,
+        heightDp = 38.dp * scale,
+        shape = RoundedCornerShape(12.dp),
+        opacity = opacity,
+        accentColor = HudAccent,
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        onStateChange = onStateChange
+    ) { isActive, isLatched ->
         Text(
-            text = label,
-            color = if (isHeld) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            text = if (isLatched) "$label •" else label,
+            color = when {
+                isLatched -> HudCyan
+                isActive -> HudAccent
+                else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+            },
             fontWeight = FontWeight.Bold,
             fontSize = (12f * scale).sp
         )
@@ -619,51 +814,29 @@ internal fun GamepadThumbClickMiniButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onStateChange: (Boolean) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
-    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
-
-    Box(
-        modifier = Modifier
-            .size(width = (42.dp * scale), height = (34.dp * scale))
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isPressed) {
-                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
-                } else {
-                    HudSurface.copy(alpha = bgAlpha)
-                }
-            )
-            .border(
-                width = 1.dp,
-                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .then(
-                if (isEditMode) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(buttonIndex) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                onStateChange(true)
-                                tryAwaitRelease()
-                                isPressed = false
-                                onStateChange(false)
-                            }
-                        )
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+    GamepadConfigurableButtonBox(
+        widthDp = 42.dp * scale,
+        heightDp = 34.dp * scale,
+        shape = RoundedCornerShape(10.dp),
+        opacity = opacity,
+        accentColor = HudAccent,
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        onStateChange = onStateChange
+    ) { isActive, isLatched ->
         Text(
-            text = label,
-            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            text = if (isLatched) "$label•" else label,
+            color = when {
+                isLatched -> HudCyan
+                isActive -> HudAccent
+                else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+            },
             fontWeight = FontWeight.ExtraBold,
             fontSize = (10.5f * scale).sp
         )
@@ -676,51 +849,31 @@ internal fun GamepadSmallButton(
     index: Int,
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
-    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                if (isPressed) {
-                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
-                } else {
-                    HudSurface.copy(alpha = bgAlpha)
-                }
-            )
-            .border(
-                1.dp,
-                if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
-                RoundedCornerShape(12.dp)
-            )
-            .then(
-                if (isEditMode) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(index) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                onButton(true)
-                                tryAwaitRelease()
-                                isPressed = false
-                                onButton(false)
-                            }
-                        )
-                    }
-                }
-            )
-            .padding(horizontal = (10.dp * scale), vertical = (6.dp * scale)),
-        contentAlignment = Alignment.Center
-    ) {
+    GamepadConfigurableButtonBox(
+        widthDp = null,
+        heightDp = null,
+        shape = RoundedCornerShape(12.dp),
+        opacity = opacity,
+        accentColor = HudAccent,
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        innerPaddingH = 10.dp * scale,
+        innerPaddingV = 6.dp * scale,
+        onStateChange = onButton
+    ) { isActive, isLatched ->
         Text(
-            text = label,
-            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            text = if (isLatched) "$label •" else label,
+            color = when {
+                isLatched -> HudCyan
+                isActive -> HudAccent
+                else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+            },
             fontSize = (11f * scale).sp,
             fontWeight = FontWeight.Bold
         )
@@ -731,46 +884,26 @@ internal fun GamepadSmallButton(
 internal fun GamepadXboxNexusButton(
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val bgAlpha = (opacity * 0.78f).coerceIn(0.18f, 0.92f)
-
-    Box(
-        modifier = Modifier
-            .size(34.dp * scale)
-            .clip(CircleShape)
-            .background(
-                if (isPressed) {
-                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
-                } else {
-                    HudSurface.copy(alpha = bgAlpha)
-                }
-            )
-            .border(1.2.dp, HudAccent.copy(alpha = opacity.coerceIn(0.30f, 1.0f)), CircleShape)
-            .then(
-                if (isEditMode) {
-                    Modifier
-                } else {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                onButton(true)
-                                tryAwaitRelease()
-                                isPressed = false
-                                onButton(false)
-                            }
-                        )
-                    }
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+    GamepadConfigurableButtonBox(
+        widthDp = 34.dp * scale,
+        heightDp = 34.dp * scale,
+        shape = CircleShape,
+        opacity = opacity,
+        accentColor = HudAccent,
+        idleBorderOverride = HudAccent.copy(alpha = opacity.coerceIn(0.30f, 1.0f)),
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        onStateChange = onButton
+    ) { isActive, isLatched ->
         Text(
             text = "✕",
-            color = HudAccent.copy(alpha = opacity.coerceIn(0.35f, 1.0f)),
+            color = if (isLatched) HudCyan else if (isActive) Color.White else HudAccent.copy(alpha = opacity.coerceIn(0.35f, 1.0f)),
             fontSize = (16f * scale).sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -784,55 +917,210 @@ internal fun StandaloneAbxyButton(
     buttonIndex: Int,
     scale: Float,
     opacity: Float,
+    pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
+    turboHz: Int = 10,
     isEditMode: Boolean,
     onButton: (Boolean) -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
-    val sizeDp = (46.dp * scale)
+    GamepadConfigurableButtonBox(
+        widthDp = 46.dp * scale,
+        heightDp = 46.dp * scale,
+        shape = CircleShape,
+        opacity = opacity,
+        accentColor = accentColor,
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        onStateChange = onButton
+    ) { isActive, isLatched ->
+        Text(
+            text = if (isLatched) "$label•" else label,
+            color = when {
+                isLatched -> HudCyan
+                isActive -> Color.White
+                else -> accentColor.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+            },
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = (16f * scale).sp
+        )
+    }
+}
+
+@Composable
+internal fun CustomVirtualGamepadButton(
+    badge: String,
+    isRound: Boolean,
+    scale: Float,
+    opacity: Float,
+    pressMode: GamepadButtonPressMode,
+    turboHz: Int,
+    isEditMode: Boolean,
+    onStateChange: (Boolean) -> Unit
+) {
+    val shape = if (isRound) CircleShape else RoundedCornerShape(12.dp)
+    val widthDp = if (isRound) (46.dp * scale) else null
+    val heightDp = if (isRound) (46.dp * scale) else (36.dp * scale)
+
+    GamepadConfigurableButtonBox(
+        widthDp = widthDp,
+        heightDp = heightDp,
+        minWidthDp = if (isRound) null else (54.dp * scale),
+        shape = shape,
+        opacity = opacity,
+        accentColor = HudCyan,
+        idleBorderOverride = HudCyan.copy(alpha = (opacity * 0.45f).coerceIn(0.15f, 0.70f)),
+        pressMode = pressMode,
+        turboHz = turboHz,
+        isEditMode = isEditMode,
+        innerPaddingH = if (isRound) 2.dp else (10.dp * scale),
+        innerPaddingV = 2.dp,
+        onStateChange = onStateChange
+    ) { isActive, isLatched ->
+        Text(
+            text = if (isLatched) "$badge•" else badge,
+            color = when {
+                isLatched -> HudAccent
+                isActive -> Color.White
+                else -> HudCyan.copy(alpha = opacity.coerceIn(0.35f, 1.0f))
+            },
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = (if (badge.length > 3) 10.5f * scale else 13f * scale).sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun GamepadConfigurableButtonBox(
+    widthDp: Dp?,
+    heightDp: Dp?,
+    minWidthDp: Dp? = null,
+    shape: androidx.compose.ui.graphics.Shape,
+    opacity: Float,
+    accentColor: Color,
+    idleBorderOverride: Color? = null,
+    pressMode: GamepadButtonPressMode,
+    turboHz: Int,
+    isEditMode: Boolean,
+    innerPaddingH: Dp = 0.dp,
+    innerPaddingV: Dp = 0.dp,
+    onStateChange: (Boolean) -> Unit,
+    content: @Composable (isActive: Boolean, isLatched: Boolean) -> Unit
+) {
+    var fingerDown by remember { mutableStateOf(false) }
+    var latched by remember { mutableStateOf(false) }
+    var emittedState by remember { mutableStateOf(false) }
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
+
+    fun emit(next: Boolean) {
+        if (emittedState != next) {
+            emittedState = next
+            currentOnStateChange(next)
+        }
+    }
+
+    LaunchedEffect(isEditMode, pressMode) {
+        if (isEditMode) {
+            fingerDown = false
+            latched = false
+            emit(false)
+        } else if (pressMode != GamepadButtonPressMode.TOGGLE_HOLD && latched) {
+            latched = false
+            if (!fingerDown) emit(false)
+        }
+    }
+
+    LaunchedEffect(fingerDown, pressMode, turboHz, isEditMode) {
+        if (isEditMode) return@LaunchedEffect
+        if (pressMode == GamepadButtonPressMode.TURBO && fingerDown) {
+            val halfPeriodMs = (500L / turboHz.coerceIn(5, 20)).coerceAtLeast(22L)
+            while (fingerDown) {
+                emit(true)
+                delay(halfPeriodMs)
+                emit(false)
+                delay(halfPeriodMs)
+            }
+            emit(false)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (emittedState) {
+                currentOnStateChange(false)
+            }
+        }
+    }
+
+    val isVisualActive = when (pressMode) {
+        GamepadButtonPressMode.NORMAL -> fingerDown
+        GamepadButtonPressMode.TOGGLE_HOLD -> latched
+        GamepadButtonPressMode.TURBO -> fingerDown || emittedState
+    }
+
     val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
     val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
 
     Box(
         modifier = Modifier
-            .size(sizeDp)
-            .clip(CircleShape)
+            .then(
+                when {
+                    widthDp != null && heightDp != null -> Modifier.size(width = widthDp, height = heightDp)
+                    heightDp != null && minWidthDp != null -> Modifier.defaultMinSize(minWidth = minWidthDp).height(heightDp)
+                    else -> Modifier
+                }
+            )
+            .clip(shape)
             .background(
-                if (isPressed) {
-                    accentColor.copy(alpha = 0.28f)
+                if (isVisualActive) {
+                    accentColor.copy(alpha = 0.26f)
                 } else {
                     HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 1.5.dp else 1.dp,
-                color = if (isPressed) accentColor else Color.White.copy(alpha = borderAlpha),
-                shape = CircleShape
+                width = if (isVisualActive) 1.5.dp else 1.dp,
+                color = when {
+                    latched -> HudCyan
+                    isVisualActive -> accentColor
+                    else -> idleBorderOverride ?: Color.White.copy(alpha = borderAlpha)
+                },
+                shape = shape
             )
             .then(
                 if (isEditMode) {
                     Modifier
                 } else {
-                    Modifier.pointerInput(buttonIndex, scale) {
-                        detectTapGestures(
-                            onPress = {
-                                isPressed = true
-                                onButton(true)
-                                tryAwaitRelease()
-                                isPressed = false
-                                onButton(false)
+                    Modifier.pointerInput(pressMode, turboHz) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            down.consume()
+                            fingerDown = true
+                            when (pressMode) {
+                                GamepadButtonPressMode.NORMAL -> emit(true)
+                                GamepadButtonPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    emit(latched)
+                                }
+                                GamepadButtonPressMode.TURBO -> {}
                             }
-                        )
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { if (it.pressed) it.consume() }
+                            } while (event.changes.any { it.pressed })
+
+                            fingerDown = false
+                            if (pressMode == GamepadButtonPressMode.NORMAL) {
+                                emit(false)
+                            }
+                        }
                     }
                 }
-            ),
+            )
+            .padding(horizontal = innerPaddingH, vertical = innerPaddingV),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = if (isPressed) Color.White else accentColor.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = (16f * scale).sp
-        )
+        content(isVisualActive, latched)
     }
 }
 
@@ -851,23 +1139,36 @@ internal fun VirtualAbxyPad(
     var bPressed by remember { mutableStateOf(false) }
     var xPressed by remember { mutableStateOf(false) }
     var yPressed by remember { mutableStateOf(false) }
+    val currentOnButton by rememberUpdatedState(onButton)
 
     fun updateAbxyState(newA: Boolean, newB: Boolean, newX: Boolean, newY: Boolean) {
         if (newA != aPressed) {
             aPressed = newA
-            onButton(0, newA)
+            currentOnButton(0, newA)
         }
         if (newB != bPressed) {
             bPressed = newB
-            onButton(1, newB)
+            currentOnButton(1, newB)
         }
         if (newX != xPressed) {
             xPressed = newX
-            onButton(2, newX)
+            currentOnButton(2, newX)
         }
         if (newY != yPressed) {
             yPressed = newY
-            onButton(3, newY)
+            currentOnButton(3, newY)
+        }
+    }
+
+    LaunchedEffect(isEditMode) {
+        if (isEditMode) {
+            updateAbxyState(false, false, false, false)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            updateAbxyState(false, false, false, false)
         }
     }
 

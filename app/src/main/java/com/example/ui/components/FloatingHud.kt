@@ -1,10 +1,15 @@
 package com.example.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,47 +32,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Wifi
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
-import android.os.Build
-import android.os.PowerManager
-import android.widget.Toast
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,34 +61,34 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.R
-import com.example.ui.theme.DirectCyan
-import com.example.ui.theme.JapanRed
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxGreen
-import com.example.ui.theme.XboxNeonGreen
-import com.example.ui.theme.XboxSurface
-import com.example.ui.theme.XboxSurfaceVariant
+import com.example.data.AppConfig
+import com.example.data.AppLogger
+import com.example.data.SettingsRepository
+import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.rememberXboxMotionEnabled
-import com.example.ui.theme.xboxHudCollapseExitTransition
-import com.example.ui.theme.xboxHudExpandEnterTransition
 import com.example.ui.theme.xboxPressScale
-import com.example.vpn.NetworkMode
 import com.example.vpn.VpnConnectionState
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 enum class HudMode {
@@ -120,6 +101,13 @@ enum class HudDockedEdge {
     NONE,
     LEFT,
     RIGHT
+}
+
+private enum class HudExpandedTab {
+    NETWORK,
+    CONTROLS,
+    IMAGE,
+    DEVICE
 }
 
 @Composable
@@ -162,11 +150,12 @@ fun FloatingHud(
 ) {
     val context = LocalContext.current
     var hudMode by rememberSaveable { mutableStateOf(HudMode.MINIMIZED) }
+    var activeTab by rememberSaveable { mutableStateOf(HudExpandedTab.NETWORK) }
     var dockedEdge by rememberSaveable { mutableStateOf(HudDockedEdge.NONE) }
     var offsetX by rememberSaveable { mutableFloatStateOf(24f) }
     var offsetY by rememberSaveable { mutableFloatStateOf(24f) }
-    var hudWidthPx by remember { mutableStateOf(220) }
-    var hudHeightPx by remember { mutableStateOf(96) }
+    var hudWidthPx by remember { mutableIntStateOf(160) }
+    var hudHeightPx by remember { mutableIntStateOf(80) }
     var isDragging by remember { mutableStateOf(false) }
     var lastOrientationPortrait by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
@@ -176,15 +165,14 @@ fun FloatingHud(
 
     LaunchedEffect(hudMode) {
         if (prevLoggedHudMode != hudMode) {
-            com.example.data.AppLogger.info("UI", "Menu nhanh trong game (HUD): ${prevLoggedHudMode.name} -> ${hudMode.name}")
+            AppLogger.info("UI", "Menu nhanh trong game (HUD): ${prevLoggedHudMode.name} -> ${hudMode.name}")
             prevLoggedHudMode = hudMode
         }
     }
 
-    // 2. THEO DÕI NHIỆT ĐỘ MÁY (API 29+, bỏ qua trên máy thấp hơn) & PIN
+    // Theo dõi nhiệt độ máy (API 29+) & pin
     val isThermalSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     var thermalStatus by remember { mutableIntStateOf(0) }
-    var showThermalWarningBanner by remember { mutableStateOf(false) }
     var batteryPercent by remember { mutableIntStateOf(-1) }
     var isBatteryCharging by remember { mutableStateOf(false) }
 
@@ -198,7 +186,6 @@ fun FloatingHud(
         val thermalListener = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             PowerManager.OnThermalStatusChangedListener { newStatus ->
                 thermalStatus = newStatus
-                showThermalWarningBanner = newStatus >= PowerManager.THERMAL_STATUS_MODERATE
             }
         } else {
             null
@@ -206,12 +193,10 @@ fun FloatingHud(
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && powerManager != null && thermalListener != null) {
             try {
-                val initialThermal = powerManager.currentThermalStatus
-                thermalStatus = initialThermal
-                showThermalWarningBanner = initialThermal >= PowerManager.THERMAL_STATUS_MODERATE
+                thermalStatus = powerManager.currentThermalStatus
                 powerManager.addThermalStatusListener(context.mainExecutor, thermalListener)
             } catch (e: Exception) {
-                com.example.data.AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi nhiệt độ máy (${com.example.data.AppLogger.shortThrowable(e)})")
+                AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi nhiệt độ máy (${AppLogger.shortThrowable(e)})")
             }
         }
 
@@ -237,7 +222,7 @@ fun FloatingHud(
             val stickyIntent = context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             updateBatteryFromIntent(stickyIntent)
         } catch (e: Exception) {
-            com.example.data.AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi pin (${com.example.data.AppLogger.shortThrowable(e)})")
+            AppLogger.error("SYSTEM", "Lỗi đăng ký theo dõi pin (${AppLogger.shortThrowable(e)})")
         }
 
         onDispose {
@@ -252,22 +237,20 @@ fun FloatingHud(
         }
     }
 
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
+    val config by SettingsRepository.config.collectAsState()
     val motionEnabled = rememberXboxMotionEnabled(
         lowEndDeviceMode = lowEndDeviceMode || config.lowEndDeviceMode,
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
 
-    // Mục 6 & 7: Cảnh báo nhỏ không chặn trên FloatingHud, tự ẩn sau vài giây
-    // Mục 6: Mỗi phiên tối đa 1 lần cho cảnh báo nhiệt độ (THERMAL_STATUS_SEVERE) và 1 lần cho cảnh báo pin yếu (<= 15%, không sạc)
+    // Cảnh báo nhỏ tự ẩn sau vài giây (nhiệt độ / pin yếu / đổi mạng)
     var hasShownSevereThermalAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
     var hasShownLowBatteryAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
     var lastStreamNetworkIsWifi by rememberSaveable(isGameActive) { mutableStateOf<Boolean?>(null) }
     var autoHudBannerText by remember { mutableStateOf<String?>(null) }
     var autoHudBannerTag by remember { mutableStateOf("hud_transient_alert_banner") }
 
-    LaunchedEffect(isGameActive, isThermalSupported, thermalStatus, batteryPercent, isBatteryCharging, isEn) {
+    LaunchedEffect(isGameActive, isThermalSupported, thermalStatus, batteryPercent, isBatteryCharging, config.appLanguage) {
         if (!isGameActive) {
             hasShownSevereThermalAlert = false
             hasShownLowBatteryAlert = false
@@ -279,24 +262,21 @@ fun FloatingHud(
         if (severeHot && !hasShownSevereThermalAlert) {
             hasShownSevereThermalAlert = true
             autoHudBannerTag = "hud_thermal_battery_alert_banner"
-            autoHudBannerText = if (isEn) {
-                "Device hot/low battery, consider lowering FPS or resolution"
-            } else {
-                "Máy nóng/pin yếu, nên giảm FPS hoặc độ phân giải"
-            }
+            autoHudBannerText = config.tr(
+                "Máy nóng, nên giảm FPS hoặc độ phân giải",
+                "Device is hot, consider lowering FPS or resolution"
+            )
         } else if (batteryPercent in 1..15 && !isBatteryCharging && !hasShownLowBatteryAlert) {
             hasShownLowBatteryAlert = true
             autoHudBannerTag = "hud_thermal_battery_alert_banner"
-            autoHudBannerText = if (isEn) {
-                "Device hot/low battery, consider lowering FPS or resolution"
-            } else {
-                "Máy nóng/pin yếu, nên giảm FPS hoặc độ phân giải"
-            }
+            autoHudBannerText = config.tr(
+                "Pin yếu (${batteryPercent}%), nên cắm sạc hoặc giảm FPS",
+                "Low battery (${batteryPercent}%), consider charging or lowering FPS"
+            )
         }
     }
 
-    // Mục 7: Khi mạng đổi giữa Wi-Fi và di động lúc đang stream
-    LaunchedEffect(isGameActive, networkStatus.isWifi, networkStatus.isCellular, isEn) {
+    LaunchedEffect(isGameActive, networkStatus.isWifi, networkStatus.isCellular, config.appLanguage) {
         val currentIsWifi: Boolean? = when {
             networkStatus.isWifi -> true
             networkStatus.isCellular -> false
@@ -310,11 +290,10 @@ fun FloatingHud(
             val previous = lastStreamNetworkIsWifi
             if (previous != null && previous != currentIsWifi) {
                 autoHudBannerTag = "hud_network_switch_alert_banner"
-                autoHudBannerText = if (isEn) {
-                    "Network switched, if laggy please retry"
-                } else {
-                    "Mạng vừa đổi, nếu giật hãy thử lại"
-                }
+                autoHudBannerText = config.tr(
+                    "Mạng vừa đổi. Nếu giật hãy thử lại.",
+                    "Network switched. If laggy please retry."
+                )
             }
             lastStreamNetworkIsWifi = currentIsWifi
         }
@@ -327,31 +306,12 @@ fun FloatingHud(
         }
     }
 
-    // Phân loại biểu tượng nhiệt trên HUD: mát / ấm / nóng
-    val thermalIcon = when {
-        !isThermalSupported -> ""
-        thermalStatus >= 2 -> "🔥"
-        thermalStatus == 1 -> "🌡️"
-        else -> "❄️"
-    }
-    val thermalLabel = when {
-        !isThermalSupported -> ""
-        thermalStatus >= 2 -> if (isEn) "Hot" else "Nóng"
-        thermalStatus == 1 -> if (isEn) "Warm" else "Ấm"
-        else -> if (isEn) "Cool" else "Mát"
-    }
-    val thermalColor = when {
-        thermalStatus >= 2 -> JapanRed
-        thermalStatus == 1 -> Color(0xFFFFB300)
-        else -> DirectCyan
-    }
-
     fun markUserInteraction() {
         lastInteractionTime = System.currentTimeMillis()
         isInteracting = true
     }
 
-    // A.4: Tự mờ còn khoảng 35% độ đục sau 3 giây không chạm, chạm vào thì hiện rõ lại
+    // Tự mờ theo config.hudIdleOpacity sau 3s không chạm
     LaunchedEffect(lastInteractionTime, hudMode) {
         if (hudMode != HudMode.EXPANDED) {
             delay(3000)
@@ -361,20 +321,21 @@ fun FloatingHud(
         }
     }
 
-    val targetAlpha = if (isInteracting || isDragging || hudMode == HudMode.EXPANDED) 1.0f else 0.35f
+    val idleAlpha = config.hudIdleOpacity.coerceIn(0.15f, 0.90f)
+    val targetAlpha = if (isInteracting || isDragging || hudMode == HudMode.EXPANDED) 1.0f else idleAlpha
     val hudAlpha by animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(if (lowEndDeviceMode) 0 else 350),
+        animationSpec = tween(if (lowEndDeviceMode) 0 else 280),
         label = "hud_alpha"
     )
 
     val safeInsets = WindowInsets.safeDrawing
-    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val layoutDirection = LocalLayoutDirection.current
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize()
     ) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
+        val density = LocalDensity.current
         val screenMaxWidth = maxWidth
         val screenMaxHeight = maxHeight
         val maxWidthPx = with(density) { screenMaxWidth.toPx() }
@@ -388,13 +349,10 @@ fun FloatingHud(
         val safeBottomPx = (safeInsets.getBottom(density).toFloat() + edgeMarginPx).coerceAtLeast(edgeMarginPx)
 
         val rightScreenEdgeX = (maxWidthPx - hudWidthPx.toFloat()).coerceAtLeast(0f)
-        val maxBoundX = (maxWidthPx - safeRightPx - hudWidthPx.toFloat()).coerceAtLeast(safeLeftPx)
         val maxBoundY = (maxHeightPx - safeBottomPx - hudHeightPx.toFloat()).coerceAtLeast(safeTopPx)
-        // Ngưỡng sát rìa trái/phải (10dp): chỉ khi kéo sát mép màn hình mới ẩn thành thanh gờ
         val edgeDockThresholdPx = with(density) { 10.dp.toPx() }
-        val restorePaddingPx = with(density) { 14.dp.toPx() }
+        val restorePaddingPx = with(density) { 12.dp.toPx() }
 
-        // Tính vị trí dải đen phía trên vùng video thực tế khi khởi tạo ở màn DỌC (Portrait)
         val actualVideoTopPx = if (isPortrait) {
             if (videoTopRatio > 0.04f) {
                 maxHeightPx * videoTopRatio
@@ -410,7 +368,6 @@ fun FloatingHud(
             safeTopPx
         }
 
-        // Đặt vị trí mặc định khi xoay màn DỌC / NGANG và chỉ giới hạn trong phạm vi màn hình (di chuyển tự do không giới hạn vùng)
         LaunchedEffect(maxWidthPx, maxHeightPx, hudWidthPx, hudHeightPx, isPortrait) {
             if (maxWidthPx > 0f && maxHeightPx > 0f) {
                 val orientationChanged = lastOrientationPortrait != isPortrait
@@ -433,12 +390,12 @@ fun FloatingHud(
 
         val animatedOffsetX by animateFloatAsState(
             targetValue = offsetX.coerceIn(0f, rightScreenEdgeX),
-            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(200),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(180),
             label = "hud_offset_x"
         )
         val animatedOffsetY by animateFloatAsState(
             targetValue = offsetY.coerceIn(safeTopPx, maxBoundY),
-            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(200),
+            animationSpec = if (isDragging || lowEndDeviceMode) tween(0) else tween(180),
             label = "hud_offset_y"
         )
         val isAnchoredRight = (offsetX + hudWidthPx / 2f) > (maxWidthPx * 0.5f)
@@ -446,7 +403,7 @@ fun FloatingHud(
             (offsetX <= edgeDockThresholdPx || offsetX >= (rightScreenEdgeX - edgeDockThresholdPx))
 
         if (dockedEdge != HudDockedEdge.NONE) {
-            // THANH GỜ SÁT RÌA MÀN HÌNH (30x56dp như bản mẫu .hud-handle): Chạm hoặc kéo để mở
+            // Thanh gờ khi dính sát mép trái / phải
             val handleWidthDp = 30.dp
             val handleHeightDp = 56.dp
             val handleWidthPx = with(density) { handleWidthDp.toPx() }
@@ -461,9 +418,9 @@ fun FloatingHud(
             val handleY = animatedOffsetY.coerceIn(safeTopPx, handleMaxY).roundToInt()
 
             val handleShape = if (dockedEdge == HudDockedEdge.LEFT) {
-                RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
+                RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
             } else {
-                RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+                RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
             }
 
             fun restoreFromEdge() {
@@ -481,9 +438,7 @@ fun FloatingHud(
                 modifier = Modifier
                     .offset { IntOffset(handleX, handleY) }
                     .size(width = handleWidthDp, height = handleHeightDp)
-                    .graphicsLayer {
-                        alpha = if (isInteracting || isDragging) 0.98f else 0.55f
-                    }
+                    .graphicsLayer { alpha = if (isInteracting || isDragging) 0.96f else idleAlpha.coerceAtLeast(0.45f) }
                     .pointerInput(dockedEdge, maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeRightPx, safeTopPx, handleMaxY) {
                         var accumulatedSwipeX = 0f
                         detectDragGestures(
@@ -515,1071 +470,478 @@ fun FloatingHud(
                         )
                     }
                     .clip(handleShape)
-                    .clickable {
-                        restoreFromEdge()
-                    }
-                    .border(
-                        1.dp,
-                        XboxCardBorder,
-                        handleShape
-                    )
+                    .clickable { restoreFromEdge() }
+                    .border(1.dp, HudLine, handleShape)
                     .testTag("hud_edge_dock_handle"),
-                color = XboxSurface,
+                shape = handleShape,
+                color = HudPanelBg,
                 shadowElevation = 0.dp
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (dockedEdge == HudDockedEdge.LEFT) "›" else "‹",
-                        color = XboxNeonGreen,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (dockedEdge == HudDockedEdge.LEFT) {
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        } else {
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                        },
+                        contentDescription = config.tr("Mở menu nổi", "Open floating menu"),
+                        tint = HudAccent,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         } else {
-        Surface(
-            modifier = Modifier
-                .offset { IntOffset(animatedOffsetX.roundToInt(), animatedOffsetY.roundToInt()) }
-                .onGloballyPositioned { coords ->
-                    if (coords.size.width > 0 && coords.size.height > 0) {
-                        hudWidthPx = coords.size.width
-                        hudHeightPx = coords.size.height
+            val containerShape = when (hudMode) {
+                HudMode.MINIMIZED -> RoundedCornerShape(20.dp)
+                HudMode.COMPACT -> RoundedCornerShape(18.dp)
+                HudMode.EXPANDED -> RoundedCornerShape(20.dp)
+            }
+
+            Column(
+                modifier = Modifier
+                    .offset { IntOffset(animatedOffsetX.roundToInt(), animatedOffsetY.roundToInt()) }
+                    .onGloballyPositioned { coords ->
+                        if (coords.size.width > 0 && coords.size.height > 0) {
+                            hudWidthPx = coords.size.width
+                            hudHeightPx = coords.size.height
+                        }
                     }
-                }
-                .graphicsLayer {
-                    alpha = if (isNearEdgeForDock) 0.65f else hudAlpha
-                }
-                .pointerInput(maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeTopPx, maxBoundX, maxBoundY, edgeDockThresholdPx, hudMode) {
-                    detectDragGestures(
-                        onDragStart = {
-                            isDragging = true
-                            markUserInteraction()
-                        },
-                        onDragEnd = {
-                            isDragging = false
-                            markUserInteraction()
-                            if (hudMode != HudMode.EXPANDED && offsetX <= edgeDockThresholdPx) {
-                                offsetX = 0f
-                                dockedEdge = HudDockedEdge.LEFT
-                            } else if (hudMode != HudMode.EXPANDED && offsetX >= (rightScreenEdgeX - edgeDockThresholdPx)) {
-                                offsetX = rightScreenEdgeX
-                                dockedEdge = HudDockedEdge.RIGHT
-                            } else {
+                    .graphicsLayer { alpha = if (isNearEdgeForDock) 0.65f else hudAlpha }
+                    .pointerInput(maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeTopPx, maxBoundY, edgeDockThresholdPx, hudMode) {
+                        detectDragGestures(
+                            onDragStart = {
+                                isDragging = true
+                                markUserInteraction()
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                markUserInteraction()
+                                if (hudMode != HudMode.EXPANDED && offsetX <= edgeDockThresholdPx) {
+                                    offsetX = 0f
+                                    dockedEdge = HudDockedEdge.LEFT
+                                } else if (hudMode != HudMode.EXPANDED && offsetX >= (rightScreenEdgeX - edgeDockThresholdPx)) {
+                                    offsetX = rightScreenEdgeX
+                                    dockedEdge = HudDockedEdge.RIGHT
+                                } else {
+                                    offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                    offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
+                                }
+                            },
+                            onDragCancel = {
+                                isDragging = false
+                                markUserInteraction()
                                 offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
                                 offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                markUserInteraction()
+                                offsetX = (offsetX + dragAmount.x).coerceIn(0f, rightScreenEdgeX)
+                                offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, maxBoundY)
                             }
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                            markUserInteraction()
-                            offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
-                            offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            markUserInteraction()
-                            offsetX = (offsetX + dragAmount.x).coerceIn(0f, rightScreenEdgeX)
-                            offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, maxBoundY)
-                        }
-                    )
-                }
-                .clip(RoundedCornerShape(14.dp))
-                .border(
-                    1.dp,
-                    if (isNearEdgeForDock) XboxNeonGreen else XboxCardBorder,
-                    RoundedCornerShape(14.dp)
-                )
-                .testTag("floating_hud_container"),
-            color = XboxSurface,
-            shadowElevation = 0.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(if (hudMode == HudMode.EXPANDED) 12.dp else 6.dp),
+                        )
+                    },
                 horizontalAlignment = if (isAnchoredRight) Alignment.End else Alignment.Start
             ) {
-                // 1. TRẠNG THÁI THU NHỎ (MINIMIZED): Thanh gọn kèm mũi tên › và ping
-                if (hudMode == HudMode.MINIMIZED) {
-                    val rawPing: Int? = if (telemetry.hasStatsSample && telemetry.rttMs > 0) telemetry.rttMs else null
-                    val hasValidPing = rawPing != null && rawPing > 0
-                    val pingColor = when {
-                        !hasValidPing -> TextSecondary
-                        rawPing < 80 -> XboxNeonGreen
-                        rawPing <= 120 -> Color(0xFFE3B341)
-                        else -> JapanRed
-                    }
-                    val pingText = if (!hasValidPing) "—" else "${rawPing}ms"
+                Surface(
+                    modifier = Modifier
+                        .clip(containerShape)
+                        .border(
+                            1.dp,
+                            if (isNearEdgeForDock) HudAccent else HudLine,
+                            containerShape
+                        )
+                        .testTag("floating_hud_container"),
+                    shape = containerShape,
+                    color = HudPanelBg,
+                    shadowElevation = 0.dp
+                ) {
+                    when (hudMode) {
+                        HudMode.MINIMIZED -> {
+                            HudMinimizedPill(
+                                config = config,
+                                telemetry = telemetry,
+                                isAnchoredRight = isAnchoredRight,
+                                motionEnabled = motionEnabled,
+                                onExpandToCompact = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.COMPACT
+                                }
+                            )
+                        }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier
-                            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable {
-                                markUserInteraction()
-                                hudMode = HudMode.COMPACT
-                            }
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
-                            .testTag("hud_minimized_pill")
-                    ) {
-                        Text(
-                            text = "›",
-                            color = XboxNeonGreen,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(pingColor)
-                        )
-                        Text(
-                            text = pingText,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            maxLines = 1
-                        )
-                    }
-                } else if (hudMode == HudMode.COMPACT) {
-                    // ==========================================
-                    // 2. TRẠNG THÁI GỌN (COMPACT): Cột dọc các nút 44dp phẳng theo bản mẫu .hud-compact
-                    // ==========================================
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        // Nút Mở rộng sang bảng Menu nhanh (›)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = XboxSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
+                        HudMode.COMPACT -> {
+                            HudCompactRail(
+                                config = config,
+                                telemetry = telemetry,
+                                isAnchoredRight = isAnchoredRight,
+                                maxHeight = (screenMaxHeight - 16.dp).coerceAtLeast(220.dp),
+                                gamepadActive = virtualControllerEnabled || physicalControllerConnected,
+                                recorderState = recorderState,
+                                onExpand = {
                                     markUserInteraction()
                                     hudMode = HudMode.EXPANDED
-                                }
-                                .testTag("hud_expand_button")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "›",
-                                    color = XboxNeonGreen,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Nút Mạng / Thông số (chuyển nhanh VPN / Direct)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (vpnState.mode != NetworkMode.DIRECT_NETWORK) Color(0xFF0F2C1D) else XboxSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (vpnState.mode != NetworkMode.DIRECT_NETWORK) XboxNeonGreen else XboxCardBorder
-                            ),
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    markUserInteraction()
-                                    onToggleNetwork()
-                                }
-                                .testTag("hud_toggle_network_button")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Speed,
-                                    contentDescription = if (isEn) "Network & stats" else "Thông số mạng",
-                                    tint = if (vpnState.mode != NetworkMode.DIRECT_NETWORK) XboxNeonGreen else TextPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Nút Tay cầm ảo
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (virtualControllerEnabled || physicalControllerConnected) Color(0xFF0F2C1D) else XboxSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (virtualControllerEnabled || physicalControllerConnected) XboxNeonGreen else XboxCardBorder
-                            ),
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
+                                },
+                                onToggleGamepad = {
                                     markUserInteraction()
                                     onToggleVirtualController()
-                                }
-                                .testTag("hud_toggle_controller_button")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Gamepad,
-                                    contentDescription = if (isEn) "Gamepad" else "Tay cầm",
-                                    tint = if (virtualControllerEnabled || physicalControllerConnected) XboxNeonGreen else TextPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Nút Quay màn hình
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (recorderState.isRecording) Color(0xFF331A19) else XboxSurfaceVariant,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (recorderState.isRecording) Color(0xFF612826) else XboxCardBorder
-                            ),
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
+                                },
+                                onToggleRecording = {
                                     markUserInteraction()
                                     onToggleRecording()
-                                }
-                                .testTag("hud_record_button")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(if (recorderState.isRecording) JapanRed else TextPrimary)
-                                )
-                            }
-                        }
-
-                        // Nút Thoát (đỏ cảnh báo)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF331A19),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF612826)),
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
+                                },
+                                onReload = {
+                                    markUserInteraction()
+                                    onReloadPage()
+                                },
+                                onMinimize = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.MINIMIZED
+                                },
+                                onRequestExit = {
                                     markUserInteraction()
                                     showExitConfirmDialog = true
                                 }
-                                .testTag("hud_home_button")
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = if (isEn) "Exit game" else "Thoát game",
-                                    tint = JapanRed,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Nút thu nhỏ về viên thuốc gọn
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable {
-                                    markUserInteraction()
-                                    hudMode = HudMode.MINIMIZED
-                                }
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                                .testTag("hud_minimize_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "─",
-                                color = TextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
                             )
                         }
-                    }
-                } else {
-                    // ==========================================
-                    // 3. TRẠNG THÁI MỞ RỘNG (EXPANDED): Bảng Menu nhanh chuẩn bản mẫu .hud-panel (#hExp)
-                    // ==========================================
-                    val panelMaxWidth = 282.dp
-                    val panelMaxHeight = (screenMaxHeight * 0.78f).coerceAtLeast(240.dp)
-                    val scrollState = rememberScrollState()
-                    var showMoreHudOptions by rememberSaveable { mutableStateOf(true) }
 
-                    val hasRealSample = telemetry.hasStatsSample
-                    val effectivePing: Int? = if (hasRealSample && telemetry.rttMs > 0) telemetry.rttMs else null
-                    val pingValStr = effectivePing?.toString() ?: "—"
-                    val fpsValStr = if (hasRealSample && telemetry.fps > 0) "${telemetry.fps}" else "—"
-                    val jitterValStr = if (hasRealSample && (telemetry.jitterMs > 0 || effectivePing != null)) "${telemetry.jitterMs}" else "—"
-                    val mbpsValStr = if (hasRealSample && telemetry.bitrateMbps > 0) String.format("%.1f", telemetry.bitrateMbps) else "—"
+                        HudMode.EXPANDED -> {
+                            val panelWidth = (screenMaxWidth - 16.dp).coerceIn(260.dp, 388.dp)
+                            val panelMaxHeight = (screenMaxHeight - 16.dp).coerceAtLeast(240.dp)
+                            val bodyScrollState = rememberScrollState()
+                            val isThermalWarmOrHot = isThermalSupported && thermalStatus >= 1
 
-                    Column(
-                        modifier = Modifier
-                            .width(panelMaxWidth)
-                            .heightIn(max = panelMaxHeight)
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Hàng đầu: "Menu nhanh" + chỉ báo ghi hình + nút thu gọn
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            Column(
+                                modifier = Modifier
+                                    .width(panelWidth)
+                                    .heightIn(max = panelMaxHeight)
                             ) {
-                                Text(
-                                    text = gameProfile?.title ?: if (isEn) "Quick Menu" else "Menu nhanh",
-                                    color = TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                                if (recorderState.isRecording) {
-                                    val mins = recorderState.elapsedSeconds / 60
-                                    val secs = recorderState.elapsedSeconds % 60
-                                    Text(
-                                        text = "● %02d:%02d".format(mins, secs),
-                                        color = JapanRed,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface,
+                                // Header (.p-head)
+                                Row(
                                     modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
+                                        .fillMaxWidth()
+                                        .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    HudPingDotIndicator(
+                                        pingMs = if (telemetry.rttMs > 0) telemetry.rttMs else null,
+                                        hasSample = telemetry.hasStatsSample,
+                                        fontSize = 15.sp,
+                                        showMsSuffix = true
+                                    )
+                                    if (recorderState.isRecording) {
+                                        val mins = recorderState.elapsedSeconds / 60
+                                        val secs = recorderState.elapsedSeconds % 60
+                                        Text(
+                                            text = "● %02d:%02d".format(mins, secs),
+                                            color = HudDanger,
+                                            fontSize = 12.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = JetBrainsMonoFontFamily,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    HudPanelIconButton(
+                                        icon = if (isAnchoredRight) {
+                                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                        } else {
+                                            Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                                        },
+                                        contentDescription = config.tr("Thu gọn", "Collapse"),
+                                        onClick = {
                                             markUserInteraction()
                                             hudMode = HudMode.COMPACT
-                                        }
-                                        .testTag("hud_collapse_48dp_button")
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = "‹",
-                                            color = TextSecondary,
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface,
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            hudMode = HudMode.MINIMIZED
-                                        }
-                                        .testTag("hud_minimize_48dp_button")
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                                        },
+                                        modifier = Modifier.testTag("hud_collapse_48dp_button")
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(HudSurface2)
+                                            .clickable {
+                                                markUserInteraction()
+                                                hudMode = HudMode.MINIMIZED
+                                            }
+                                            .testTag("hud_minimize_48dp_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
                                         Text(
                                             text = "─",
-                                            color = TextSecondary,
-                                            fontSize = 13.sp,
+                                            color = HudMuted,
+                                            fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
-                            }
-                        }
 
-                        // Cảnh báo nhiệt độ khi từ MODERATE trở lên
-                        if (isThermalSupported && showThermalWarningBanner) {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable { showThermalWarningBanner = false }
-                                    .testTag("hud_thermal_warning_banner"),
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFF361B1A)
-                            ) {
-                                Text(
-                                    text = if (isEn) "Device is warm, consider lowering resolution" else "Máy đang nóng, nên hạ chất lượng",
-                                    color = JapanRed,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                    maxLines = 2
-                                )
-                            }
-                        }
-
-                        // Lưới 4 cột thông số (.hud-stats): ms | FPS | jitter | Mbps
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            val statsList = listOf(
-                                Triple(pingValStr, "ms", true),
-                                Triple(fpsValStr, "FPS", false),
-                                Triple(jitterValStr, "jitter", false),
-                                Triple(mbpsValStr, "Mbps", false)
-                            )
-                            statsList.forEach { (numStr, unitStr, highlightCyan) ->
-                                Surface(
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 6.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = numStr,
-                                            color = if (highlightCyan) DirectCyan else TextPrimary,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            maxLines = 1
-                                        )
-                                        Text(
-                                            text = unitStr,
-                                            color = TextSecondary,
-                                            fontSize = 10.5.sp,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Lưới 3x3 nút hành động (.hud-actions): Tay cầm, Đồ họa, Xoay, Quay, Tải lại, Thoát, Trang chủ, Cài đặt, Dịch
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            // Hàng 1: Tay cầm | Đồ họa | Xoay
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // 1. Tay cầm
-                                val padOn = virtualControllerEnabled || physicalControllerConnected
-                                Surface(
+                                // 4 Tabs (.tabs)
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onToggleVirtualController()
-                                        }
-                                        .testTag("hud_toggle_controller_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (padOn) Color(0xFF16352A) else XboxSurface
+                                        .fillMaxWidth()
+                                        .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Gamepad,
-                                            contentDescription = null,
-                                            tint = if (padOn) XboxNeonGreen else TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Gamepad" else "Tay cầm",
-                                            color = if (padOn) XboxNeonGreen else TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 2. Đồ họa
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            showMoreHudOptions = !showMoreHudOptions
-                                        }
-                                        .testTag("hud_more_options_toggle_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (showMoreHudOptions) Color(0xFF16352A) else XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Tune,
-                                            contentDescription = null,
-                                            tint = if (showMoreHudOptions) XboxNeonGreen else TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Graphics" else "Đồ họa",
-                                            color = if (showMoreHudOptions) XboxNeonGreen else TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 3. Xoay
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onToggleOrientation()
-                                        }
-                                        .testTag("hud_expanded_rotate_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ScreenRotation,
-                                            contentDescription = null,
-                                            tint = TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Rotate" else "Xoay",
-                                            color = TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Hàng 2: Quay | Tải lại | Thoát
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // 4. Quay
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            if (!recorderState.isRecording) {
-                                                hudMode = HudMode.COMPACT
-                                            }
-                                            onToggleRecording()
-                                        }
-                                        .testTag("hud_expanded_record_card"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (recorderState.isRecording) Color(0xFF361B1A) else XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
+                                    val tabs = listOf(
+                                        HudExpandedTab.NETWORK to config.tr("Mạng", "Net"),
+                                        HudExpandedTab.CONTROLS to config.tr("Điều khiển", "Controls"),
+                                        HudExpandedTab.IMAGE to config.tr("Hình ảnh", "Image"),
+                                        HudExpandedTab.DEVICE to config.tr("Máy", "Device")
+                                    )
+                                    tabs.forEach { (tab, title) ->
+                                        val selected = activeTab == tab
                                         Box(
                                             modifier = Modifier
-                                                .size(12.dp)
-                                                .clip(CircleShape)
-                                                .background(if (recorderState.isRecording) JapanRed else TextPrimary)
-                                        )
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = if (recorderState.isRecording) {
-                                                val mins = recorderState.elapsedSeconds / 60
-                                                val secs = recorderState.elapsedSeconds % 60
-                                                "%02d:%02d".format(mins, secs)
-                                            } else {
-                                                if (isEn) "Record" else "Quay"
-                                            },
-                                            color = if (recorderState.isRecording) JapanRed else TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 5. Tải lại
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onReloadPage()
-                                        }
-                                        .testTag("hud_expanded_reload_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            tint = TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Reload" else "Tải lại",
-                                            color = TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 6. Thoát (màu đỏ cảnh báo)
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            com.example.data.AppLogger.info("UI", "Mở hộp thoại xác nhận Thoát game từ HUD")
-                                            showExitConfirmDialog = true
-                                        }
-                                        .testTag("hud_expanded_home_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = Color(0xFF361B1A)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = null,
-                                            tint = JapanRed,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Exit" else "Thoát",
-                                            color = JapanRed,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Hàng 3: Trang chủ | Cài đặt | Dịch
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // 7. Trang chủ
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            showExitConfirmDialog = true
-                                        }
-                                        .testTag("hud_expanded_go_home_card"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Home,
-                                            contentDescription = null,
-                                            tint = TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Home" else "Trang chủ",
-                                            color = TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 8. Cài đặt
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onOpenSettings()
-                                        }
-                                        .testTag("hud_expanded_video_settings_card"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Settings,
-                                            contentDescription = null,
-                                            tint = TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Settings" else "Cài đặt",
-                                            color = TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                // 9. Dịch
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = 56.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .clickable {
-                                            markUserInteraction()
-                                            onOpenTranslator()
-                                        }
-                                        .testTag("hud_expanded_translator_card"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (translationActive) Color(0xFF16352A) else XboxSurface
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Language,
-                                            contentDescription = null,
-                                            tint = if (translationActive) XboxNeonGreen else TextPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = if (isEn) "Translate" else "Dịch",
-                                            color = if (translationActive) XboxNeonGreen else TextPrimary,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // Chuyển nhanh Giao diện cũ (xbox.com/play) ⇄ Giao diện mới (play.xbox.com)
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("hud_web_ui_mode_switcher"),
-                            shape = RoundedCornerShape(10.dp),
-                            color = XboxSurface,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = config.tr("Giao diện web Xbox", "Xbox Web UI"),
-                                        color = TextSecondary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = if (xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC) {
-                                            "xbox.com/play"
-                                        } else {
-                                            "play.xbox.com"
-                                        },
-                                        color = XboxNeonGreen,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    com.example.data.XboxWebUiMode.entries.forEach { uiMode ->
-                                        val selected = xboxWebUiMode == uiMode
-                                        Surface(
-                                            modifier = Modifier
                                                 .weight(1f)
-                                                .heightIn(min = 40.dp)
-                                                .clip(RoundedCornerShape(8.dp))
+                                                .heightIn(min = 34.dp)
+                                                .clip(RoundedCornerShape(11.dp))
+                                                .background(if (selected) HudSelBg else HudSurface)
                                                 .clickable {
                                                     markUserInteraction()
-                                                    onSelectXboxWebUiMode(uiMode)
+                                                    activeTab = tab
                                                 }
-                                                .testTag("hud_ui_mode_${uiMode.name.lowercase()}"),
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (selected) Color(0xFF16352A) else XboxSurfaceVariant,
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                if (selected) XboxNeonGreen else XboxCardBorder
-                                            )
+                                                .testTag("hud_tab_${tab.name.lowercase()}")
+                                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Column(
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 5.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                Text(
-                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
-                                                        config.tr("Giao diện cũ", "Classic UI")
-                                                    } else {
-                                                        config.tr("Giao diện mới", "New UI")
-                                                    },
-                                                    color = if (selected) XboxNeonGreen else TextPrimary,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    text = if (uiMode == com.example.data.XboxWebUiMode.CLASSIC) {
-                                                        config.tr("Ổn định ở VN", "Stable")
-                                                    } else {
-                                                        config.tr("Mỹ/Nhật/VPN", "Preview")
-                                                    },
-                                                    color = TextSecondary,
-                                                    fontSize = 9.5.sp,
-                                                    maxLines = 1
-                                                )
-                                            }
+                                            Text(
+                                                text = title,
+                                                color = if (selected) HudAccent else HudMuted,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                        // Các nhóm Mạng, Hình ảnh, Điều khiển hiển thị ngay bên dưới chuẩn #hExp
-                        if (showMoreHudOptions) {
-                            DenseQualityModeSection(
-                                networkStatus = networkStatus,
-                                adaptiveQualityState = adaptiveQualityState,
-                                telemetry = telemetry,
-                                isVpnActive = vpnState.mode != NetworkMode.DIRECT_NETWORK,
-                                onSelectCellularMode = { mode ->
-                                    markUserInteraction()
-                                    onSelectCellularMode(mode)
-                                },
-                                onToggleAutoAdapting = { enabled ->
-                                    markUserInteraction()
-                                    onToggleAutoAdapting(enabled)
-                                },
-                                onToggleWifiSpeedFirst = { enabled ->
-                                    markUserInteraction()
-                                    onToggleWifiSpeedFirst(enabled)
-                                }
-                            )
+                                // Body (.p-body)
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .fillMaxWidth()
+                                        .verticalScroll(bodyScrollState)
+                                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    when (activeTab) {
+                                        HudExpandedTab.NETWORK -> HudNetworkTabContent(
+                                            config = config,
+                                            vpnState = vpnState,
+                                            networkStatus = networkStatus,
+                                            telemetry = telemetry,
+                                            adaptiveQualityState = adaptiveQualityState,
+                                            isThermalWarmOrHot = isThermalWarmOrHot,
+                                            onInteraction = ::markUserInteraction,
+                                            onToggleNetwork = onToggleNetwork
+                                        )
 
-                            if (gameProfile?.gameId == "fortnite") {
-                                FortniteExclusiveHudCard(
-                                    isEn = isEn,
-                                    virtualControllerEnabled = virtualControllerEnabled,
-                                    onSelectFortniteControlMode = { useVirtualFpsPro ->
-                                        markUserInteraction()
-                                        onSelectFortniteControlMode(useVirtualFpsPro)
+                                        HudExpandedTab.CONTROLS -> HudControlsTabContent(
+                                            config = config,
+                                            virtualControllerEnabled = virtualControllerEnabled,
+                                            translationActive = translationActive,
+                                            translatedCount = translatedCount,
+                                            gameProfile = gameProfile,
+                                            xboxWebUiMode = xboxWebUiMode,
+                                            onInteraction = ::markUserInteraction,
+                                            onToggleVirtualController = onToggleVirtualController,
+                                            onSelectFortniteControlMode = onSelectFortniteControlMode,
+                                            onToggleTranslation = onToggleTranslation,
+                                            onOpenTranslator = onOpenTranslator,
+                                            onSelectXboxWebUiMode = onSelectXboxWebUiMode,
+                                            onToggleOrientation = onToggleOrientation
+                                        )
+
+                                        HudExpandedTab.IMAGE -> HudImageTabContent(
+                                            config = config,
+                                            clarityBoostActive = clarityBoostActive,
+                                            hideStreamStats = hideStreamStats,
+                                            networkStatus = networkStatus,
+                                            adaptiveQualityState = adaptiveQualityState,
+                                            isThermalWarmOrHot = isThermalWarmOrHot,
+                                            onInteraction = ::markUserInteraction,
+                                            onSelectCellularMode = onSelectCellularMode,
+                                            onToggleClarityBoost = onToggleClarityBoost,
+                                            onToggleHideStreamStats = onToggleHideStreamStats,
+                                            onSelectLadderStep = onSelectLadderStep,
+                                            onToggleAutoAdapting = onToggleAutoAdapting
+                                        )
+
+                                        HudExpandedTab.DEVICE -> HudDeviceTabContent(
+                                            config = config,
+                                            batteryPercent = batteryPercent,
+                                            isBatteryCharging = isBatteryCharging,
+                                            isThermalSupported = isThermalSupported,
+                                            thermalStatus = thermalStatus,
+                                            networkStatus = networkStatus,
+                                            recorderState = recorderState,
+                                            onInteraction = ::markUserInteraction,
+                                            onToggleWifiSpeedFirst = onToggleWifiSpeedFirst,
+                                            onToggleRecording = onToggleRecording
+                                        )
                                     }
-                                )
-                            }
-
-                            DenseFeatureTogglesSection(
-                                clarityBoostActive = clarityBoostActive,
-                                hideStreamStats = hideStreamStats,
-                                translationActive = translationActive,
-                                translatedCount = translatedCount,
-                                onToggleClarityBoost = { enabled ->
-                                    markUserInteraction()
-                                    onToggleClarityBoost(enabled)
-                                },
-                                onToggleHideStreamStats = { enabled ->
-                                    markUserInteraction()
-                                    onToggleHideStreamStats(enabled)
-                                },
-                                onToggleTranslation = { enabled ->
-                                    markUserInteraction()
-                                    onToggleTranslation(enabled)
-                                },
-                                onToggleGpuLoadReduction = {
-                                    markUserInteraction()
-                                    val nextState = !config.gpuLoadReductionEnabled
-                                    com.example.data.SettingsRepository.updateGpuLoadReductionEnabled(nextState)
                                 }
-                            )
 
-                            if (virtualControllerEnabled) {
-                                DenseQuickGamepadSection(
-                                    virtualControllerEnabled = true,
-                                    onInteraction = { markUserInteraction() }
+                                // Sticky Footer (.p-foot): Tải lại | Trang chủ | Cài đặt | Thoát
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(HudFootBorder)
                                 )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    HudFooterActionButton(
+                                        icon = Icons.Default.Refresh,
+                                        label = config.tr("Tải lại", "Reload"),
+                                        onClick = {
+                                            markUserInteraction()
+                                            onReloadPage()
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("hud_expanded_reload_button")
+                                    )
+                                    HudFooterActionButton(
+                                        icon = Icons.Default.Home,
+                                        label = config.tr("Trang chủ", "Home"),
+                                        onClick = {
+                                            markUserInteraction()
+                                            showExitConfirmDialog = true
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("hud_expanded_go_home_card")
+                                    )
+                                    HudFooterActionButton(
+                                        icon = Icons.Default.Tune,
+                                        label = config.tr("Cài đặt", "Settings"),
+                                        onClick = {
+                                            markUserInteraction()
+                                            onOpenSettings()
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("hud_expanded_video_settings_card")
+                                    )
+                                    HudFooterActionButton(
+                                        icon = Icons.AutoMirrored.Filled.ExitToApp,
+                                        label = config.tr("Thoát", "Exit"),
+                                        isDanger = true,
+                                        onClick = {
+                                            markUserInteraction()
+                                            AppLogger.info("UI", "Mở hộp thoại xác nhận Thoát game từ HUD")
+                                            showExitConfirmDialog = true
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("hud_expanded_home_button")
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Banner cảnh báo nhỏ tự ẩn sau vài giây (Mục 6: Máy nóng/pin yếu; Mục 7: Đổi mạng Wi-Fi/di động)
+                // Banner cảnh báo nhỏ tự ẩn (nhiệt độ / pin yếu / chuyển mạng)
                 val currentBanner = autoHudBannerText
                 if (currentBanner != null) {
-                    Surface(
+                    Spacer(modifier = Modifier.height(4.dp))
+                    HudNoteCard(
+                        text = currentBanner,
+                        isWarning = true,
+                        onClick = { autoHudBannerText = null },
                         modifier = Modifier
-                            .padding(top = 3.dp)
-                            .widthIn(max = 250.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { autoHudBannerText = null }
-                            .testTag(autoHudBannerTag),
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xEB18241D),
-                        border = androidx.compose.foundation.BorderStroke(0.8.dp, Color(0xFFFFB300).copy(alpha = 0.85f))
-                    ) {
-                        Text(
-                            text = currentBanner,
-                            color = Color(0xFFFFE082),
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = 13.5.sp,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            maxLines = 2
-                        )
-                    }
+                            .widthIn(max = 270.dp)
+                            .testTag(autoHudBannerTag)
+                    )
                 }
             }
         }
-        }
     }
 
-    // Exit Game Confirmation Dialog theo khuôn .dlg
+    // Hộp thoại Xác nhận thoát theo khuôn .dlg của hud-mockup.html
     if (showExitConfirmDialog) {
-        androidx.compose.ui.window.Dialog(
+        Dialog(
             onDismissRequest = {
-                com.example.data.AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
                 showExitConfirmDialog = false
             }
         ) {
             Surface(
                 modifier = Modifier
+                    .widthIn(max = 340.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
                     .testTag("hud_exit_confirm_dialog"),
                 shape = RoundedCornerShape(22.dp),
-                color = XboxSurfaceVariant
+                color = HudSurface2,
+                shadowElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.dialog_exit_title),
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
+                        color = HudInk,
+                        fontWeight = FontWeight.ExtraBold,
                         fontSize = 17.sp
                     )
                     Text(
                         text = stringResource(R.string.dialog_exit_message),
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
+                        color = HudDialogBody,
+                        fontSize = 14.sp,
+                        lineHeight = 19.sp
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
                             onClick = {
-                                com.example.data.AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                                AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
                                 showExitConfirmDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = XboxSurface,
-                                contentColor = TextPrimary
+                                containerColor = HudSurface,
+                                contentColor = HudInk
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
+                            modifier = Modifier.heightIn(min = 42.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_cancel),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.5.sp
                             )
                         }
                         Button(
                             onClick = {
-                                com.example.data.AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
+                                AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
                                 showExitConfirmDialog = false
                                 onNavigateHome()
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = JapanRed,
-                                contentColor = Color(0xFF2A0A09)
+                                containerColor = HudDanger,
+                                contentColor = HudDangerOn
                             ),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
+                            modifier = Modifier.heightIn(min = 42.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_confirm_exit),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.5.sp
                             )
                         }
                     }
@@ -1589,4 +951,245 @@ fun FloatingHud(
     }
 }
 
+@Composable
+private fun HudMinimizedPill(
+    config: AppConfig,
+    telemetry: com.example.cloudplay.StreamTelemetry,
+    isAnchoredRight: Boolean,
+    motionEnabled: Boolean,
+    onExpandToCompact: () -> Unit
+) {
+    val chevIcon = if (isAnchoredRight) {
+        Icons.AutoMirrored.Filled.KeyboardArrowLeft
+    } else {
+        Icons.AutoMirrored.Filled.KeyboardArrowRight
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = Modifier
+            .height(40.dp)
+            .xboxPressScale(enabled = motionEnabled, pressedScale = 0.94f)
+            .clickable(onClick = onExpandToCompact)
+            .padding(
+                start = if (isAnchoredRight) 10.dp else 8.dp,
+                end = if (isAnchoredRight) 8.dp else 10.dp
+            )
+            .testTag("hud_minimized_pill")
+    ) {
+        if (!isAnchoredRight) {
+            Icon(
+                imageVector = chevIcon,
+                contentDescription = config.tr("Mở menu nhanh", "Open quick menu"),
+                tint = HudInk,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        HudPingDotIndicator(
+            pingMs = if (telemetry.rttMs > 0) telemetry.rttMs else null,
+            hasSample = telemetry.hasStatsSample,
+            fontSize = 13.sp,
+            showMsSuffix = false
+        )
+        if (isAnchoredRight) {
+            Icon(
+                imageVector = chevIcon,
+                contentDescription = config.tr("Mở menu nhanh", "Open quick menu"),
+                tint = HudInk,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
 
+@Composable
+private fun HudCompactRail(
+    config: AppConfig,
+    telemetry: com.example.cloudplay.StreamTelemetry,
+    isAnchoredRight: Boolean,
+    maxHeight: androidx.compose.ui.unit.Dp,
+    gamepadActive: Boolean,
+    recorderState: com.example.cloudplay.ScreenRecorderState,
+    onExpand: () -> Unit,
+    onToggleGamepad: () -> Unit,
+    onToggleRecording: () -> Unit,
+    onReload: () -> Unit,
+    onMinimize: () -> Unit,
+    onRequestExit: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(56.dp)
+            .heightIn(max = maxHeight)
+            .verticalScroll(rememberScrollState())
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        HudPingDotIndicator(
+            pingMs = if (telemetry.rttMs > 0) telemetry.rttMs else null,
+            hasSample = telemetry.hasStatsSample,
+            fontSize = 12.sp,
+            showMsSuffix = false,
+            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+        )
+
+        // Mở rộng (.on)
+        HudRailButton(
+            icon = Icons.Default.OpenInFull,
+            contentDescription = config.tr("Mở rộng", "Expand"),
+            bgColor = HudSelBg,
+            tint = HudAccent,
+            onClick = onExpand,
+            modifier = Modifier.testTag("hud_expand_button")
+        )
+
+        // Tay cầm ảo
+        HudRailButton(
+            icon = Icons.Default.SportsEsports,
+            contentDescription = config.tr("Tay cầm ảo", "Virtual gamepad"),
+            bgColor = if (gamepadActive) HudSelBg else Color.Transparent,
+            tint = if (gamepadActive) HudAccent else HudInk,
+            onClick = onToggleGamepad,
+            modifier = Modifier.testTag("hud_toggle_controller_button")
+        )
+
+        // Quay màn hình (hiển thị MM:SS khi đang quay)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(if (recorderState.isRecording) HudDangerBg else Color.Transparent)
+                .clickable(onClick = onToggleRecording)
+                .testTag("hud_record_button"),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FiberManualRecord,
+                    contentDescription = config.tr("Quay màn hình", "Record screen"),
+                    tint = if (recorderState.isRecording) HudDanger else HudInk,
+                    modifier = Modifier.size(if (recorderState.isRecording) 16.dp else 20.dp)
+                )
+                if (recorderState.isRecording) {
+                    val m = recorderState.elapsedSeconds / 60
+                    val s = recorderState.elapsedSeconds % 60
+                    Text(
+                        text = "%02d:%02d".format(m, s),
+                        color = HudDanger,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        // Tải lại
+        HudRailButton(
+            icon = Icons.Default.Refresh,
+            contentDescription = config.tr("Tải lại", "Reload"),
+            bgColor = Color.Transparent,
+            tint = HudInk,
+            onClick = onReload
+        )
+
+        Box(
+            modifier = Modifier
+                .padding(vertical = 2.dp)
+                .size(width = 28.dp, height = 1.dp)
+                .background(HudLine)
+        )
+
+        // Thu nhỏ
+        HudRailButton(
+            icon = if (isAnchoredRight) {
+                Icons.AutoMirrored.Filled.KeyboardArrowRight
+            } else {
+                Icons.AutoMirrored.Filled.KeyboardArrowLeft
+            },
+            contentDescription = config.tr("Thu nhỏ", "Minimize"),
+            bgColor = Color.Transparent,
+            tint = HudInk,
+            onClick = onMinimize,
+            modifier = Modifier.testTag("hud_minimize_button")
+        )
+
+        // Thoát
+        HudRailButton(
+            icon = Icons.AutoMirrored.Filled.ExitToApp,
+            contentDescription = config.tr("Thoát game", "Exit game"),
+            bgColor = Color.Transparent,
+            tint = HudDanger,
+            onClick = onRequestExit,
+            modifier = Modifier.testTag("hud_home_button")
+        )
+    }
+}
+
+@Composable
+private fun HudRailButton(
+    icon: ImageVector,
+    contentDescription: String,
+    bgColor: Color,
+    tint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(bgColor)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(21.dp)
+        )
+    }
+}
+
+@Composable
+private fun HudFooterActionButton(
+    icon: ImageVector,
+    label: String,
+    isDanger: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bg = if (isDanger) HudDangerBg else HudSurface2
+    val fg = if (isDanger) HudDanger else HudInk
+    Column(
+        modifier = modifier
+            .heightIn(min = 44.dp)
+            .clip(RoundedCornerShape(13.dp))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = fg,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = label,
+            color = fg,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}

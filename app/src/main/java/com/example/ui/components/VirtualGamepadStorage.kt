@@ -94,3 +94,46 @@ internal fun parseHiddenButtons(raw: String): Set<String> {
 internal fun serializeHiddenButtons(set: Set<String>): String {
     return set.filter { it.isNotBlank() }.sorted().joinToString(",")
 }
+
+internal fun parseButtonOpacities(raw: String): Map<String, Float> {
+    if (raw.isBlank()) return emptyMap()
+    val result = mutableMapOf<String, Float>()
+    raw.split(";").forEach { entry ->
+        val parts = entry.split(":")
+        if (parts.size == 2) {
+            val op = parts[1].toFloatOrNull()
+            if (op != null) {
+                result[parts[0]] = op.coerceIn(0.20f, 1.00f)
+            }
+        }
+    }
+    return result
+}
+
+internal fun serializeButtonOpacities(map: Map<String, Float>): String {
+    return map.entries
+        .joinToString(";") { (k, v) ->
+            val rounded = (v.coerceIn(0.20f, 1.00f) * 100f).roundToInt() / 100f
+            "$k:$rounded"
+        }
+}
+
+internal fun parseButtonHaptics(raw: String): Map<String, com.example.data.GamepadHapticLevel> {
+    if (raw.isBlank()) return emptyMap()
+    val result = mutableMapOf<String, com.example.data.GamepadHapticLevel>()
+    raw.split(";").forEach { entry ->
+        val parts = entry.split(":")
+        if (parts.size == 2) {
+            val lvl = runCatching { com.example.data.GamepadHapticLevel.valueOf(parts[1]) }.getOrNull()
+            if (lvl != null) {
+                result[parts[0]] = lvl
+            }
+        }
+    }
+    return result
+}
+
+internal fun serializeButtonHaptics(map: Map<String, com.example.data.GamepadHapticLevel>): String {
+    return map.entries.joinToString(";") { (k, v) -> "$k:${v.name}" }
+}
+

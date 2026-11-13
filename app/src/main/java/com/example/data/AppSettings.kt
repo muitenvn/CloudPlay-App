@@ -655,6 +655,8 @@ enum class XboxWebUiMode(
 data class PerGameGamepadLayout(
     val offsets: String = "",
     val scales: String = "",
+    val opacities: String = "",
+    val haptics: String = "",
     val hiddenButtons: String = "",
     val abxySplit: Boolean = false,
     val dpadSplit: Boolean = false
@@ -674,6 +676,7 @@ data class AppConfig(
     val antiAfkKeepAlive: Boolean = true,
     val inputPollingBoost: Boolean = true,
     val showFloatingHud: Boolean = true,
+    val hudIdleOpacity: Float = 0.35f, // 0.15f .. 0.90f
     val showVirtualController: Boolean = false,
     val autoHideVirtualOnPhysicalController: Boolean = true,
     val gamepadScale: Float = 1.0f, // 0.75f .. 1.35f
@@ -694,6 +697,8 @@ data class AppConfig(
     val gamepadSprintLockEnabled: Boolean = true,
     val gamepadCustomOffsets: String = "",
     val gamepadButtonScales: String = "",
+    val gamepadButtonOpacities: String = "",
+    val gamepadButtonHaptics: String = "",
     val gamepadHiddenButtons: String = "",
     val gamepadAbxySplitMode: Boolean = false,
     val gamepadDpadSplitMode: Boolean = false,
@@ -910,6 +915,7 @@ object SettingsRepository {
             maxBitrateMbps = sp.getInt("max_bitrate", 15),
             antiAfkKeepAlive = sp.getBoolean("anti_afk", true),
             inputPollingBoost = sp.getBoolean("input_polling_boost", true),
+            hudIdleOpacity = sp.getFloat("hud_idle_opacity", 0.35f).coerceIn(0.15f, 0.90f),
             showVirtualController = sp.getBoolean("show_virtual_controller", false),
             autoHideVirtualOnPhysicalController = sp.getBoolean("auto_hide_virtual_on_phys", true),
             gamepadScale = sp.getFloat("gamepad_scale", 1.0f).coerceIn(0.75f, 1.35f),
@@ -936,6 +942,8 @@ object SettingsRepository {
             gamepadSprintLockEnabled = sp.getBoolean("gamepad_sprint_lock", true),
             gamepadCustomOffsets = sp.getString("gamepad_custom_offsets", "") ?: "",
             gamepadButtonScales = sp.getString("gamepad_button_scales", "") ?: "",
+            gamepadButtonOpacities = sp.getString("gamepad_button_opacities", "") ?: "",
+            gamepadButtonHaptics = sp.getString("gamepad_button_haptics", "") ?: "",
             gamepadHiddenButtons = sp.getString("gamepad_hidden_buttons", "") ?: "",
             gamepadAbxySplitMode = sp.getBoolean("gamepad_abxy_split_mode", false),
             gamepadDpadSplitMode = sp.getBoolean("gamepad_dpad_split_mode", false),
@@ -1051,6 +1059,7 @@ object SettingsRepository {
             putInt("max_bitrate", c.maxBitrateMbps)
             putBoolean("anti_afk", c.antiAfkKeepAlive)
             putBoolean("input_polling_boost", c.inputPollingBoost)
+            putFloat("hud_idle_opacity", c.hudIdleOpacity)
             putBoolean("show_virtual_controller", c.showVirtualController)
             putBoolean("auto_hide_virtual_on_phys", c.autoHideVirtualOnPhysicalController)
             putFloat("gamepad_scale", c.gamepadScale)
@@ -1071,6 +1080,8 @@ object SettingsRepository {
             putBoolean("gamepad_sprint_lock", c.gamepadSprintLockEnabled)
             putString("gamepad_custom_offsets", c.gamepadCustomOffsets)
             putString("gamepad_button_scales", c.gamepadButtonScales)
+            putString("gamepad_button_opacities", c.gamepadButtonOpacities)
+            putString("gamepad_button_haptics", c.gamepadButtonHaptics)
             putString("gamepad_hidden_buttons", c.gamepadHiddenButtons)
             putBoolean("gamepad_abxy_split_mode", c.gamepadAbxySplitMode)
             putBoolean("gamepad_dpad_split_mode", c.gamepadDpadSplitMode)
@@ -1800,16 +1811,28 @@ object SettingsRepository {
         logSettingChange("Khóa chạy nhanh cần trái (Sprint Lock)", old, enabled)
     }
 
+    fun updateHudIdleOpacity(opacity: Float) {
+        val old = _config.value.hudIdleOpacity
+        val next = opacity.coerceIn(0.15f, 0.90f)
+        _config.update { it.copy(hudIdleOpacity = next) }
+        persist(_config.value)
+        logSettingChange("Độ mờ menu nổi khi không chạm", "${(old * 100).toInt()}%", "${(next * 100).toInt()}%", throttleMs = 400L)
+    }
+
+    private fun currentPerGameSeed(cfg: AppConfig = _config.value): PerGameGamepadLayout = PerGameGamepadLayout(
+        offsets = cfg.gamepadCustomOffsets,
+        scales = cfg.gamepadButtonScales,
+        opacities = cfg.gamepadButtonOpacities,
+        haptics = cfg.gamepadButtonHaptics,
+        hiddenButtons = cfg.gamepadHiddenButtons,
+        abxySplit = cfg.gamepadAbxySplitMode,
+        dpadSplit = cfg.gamepadDpadSplitMode
+    )
+
     fun updateGamepadCustomOffsets(offsets: String, gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
-            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
-                offsets = _config.value.gamepadCustomOffsets,
-                scales = _config.value.gamepadButtonScales,
-                hiddenButtons = _config.value.gamepadHiddenButtons,
-                abxySplit = _config.value.gamepadAbxySplitMode,
-                dpadSplit = _config.value.gamepadDpadSplitMode
-            )
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
             savePerGameLayout(normKey, current.copy(offsets = offsets))
             logSettingChange("Vị trí nút tay cầm ảo ($normKey)", current.offsets.length, offsets.length, throttleMs = 600L)
             return
@@ -1823,13 +1846,7 @@ object SettingsRepository {
     fun updateGamepadButtonScales(scales: String, gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
-            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
-                offsets = _config.value.gamepadCustomOffsets,
-                scales = _config.value.gamepadButtonScales,
-                hiddenButtons = _config.value.gamepadHiddenButtons,
-                abxySplit = _config.value.gamepadAbxySplitMode,
-                dpadSplit = _config.value.gamepadDpadSplitMode
-            )
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
             savePerGameLayout(normKey, current.copy(scales = scales))
             logSettingChange("Cỡ từng nút tay cầm ảo ($normKey)", current.scales, scales, throttleMs = 500L)
             return
@@ -1840,16 +1857,38 @@ object SettingsRepository {
         logSettingChange("Cỡ từng nút tay cầm ảo", old, scales, throttleMs = 500L)
     }
 
+    fun updateGamepadButtonOpacities(opacities: String, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
+            savePerGameLayout(normKey, current.copy(opacities = opacities))
+            logSettingChange("Độ mờ từng nút tay cầm ảo ($normKey)", current.opacities, opacities, throttleMs = 500L)
+            return
+        }
+        val old = _config.value.gamepadButtonOpacities
+        _config.update { it.copy(gamepadButtonOpacities = opacities) }
+        persist(_config.value)
+        logSettingChange("Độ mờ từng nút tay cầm ảo", old, opacities, throttleMs = 500L)
+    }
+
+    fun updateGamepadButtonHaptics(haptics: String, gameKey: String? = null) {
+        val normKey = normalizeGameLayoutKey(gameKey)
+        if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
+            savePerGameLayout(normKey, current.copy(haptics = haptics))
+            logSettingChange("Rung từng nút tay cầm ảo ($normKey)", current.haptics, haptics)
+            return
+        }
+        val old = _config.value.gamepadButtonHaptics
+        _config.update { it.copy(gamepadButtonHaptics = haptics) }
+        persist(_config.value)
+        logSettingChange("Rung từng nút tay cầm ảo", old, haptics)
+    }
+
     fun updateGamepadHiddenButtons(hidden: String, gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
-            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
-                offsets = _config.value.gamepadCustomOffsets,
-                scales = _config.value.gamepadButtonScales,
-                hiddenButtons = _config.value.gamepadHiddenButtons,
-                abxySplit = _config.value.gamepadAbxySplitMode,
-                dpadSplit = _config.value.gamepadDpadSplitMode
-            )
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
             savePerGameLayout(normKey, current.copy(hiddenButtons = hidden))
             logSettingChange("Nút ẩn tay cầm ảo ($normKey)", current.hiddenButtons.ifBlank { "không" }, hidden.ifBlank { "không" })
             return
@@ -1863,13 +1902,7 @@ object SettingsRepository {
     fun updateGamepadAbxySplitMode(split: Boolean, gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
-            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
-                offsets = _config.value.gamepadCustomOffsets,
-                scales = _config.value.gamepadButtonScales,
-                hiddenButtons = _config.value.gamepadHiddenButtons,
-                abxySplit = _config.value.gamepadAbxySplitMode,
-                dpadSplit = _config.value.gamepadDpadSplitMode
-            )
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
             savePerGameLayout(normKey, current.copy(abxySplit = split))
             logSettingChange("Tách rời nút A/B/X/Y ($normKey)", current.abxySplit, split)
             return
@@ -1883,13 +1916,7 @@ object SettingsRepository {
     fun updateGamepadDpadSplitMode(split: Boolean, gameKey: String? = null) {
         val normKey = normalizeGameLayoutKey(gameKey)
         if (_config.value.usePerGameGamepadLayout && normKey.isNotEmpty()) {
-            val current = getPerGameLayout(normKey) ?: PerGameGamepadLayout(
-                offsets = _config.value.gamepadCustomOffsets,
-                scales = _config.value.gamepadButtonScales,
-                hiddenButtons = _config.value.gamepadHiddenButtons,
-                abxySplit = _config.value.gamepadAbxySplitMode,
-                dpadSplit = _config.value.gamepadDpadSplitMode
-            )
+            val current = getPerGameLayout(normKey) ?: currentPerGameSeed()
             savePerGameLayout(normKey, current.copy(dpadSplit = split))
             logSettingChange("Tách rời cụm phím D-Pad ($normKey)", current.dpadSplit, split)
             return
@@ -1911,6 +1938,8 @@ object SettingsRepository {
             it.copy(
                 gamepadCustomOffsets = "",
                 gamepadButtonScales = "",
+                gamepadButtonOpacities = "",
+                gamepadButtonHaptics = "",
                 gamepadHiddenButtons = "",
                 gamepadAbxySplitMode = false,
                 gamepadDpadSplitMode = false
@@ -1943,6 +1972,8 @@ object SettingsRepository {
             PerGameGamepadLayout(
                 offsets = obj.optString("offsets", ""),
                 scales = obj.optString("scales", ""),
+                opacities = obj.optString("opacities", ""),
+                haptics = obj.optString("haptics", ""),
                 hiddenButtons = obj.optString("hidden", ""),
                 abxySplit = obj.optBoolean("abxySplit", false),
                 dpadSplit = obj.optBoolean("dpadSplit", false)
@@ -1965,6 +1996,8 @@ object SettingsRepository {
             val obj = org.json.JSONObject().apply {
                 put("offsets", layout.offsets)
                 put("scales", layout.scales)
+                put("opacities", layout.opacities)
+                put("haptics", layout.haptics)
                 put("hidden", layout.hiddenButtons)
                 put("abxySplit", layout.abxySplit)
                 put("dpadSplit", layout.dpadSplit)
@@ -2157,6 +2190,8 @@ object SettingsRepository {
                 result[k] = PerGameGamepadLayout(
                     offsets = obj.optString("offsets", ""),
                     scales = obj.optString("scales", ""),
+                    opacities = obj.optString("opacities", ""),
+                    haptics = obj.optString("haptics", ""),
                     hiddenButtons = obj.optString("hidden", ""),
                     abxySplit = obj.optBoolean("abxySplit", false),
                     dpadSplit = obj.optBoolean("dpadSplit", false)

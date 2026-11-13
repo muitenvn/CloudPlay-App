@@ -1,356 +1,388 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.DirectCyan
-import com.example.ui.theme.JapanRed
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxNeonGreen
+import com.example.data.AppConfig
+import com.example.data.GameOptimizationProfile
+import com.example.data.SettingsRepository
+import com.example.data.XboxWebUiMode
+import com.example.ui.theme.JetBrainsMonoFontFamily
+import kotlin.math.roundToInt
 
 /**
- * Nhóm 2: Điều khiển & Tiện ích nhanh (Làm nét, Giảm nền, Máy yếu, Dịch VI) với cỡ chữ >= 11sp.
+ * Tab "Điều khiển" trong Menu nổi mở rộng (chuẩn hud-mockup.html).
  */
 @Composable
-internal fun DenseFeatureTogglesSection(
-    clarityBoostActive: Boolean,
-    hideStreamStats: Boolean,
+internal fun HudControlsTabContent(
+    config: AppConfig,
+    virtualControllerEnabled: Boolean,
     translationActive: Boolean,
     translatedCount: Int,
-    onToggleClarityBoost: (Boolean) -> Unit,
-    onToggleHideStreamStats: (Boolean) -> Unit,
+    gameProfile: GameOptimizationProfile?,
+    xboxWebUiMode: XboxWebUiMode,
+    onInteraction: () -> Unit,
+    onToggleVirtualController: () -> Unit,
+    onSelectFortniteControlMode: (Boolean) -> Unit,
     onToggleTranslation: (Boolean) -> Unit,
-    onToggleGpuLoadReduction: () -> Unit
+    onOpenTranslator: () -> Unit,
+    onSelectXboxWebUiMode: (XboxWebUiMode) -> Unit,
+    onToggleOrientation: () -> Unit
 ) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xFF101C16),
-        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxCardBorder.copy(alpha = 0.65f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Text(
-                text = if (isEn) "Controls & Quick Toggles" else "Điều khiển & Tối ưu nhanh",
-                color = DirectCyan,
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HudSectionLabel(config.tr("Tay cầm ảo", "Virtual gamepad"))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                DenseQuickTogglePill(
-                    label = if (clarityBoostActive) {
-                        if (isEn) "Sharpen: ON" else "Làm nét: Bật"
-                    } else {
-                        if (isEn) "Sharpen: OFF" else "Làm nét: Tắt"
-                    },
-                    active = clarityBoostActive,
-                    activeColor = XboxNeonGreen,
-                    onClick = { onToggleClarityBoost(!clarityBoostActive) },
-                    modifier = Modifier.weight(1f)
-                )
-                DenseQuickTogglePill(
-                    label = if (config.gpuLoadReductionEnabled) {
-                        if (isEn) "Light BG: ON" else "Giảm nền: Bật"
-                    } else {
-                        if (isEn) "Light BG: OFF" else "Giảm nền: Tắt"
-                    },
-                    active = config.gpuLoadReductionEnabled,
-                    activeColor = DirectCyan,
-                    onClick = onToggleGpuLoadReduction,
-                    modifier = Modifier.weight(1f)
-                )
+        HudSegmentedControl(
+            options = listOf(config.tr("Bật", "Show"), config.tr("Ẩn", "Hide")),
+            selectedIndex = if (virtualControllerEnabled) 0 else 1,
+            onSelect = { idx ->
+                onInteraction()
+                val wantOn = idx == 0
+                if (wantOn != virtualControllerEnabled) {
+                    onToggleVirtualController()
+                }
+            },
+            tagPrefix = "hud_ctrl_gamepad_seg"
+        )
+
+        HudSliderRow(
+            label = config.tr("Cỡ nút", "Button size"),
+            valueText = "${(config.gamepadScale * 100).roundToInt()}%",
+            value = config.gamepadScale,
+            valueRange = 0.75f..1.35f,
+            onValueChange = {
+                onInteraction()
+                SettingsRepository.updateGamepadScale(it)
             }
+        )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+        HudSliderRow(
+            label = config.tr("Độ mờ", "Opacity"),
+            valueText = "${(config.gamepadOpacity * 100).roundToInt()}%",
+            value = config.gamepadOpacity,
+            valueRange = 0.25f..0.95f,
+            onValueChange = {
+                onInteraction()
+                SettingsRepository.updateGamepadOpacity(it)
+            }
+        )
+
+        if (gameProfile?.gameId == "fortnite") {
+            HudSectionLabel(config.tr("Điều khiển Fortnite", "Fortnite controls"))
+            HudSegmentedControl(
+                options = listOf(config.tr("Cảm ứng", "Touch"), config.tr("Tay cầm", "Gamepad")),
+                selectedIndex = if (!virtualControllerEnabled) 0 else 1,
+                onSelect = { idx ->
+                    onInteraction()
+                    onSelectFortniteControlMode(idx == 1)
+                },
+                tagPrefix = "hud_fortnite_mode_seg"
+            )
+        }
+
+        // Dịch giao diện Xbox · N mục + nút Chi tiết + công tắc
+        HudSurfaceRow(minHeight = 42.dp) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 6.dp)
             ) {
-                DenseQuickTogglePill(
-                    label = if (config.lowEndDeviceMode) {
-                        if (isEn) "Low-End: ON" else "Máy yếu: Bật"
-                    } else {
-                        if (isEn) "Low-End: OFF" else "Máy yếu: Tắt"
-                    },
-                    active = config.lowEndDeviceMode,
-                    activeColor = DirectCyan,
-                    onClick = { com.example.data.SettingsRepository.updateLowEndDeviceMode(!config.lowEndDeviceMode) },
-                    modifier = Modifier.weight(1f)
+                Text(
+                    text = config.tr("Dịch giao diện Xbox", "Translate Xbox UI"),
+                    color = HudInk,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                DenseQuickTogglePill(
-                    label = if (translationActive) {
-                        if (isEn) {
-                            if (translatedCount > 0) "VI ($translatedCount)" else "VI Trans: ON"
-                        } else {
-                            if (translatedCount > 0) "Dịch VI ($translatedCount)" else "Dịch VI: Bật"
-                        }
-                    } else {
-                        if (isEn) "VI Trans: OFF" else "Dịch VI: Tắt"
+                if (translatedCount > 0) {
+                    Text(
+                        text = config.tr("Đã dịch $translatedCount mục", "$translatedCount items"),
+                        color = HudFaint,
+                        fontSize = 11.5.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HudButton(
+                    text = config.tr("Chi tiết", "Open"),
+                    onClick = {
+                        onInteraction()
+                        onOpenTranslator()
                     },
-                    active = translationActive,
-                    activeColor = XboxNeonGreen,
-                    onClick = { onToggleTranslation(!translationActive) },
-                    modifier = Modifier.weight(1f)
+                    minHeight = 30.dp,
+                    fontSize = 11.5.sp,
+                    modifier = Modifier.testTag("hud_expanded_translator_card")
+                )
+                HudSwitch(
+                    checked = translationActive,
+                    onCheckedChange = {
+                        onInteraction()
+                        onToggleTranslation(it)
+                    },
+                    contentDescription = config.tr("Bật dịch giao diện Xbox", "Toggle Xbox UI translation")
                 )
             }
         }
-    }
-}
 
-@Composable
-internal fun DenseQuickTogglePill(
-    label: String,
-    active: Boolean,
-    activeColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .clickable { onClick() },
-        shape = RoundedCornerShape(6.dp),
-        color = if (active) activeColor.copy(alpha = 0.18f) else Color(0xFF14221A),
-        border = androidx.compose.foundation.BorderStroke(
-            0.7.dp,
-            if (active) activeColor.copy(alpha = 0.55f) else XboxCardBorder.copy(alpha = 0.5f)
+        HudSectionLabel(config.tr("Giao diện web Xbox", "Xbox Web UI"))
+        HudSegmentedControl(
+            options = listOf(
+                config.tr("Giao diện cũ", "Classic UI"),
+                config.tr("Giao diện mới", "New UI")
+            ),
+            selectedIndex = if (xboxWebUiMode == XboxWebUiMode.CLASSIC) 0 else 1,
+            onSelect = { idx ->
+                onInteraction()
+                val next = if (idx == 0) XboxWebUiMode.CLASSIC else XboxWebUiMode.NEW_UI
+                if (next != xboxWebUiMode) {
+                    onSelectXboxWebUiMode(next)
+                }
+            },
+            tagPrefix = "hud_ui_mode"
         )
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center
+
+        HudSurfaceRow(
+            minHeight = 40.dp,
+            onClick = {
+                onInteraction()
+                onToggleOrientation()
+            },
+            modifier = Modifier.testTag("hud_expanded_rotate_button")
         ) {
             Text(
-                text = label,
-                color = if (active) activeColor else TextSecondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                text = config.tr("Xoay màn hình", "Rotate screen"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1
+            )
+            HudPanelIconButton(
+                icon = Icons.Default.ScreenRotation,
+                contentDescription = config.tr("Xoay màn hình", "Rotate screen"),
+                onClick = {
+                    onInteraction()
+                    onToggleOrientation()
+                },
+                size = 32.dp,
+                tint = HudInk
             )
         }
     }
 }
 
 /**
- * Nhóm Tùy chỉnh nhanh tay cầm ảo (Độ mờ, Kích thước nút) ngay trên HUD khi đang chơi.
+ * Tab "Máy" trong Menu nổi mở rộng (chuẩn hud-mockup.html).
  */
 @Composable
-internal fun DenseQuickGamepadSection(
-    virtualControllerEnabled: Boolean,
-    onInteraction: () -> Unit = {}
+internal fun HudDeviceTabContent(
+    config: AppConfig,
+    batteryPercent: Int,
+    isBatteryCharging: Boolean,
+    isThermalSupported: Boolean,
+    thermalStatus: Int,
+    networkStatus: com.example.cloudplay.NetworkOptimizerStatus,
+    recorderState: com.example.cloudplay.ScreenRecorderState,
+    onInteraction: () -> Unit,
+    onToggleWifiSpeedFirst: (Boolean) -> Unit,
+    onToggleRecording: () -> Unit
 ) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
-    if (!virtualControllerEnabled) return
+    val batteryVal = if (batteryPercent >= 0) {
+        if (isBatteryCharging) {
+            config.tr("$batteryPercent% · đang sạc ⚡", "$batteryPercent% · charging ⚡")
+        } else {
+            "$batteryPercent%"
+        }
+    } else {
+        "—%"
+    }
+    val batteryColor = when {
+        isBatteryCharging -> HudAccent
+        batteryPercent in 0..15 -> HudDanger
+        batteryPercent in 16..30 -> HudWarn
+        else -> HudInk
+    }
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color(0xFF101C16),
-        border = androidx.compose.foundation.BorderStroke(0.7.dp, XboxNeonGreen.copy(alpha = 0.35f))
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+    val (thermalText, thermalTier) = when {
+        !isThermalSupported -> config.tr("Chưa hỗ trợ", "N/A") to HudTagTier.NEUTRAL
+        thermalStatus >= 2 -> config.tr("Nóng", "Hot") to HudTagTier.BAD
+        thermalStatus == 1 -> config.tr("Ấm", "Warm") to HudTagTier.MID
+        else -> config.tr("Mát", "Cool") to HudTagTier.GOOD
+    }
+    val (thermalBadge, _) = when {
+        !isThermalSupported -> "—" to HudTagTier.NEUTRAL
+        thermalStatus >= 2 -> config.tr("Nên hạ", "Lower") to HudTagTier.BAD
+        thermalStatus == 1 -> config.tr("Chú ý", "Watch") to HudTagTier.MID
+        else -> config.tr("Tốt", "Good") to HudTagTier.GOOD
+    }
+
+    val netSummary = when {
+        networkStatus.isWifi -> {
+            val band = when (networkStatus.physicalType) {
+                com.example.cloudplay.PhysicalNetworkType.WIFI_6GHZ -> "Wi-Fi 6GHz"
+                com.example.cloudplay.PhysicalNetworkType.WIFI_5GHZ -> "Wi-Fi 5GHz"
+                com.example.cloudplay.PhysicalNetworkType.WIFI_2_4GHZ -> "Wi-Fi 2.4GHz"
+                else -> "Wi-Fi"
+            }
+            if (networkStatus.isWeakWifiSignal) config.tr("$band · sóng yếu", "$band · weak")
+            else config.tr("$band · sóng tốt", "$band · good")
+        }
+        networkStatus.isCellular -> {
+            if (networkStatus.isWeakCellularSignal) config.tr("4G/5G · sóng yếu", "4G/5G · weak")
+            else config.tr("4G/5G · ổn định", "4G/5G · stable")
+        }
+        else -> config.tr("Đang kết nối", "Active")
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HudSurfaceRow {
+            Text(
+                text = config.tr("Pin", "Battery"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = batteryVal,
+                color = batteryColor,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = JetBrainsMonoFontFamily
+            )
+        }
+
+        HudSurfaceRow {
+            Text(
+                text = config.tr("Nhiệt độ máy", "Device temperature"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = if (isEn) "🎮 Virtual Gamepad Quick Adjust" else "🎮 Tùy chỉnh nhanh tay cầm ảo",
-                    color = XboxNeonGreen,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1
-                )
-                Text(
-                    text = "${(config.gamepadOpacity * 100).toInt()}% • ${String.format("%.2f", config.gamepadScale)}x",
-                    color = DirectCyan,
-                    fontSize = 10.5.sp,
+                    text = thermalText,
+                    color = HudMuted,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-            }
-
-            // Opacity quick presets: 40%, 65%, 85%
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isEn) "Opacity" else "Độ mờ",
-                    color = TextSecondary,
-                    fontSize = 10.5.sp,
-                    modifier = Modifier.width(44.dp)
-                )
-                listOf(0.40f to "40%", 0.65f to "65%", 0.85f to "85%").forEach { (opVal, opLabel) ->
-                    val isSel = kotlin.math.abs(config.gamepadOpacity - opVal) < 0.10f
-                    DenseQualityPresetChip(
-                        label = opLabel,
-                        isSelected = isSel,
-                        onClick = {
-                            onInteraction()
-                            com.example.data.SettingsRepository.updateGamepadOpacity(opVal)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-
-            // Scale quick presets: 0.85x, 1.0x, 1.20x
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isEn) "Scale" else "Cỡ nút",
-                    color = TextSecondary,
-                    fontSize = 10.5.sp,
-                    modifier = Modifier.width(44.dp)
-                )
-                listOf(0.85f to "0.85x", 1.0f to "1.0x", 1.20f to "1.2x").forEach { (scVal, scLabel) ->
-                    val isSel = kotlin.math.abs(config.gamepadScale - scVal) < 0.08f
-                    DenseQualityPresetChip(
-                        label = scLabel,
-                        isSelected = isSel,
-                        onClick = {
-                            onInteraction()
-                            com.example.data.SettingsRepository.updateGamepadScale(scVal)
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+                if (isThermalSupported) {
+                    HudTagChip(text = thermalBadge, tier = thermalTier)
                 }
             }
         }
-    }
-}
 
-/**
- * Hàng nút tác vụ dưới cùng: Tải lại, Xoay, Đồ họa, Thoát (xếp 1 hàng ngang, biểu tượng ở trên và nhãn >= 11sp ở dưới).
- */
-@Composable
-internal fun DenseBottomActionsSection(
-    onReloadPage: () -> Unit,
-    onToggleOrientation: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onRequestExitHome: () -> Unit
-) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        DenseBottomActionChip(
-            icon = Icons.Default.Refresh,
-            label = if (isEn) "Reload" else "Tải lại",
-            tint = XboxNeonGreen,
-            onClick = onReloadPage,
-            modifier = Modifier.weight(1f),
-            testTag = "hud_expanded_reload_button"
-        )
-        DenseBottomActionChip(
-            icon = Icons.Default.ScreenRotation,
-            label = if (isEn) "Rotate" else "Xoay",
-            tint = DirectCyan,
-            onClick = onToggleOrientation,
-            modifier = Modifier.weight(1f),
-            testTag = "hud_expanded_rotate_button"
-        )
-        DenseBottomActionChip(
-            icon = Icons.Default.Settings,
-            label = if (isEn) "Graphics" else "Đồ họa",
-            tint = DirectCyan,
-            onClick = onOpenSettings,
-            modifier = Modifier.weight(1f),
-            testTag = "hud_expanded_settings_button"
-        )
-        DenseBottomActionChip(
-            icon = Icons.Default.Home,
-            label = if (isEn) "Exit" else "Thoát",
-            tint = JapanRed,
-            onClick = onRequestExitHome,
-            modifier = Modifier.weight(1f),
-            testTag = "hud_expanded_home_button"
-        )
-    }
-}
-
-@Composable
-internal fun DenseBottomActionChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    testTag: String
-) {
-    Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(7.dp))
-            .clickable { onClick() }
-            .testTag(testTag),
-        shape = RoundedCornerShape(7.dp),
-        color = Color(0xFF101915),
-        border = androidx.compose.foundation.BorderStroke(0.8.dp, tint.copy(alpha = 0.5f))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp, vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = tint,
-                modifier = Modifier.size(15.dp)
+        HudSurfaceRow {
+            Text(
+                text = config.tr("Mạng", "Network"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = label,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
+                text = netSummary,
+                color = if (networkStatus.isWeakWifiSignal || networkStatus.isWeakCellularSignal) HudWarn else HudMuted,
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        HudSwitchRow(
+            title = config.tr("Ưu tiên phản hồi mượt", "Low-latency Wi-Fi lock"),
+            checked = config.wifiSpeedFirstPriority,
+            onCheckedChange = {
+                onInteraction()
+                onToggleWifiSpeedFirst(it)
+            }
+        )
+
+        HudSurfaceRow(minHeight = 42.dp) {
+            Text(
+                text = config.tr("Quay màn hình", "Screen recording"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (recorderState.isRecording) {
+                    val m = recorderState.elapsedSeconds / 60
+                    val s = recorderState.elapsedSeconds % 60
+                    Text(
+                        text = "● %02d:%02d".format(m, s),
+                        color = HudDanger,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = JetBrainsMonoFontFamily
+                    )
+                }
+                HudButton(
+                    text = if (recorderState.isRecording) {
+                        config.tr("Dừng", "Stop")
+                    } else {
+                        config.tr("Quay", "Record")
+                    },
+                    onClick = {
+                        onInteraction()
+                        onToggleRecording()
+                    },
+                    style = if (recorderState.isRecording) HudButtonStyle.DANGER else HudButtonStyle.DEFAULT,
+                    minHeight = 32.dp,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        HudSectionLabel(config.tr("Menu nổi", "Floating HUD"))
+
+        HudSliderRow(
+            label = config.tr("Độ mờ khi không chạm", "Idle opacity"),
+            valueText = "${(config.hudIdleOpacity * 100).roundToInt()}%",
+            value = config.hudIdleOpacity,
+            valueRange = 0.15f..0.90f,
+            onValueChange = {
+                onInteraction()
+                SettingsRepository.updateHudIdleOpacity(it)
+            }
+        )
+
+        HudSurfaceRow(minHeight = 42.dp) {
+            Text(
+                text = config.tr("Vị trí", "Position"),
+                color = HudInk,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = config.tr("Kéo để di chuyển, thả gần mép để dính", "Drag anywhere, snap near edge"),
+                color = HudFaint,
+                fontSize = 11.5.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 12.dp)
             )
         }
     }

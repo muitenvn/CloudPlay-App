@@ -37,11 +37,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.DirectCyan
-import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxNeonGreen
-import com.example.ui.theme.XboxSurface
-import com.example.ui.theme.XboxSurfaceVariant
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -90,17 +85,22 @@ internal fun VirtualAnalogStick(
         return sign(rawNorm) * rescaled.pow(exponent)
     }
 
+    val idleBorder = Color.White.copy(alpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f))
+    val outerBgAlpha = (opacity * 0.54f).coerceIn(0.12f, 0.72f)
+    val knobBgAlpha = (opacity * 0.30f).coerceIn(0.08f, 0.48f)
+    val knobBorderAlpha = (opacity * 0.40f).coerceIn(0.10f, 0.56f)
+
     Box(
         modifier = Modifier
             .size(outerSizeDp)
             .clip(CircleShape)
-            .background(XboxSurface.copy(alpha = opacity * 0.78f))
+            .background(HudSurface.copy(alpha = outerBgAlpha))
             .border(
-                width = if (isTouching) 1.8.dp else 1.2.dp,
+                width = if (isTouching) 1.5.dp else 1.dp,
                 color = when {
-                    isAutoSprinting -> DirectCyan
-                    isTouching -> XboxNeonGreen
-                    else -> XboxCardBorder.copy(alpha = opacity)
+                    isAutoSprinting -> HudCyan
+                    isTouching -> HudAccent
+                    else -> idleBorder
                 },
                 shape = CircleShape
             )
@@ -201,23 +201,23 @@ internal fun VirtualAnalogStick(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val c = Offset(size.width / 2f, size.height / 2f)
             drawCircle(
-                color = XboxCardBorder.copy(alpha = 0.55f),
+                color = Color.White.copy(alpha = 0.14f),
                 radius = maxRadiusPx * currentOuterDeadzone.coerceIn(0.50f, 1.0f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )
             drawCircle(
-                color = DirectCyan.copy(alpha = 0.25f),
+                color = HudCyan.copy(alpha = 0.22f),
                 radius = maxRadiusPx * currentInnerDeadzone.coerceIn(0.0f, 0.35f),
                 center = c,
                 style = Stroke(width = 1.dp.toPx())
             )
             if (isTouching && (abs(stickX) > 2f || abs(stickY) > 2f)) {
                 drawLine(
-                    color = if (isAutoSprinting) DirectCyan else XboxNeonGreen,
+                    color = if (isAutoSprinting) HudCyan else HudAccent,
                     start = c,
                     end = Offset(c.x + stickX, c.y + stickY),
-                    strokeWidth = 2.2.dp.toPx(),
+                    strokeWidth = 2.dp.toPx(),
                     cap = StrokeCap.Round
                 )
             }
@@ -226,7 +226,7 @@ internal fun VirtualAnalogStick(
         if (isAutoSprinting) {
             Text(
                 text = "🏃 L3",
-                color = DirectCyan,
+                color = HudCyan,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Black,
                 modifier = Modifier
@@ -235,7 +235,7 @@ internal fun VirtualAnalogStick(
             )
         }
 
-        // Inner thumb knob (flat Bản 4 surface — zero gradient shader allocation)
+        // Inner thumb knob matching mockup translucent white knob
         Box(
             modifier = Modifier
                 .offset { IntOffset(stickX.roundToInt(), stickY.roundToInt()) }
@@ -243,17 +243,17 @@ internal fun VirtualAnalogStick(
                 .clip(CircleShape)
                 .background(
                     when {
-                        isAutoSprinting -> Color(0xFF10313A).copy(alpha = opacity)
-                        isTouching -> Color(0xFF16352A).copy(alpha = opacity)
-                        else -> XboxSurfaceVariant.copy(alpha = opacity)
+                        isAutoSprinting -> Color(0xFF10313A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                        isTouching -> HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
+                        else -> Color.White.copy(alpha = knobBgAlpha)
                     }
                 )
                 .border(
-                    width = if (isTouching) 1.8.dp else 1.4.dp,
+                    width = if (isTouching) 1.5.dp else 1.dp,
                     color = when {
-                        isAutoSprinting -> DirectCyan
-                        isTouching -> XboxNeonGreen
-                        else -> XboxNeonGreen.copy(alpha = opacity * 0.72f)
+                        isAutoSprinting -> HudCyan
+                        isTouching -> HudAccent
+                        else -> Color.White.copy(alpha = knobBorderAlpha)
                     },
                     shape = CircleShape
                 ),
@@ -261,7 +261,7 @@ internal fun VirtualAnalogStick(
         ) {
             Text(
                 text = label,
-                color = Color.White.copy(alpha = opacity),
+                color = PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = (12f * scale).sp
             )
@@ -303,12 +303,15 @@ internal fun VirtualDpadCross(
         }
     }
 
+    val containerBgAlpha = (opacity * 0.48f).coerceIn(0.10f, 0.65f)
+    val borderAlpha = (opacity * 0.24f).coerceIn(0.06f, 0.40f)
+
     Box(
         modifier = Modifier
             .size(dpadSize)
             .clip(RoundedCornerShape(16.dp))
-            .background(XboxSurface.copy(alpha = opacity * 0.78f))
-            .border(1.2.dp, XboxCardBorder.copy(alpha = opacity), RoundedCornerShape(16.dp))
+            .background(HudSurface.copy(alpha = containerBgAlpha))
+            .border(1.dp, Color.White.copy(alpha = borderAlpha), RoundedCornerShape(16.dp))
             .then(
                 if (isEditMode) {
                     Modifier
@@ -365,9 +368,9 @@ internal fun VirtualDpadCross(
                 .clip(CircleShape)
                 .background(
                     if (upPressed || downPressed || leftPressed || rightPressed) {
-                        XboxNeonGreen
+                        HudAccent
                     } else {
-                        XboxCardBorder.copy(alpha = opacity)
+                        Color.White.copy(alpha = (opacity * 0.25f).coerceIn(0.08f, 0.40f))
                     }
                 )
         )
@@ -385,21 +388,24 @@ internal fun StandaloneDpadButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val sizeDp = (38.dp * scale)
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+
     Box(
         modifier = Modifier
             .size(sizeDp)
-            .clip(RoundedCornerShape(9.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 1.6.dp else 1.1.dp,
-                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                shape = RoundedCornerShape(9.dp)
+                width = if (isPressed) 1.5.dp else 1.dp,
+                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(10.dp)
             )
             .then(
                 if (isEditMode) {
@@ -422,7 +428,7 @@ internal fun StandaloneDpadButton(
     ) {
         Text(
             text = symbol,
-            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
+            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontSize = (13f * scale).sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -437,28 +443,31 @@ internal fun DpadVisualKey(
     isPressed: Boolean,
     opacity: Float
 ) {
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+
     Box(
         modifier = modifier
             .size(sizeDp)
             .padding(2.dp)
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(9.dp))
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A)
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 1.4.dp else 0.9.dp,
-                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                shape = RoundedCornerShape(7.dp)
+                width = if (isPressed) 1.4.dp else 1.dp,
+                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(9.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = symbol,
-            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
+            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold
         )
@@ -477,22 +486,24 @@ internal fun GamepadTriggerButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     var analogLevel by remember { mutableFloatStateOf(0f) }
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
 
     Box(
         modifier = Modifier
             .size(width = (64.dp * scale), height = (38.dp * scale))
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 1.6.dp else 1.1.dp,
-                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                shape = RoundedCornerShape(10.dp)
+                width = if (isPressed) 1.5.dp else 1.dp,
+                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(12.dp)
             )
             .then(
                 if (isEditMode) {
@@ -533,14 +544,14 @@ internal fun GamepadTriggerButton(
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
                     .fillMaxWidth(analogLevel.coerceIn(0f, 1f))
-                    .background(XboxNeonGreen.copy(alpha = 0.25f))
+                    .background(HudAccent.copy(alpha = 0.25f))
             )
         }
         Text(
             text = if (analogDragMode && isPressed) "$label ${(analogLevel * 100).roundToInt()}%" else label,
-            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
+            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontWeight = FontWeight.ExtraBold,
-            fontSize = (11.5f * scale).sp
+            fontSize = (12f * scale).sp
         )
     }
 }
@@ -555,22 +566,24 @@ internal fun GamepadShoulderButton(
     onStateChange: (Boolean) -> Unit
 ) {
     var isHeld by remember { mutableStateOf(false) }
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
 
     Box(
         modifier = Modifier
             .size(width = (58.dp * scale), height = (38.dp * scale))
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (isHeld) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isHeld) 1.6.dp else 1.1.dp,
-                color = if (isHeld) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                shape = RoundedCornerShape(10.dp)
+                width = if (isHeld) 1.5.dp else 1.dp,
+                color = if (isHeld) HudAccent else Color.White.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(12.dp)
             )
             .then(
                 if (isEditMode) {
@@ -593,9 +606,9 @@ internal fun GamepadShoulderButton(
     ) {
         Text(
             text = label,
-            color = if (isHeld) XboxNeonGreen else Color.White.copy(alpha = opacity),
+            color = if (isHeld) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontWeight = FontWeight.Bold,
-            fontSize = (11.5f * scale).sp
+            fontSize = (12f * scale).sp
         )
     }
 }
@@ -610,22 +623,24 @@ internal fun GamepadThumbClickMiniButton(
     onStateChange: (Boolean) -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
 
     Box(
         modifier = Modifier
             .size(width = (42.dp * scale), height = (34.dp * scale))
-            .clip(RoundedCornerShape(9.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurface.copy(alpha = opacity * 0.85f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = 1.1.dp,
-                color = if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                shape = RoundedCornerShape(9.dp)
+                width = 1.dp,
+                color = if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                shape = RoundedCornerShape(10.dp)
             )
             .then(
                 if (isEditMode) {
@@ -648,7 +663,7 @@ internal fun GamepadThumbClickMiniButton(
     ) {
         Text(
             text = label,
-            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
+            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontWeight = FontWeight.ExtraBold,
             fontSize = (10.5f * scale).sp
         )
@@ -665,20 +680,23 @@ internal fun GamepadSmallButton(
     onButton: (Boolean) -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurface.copy(alpha = opacity * 0.85f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
                 1.dp,
-                if (isPressed) XboxNeonGreen else XboxCardBorder.copy(alpha = opacity),
-                RoundedCornerShape(8.dp)
+                if (isPressed) HudAccent else Color.White.copy(alpha = borderAlpha),
+                RoundedCornerShape(12.dp)
             )
             .then(
                 if (isEditMode) {
@@ -697,13 +715,13 @@ internal fun GamepadSmallButton(
                     }
                 }
             )
-            .padding(horizontal = (8.dp * scale), vertical = (4.dp * scale)),
+            .padding(horizontal = (10.dp * scale), vertical = (6.dp * scale)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (isPressed) XboxNeonGreen else Color.White.copy(alpha = opacity),
-            fontSize = (10f * scale).sp,
+            color = if (isPressed) HudAccent else PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
+            fontSize = (11f * scale).sp,
             fontWeight = FontWeight.Bold
         )
     }
@@ -717,18 +735,20 @@ internal fun GamepadXboxNexusButton(
     onButton: (Boolean) -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
+    val bgAlpha = (opacity * 0.78f).coerceIn(0.18f, 0.92f)
+
     Box(
         modifier = Modifier
-            .size(36.dp * scale)
+            .size(34.dp * scale)
             .clip(CircleShape)
             .background(
                 if (isPressed) {
-                    Color(0xFF16352A).copy(alpha = opacity.coerceAtLeast(0.85f))
+                    HudSelBg.copy(alpha = opacity.coerceAtLeast(0.85f))
                 } else {
-                    XboxSurface.copy(alpha = opacity * 0.90f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
-            .border(1.5.dp, XboxNeonGreen.copy(alpha = opacity), CircleShape)
+            .border(1.2.dp, HudAccent.copy(alpha = opacity.coerceIn(0.30f, 1.0f)), CircleShape)
             .then(
                 if (isEditMode) {
                     Modifier
@@ -750,8 +770,8 @@ internal fun GamepadXboxNexusButton(
     ) {
         Text(
             text = "✕",
-            color = XboxNeonGreen.copy(alpha = opacity),
-            fontSize = (18f * scale).sp,
+            color = HudAccent.copy(alpha = opacity.coerceIn(0.35f, 1.0f)),
+            fontSize = (16f * scale).sp,
             fontWeight = FontWeight.ExtraBold
         )
     }
@@ -769,6 +789,9 @@ internal fun StandaloneAbxyButton(
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val sizeDp = (46.dp * scale)
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+
     Box(
         modifier = Modifier
             .size(sizeDp)
@@ -777,12 +800,12 @@ internal fun StandaloneAbxyButton(
                 if (isPressed) {
                     accentColor.copy(alpha = 0.28f)
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 2.dp else 1.4.dp,
-                color = if (isPressed) accentColor else accentColor.copy(alpha = opacity * 0.85f),
+                width = if (isPressed) 1.5.dp else 1.dp,
+                color = if (isPressed) accentColor else Color.White.copy(alpha = borderAlpha),
                 shape = CircleShape
             )
             .then(
@@ -806,7 +829,7 @@ internal fun StandaloneAbxyButton(
     ) {
         Text(
             text = label,
-            color = if (isPressed) Color.White else accentColor.copy(alpha = opacity),
+            color = if (isPressed) Color.White else accentColor.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontWeight = FontWeight.ExtraBold,
             fontSize = (16f * scale).sp
         )
@@ -822,7 +845,7 @@ internal fun VirtualAbxyPad(
 ) {
     // Slide & Multi-Button Combo ABXY Pad: A=0 (Bottom), B=1 (Right), X=2 (Left), Y=3 (Top)
     val padSize: Dp = (132.dp * scale)
-    val buttonSize: Dp = (44.dp * scale)
+    val buttonSize: Dp = (46.dp * scale)
 
     var aPressed by remember { mutableStateOf(false) }
     var bPressed by remember { mutableStateOf(false) }
@@ -848,12 +871,15 @@ internal fun VirtualAbxyPad(
         }
     }
 
+    val containerBgAlpha = (opacity * 0.42f).coerceIn(0.08f, 0.60f)
+    val borderAlpha = (opacity * 0.22f).coerceIn(0.06f, 0.36f)
+
     Box(
         modifier = Modifier
             .size(padSize)
             .clip(CircleShape)
-            .background(XboxSurface.copy(alpha = opacity * 0.78f))
-            .border(1.2.dp, XboxCardBorder.copy(alpha = opacity), CircleShape)
+            .background(HudSurface.copy(alpha = containerBgAlpha))
+            .border(1.dp, Color.White.copy(alpha = borderAlpha), CircleShape)
             .then(
                 if (isEditMode) {
                     Modifier
@@ -906,10 +932,10 @@ internal fun VirtualAbxyPad(
             ),
         contentAlignment = Alignment.Center
     ) {
-        AbxyVisualButton(Modifier.align(Alignment.TopCenter), "Y", Color(0xFFE0B44C), buttonSize, yPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.BottomCenter), "A", XboxNeonGreen, buttonSize, aPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.CenterStart), "X", DirectCyan, buttonSize, xPressed, opacity)
-        AbxyVisualButton(Modifier.align(Alignment.CenterEnd), "B", Color(0xFFEA6D6A), buttonSize, bPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.TopCenter), "Y", PadYColor, buttonSize, yPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.BottomCenter), "A", PadAColor, buttonSize, aPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.CenterStart), "X", PadXColor, buttonSize, xPressed, opacity)
+        AbxyVisualButton(Modifier.align(Alignment.CenterEnd), "B", PadBColor, buttonSize, bPressed, opacity)
     }
 }
 
@@ -928,6 +954,9 @@ internal fun AbxyVisualButton(
     isPressed: Boolean,
     opacity: Float
 ) {
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+
     Box(
         modifier = modifier
             .size(sizeDp)
@@ -937,19 +966,19 @@ internal fun AbxyVisualButton(
                 if (isPressed) {
                     accentColor.copy(alpha = 0.28f)
                 } else {
-                    XboxSurfaceVariant.copy(alpha = opacity * 0.88f)
+                    HudSurface.copy(alpha = bgAlpha)
                 }
             )
             .border(
-                width = if (isPressed) 2.dp else 1.4.dp,
-                color = if (isPressed) accentColor else accentColor.copy(alpha = opacity * 0.85f),
+                width = if (isPressed) 1.5.dp else 1.dp,
+                color = if (isPressed) accentColor else Color.White.copy(alpha = borderAlpha),
                 shape = CircleShape
             ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (isPressed) Color.White else accentColor.copy(alpha = opacity),
+            color = if (isPressed) Color.White else accentColor.copy(alpha = opacity.coerceIn(0.25f, 1.0f)),
             fontWeight = FontWeight.ExtraBold,
             fontSize = 16.sp
         )

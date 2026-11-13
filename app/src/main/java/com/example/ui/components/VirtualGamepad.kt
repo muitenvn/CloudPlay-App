@@ -6,56 +6,53 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.webkit.WebView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -63,30 +60,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
 import com.example.data.SettingsRepository
-import com.example.ui.theme.DirectCyan
-import com.example.ui.theme.JapanRed
-import com.example.ui.theme.JetBrainsMonoFontFamily
-import com.example.ui.theme.SpaceGroteskFontFamily
-import com.example.ui.theme.TextSecondary
-import com.example.ui.theme.WarningAmber
-import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxNeonGreen
-import com.example.ui.theme.XboxSurface
-import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.pow
 import kotlin.math.roundToInt
-import kotlin.math.sign
-import kotlin.math.sqrt
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VirtualGamepadOverlay(
     webView: WebView?,
@@ -96,8 +80,8 @@ fun VirtualGamepadOverlay(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val config by SettingsRepository.config.collectAsState()
-    val isEn = config.isEnglishUI()
 
     val effectiveOpacity = (opacity ?: config.gamepadOpacity).coerceIn(0.25f, 0.95f)
     val presetScaleMultiplier = when (config.gamepadLayoutPreset) {
@@ -113,12 +97,16 @@ fun VirtualGamepadOverlay(
         effectiveScale
     }
 
-    var showControlTuner by remember { mutableStateOf(false) }
     var isEditPositionMode by remember { mutableStateOf(false) }
-    var selectedButtonId by remember { mutableStateOf<String?>("abxy") }
+    var isPositionLocked by remember { mutableStateOf(false) }
+    var activePopoverNodeId by remember { mutableStateOf<String?>(null) }
+    var selectedButtonId by remember { mutableStateOf<String?>(null) }
     var showAddButtonModal by remember { mutableStateOf(false) }
     var showEditGrid by remember { mutableStateOf(true) }
-    var isToolbarCollapsed by remember { mutableStateOf(false) }
+
+    var rootSizePx by remember { mutableStateOf(IntSize.Zero) }
+    var rootPosInWindow by remember { mutableStateOf(Offset.Zero) }
+    val nodeBoundsMap = remember { mutableStateMapOf<String, Rect>() }
 
     val normGameKey = remember(gameKey) { SettingsRepository.normalizeGameLayoutKey(gameKey) }
     val perGameLayout = remember(normGameKey, config.usePerGameGamepadLayout, config.perGameLayoutsJson) {
@@ -129,16 +117,16 @@ fun VirtualGamepadOverlay(
 
     val effectiveOffsetsRaw = perGameLayout?.offsets ?: config.gamepadCustomOffsets
     val effectiveScalesRaw = perGameLayout?.scales ?: config.gamepadButtonScales
+    val effectiveOpacitiesRaw = perGameLayout?.opacities ?: config.gamepadButtonOpacities
+    val effectiveHapticsRaw = perGameLayout?.haptics ?: config.gamepadButtonHaptics
     val effectiveHiddenRaw = perGameLayout?.hiddenButtons ?: config.gamepadHiddenButtons
     val abxySplitMode = perGameLayout?.abxySplit ?: config.gamepadAbxySplitMode
     val dpadSplitMode = perGameLayout?.dpadSplit ?: config.gamepadDpadSplitMode
 
-    // Custom draggable per-button offsets (in pixels), backward-compatible with legacy cluster keys
     val customOffsets = remember(effectiveOffsetsRaw, normGameKey, config.usePerGameGamepadLayout) {
         mutableStateMapOf<String, Pair<Float, Float>>().apply {
             val parsed = parseControlOffsets(effectiveOffsetsRaw)
             putAll(parsed)
-            // Backward compatibility: if user had legacy cluster offsets, seed individual button offsets if unset
             parsed["left_shoulder"]?.let { (cx, cy) ->
                 if (cx != 0f || cy != 0f) {
                     if (!containsKey("btn_lt")) put("btn_lt", cx to cy)
@@ -163,14 +151,24 @@ fun VirtualGamepadOverlay(
         }
     }
 
-    // Per-button individual scale multiplier (0.50f .. 2.00f)
     val customButtonScales = remember(effectiveScalesRaw, normGameKey, config.usePerGameGamepadLayout) {
         mutableStateMapOf<String, Float>().apply {
             putAll(parseButtonScales(effectiveScalesRaw))
         }
     }
 
-    // Hidden (deleted) buttons set
+    val customButtonOpacities = remember(effectiveOpacitiesRaw, normGameKey, config.usePerGameGamepadLayout) {
+        mutableStateMapOf<String, Float>().apply {
+            putAll(parseButtonOpacities(effectiveOpacitiesRaw))
+        }
+    }
+
+    val customButtonHaptics = remember(effectiveHapticsRaw, normGameKey, config.usePerGameGamepadLayout) {
+        mutableStateMapOf<String, GamepadHapticLevel>().apply {
+            putAll(parseButtonHaptics(effectiveHapticsRaw))
+        }
+    }
+
     val hiddenButtons = remember(effectiveHiddenRaw, normGameKey, config.usePerGameGamepadLayout) {
         parseHiddenButtons(effectiveHiddenRaw)
     }
@@ -183,10 +181,29 @@ fun VirtualGamepadOverlay(
         SettingsRepository.updateGamepadButtonScales(serializeButtonScales(customButtonScales), normGameKey)
     }
 
+    fun saveButtonOpacities() {
+        SettingsRepository.updateGamepadButtonOpacities(serializeButtonOpacities(customButtonOpacities), normGameKey)
+    }
+
+    fun saveButtonHaptics() {
+        SettingsRepository.updateGamepadButtonHaptics(serializeButtonHaptics(customButtonHaptics), normGameKey)
+    }
+
     fun setButtonScale(nodeId: String, newMultiplier: Float) {
         val clamped = newMultiplier.coerceIn(0.50f, 2.00f)
         customButtonScales[nodeId] = clamped
         saveButtonScales()
+    }
+
+    fun setButtonOpacity(nodeId: String, newOpacity: Float) {
+        val clamped = newOpacity.coerceIn(0.20f, 1.00f)
+        customButtonOpacities[nodeId] = clamped
+        saveButtonOpacities()
+    }
+
+    fun setButtonHaptic(nodeId: String, level: GamepadHapticLevel) {
+        customButtonHaptics[nodeId] = level
+        saveButtonHaptics()
     }
 
     fun deleteButton(nodeId: String) {
@@ -205,13 +222,19 @@ fun VirtualGamepadOverlay(
     fun resetSingleButton(nodeId: String) {
         customOffsets.remove(nodeId)
         customButtonScales.remove(nodeId)
+        customButtonOpacities.remove(nodeId)
+        customButtonHaptics.remove(nodeId)
         saveCustomOffsets()
         saveButtonScales()
+        saveButtonOpacities()
+        saveButtonHaptics()
     }
 
     fun resetAllCustomizations() {
         customOffsets.clear()
         customButtonScales.clear()
+        customButtonOpacities.clear()
+        customButtonHaptics.clear()
         SettingsRepository.resetGamepadCustomOffsets(normGameKey)
     }
 
@@ -224,8 +247,15 @@ fun VirtualGamepadOverlay(
         return (baseScale * mult).coerceIn(0.45f, 2.50f)
     }
 
-    fun vibrate(stronger: Boolean = false) {
-        val level = config.gamepadHapticLevel
+    fun nodeOpacity(nodeId: String, baseOpacity: Float = effectiveOpacity): Float {
+        return (customButtonOpacities[nodeId] ?: baseOpacity).coerceIn(0.20f, 1.00f)
+    }
+
+    fun nodeHaptic(nodeId: String): GamepadHapticLevel {
+        return customButtonHaptics[nodeId] ?: config.gamepadHapticLevel
+    }
+
+    fun vibrateWithLevel(level: GamepadHapticLevel, stronger: Boolean = false) {
         if (level == GamepadHapticLevel.OFF) return
         try {
             val dur = if (stronger) (level.durationMs + 10L) else level.durationMs
@@ -272,8 +302,18 @@ fun VirtualGamepadOverlay(
         }
     }
 
-    fun sendButtonEvent(buttonIndex: Int, pressed: Boolean, analogValue: Float? = null) {
-        if (pressed) vibrate(stronger = buttonIndex in setOf(6, 7, 10, 11))
+    fun vibrate(nodeId: String? = null, stronger: Boolean = false) {
+        val level = if (nodeId != null) nodeHaptic(nodeId) else config.gamepadHapticLevel
+        vibrateWithLevel(level, stronger)
+    }
+
+    fun sendButtonEvent(
+        buttonIndex: Int,
+        pressed: Boolean,
+        analogValue: Float? = null,
+        nodeId: String? = null
+    ) {
+        if (pressed) vibrate(nodeId = nodeId, stronger = buttonIndex in setOf(6, 7, 10, 11))
         val v = analogValue ?: if (pressed) 1f else 0f
         val rv = (v * 100f).roundToInt() / 100f
         webView?.evaluateJavascript(
@@ -291,101 +331,127 @@ fun VirtualGamepadOverlay(
         )
     }
 
+    fun Modifier.trackNodeBounds(key: String): Modifier = this.onGloballyPositioned { coords ->
+        val pos = coords.positionInWindow() - rootPosInWindow
+        val next = Rect(pos.x, pos.y, pos.x + coords.size.width, pos.y + coords.size.height)
+        val old = nodeBoundsMap[key]
+        if (old == null ||
+            abs(old.left - next.left) > 1.5f ||
+            abs(old.top - next.top) > 1.5f ||
+            abs(old.width - next.width) > 1.5f ||
+            abs(old.height - next.height) > 1.5f
+        ) {
+            nodeBoundsMap[key] = next
+        }
+    }
+
     fun Modifier.draggableGamepadNode(key: String): Modifier {
         val offsetPair = customOffsets[key] ?: (0f to 0f)
-        val isSelected = isEditPositionMode && selectedButtonId == key
-        val base = this.offset { IntOffset(offsetPair.first.roundToInt(), offsetPair.second.roundToInt()) }
+        val isSelected = isEditPositionMode && (selectedButtonId == key || activePopoverNodeId == key)
+        val base = this
+            .offset { IntOffset(offsetPair.first.roundToInt(), offsetPair.second.roundToInt()) }
+            .trackNodeBounds(key)
+
         return if (!isEditPositionMode) {
             base
         } else {
-            base
-                .border(
-                    width = if (isSelected) 2.2.dp else 1.2.dp,
-                    color = if (isSelected) XboxNeonGreen else DirectCyan.copy(alpha = 0.75f),
-                    shape = RoundedCornerShape(14.dp)
-                )
-                .background(
-                    color = if (isSelected) XboxNeonGreen.copy(alpha = 0.22f) else DirectCyan.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(14.dp)
-                )
+            val editOutlineModifier = if (isSelected) {
+                base
+                    .border(2.dp, HudAccent, RoundedCornerShape(14.dp))
+                    .background(HudAccent.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+            } else {
+                base.drawBehind {
+                    val strokePx = 1.8.dp.toPx()
+                    val dashPx = 6.dp.toPx()
+                    val gapPx = 4.dp.toPx()
+                    val radiusPx = 14.dp.toPx()
+                    drawRoundRect(
+                        color = HudAccent.copy(alpha = 0.80f),
+                        cornerRadius = CornerRadius(radiusPx, radiusPx),
+                        style = Stroke(
+                            width = strokePx,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashPx, gapPx), 0f)
+                        )
+                    )
+                }
+            }
+
+            editOutlineModifier
                 .pointerInput(key, isEditPositionMode) {
                     detectTapGestures(
                         onTap = {
-                            vibrate()
-                            selectedButtonId = key
-                        }
-                    )
-                }
-                .pointerInput(key, isEditPositionMode) {
-                    detectDragGestures(
-                        onDragStart = {
+                            vibrate(key)
                             selectedButtonId = key
                         },
-                        onDragEnd = { saveCustomOffsets() },
-                        onDragCancel = { saveCustomOffsets() },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
+                        onDoubleTap = {
+                            vibrate(key)
                             selectedButtonId = key
-                            val cur = customOffsets[key] ?: (0f to 0f)
-                            customOffsets[key] = (cur.first + dragAmount.x) to (cur.second + dragAmount.y)
+                            activePopoverNodeId = key
+                            showAddButtonModal = false
                         }
                     )
                 }
+                .then(
+                    if (isPositionLocked) {
+                        Modifier
+                    } else {
+                        Modifier.pointerInput(key, isEditPositionMode, isPositionLocked) {
+                            detectDragGestures(
+                                onDragStart = { selectedButtonId = key },
+                                onDragEnd = { saveCustomOffsets() },
+                                onDragCancel = { saveCustomOffsets() },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    selectedButtonId = key
+                                    val cur = customOffsets[key] ?: (0f to 0f)
+                                    customOffsets[key] = (cur.first + dragAmount.x) to (cur.second + dragAmount.y)
+                                }
+                            )
+                        }
+                    }
+                )
         }
     }
 
     Box(
         modifier = modifier
             .fillMaxSize()
+            .onGloballyPositioned { coords ->
+                rootSizePx = coords.size
+                val nextPos = coords.positionInWindow()
+                if (abs(rootPosInWindow.x - nextPos.x) > 1f || abs(rootPosInWindow.y - nextPos.y) > 1f) {
+                    rootPosInWindow = nextPos
+                }
+            }
             .testTag("virtual_gamepad_overlay")
     ) {
-        // Simple Alignment Grid & Center Crosshair when editing button positions
+        // Alignment Grid & Center Crosshair when editing button positions
         if (isEditPositionMode && showEditGrid) {
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
                     .testTag("virtual_gamepad_alignment_grid")
             ) {
-                drawRect(color = Color(0x40060B09))
+                drawRect(color = Color(0x40070B09))
                 val stepPx = 32.dp.toPx().coerceAtLeast(16f)
-                val gridColor = Color.White.copy(alpha = 0.08f)
-                val centerColor = XboxNeonGreen.copy(alpha = 0.35f)
+                val gridColor = Color.White.copy(alpha = 0.07f)
+                val centerColor = HudAccent.copy(alpha = 0.35f)
 
                 var x = stepPx
                 while (x < size.width) {
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(x, 0f),
-                        end = Offset(x, size.height),
-                        strokeWidth = 1f
-                    )
+                    drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
                     x += stepPx
                 }
                 var y = stepPx
                 while (y < size.height) {
-                    drawLine(
-                        color = gridColor,
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1f
-                    )
+                    drawLine(gridColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
                     y += stepPx
                 }
 
                 val midX = size.width / 2f
                 val midY = size.height / 2f
-                drawLine(
-                    color = centerColor,
-                    start = Offset(midX, 0f),
-                    end = Offset(midX, size.height),
-                    strokeWidth = 1.5f
-                )
-                drawLine(
-                    color = centerColor,
-                    start = Offset(0f, midY),
-                    end = Offset(size.width, midY),
-                    strokeWidth = 1.5f
-                )
+                drawLine(centerColor, Offset(midX, 0f), Offset(midX, size.height), strokeWidth = 1.5f)
+                drawLine(centerColor, Offset(0f, midY), Offset(size.width, midY), strokeWidth = 1.5f)
             }
         }
 
@@ -398,7 +464,7 @@ fun VirtualGamepadOverlay(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left Shoulder Buttons: LT, LB, L3 (each independently draggable & resizable)
+            // Left Shoulder Buttons: LT, LB, L3
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -409,11 +475,11 @@ fun VirtualGamepadOverlay(
                             label = "LT",
                             buttonIndex = 6,
                             scale = nodeScale("btn_lt"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_lt"),
                             analogDragMode = config.gamepadLayoutPreset == GamepadLayoutPreset.RACING,
                             isEditMode = isEditPositionMode,
                             onStateChange = { pressed, analogVal ->
-                                sendButtonEvent(6, pressed, analogVal)
+                                sendButtonEvent(6, pressed, analogVal, nodeId = "btn_lt")
                             }
                         )
                     }
@@ -424,9 +490,9 @@ fun VirtualGamepadOverlay(
                             label = "LB",
                             buttonIndex = 4,
                             scale = nodeScale("btn_lb"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_lb"),
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(4, it) }
+                            onStateChange = { sendButtonEvent(4, it, nodeId = "btn_lb") }
                         )
                     }
                 }
@@ -436,15 +502,15 @@ fun VirtualGamepadOverlay(
                             label = "L3",
                             buttonIndex = 10,
                             scale = nodeScale("btn_l3"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_l3"),
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(10, it) }
+                            onStateChange = { sendButtonEvent(10, it, nodeId = "btn_l3") }
                         )
                     }
                 }
             }
 
-            // Right Shoulder Buttons: R3, RB, RT (each independently draggable & resizable)
+            // Right Shoulder Buttons: R3, RB, RT
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -455,9 +521,9 @@ fun VirtualGamepadOverlay(
                             label = "R3",
                             buttonIndex = 11,
                             scale = nodeScale("btn_r3"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_r3"),
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(11, it) }
+                            onStateChange = { sendButtonEvent(11, it, nodeId = "btn_r3") }
                         )
                     }
                 }
@@ -467,9 +533,9 @@ fun VirtualGamepadOverlay(
                             label = "RB",
                             buttonIndex = 5,
                             scale = nodeScale("btn_rb"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_rb"),
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(5, it) }
+                            onStateChange = { sendButtonEvent(5, it, nodeId = "btn_rb") }
                         )
                     }
                 }
@@ -479,11 +545,11 @@ fun VirtualGamepadOverlay(
                             label = "RT",
                             buttonIndex = 7,
                             scale = nodeScale("btn_rt"),
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("btn_rt"),
                             analogDragMode = config.gamepadLayoutPreset == GamepadLayoutPreset.RACING,
                             isEditMode = isEditPositionMode,
                             onStateChange = { pressed, analogVal ->
-                                sendButtonEvent(7, pressed, analogVal)
+                                sendButtonEvent(7, pressed, analogVal, nodeId = "btn_rt")
                             }
                         )
                     }
@@ -491,7 +557,7 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Center Top System Bar: View, Xbox Nexus, Menu + Pro Control Tuner Button (⚙)
+        // Center Top System Bar: View, Xbox Nexus, Menu + Tune ⚙ Icon
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -505,18 +571,18 @@ fun VirtualGamepadOverlay(
                         label = "⧉ View",
                         index = 8,
                         scale = customButtonScales["btn_view"] ?: 1.0f,
-                        opacity = effectiveOpacity,
+                        opacity = nodeOpacity("btn_view"),
                         isEditMode = isEditPositionMode
-                    ) { sendButtonEvent(8, it) }
+                    ) { sendButtonEvent(8, it, nodeId = "btn_view") }
                 }
             }
             if ("btn_xbox" !in hiddenButtons) {
                 Box(modifier = Modifier.draggableGamepadNode("btn_xbox")) {
                     GamepadXboxNexusButton(
                         scale = customButtonScales["btn_xbox"] ?: 1.0f,
-                        opacity = effectiveOpacity,
+                        opacity = nodeOpacity("btn_xbox"),
                         isEditMode = isEditPositionMode
-                    ) { sendButtonEvent(16, it) }
+                    ) { sendButtonEvent(16, it, nodeId = "btn_xbox") }
                 }
             }
             if ("btn_menu" !in hiddenButtons) {
@@ -525,51 +591,55 @@ fun VirtualGamepadOverlay(
                         label = "☰ Menu",
                         index = 9,
                         scale = customButtonScales["btn_menu"] ?: 1.0f,
-                        opacity = effectiveOpacity,
+                        opacity = nodeOpacity("btn_menu"),
                         isEditMode = isEditPositionMode
-                    ) { sendButtonEvent(9, it) }
+                    ) { sendButtonEvent(9, it, nodeId = "btn_menu") }
                 }
             }
 
-            // Control Quick-Tune Pill (always accessible so user can edit or restore buttons)
+            // Tune ⚙ Icon Button (matching mockup .tune: tap or double-tap opens Global "Cả tay cầm" popover)
+            val isAllOpen = activePopoverNodeId == "all"
+            val tuneDesc = config.tr("Tinh chỉnh tay cầm ảo", "Virtual gamepad settings")
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (showControlTuner || isEditPositionMode) {
-                            Color(0xFF16352A)
-                        } else {
-                            XboxSurface.copy(alpha = effectiveOpacity * 0.88f)
-                        }
-                    )
+                    .size(width = 38.dp, height = 30.dp)
+                    .trackNodeBounds("all")
+                    .alpha(if (isEditPositionMode && !isAllOpen) 0.45f else 1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isAllOpen) HudSelBg else PadBtnBg)
                     .border(
                         1.dp,
-                        if (showControlTuner || isEditPositionMode) XboxNeonGreen else XboxCardBorder,
-                        RoundedCornerShape(8.dp)
+                        if (isAllOpen) HudAccent else PadBtnBorder,
+                        RoundedCornerShape(10.dp)
                     )
-                    .clickable {
-                        vibrate()
-                        if (isEditPositionMode) {
-                            isEditPositionMode = false
-                            showAddButtonModal = false
-                        } else {
-                            showControlTuner = !showControlTuner
-                        }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                vibrate()
+                                activePopoverNodeId = if (activePopoverNodeId == "all") null else "all"
+                                showAddButtonModal = false
+                            },
+                            onDoubleTap = {
+                                vibrate()
+                                activePopoverNodeId = "all"
+                                showAddButtonModal = false
+                            }
+                        )
                     }
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .semantics { contentDescription = tuneDesc }
                     .testTag("virtual_gamepad_tune_button"),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (isEditPositionMode) (if (isEn) "✓ Done" else "✓ Xong") else "⚙ Control",
-                    color = if (showControlTuner || isEditPositionMode) XboxNeonGreen else DirectCyan,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.ExtraBold
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = tuneDesc,
+                    tint = if (isAllOpen) HudAccent else PadBtnText,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
 
-        // Left Controls: Left Analog Stick & D-Pad (Cluster or Split 4 Directional Buttons)
+        // Left Controls: Left Analog Stick & D-Pad
         Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -580,7 +650,7 @@ fun VirtualGamepadOverlay(
             if ("left_stick" !in hiddenButtons) {
                 Box(modifier = Modifier.draggableGamepadNode("left_stick")) {
                     VirtualAnalogStick(
-                        opacity = effectiveOpacity,
+                        opacity = nodeOpacity("left_stick"),
                         scale = nodeScale("left_stick"),
                         innerDeadzone = config.leftStickInnerDeadzone,
                         outerDeadzone = config.leftStickOuterDeadzone,
@@ -589,7 +659,7 @@ fun VirtualGamepadOverlay(
                         enableAutoSprintL3 = config.gamepadSprintLockEnabled,
                         isEditMode = isEditPositionMode,
                         onSprintStateChange = { sprinting ->
-                            sendButtonEvent(10, sprinting)
+                            sendButtonEvent(10, sprinting, nodeId = "left_stick")
                         },
                         onMove = { x, y ->
                             sendStickAxesPair(0, x, 1, y)
@@ -602,15 +672,14 @@ fun VirtualGamepadOverlay(
                 if ("dpad" !in hiddenButtons) {
                     Box(modifier = Modifier.draggableGamepadNode("dpad")) {
                         VirtualDpadCross(
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("dpad"),
                             scale = nodeScale("dpad"),
                             isEditMode = isEditPositionMode,
-                            onButton = { index, pressed -> sendButtonEvent(index, pressed) }
+                            onButton = { index, pressed -> sendButtonEvent(index, pressed, nodeId = "dpad") }
                         )
                     }
                 }
             } else {
-                // Split D-Pad: 4 individually draggable & resizable direction buttons
                 val splitBaseSize = 104.dp * effectiveScale
                 Box(modifier = Modifier.size(splitBaseSize)) {
                     if ("dpad_up" !in hiddenButtons) {
@@ -623,9 +692,9 @@ fun VirtualGamepadOverlay(
                                 symbol = "▲",
                                 buttonIndex = 12,
                                 scale = nodeScale("dpad_up"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("dpad_up"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(12, it) }
+                                onButton = { sendButtonEvent(12, it, nodeId = "dpad_up") }
                             )
                         }
                     }
@@ -639,9 +708,9 @@ fun VirtualGamepadOverlay(
                                 symbol = "▼",
                                 buttonIndex = 13,
                                 scale = nodeScale("dpad_down"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("dpad_down"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(13, it) }
+                                onButton = { sendButtonEvent(13, it, nodeId = "dpad_down") }
                             )
                         }
                     }
@@ -655,9 +724,9 @@ fun VirtualGamepadOverlay(
                                 symbol = "◀",
                                 buttonIndex = 14,
                                 scale = nodeScale("dpad_left"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("dpad_left"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(14, it) }
+                                onButton = { sendButtonEvent(14, it, nodeId = "dpad_left") }
                             )
                         }
                     }
@@ -671,9 +740,9 @@ fun VirtualGamepadOverlay(
                                 symbol = "▶",
                                 buttonIndex = 15,
                                 scale = nodeScale("dpad_right"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("dpad_right"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(15, it) }
+                                onButton = { sendButtonEvent(15, it, nodeId = "dpad_right") }
                             )
                         }
                     }
@@ -681,7 +750,7 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Right Controls: Right Analog Stick & ABXY (Cluster or Split A, B, X, Y Independent Buttons)
+        // Right Controls: Right Analog Stick & ABXY
         Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -692,7 +761,7 @@ fun VirtualGamepadOverlay(
             if ("right_stick" !in hiddenButtons) {
                 Box(modifier = Modifier.draggableGamepadNode("right_stick")) {
                     VirtualAnalogStick(
-                        opacity = effectiveOpacity * 0.92f,
+                        opacity = nodeOpacity("right_stick", effectiveOpacity * 0.92f),
                         scale = nodeScale("right_stick", rightStickBaseScale),
                         innerDeadzone = config.rightStickInnerDeadzone,
                         outerDeadzone = config.rightStickOuterDeadzone,
@@ -712,17 +781,16 @@ fun VirtualGamepadOverlay(
                 if ("abxy" !in hiddenButtons) {
                     Box(modifier = Modifier.draggableGamepadNode("abxy")) {
                         VirtualAbxyPad(
-                            opacity = effectiveOpacity,
+                            opacity = nodeOpacity("abxy"),
                             scale = nodeScale("abxy"),
                             isEditMode = isEditPositionMode,
                             onButton = { index, pressed ->
-                                sendButtonEvent(index, pressed)
+                                sendButtonEvent(index, pressed, nodeId = "abxy")
                             }
                         )
                     }
                 }
             } else {
-                // Split ABXY Mode: 4 independent draggable, resizable, removable buttons A, B, X, Y
                 val splitAbxyBoxSize = 132.dp * effectiveScale
                 Box(modifier = Modifier.size(splitAbxyBoxSize)) {
                     if ("btn_y" !in hiddenButtons) {
@@ -733,12 +801,12 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "Y",
-                                accentColor = Color(0xFFE0B44C),
+                                accentColor = PadYColor,
                                 buttonIndex = 3,
                                 scale = nodeScale("btn_y"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("btn_y"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(3, it) }
+                                onButton = { sendButtonEvent(3, it, nodeId = "btn_y") }
                             )
                         }
                     }
@@ -750,12 +818,12 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "A",
-                                accentColor = XboxNeonGreen,
+                                accentColor = PadAColor,
                                 buttonIndex = 0,
                                 scale = nodeScale("btn_a"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("btn_a"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(0, it) }
+                                onButton = { sendButtonEvent(0, it, nodeId = "btn_a") }
                             )
                         }
                     }
@@ -767,12 +835,12 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "X",
-                                accentColor = DirectCyan,
+                                accentColor = PadXColor,
                                 buttonIndex = 2,
                                 scale = nodeScale("btn_x"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("btn_x"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(2, it) }
+                                onButton = { sendButtonEvent(2, it, nodeId = "btn_x") }
                             )
                         }
                     }
@@ -784,12 +852,12 @@ fun VirtualGamepadOverlay(
                         ) {
                             StandaloneAbxyButton(
                                 label = "B",
-                                accentColor = Color(0xFFEA6D6A),
+                                accentColor = PadBColor,
                                 buttonIndex = 1,
                                 scale = nodeScale("btn_b"),
-                                opacity = effectiveOpacity,
+                                opacity = nodeOpacity("btn_b"),
                                 isEditMode = isEditPositionMode,
-                                onButton = { sendButtonEvent(1, it) }
+                                onButton = { sendButtonEvent(1, it, nodeId = "btn_b") }
                             )
                         }
                     }
@@ -797,480 +865,302 @@ fun VirtualGamepadOverlay(
             }
         }
 
-        // Per-Button Edit Mode Inspector Toolbar (Bản 4 Flat Style + Live X/Y Coordinates + Fine Nudge)
-        if (isEditPositionMode && !showControlTuner) {
-            val activeId = selectedButtonId
-            val activeInfo = remember(activeId) {
-                ALL_GAMEPAD_NODES.find { it.id == activeId }
-            }
-            val activeScaleMult = if (activeId != null) (customButtonScales[activeId] ?: 1.0f) else 1.0f
-            val activeOffset = if (activeId != null) (customOffsets[activeId] ?: (0f to 0f)) else (0f to 0f)
-            val coordX = activeOffset.first.roundToInt()
-            val coordY = activeOffset.second.roundToInt()
-            val xSign = if (coordX > 0) "+$coordX" else "$coordX"
-            val ySign = if (coordY > 0) "+$coordY" else "$coordY"
-
-            fun nudgeSelectedButton(dx: Float, dy: Float) {
-                val id = activeId ?: return
-                vibrate()
-                val cur = customOffsets[id] ?: (0f to 0f)
-                customOffsets[id] = (cur.first + dx) to (cur.second + dy)
-                saveCustomOffsets()
-            }
-
+        // Compact Edit Mode Toolbar (.edit-bar: hint, + Thêm nút, # Lưới, Khóa vị trí, ✓ Xong)
+        if (isEditPositionMode) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 46.dp, start = 12.dp, end = 12.dp)
-                    .widthIn(max = 540.dp)
+                    .padding(top = 52.dp, start = 12.dp, end = 12.dp)
+                    .widthIn(max = 420.dp)
                     .testTag("virtual_gamepad_edit_toolbar"),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFF142019),
-                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
+                shape = RoundedCornerShape(16.dp),
+                color = HudPanelBg,
+                border = BorderStroke(1.dp, HudLine),
+                shadowElevation = 0.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Row 1: Selected button name + Live Coordinates (X, Y) + Size % + Collapse toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Text(
+                        text = config.tr(
+                            "Kéo để di chuyển · nhấn đúp để chỉnh riêng",
+                            "Drag to move · double-tap to customize"
+                        ),
+                        color = HudDialogBody,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        val hiddenCount = hiddenButtons.size
+                        HudButton(
+                            text = if (hiddenCount > 0) {
+                                config.tr("＋ Thêm nút ($hiddenCount)", "＋ Add ($hiddenCount)")
+                            } else {
+                                config.tr("＋ Thêm nút", "＋ Buttons")
+                            },
+                            onClick = {
+                                vibrate()
+                                showAddButtonModal = !showAddButtonModal
+                                if (showAddButtonModal) activePopoverNodeId = null
+                            },
+                            minHeight = 34.dp,
+                            fontSize = 11.5.sp,
+                            containerOverride = if (showAddButtonModal) HudSelBg else HudSurface2,
+                            contentOverride = if (showAddButtonModal) HudAccent else HudInk,
+                            modifier = Modifier.testTag("virtual_gamepad_add_button")
+                        )
+
+                        HudButton(
+                            text = config.tr("# Lưới", "# Grid"),
+                            onClick = {
+                                vibrate()
+                                showEditGrid = !showEditGrid
+                            },
+                            minHeight = 34.dp,
+                            fontSize = 11.5.sp,
+                            containerOverride = if (showEditGrid) HudSelBg else HudSurface2,
+                            contentOverride = if (showEditGrid) HudAccent else HudMuted,
+                            modifier = Modifier.testTag("virtual_gamepad_grid_toggle")
+                        )
+
                         Row(
-                            modifier = Modifier.weight(1f),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { isPositionLocked = !isPositionLocked }
+                                .padding(horizontal = 4.dp)
                         ) {
                             Text(
-                                text = if (activeInfo != null) {
-                                    val title = if (isEn) activeInfo.labelEn else activeInfo.labelVi
-                                    "✥ $title"
-                                } else {
-                                    if (isEn) "✥ Tap a button to edit" else "✥ Chạm nút bất kỳ để sửa"
-                                },
-                                color = XboxNeonGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                text = config.tr("Khóa vị trí", "Lock"),
+                                color = HudInk,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
-
-                            if (activeId != null) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
-                                ) {
-                                    Text(
-                                        text = "X:$xSign  Y:$ySign  •  ${(activeScaleMult * 100).roundToInt()}%",
-                                        color = Color.White,
-                                        fontFamily = JetBrainsMonoFontFamily,
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            .testTag("virtual_gamepad_live_coords")
-                                    )
-                                }
-                            }
+                            HudSwitch(
+                                checked = isPositionLocked,
+                                onCheckedChange = { isPositionLocked = it },
+                                contentDescription = config.tr("Khóa vị trí", "Lock Position")
+                            )
                         }
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (activeId != null && !isToolbarCollapsed) {
-                                // Size -10%
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                                    modifier = Modifier
-                                        .clickable {
-                                            vibrate()
-                                            setButtonScale(activeId, activeScaleMult - 0.10f)
-                                        }
-                                        .testTag("virtual_gamepad_btn_scale_minus")
-                                ) {
-                                    Text(
-                                        text = "− Cỡ",
-                                        color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                    )
-                                }
-
-                                // Size +10%
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF16352A),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
-                                    modifier = Modifier
-                                        .clickable {
-                                            vibrate()
-                                            setButtonScale(activeId, activeScaleMult + 0.10f)
-                                        }
-                                        .testTag("virtual_gamepad_btn_scale_plus")
-                                ) {
-                                    Text(
-                                        text = "+ Cỡ",
-                                        color = XboxNeonGreen,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                    )
-                                }
-
-                                // Reset only selected button
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                                    modifier = Modifier
-                                        .clickable {
-                                            vibrate()
-                                            resetSingleButton(activeId)
-                                        }
-                                        .testTag("virtual_gamepad_reset_single_button")
-                                ) {
-                                    Text(
-                                        text = if (isEn) "↺ Button" else "↺ Nút này",
-                                        color = TextSecondary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                    )
-                                }
-
-                                // Delete / Hide Selected Button
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Color(0xFF2B1818),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, JapanRed),
-                                    modifier = Modifier
-                                        .clickable {
-                                            vibrate(stronger = true)
-                                            deleteButton(activeId)
-                                            selectedButtonId = null
-                                        }
-                                        .testTag("virtual_gamepad_delete_button")
-                                ) {
-                                    Text(
-                                        text = if (isEn) "🗑 Delete" else "🗑 Xóa nút",
-                                        color = JapanRed,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-
-                            // Collapse / Expand Inspector Toolbar
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = XboxSurface,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                                modifier = Modifier.clickable {
-                                    isToolbarCollapsed = !isToolbarCollapsed
-                                }
-                            ) {
-                                Text(
-                                    text = if (isToolbarCollapsed) "▼" else "▲",
-                                    color = TextSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (!isToolbarCollapsed) {
-                        // Per-button smooth size slider + Fine 2px Nudge buttons when a button is selected
-                        if (activeId != null) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = if (isEn) "Size:" else "Cỡ nút:",
-                                    color = TextSecondary,
-                                    fontSize = 9.5.sp
-                                )
-                                Slider(
-                                    value = activeScaleMult,
-                                    onValueChange = { setButtonScale(activeId, it) },
-                                    valueRange = 0.50f..2.00f,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(20.dp),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = XboxNeonGreen,
-                                        activeTrackColor = XboxNeonGreen
-                                    )
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    listOf(
-                                        Triple("◀", -2f, 0f),
-                                        Triple("▲", 0f, -2f),
-                                        Triple("▼", 0f, 2f),
-                                        Triple("▶", 2f, 0f)
-                                    ).forEach { (sym, dx, dy) ->
-                                        Surface(
-                                            shape = RoundedCornerShape(5.dp),
-                                            color = XboxSurface,
-                                            border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                                            modifier = Modifier.clickable { nudgeSelectedButton(dx, dy) }
-                                        ) {
-                                            Text(
-                                                text = sym,
-                                                color = Color.White,
-                                                fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Row 2: Grid toggle, Split/Merge ABXY, Split/Merge D-Pad, + Add Button, Reset All, Done
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Grid Toggle
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (showEditGrid) Color(0xFF16352A) else XboxSurface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (showEditGrid) XboxNeonGreen else XboxCardBorder
-                                ),
-                                modifier = Modifier
-                                    .clickable {
-                                        vibrate()
-                                        showEditGrid = !showEditGrid
-                                    }
-                                    .testTag("virtual_gamepad_grid_toggle")
-                            ) {
-                                Text(
-                                    text = if (isEn) "# Grid" else "# Lưới",
-                                    color = if (showEditGrid) XboxNeonGreen else TextSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Toggle Split / Merge ABXY
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (abxySplitMode) Color(0xFF16352A) else XboxSurface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (abxySplitMode) XboxNeonGreen else XboxCardBorder
-                                ),
-                                modifier = Modifier
-                                    .clickable {
-                                        vibrate()
-                                        val nextSplit = !abxySplitMode
-                                        SettingsRepository.updateGamepadAbxySplitMode(nextSplit, normGameKey)
-                                        selectedButtonId = if (nextSplit) "btn_a" else "abxy"
-                                    }
-                                    .testTag("virtual_gamepad_split_abxy_toggle")
-                            ) {
-                                Text(
-                                    text = if (abxySplitMode) {
-                                        if (isEn) "⇄ Merge ABXY" else "⇄ Gộp chùm ABXY"
-                                    } else {
-                                        if (isEn) "⇄ Split A/B/X/Y" else "⇄ Tách rời A/B/X/Y"
-                                    },
-                                    color = if (abxySplitMode) XboxNeonGreen else Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Toggle Split / Merge D-Pad
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (dpadSplitMode) Color(0xFF16352A) else XboxSurface,
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (dpadSplitMode) XboxNeonGreen else XboxCardBorder
-                                ),
-                                modifier = Modifier
-                                    .clickable {
-                                        vibrate()
-                                        val nextSplit = !dpadSplitMode
-                                        SettingsRepository.updateGamepadDpadSplitMode(nextSplit, normGameKey)
-                                        selectedButtonId = if (nextSplit) "dpad_up" else "dpad"
-                                    }
-                                    .testTag("virtual_gamepad_split_dpad_toggle")
-                            ) {
-                                Text(
-                                    text = if (dpadSplitMode) {
-                                        if (isEn) "⇄ Merge D-Pad" else "⇄ Gộp D-Pad"
-                                    } else {
-                                        if (isEn) "⇄ Split D-Pad" else "⇄ Tách D-Pad"
-                                    },
-                                    color = if (dpadSplitMode) XboxNeonGreen else Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // + Add / Restore Buttons
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = XboxSurface,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder),
-                                modifier = Modifier
-                                    .clickable {
-                                        vibrate()
-                                        showAddButtonModal = !showAddButtonModal
-                                    }
-                                    .testTag("virtual_gamepad_add_button")
-                            ) {
-                                val hiddenCount = hiddenButtons.size
-                                Text(
-                                    text = if (hiddenCount > 0) {
-                                        if (isEn) "＋ Add Button ($hiddenCount)" else "＋ Thêm nút ($hiddenCount)"
-                                    } else {
-                                        if (isEn) "＋ Add / Manage Buttons" else "＋ Thêm / Quản lý nút"
-                                    },
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Reset All
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFF282210),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber),
-                                modifier = Modifier.clickable {
-                                    vibrate()
-                                    resetAllCustomizations()
-                                }
-                            ) {
-                                Text(
-                                    text = if (isEn) "↺ Default" else "↺ Mặc định",
-                                    color = WarningAmber,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Done
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = XboxNeonGreen,
-                                modifier = Modifier.clickable {
-                                    vibrate()
-                                    isEditPositionMode = false
-                                    showAddButtonModal = false
-                                }
-                            ) {
-                                Text(
-                                    text = if (isEn) "✓ Done" else "✓ Xong",
-                                    color = Color(0xFF03140B),
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
+                        HudButton(
+                            text = config.tr("✓ Xong", "✓ Done"),
+                            onClick = {
+                                vibrate()
+                                isEditPositionMode = false
+                                showAddButtonModal = false
+                                activePopoverNodeId = null
+                                selectedButtonId = null
+                            },
+                            style = HudButtonStyle.MAIN,
+                            minHeight = 34.dp,
+                            fontSize = 11.5.sp
+                        )
                     }
                 }
             }
         }
 
-        // Modal Drawer to Add / Restore or Toggle Any Button
-        if (showAddButtonModal) {
-            AddOrManageButtonsModal(
-                isEn = isEn,
-                hiddenButtons = hiddenButtons,
-                abxySplitMode = abxySplitMode,
-                dpadSplitMode = dpadSplitMode,
-                onToggleButtonVisibility = { nodeId ->
-                    vibrate()
-                    if (nodeId in hiddenButtons) {
-                        restoreButton(nodeId)
-                    } else {
-                        deleteButton(nodeId)
-                    }
-                },
-                onRestoreAll = {
-                    vibrate()
-                    SettingsRepository.updateGamepadHiddenButtons("", normGameKey)
-                },
-                onClose = { showAddButtonModal = false },
+        // Bottom Toast Hint in Edit Mode (.toast) when no popover/modal is open
+        if (isEditPositionMode && activePopoverNodeId == null && !showAddButtonModal) {
+            Surface(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 16.dp)
-            )
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 44.dp, start = 16.dp, end = 16.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = HudPanelBg,
+                border = BorderStroke(1.dp, HudLine),
+                shadowElevation = 0.dp
+            ) {
+                Text(
+                    text = config.tr(
+                        "Nhấn đúp một nút để chỉnh riêng nút đó",
+                        "Double-tap any button to customize it"
+                    ),
+                    color = HudMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
         }
 
-        // In-Game Floating Control Quick-Tune Modal Panel
-        if (showControlTuner) {
-            ControlQuickTunerPanel(
-                isEn = isEn,
-                scale = config.gamepadScale,
-                opacity = config.gamepadOpacity,
-                deadzone = config.leftStickInnerDeadzone,
-                sensitivity = config.gamepadSensitivity,
-                preset = config.gamepadLayoutPreset,
-                hapticLevel = config.gamepadHapticLevel,
-                gameRumbleLevel = config.gameRumbleLevel,
-                sprintLockEnabled = config.gamepadSprintLockEnabled,
-                abxySplitMode = abxySplitMode,
-                dpadSplitMode = dpadSplitMode,
-                isEditPositionMode = isEditPositionMode,
-                hasActiveGameKey = normGameKey.isNotEmpty(),
-                hasPerGameCustomLayout = perGameLayout != null,
-                gameDisplayName = gameDisplayName,
-                onUseGlobalLayout = {
-                    vibrate()
-                    switchCurrentGameToGlobalLayout()
-                },
-                onToggleEditPosition = {
-                    isEditPositionMode = !isEditPositionMode
-                    if (isEditPositionMode) showControlTuner = false
-                },
-                onToggleAbxySplit = {
-                    SettingsRepository.updateGamepadAbxySplitMode(!abxySplitMode, normGameKey)
-                },
-                onToggleDpadSplit = {
-                    SettingsRepository.updateGamepadDpadSplitMode(!dpadSplitMode, normGameKey)
-                },
-                onOpenAddButtons = {
-                    showControlTuner = false
-                    isEditPositionMode = true
-                    showAddButtonModal = true
-                },
-                onResetPositions = {
-                    resetAllCustomizations()
-                },
-                onClose = { showControlTuner = false },
+        // Modal Drawer to Add / Restore or Hide Any Button
+        if (showAddButtonModal) {
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 16.dp)
-            )
+                    .fillMaxSize()
+                    .background(HudScrimColor.copy(alpha = 0.35f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showAddButtonModal = false },
+                contentAlignment = Alignment.Center
+            ) {
+                AddOrManageButtonsModal(
+                    config = config,
+                    hiddenButtons = hiddenButtons,
+                    abxySplitMode = abxySplitMode,
+                    dpadSplitMode = dpadSplitMode,
+                    onToggleButtonVisibility = { nodeId ->
+                        vibrate(nodeId)
+                        if (nodeId in hiddenButtons) {
+                            restoreButton(nodeId)
+                        } else {
+                            deleteButton(nodeId)
+                        }
+                    },
+                    onRestoreAll = {
+                        vibrate()
+                        SettingsRepository.updateGamepadHiddenButtons("", normGameKey)
+                    },
+                    onClose = { showAddButtonModal = false },
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
+                )
+            }
+        }
+
+        // Floating Contextual Popover (.pop) anchored beside double-tapped node or ⚙ icon
+        val popNodeId = activePopoverNodeId
+        if (popNodeId != null) {
+            val anchorRect = nodeBoundsMap[popNodeId]
+            val popWidthPx = with(density) { 246.dp.toPx() }
+            val popMaxHeightPx = with(density) { 340.dp.toPx() }
+            val marginPx = with(density) { 10.dp.toPx() }
+            val viewportW = rootSizePx.width.toFloat().coerceAtLeast(popWidthPx + marginPx * 2f)
+            val viewportH = rootSizePx.height.toFloat().coerceAtLeast(popMaxHeightPx + marginPx * 2f)
+
+            val (popX, popY) = remember(popNodeId, anchorRect, viewportW, viewportH) {
+                if (anchorRect == null) {
+                    ((viewportW - popWidthPx) / 2f).roundToInt() to ((viewportH - popMaxHeightPx) / 2f).roundToInt()
+                } else if (popNodeId == "all") {
+                    val cx = anchorRect.center.x - popWidthPx / 2f
+                    val clampedX = cx.coerceIn(marginPx, (viewportW - popWidthPx - marginPx).coerceAtLeast(marginPx))
+                    val rawY = anchorRect.bottom + marginPx
+                    val clampedY = rawY.coerceIn(marginPx, (viewportH - popMaxHeightPx - marginPx).coerceAtLeast(marginPx))
+                    clampedX.roundToInt() to clampedY.roundToInt()
+                } else {
+                    var x = anchorRect.right + marginPx
+                    if (x + popWidthPx > viewportW - marginPx) {
+                        x = anchorRect.left - popWidthPx - marginPx
+                    }
+                    if (x < marginPx) {
+                        x = anchorRect.center.x - popWidthPx / 2f
+                    }
+                    val clampedX = x.coerceIn(marginPx, (viewportW - popWidthPx - marginPx).coerceAtLeast(marginPx))
+                    val rawY = anchorRect.top - marginPx
+                    val clampedY = rawY.coerceIn(marginPx, (viewportH - popMaxHeightPx - marginPx).coerceAtLeast(marginPx))
+                    clampedX.roundToInt() to clampedY.roundToInt()
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { activePopoverNodeId = null }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset(popX, popY) }
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {}
+                ) {
+                    GamepadNodePopover(
+                        nodeId = popNodeId,
+                        config = config,
+                        isEditPositionMode = isEditPositionMode,
+                        hasActiveGameKey = normGameKey.isNotEmpty(),
+                        hasPerGameCustomLayout = perGameLayout != null,
+                        gameDisplayName = gameDisplayName,
+                        nodeOffset = customOffsets[popNodeId] ?: (0f to 0f),
+                        nodeScaleMult = customButtonScales[popNodeId] ?: 1.0f,
+                        nodeOpacity = nodeOpacity(popNodeId),
+                        nodeHaptic = nodeHaptic(popNodeId),
+                        abxySplitMode = abxySplitMode,
+                        dpadSplitMode = dpadSplitMode,
+                        onScaleChange = { setButtonScale(popNodeId, it) },
+                        onOpacityChange = { setButtonOpacity(popNodeId, it) },
+                        onHapticChange = {
+                            vibrateWithLevel(it)
+                            setButtonHaptic(popNodeId, it)
+                        },
+                        onNudge = { dx, dy ->
+                            vibrate(popNodeId)
+                            val cur = customOffsets[popNodeId] ?: (0f to 0f)
+                            customOffsets[popNodeId] = (cur.first + dx) to (cur.second + dy)
+                            saveCustomOffsets()
+                        },
+                        onHideNode = {
+                            vibrate(popNodeId, stronger = true)
+                            deleteButton(popNodeId)
+                            if (selectedButtonId == popNodeId) selectedButtonId = null
+                            activePopoverNodeId = null
+                        },
+                        onResetNode = {
+                            vibrate(popNodeId)
+                            resetSingleButton(popNodeId)
+                        },
+                        onToggleAbxySplit = {
+                            vibrate(popNodeId)
+                            val nextSplit = !abxySplitMode
+                            SettingsRepository.updateGamepadAbxySplitMode(nextSplit, normGameKey)
+                            val nextId = if (nextSplit) "btn_a" else "abxy"
+                            selectedButtonId = nextId
+                            activePopoverNodeId = nextId
+                        },
+                        onToggleDpadSplit = {
+                            vibrate(popNodeId)
+                            val nextSplit = !dpadSplitMode
+                            SettingsRepository.updateGamepadDpadSplitMode(nextSplit, normGameKey)
+                            val nextId = if (nextSplit) "dpad_up" else "dpad"
+                            selectedButtonId = nextId
+                            activePopoverNodeId = nextId
+                        },
+                        onEnterEditMode = {
+                            vibrate()
+                            isEditPositionMode = !isEditPositionMode
+                            if (!isEditPositionMode) {
+                                showAddButtonModal = false
+                                selectedButtonId = null
+                            }
+                            activePopoverNodeId = null
+                        },
+                        onUseGlobalLayout = {
+                            vibrate()
+                            switchCurrentGameToGlobalLayout()
+                        },
+                        onShowAll = {
+                            vibrate()
+                            SettingsRepository.updateGamepadHiddenButtons("", normGameKey)
+                        },
+                        onResetAll = {
+                            vibrate()
+                            resetAllCustomizations()
+                            activePopoverNodeId = null
+                        },
+                        onClose = { activePopoverNodeId = null }
+                    )
+                }
+            }
         }
     }
 }
-

@@ -688,7 +688,7 @@ fun SettingsScreen(
 
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun FullTermsInAppDialog(
+internal fun FullTermsInAppDialog(
     isEn: Boolean,
     onOpenExternalBrowser: () -> Unit,
     onDismiss: () -> Unit

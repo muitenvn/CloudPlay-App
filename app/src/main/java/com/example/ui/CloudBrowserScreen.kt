@@ -1712,6 +1712,8 @@ private fun IsolatedFloatingHud(
     onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {},
     onHudOpenStateChanged: (Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val config by SettingsRepository.config.collectAsState()
     val vpnState by VpnManager.state.collectAsState()
     val translationInfo by XboxBridge.translationInfo.collectAsState()
     val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
@@ -1719,43 +1721,70 @@ private fun IsolatedFloatingHud(
     val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
     val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
 
-    FloatingHud(
-        vpnState = vpnState,
-        isGameActive = isGameActive,
-        virtualControllerEnabled = virtualControllerEnabled,
-        physicalControllerConnected = physicalControllerConnected,
-        controllerName = controllerName,
-        onToggleNetwork = onToggleNetwork,
-        onToggleVirtualController = onToggleVirtualController,
-        onOpenSettings = onOpenSettings,
-        onNavigateHome = onNavigateHome,
-        onReloadPage = onReloadPage,
-        onToggleClarityBoost = onToggleClarityBoost,
-        clarityBoostActive = clarityBoostActive,
-        translationActive = translationActive,
-        translatedCount = translationInfo.translatedCount,
-        onToggleTranslation = onToggleTranslation,
-        hideStreamStats = hideStreamStats,
-        onToggleHideStreamStats = onToggleHideStreamStats,
-        networkStatus = networkStatus,
-        telemetry = telemetry,
-        adaptiveQualityState = adaptiveQualityState,
-        onSelectLadderStep = onSelectLadderStep,
-        onToggleAutoAdapting = onToggleAutoAdapting,
-        onSelectCellularMode = onSelectCellularMode,
-        onToggleWifiSpeedFirst = onToggleWifiSpeedFirst,
-        gameProfile = gameProfile,
-        onOpenTranslator = onOpenTranslator,
-        onToggleOrientation = onToggleOrientation,
-        videoTopRatio = videoTopRatio,
-        lowEndDeviceMode = lowEndDeviceMode,
-        onSelectFortniteControlMode = onSelectFortniteControlMode,
-        recorderState = recorderState,
-        onToggleRecording = onToggleRecording,
-        xboxWebUiMode = xboxWebUiMode,
-        onSelectXboxWebUiMode = onSelectXboxWebUiMode,
-        onHudOpenStateChanged = onHudOpenStateChanged
-    )
+    val isTvMode = remember(config.appUiMode, context) {
+        config.isEffectiveTvMode(context)
+    }
+
+    if (isTvMode) {
+        com.example.ui.tv.TvInGameFloatingHud(
+            config = config,
+            vpnState = vpnState,
+            telemetry = telemetry,
+            clarityBoostActive = clarityBoostActive,
+            translationActive = translationActive,
+            hideStreamStats = hideStreamStats,
+            recorderState = recorderState,
+            xboxWebUiMode = xboxWebUiMode,
+            onToggleClarityBoost = onToggleClarityBoost,
+            onToggleTranslation = onToggleTranslation,
+            onToggleHideStreamStats = onToggleHideStreamStats,
+            onToggleRecording = onToggleRecording,
+            onToggleNetwork = onToggleNetwork,
+            onSelectXboxWebUiMode = onSelectXboxWebUiMode,
+            onReloadPage = onReloadPage,
+            onOpenQuickSettings = onOpenSettings,
+            onNavigateHome = onNavigateHome,
+            onHudOpenStateChanged = onHudOpenStateChanged
+        )
+    } else {
+        FloatingHud(
+            vpnState = vpnState,
+            isGameActive = isGameActive,
+            virtualControllerEnabled = virtualControllerEnabled,
+            physicalControllerConnected = physicalControllerConnected,
+            controllerName = controllerName,
+            onToggleNetwork = onToggleNetwork,
+            onToggleVirtualController = onToggleVirtualController,
+            onOpenSettings = onOpenSettings,
+            onNavigateHome = onNavigateHome,
+            onReloadPage = onReloadPage,
+            onToggleClarityBoost = onToggleClarityBoost,
+            clarityBoostActive = clarityBoostActive,
+            translationActive = translationActive,
+            translatedCount = translationInfo.translatedCount,
+            onToggleTranslation = onToggleTranslation,
+            hideStreamStats = hideStreamStats,
+            onToggleHideStreamStats = onToggleHideStreamStats,
+            networkStatus = networkStatus,
+            telemetry = telemetry,
+            adaptiveQualityState = adaptiveQualityState,
+            onSelectLadderStep = onSelectLadderStep,
+            onToggleAutoAdapting = onToggleAutoAdapting,
+            onSelectCellularMode = onSelectCellularMode,
+            onToggleWifiSpeedFirst = onToggleWifiSpeedFirst,
+            gameProfile = gameProfile,
+            onOpenTranslator = onOpenTranslator,
+            onToggleOrientation = onToggleOrientation,
+            videoTopRatio = videoTopRatio,
+            lowEndDeviceMode = lowEndDeviceMode,
+            onSelectFortniteControlMode = onSelectFortniteControlMode,
+            recorderState = recorderState,
+            onToggleRecording = onToggleRecording,
+            xboxWebUiMode = xboxWebUiMode,
+            onSelectXboxWebUiMode = onSelectXboxWebUiMode,
+            onHudOpenStateChanged = onHudOpenStateChanged
+        )
+    }
 }
 
 

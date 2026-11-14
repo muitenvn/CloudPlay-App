@@ -63,9 +63,6 @@ import com.example.ui.components.HowToUseGuideDialog
 import com.example.ui.components.SmartTranslatorDialog
 import com.example.ui.components.WebDownloadPortalDialog
 import com.example.ui.components.gamepadClickable
-import com.example.ui.tabs.GameLibraryScreen
-import com.example.ui.tabs.ServersScreen
-import com.example.ui.tabs.SettingsScreen
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.vpn.ServerLocation
 import com.example.vpn.VpnManager
@@ -114,6 +111,7 @@ fun TvDashboardScreen(
     val homePrimaryFocusRequester = remember { FocusRequester() }
     val activeRailFocusRequester = remember { FocusRequester() }
     var librarySearchFocusTick by remember { mutableIntStateOf(0) }
+    var libraryFavoriteToggleTick by remember { mutableIntStateOf(0) }
 
     fun switchTab(newTab: DashboardTab, reason: String = "") {
         if (currentTab != newTab) {
@@ -181,7 +179,9 @@ fun TvDashboardScreen(
                     AppLogger.info("UI", "Bấm phím Y tay cầm trên TV: Mở trình duyệt Xbox Cloud từ Trang chủ")
                     onLaunchUrl(config.targetRegionUrl)
                 }
-                DashboardTab.LIBRARY,
+                DashboardTab.LIBRARY -> {
+                    libraryFavoriteToggleTick++
+                }
                 DashboardTab.SERVERS,
                 DashboardTab.SETTINGS -> {}
             }
@@ -292,112 +292,51 @@ fun TvDashboardScreen(
                                             )
                                         }
                                         DashboardTab.LIBRARY -> {
-                                            GameLibraryScreen(
+                                            TvLibraryScreen(
+                                                config = config,
                                                 games = allGames,
-                                                onLaunchGame = {
+                                                scale = scale,
+                                                focusSearchTrigger = librarySearchFocusTick,
+                                                favoriteToggleTrigger = libraryFavoriteToggleTick,
+                                                onLaunchGame = { rawUrl ->
                                                     onLaunchUrl(
                                                         SettingsRepository.formatXboxUrlWithLocale(
-                                                            it,
+                                                            rawUrl,
                                                             config.getEffectiveLocale()
                                                         )
                                                     )
-                                                },
-                                                focusSearchTrigger = librarySearchFocusTick
+                                                }
                                             )
                                         }
                                         DashboardTab.SERVERS -> {
-                                            ServersScreen(
+                                            TvServersScreen(
+                                                config = config,
                                                 currentServer = vpnState.currentServer,
                                                 onSelectServer = onSelectServerStable,
-                                                isTabActive = isSelectedTab
+                                                isTabActive = isSelectedTab,
+                                                scale = scale
                                             )
                                         }
                                         DashboardTab.SETTINGS -> {
-                                            Column(
-                                                modifier = Modifier.fillMaxSize(),
-                                                verticalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(8.dp))
-                                            ) {
-                                                // Thanh chuyển nhanh Giao diện (Tự động / Điện thoại / TV) luôn hiện rõ trên TV
-                                                val uiModes = AppUiMode.entries
-                                                val selectedUiIdx = uiModes.indexOf(config.appUiMode).coerceAtLeast(0)
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clip(RoundedCornerShape((16.dp * scale).coerceAtLeast(12.dp)))
-                                                        .background(TvSurface)
-                                                        .gamepadClickable(
-                                                            cornerRadius = (16.dp * scale).coerceAtLeast(12.dp),
-                                                            onStepHorizontal = { dir ->
-                                                                val next = (selectedUiIdx + dir).coerceIn(0, uiModes.lastIndex)
-                                                                SettingsRepository.updateAppUiMode(uiModes[next])
-                                                            },
-                                                            onClick = {
-                                                                val next = (selectedUiIdx + 1) % uiModes.size
-                                                                SettingsRepository.updateAppUiMode(uiModes[next])
-                                                            }
-                                                        )
-                                                        .padding(
-                                                            horizontal = (18.dp * scale).coerceAtLeast(12.dp),
-                                                            vertical = (10.dp * scale).coerceAtLeast(8.dp)
-                                                        )
-                                                        .testTag("tv_settings_quick_ui_mode_row"),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = config.tr("Giao diện (Chế độ nâng cao)", "Interface (Advanced Mode)"),
-                                                            color = TvInk,
-                                                            fontFamily = SpaceGroteskFontFamily,
-                                                            fontSize = (16.5f * scale).coerceAtLeast(13.5f).sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        Text(
-                                                            text = config.tr(
-                                                                "Đổi ngay giữa Tự động, Điện thoại và TV (D-Pad ◀ ▶ hoặc A)",
-                                                                "Switch immediately between Auto, Phone, and TV"
-                                                            ),
-                                                            color = TvMuted,
-                                                            fontSize = (13f * scale).coerceAtLeast(11f).sp,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
+                                            TvSettingsScreen(
+                                                config = config,
+                                                vpnState = vpnState,
+                                                scale = scale,
+                                                onOpenGuide = { section ->
+                                                    guideInitialSection = section
+                                                    showGuideDialog = true
+                                                },
+                                                onClearCookies = {
+                                                    android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                                                    android.webkit.WebStorage.getInstance().deleteAllData()
+                                                    val msg = if (config.isSettingsEnglishUI()) {
+                                                        "Cleared saved login & web data!"
+                                                    } else {
+                                                        "Đã làm mới dữ liệu đăng nhập Xbox!"
                                                     }
-                                                    Spacer(modifier = Modifier.width((12.dp * scale).coerceAtLeast(8.dp)))
-                                                    TvSegmentedControl(
-                                                        options = uiModes.map { config.tr(it.titleVi, it.titleEn) },
-                                                        selectedIndex = selectedUiIdx,
-                                                        onSelect = { idx ->
-                                                            uiModes.getOrNull(idx)?.let { SettingsRepository.updateAppUiMode(it) }
-                                                        },
-                                                        scale = scale,
-                                                        containerColor = TvSurface2
-                                                    )
+                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                                 }
-
-                                                Box(modifier = Modifier.weight(1f)) {
-                                                    SettingsScreen(
-                                                        config = config,
-                                                        vpnState = vpnState,
-                                                        onOpenGuide = { section ->
-                                                            guideInitialSection = section
-                                                            showGuideDialog = true
-                                                        },
-                                                        onClearCookies = {
-                                                            android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                                                            android.webkit.WebStorage.getInstance().deleteAllData()
-                                                            val msg = if (config.isSettingsEnglishUI()) {
-                                                                "Cleared saved login & web data!"
-                                                            } else {
-                                                                "Đã làm mới dữ liệu đăng nhập Xbox!"
-                                                            }
-                                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    )
-                                                }
-                                            }
+                                            )
                                         }
                                     }
                                 }

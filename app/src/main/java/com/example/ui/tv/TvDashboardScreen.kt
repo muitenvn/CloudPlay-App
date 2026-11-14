@@ -198,9 +198,9 @@ fun TvDashboardScreen(
         ) {
             val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
             val scale = computeTvScale(maxWidth, maxHeight, fontScale)
-            val safePadH = (32.dp * scale).coerceIn(16.dp, 48.dp)
-            val safePadV = (22.dp * scale).coerceIn(12.dp, 36.dp)
-            val railGap = (24.dp * scale).coerceIn(14.dp, 36.dp)
+            val safePadH = (22.dp * scale).coerceIn(12.dp, 32.dp)
+            val safePadV = (16.dp * scale).coerceIn(10.dp, 24.dp)
+            val railGap = (18.dp * scale).coerceIn(10.dp, 24.dp)
 
             LaunchedEffect(currentTab) {
                 if (currentTab == DashboardTab.HOME) {

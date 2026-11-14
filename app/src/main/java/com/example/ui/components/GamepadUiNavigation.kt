@@ -90,6 +90,34 @@ object GamepadUiNavigation {
         }
     }
 
+    fun triggerHudToggle() {
+        hudToggleComboTick++
+    }
+
+    /**
+     * Nghe lén tổ hợp giữ View (nút 8) + Menu (nút 9) trên tay cầm ảo trong ~0,6 giây (600ms).
+     */
+    fun observeVirtualSelectStartPassively(buttonIndex: Int, pressed: Boolean) {
+        if (buttonIndex != 8 && buttonIndex != 9) return
+        if (pressed) {
+            val wasBothHeld = isSelectHeld && isStartHeld
+            if (buttonIndex == 8) isSelectHeld = true
+            if (buttonIndex == 9) isStartHeld = true
+            val nowBothHeld = isSelectHeld && isStartHeld
+            if (!wasBothHeld && nowBothHeld && !comboFiredForCurrentHold) {
+                mainHandler.removeCallbacks(comboHoldRunnable)
+                mainHandler.postDelayed(comboHoldRunnable, 600L)
+            }
+        } else {
+            if (buttonIndex == 8) isSelectHeld = false
+            if (buttonIndex == 9) isStartHeld = false
+            if (!isSelectHeld || !isStartHeld) {
+                comboFiredForCurrentHold = false
+                mainHandler.removeCallbacks(comboHoldRunnable)
+            }
+        }
+    }
+
     /**
      * Nghe lén tổ hợp phím giữ View (KEYCODE_BUTTON_SELECT) + Menu (KEYCODE_BUTTON_START) trong ~0,6 giây (600ms).
      * Hàm này KHÔNG bao giờ tiêu thụ sự kiện phím để mọi nút vẫn đi thẳng vào WebView game bình thường.

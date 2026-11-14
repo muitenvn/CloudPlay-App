@@ -186,7 +186,7 @@ internal fun TvHomeScreen(
                     text = config.tr("Xin chào", "Welcome"),
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (28f * scale).coerceAtLeast(20f).sp,
+                    fontSize = (22f * scale).coerceAtLeast(16.5f).sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -279,22 +279,22 @@ internal fun TvHomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = (186.dp * scale).coerceAtLeast(140.dp))
+                    .defaultMinSize(minHeight = (138.dp * scale).coerceAtLeast(106.dp))
                     .clip(RoundedCornerShape(heroCorner))
                     .background(heroBrush)
                     .padding(
-                        horizontal = (28.dp * scale).coerceAtLeast(18.dp),
-                        vertical = (24.dp * scale).coerceAtLeast(16.dp)
+                        horizontal = (20.dp * scale).coerceAtLeast(14.dp),
+                        vertical = (16.dp * scale).coerceAtLeast(12.dp)
                     )
                     .testTag("tv_home_hero_card"),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))) {
+                Column(verticalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp))) {
                     Text(
                         text = config.tr("Chơi Xbox Cloud", "Play Xbox Cloud"),
                         color = TvInk,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = (34f * scale).coerceAtLeast(22f).sp,
+                        fontSize = (24f * scale).coerceAtLeast(18f).sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -305,13 +305,13 @@ internal fun TvHomeScreen(
                             "Hundreds of console games, right on the big screen."
                         ),
                         color = Color(0xFFB6CBC0),
-                        fontSize = (17f * scale).coerceAtLeast(13f).sp,
+                        fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.height((18.dp * scale).coerceAtLeast(12.dp)))
+                Spacer(modifier = Modifier.height((12.dp * scale).coerceAtLeast(8.dp)))
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy((12.dp * scale).coerceAtLeast(8.dp)),
@@ -474,9 +474,9 @@ private fun TvHomeRecentCard(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val cardW = (196.dp * scale).coerceIn(146.dp, 250.dp)
-    val cardH = (106.dp * scale).coerceIn(82.dp, 136.dp)
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val cardW = (164.dp * scale).coerceIn(124.dp, 200.dp)
+    val cardH = (90.dp * scale).coerceIn(68.dp, 112.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
 
     val imageRequest = remember(game.imageUrl) {
         game.imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
@@ -538,7 +538,7 @@ private fun TvHomeRecentCard(
                     text = game.title,
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (16.5f * scale).coerceAtLeast(13f).sp,
+                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -546,7 +546,7 @@ private fun TvHomeRecentCard(
                 Text(
                     text = subtitle,
                     color = TvMuted,
-                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11.5f * scale).coerceAtLeast(9.5f).sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

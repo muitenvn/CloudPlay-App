@@ -1762,7 +1762,6 @@ class XboxBridge(
                     }
 
                     function armExitPreviewModalWatcher() {
-                        if (!window.__autoExitPreviewEnabled) return;
                         if (window.__cpExitPreviewStage === 'OPTING_OUT' || window.__cpExitPreviewStage === 'COMMITTED') return;
                         window.__cpExitPreviewStage = 'MODAL_OPENING';
                         window.__cpExitPreviewArmedAt = Date.now();
@@ -1778,12 +1777,6 @@ class XboxBridge(
                         let autoClickedCancel = false;
                         exitPreviewWatcherId = setInterval(function() {
                             try {
-                                if (!window.__autoExitPreviewEnabled) {
-                                    window.__cpExitPreviewStage = 'IDLE';
-                                    clearInterval(exitPreviewWatcherId);
-                                    exitPreviewWatcherId = null;
-                                    return;
-                                }
                                 const stage = window.__cpExitPreviewStage;
                                 if (stage !== 'MODAL_OPENING' && stage !== 'OPTING_OUT') {
                                     clearInterval(exitPreviewWatcherId);
@@ -1791,7 +1784,7 @@ class XboxBridge(
                                     return;
                                 }
                                 const now = Date.now();
-                                if (now - (window.__cpExitPreviewArmedAt || now) > 18000) {
+                                if (now - (window.__cpExitPreviewArmedAt || now) > 25000) {
                                     window.__cpExitPreviewStage = 'IDLE';
                                     clearInterval(exitPreviewWatcherId);
                                     exitPreviewWatcherId = null;
@@ -1809,8 +1802,9 @@ class XboxBridge(
                                 if (stage === 'MODAL_OPENING') {
                                     if (feedbackDialog) {
                                         if (modalFoundAt === 0) modalFoundAt = now;
-                                        // Đợi 280ms để hộp thoại của React gắn xong sự kiện rồi tự động bấm nút Hủy (Cancel)
-                                        if (!autoClickedCancel && (now - modalFoundAt >= 280)) {
+                                        // Nếu đang bật Tự động xử lý: đợi 280ms rồi tự bấm Hủy (Cancel).
+                                        // Nếu TẮT Tự động xử lý: không tự bấm hộ, nhưng vẫn theo dõi khi người dùng bấm Hủy/Nộp làm hộp thoại đóng lại để chuyển sang Giao diện cũ!
+                                        if (window.__autoExitPreviewEnabled && !autoClickedCancel && (now - modalFoundAt >= 280)) {
                                             const btns = feedbackDialog.querySelectorAll('button, [role="button"]');
                                             let cancelBtn = null;
                                             let closeBtn = null;
@@ -1834,6 +1828,9 @@ class XboxBridge(
                                                 return;
                                             }
                                         }
+                                    } else if (modalFoundAt > 0) {
+                                        // Người dùng đã tự bấm Hủy / Nộp / Đóng làm hộp thoại phản hồi biến mất (khi tắt tự động xử lý)
+                                        startExitPreviewOptOutPhase();
                                     } else if (now - (window.__cpExitPreviewArmedAt || now) >= 1100 && window.__cpExitPreviewInFlightFetches > 0) {
                                         // Trường hợp trang bắt đầu gửi opt-out ngay mà không hiện hộp thoại
                                         startExitPreviewOptOutPhase();
@@ -1845,11 +1842,9 @@ class XboxBridge(
                                     const optElapsed = now - (window.__cpExitPreviewOptOutStartedAt || now);
                                     if (optElapsed < 500) return;
 
-                                    // Theo dõi 3 giai đoạn thực tế trên play.xbox.com sau khi bấm Hủy (Cancel):
+                                    // Theo dõi 3 giai đoạn thực tế trên play.xbox.com sau khi đóng hộp thoại phản hồi:
                                     // - Giai đoạn 1 (0.2s -> ~3.3s): Màn hình đen xoay logo Xbox toàn trang (đang gửi opt-out lên máy chủ).
-                                    //   TUYỆT ĐỐI KHÔNG cắt ở giai đoạn này để tránh làm đứt yêu cầu opt-out.
-                                    // - Giai đoạn 2 (~3.4s -> ~8.5s): Màn hình khung xương (Skeleton) mới hiện ra, thanh điều hướng đã dựng
-                                    //   nhưng ảnh đại diện gamerpic góc phải chưa tải xong. Đây là thời điểm vàng để cắt phiên sang Giao diện cũ!
+                                    // - Giai đoạn 2 (~3.4s -> ~8.5s): Màn hình khung xương (Skeleton) mới hiện ra, cắt phiên sang đúng game ở Giao diện cũ!
                                     const interactives = document.querySelectorAll('header button, nav button, nav a, a[href="/"], [role="navigation"] a, [role="navigation"] button');
                                     let visibleNavCount = 0;
                                     for (let i = 0; i < interactives.length && visibleNavCount < 5; i++) {
@@ -1860,7 +1855,6 @@ class XboxBridge(
                                         window.__cpExitPreviewSawSpinner = true;
                                     }
 
-                                    // Kiểm tra xem ảnh gamerpic thật ở góc phải đã tải lại chưa (trong giai đoạn Skeleton thì chưa có)
                                     const gamerpics = document.querySelectorAll('img[src*="xboxlive.com"], img[src*="ssl-images-microsoft.com"], img[alt*="gamerpic" i]');
                                     let hasVisibleGamerpic = false;
                                     for (let g = 0; g < gamerpics.length; g++) {
@@ -1871,7 +1865,6 @@ class XboxBridge(
                                         }
                                     }
 
-                                    // Chỉ cắt sau khi Giai đoạn 1 (vòng xoay toàn màn hình ~3.2s) đã hoàn tất và sang Giai đoạn 2 (Skeleton >= 3.6s)
                                     const skeletonReadyAfterSpinner = !feedbackDialog &&
                                         optElapsed >= 3600 &&
                                         window.__cpExitPreviewInFlightFetches === 0 &&
@@ -1894,11 +1887,11 @@ class XboxBridge(
                         return !!(notifiedStreamConnection || window.__activePeerConnection || (location.pathname && location.pathname.indexOf('/launch/') !== -1));
                     }
 
-                    // Tự động phát hiện hộp thoại "Gửi phản hồi tới Xbox" / "Give feedback to Xbox" ngay cả khi công tắc React chặn sự kiện click
+                    // Tự động phát hiện hộp thoại "Gửi phản hồi tới Xbox" / "Give feedback to Xbox" (kể cả khi tắt tự động bấm nút)
                     setInterval(function() {
                         try {
                             if (isGameplayStreamActiveNow()) return;
-                            if (location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return;
+                            if (location.hostname !== 'play.xbox.com') return;
                             if (window.__cpExitPreviewStage === 'IDLE') {
                                 const dlg = findExitPreviewFeedbackDialog();
                                 if (dlg) {
@@ -1908,8 +1901,47 @@ class XboxBridge(
                         } catch (e) {}
                     }, 350);
 
+                    window.__prepareSwitchToClassicUi = function(targetClassicUrl) {
+                        try {
+                            // Phương pháp 1: Ghi cờ opt-out preview vào localStorage & sessionStorage và xóa mọi cờ ép migrate sang play.xbox.com
+                            const applyClassicStorageFlags = function(store) {
+                                if (!store) return;
+                                const keysToRemove = [];
+                                for (let i = 0; i < store.length; i++) {
+                                    const k = store.key(i) || '';
+                                    const kl = k.toLowerCase();
+                                    if (kl.indexOf('migrate') !== -1 || kl.indexOf('takahashi') !== -1) {
+                                        keysToRemove.push(k);
+                                    }
+                                }
+                                for (let j = 0; j < keysToRemove.length; j++) {
+                                    try { store.removeItem(keysToRemove[j]); } catch (e) {}
+                                }
+                                try {
+                                    store.setItem('TakahashiOptOut', 'true');
+                                    store.setItem('xcloud_preview_optout', 'true');
+                                } catch (e) {}
+                            };
+                            applyClassicStorageFlags(window.localStorage);
+                            applyClassicStorageFlags(window.sessionStorage);
+
+                            // Phương pháp 2: Đặt cookie từ chối giao diện thử nghiệm (TakahashiOptOut) trên miền .xbox.com
+                            try {
+                                document.cookie = 'TakahashiOptOut=true;domain=.xbox.com;path=/;max-age=31536000;SameSite=Lax';
+                                document.cookie = 'xcloud_preview_optout=true;domain=.xbox.com;path=/;max-age=31536000;SameSite=Lax';
+                            } catch (e) {}
+                        } catch (e) {}
+                        if (targetClassicUrl && typeof targetClassicUrl === 'string') {
+                            try {
+                                location.replace(targetClassicUrl);
+                            } catch (e) {
+                                location.href = targetClassicUrl;
+                            }
+                        }
+                    };
+
                     function checkTargetForExitPreviewRow(target) {
-                        if (!target || isGameplayStreamActiveNow() || location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return false;
+                        if (!target || isGameplayStreamActiveNow() || location.hostname !== 'play.xbox.com') return false;
                         // Duyệt ngược lên tối đa 9 cấp cha vì nút gạt (switch thumb) bên trong dòng "Thoát khỏi chế độ xem trước" là thẻ div rỗng không có chữ
                         let node = target;
                         for (let depth = 0; node && node !== document.body && depth < 9; depth++, node = node.parentElement) {
@@ -1953,8 +1985,8 @@ class XboxBridge(
                         if (isGameplayStreamActiveNow()) return;
                         const target = e.target;
                         if (target) {
-                            // Phát hiện thao tác bấm "Exit preview" / "Thoát xem trước" trên play.xbox.com
-                            if (location.hostname === 'play.xbox.com' && window.__autoExitPreviewEnabled) {
+                            // Phát hiện thao tác bấm "Exit preview" / "Thoát xem trước" trên play.xbox.com (hoạt động cả khi bật lẫn khi tắt tự động bấm Hủy)
+                            if (location.hostname === 'play.xbox.com') {
                                 if (checkTargetForExitPreviewRow(target)) {
                                     armExitPreviewModalWatcher();
                                 } else if (window.__cpExitPreviewStage === 'MODAL_OPENING') {
@@ -3358,8 +3390,8 @@ class XboxBridge(
         if (!isCallerTrusted()) return
         val rawTrimmed = signal?.trim() ?: return
         val cleanSignal = rawTrimmed.substringBefore("|").trim().uppercase()
-        if (cleanSignal.startsWith("EXIT_PREVIEW_")) {
-            Log.d(TAG, "Exit preview signal: $rawTrimmed")
+        if (cleanSignal.startsWith("EXIT_PREVIEW_") || cleanSignal.startsWith("ENTER_PREVIEW_")) {
+            Log.d(TAG, "Preview UI switch signal: $rawTrimmed")
             scope.launch(Dispatchers.Main) {
                 exitPreviewSignalListener?.invoke(rawTrimmed)
             }

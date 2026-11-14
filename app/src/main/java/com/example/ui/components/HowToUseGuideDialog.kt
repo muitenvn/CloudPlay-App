@@ -275,11 +275,11 @@ fun HowToUseGuideDialog(
                             item {
                                 GuideStepCard(
                                     stepNum = "3",
-                                    badge = config.tr("Điều khiển", "Controls"),
-                                    title = config.tr("Bật tay cầm ảo hoặc gắn tay cầm rời", "Enable touch buttons or connect a gamepad"),
+                                    badge = config.tr("Menu & Điều khiển", "Menu & Controls"),
+                                    title = config.tr("Cách mở Menu nhanh & quay về Trang chủ", "How to open Quick Menu & return Home"),
                                     desc = config.tr(
-                                        "• Nếu không có tay cầm Bluetooth/USB-C, chạm vào nút tròn nổi trên màn hình khi vào game để bật các nút bấm cảm ứng.",
-                                        "• If you don't have a Bluetooth/USB-C controller, tap the floating button in-game to show on-screen touch buttons."
+                                        "• Nút nổi đã được ẩn hoàn toàn để không che màn hình chơi game.\n• Trên điện thoại: Vuốt/bấm nút Quay lại (Back) của máy để mở hoặc đóng Menu nhanh (tại đây có thể bật Tay cầm ảo, đổi giao diện Cũ/Mới, hoặc bấm 'Trang chủ' để thoát).\n• Trên tay cầm / TV: Giữ đồng thời 2 nút View + Menu khoảng 0,6 giây để mở/đóng Menu nhanh.",
+                                        "• The floating button is hidden for an unobstructed game screen.\n• On phone: Swipe/press the system Back button to toggle the Quick Menu (toggle virtual buttons, switch Classic/New UI, or tap 'Home' to exit).\n• On controller / TV: Hold View + Menu together for 0.6s to toggle the Quick Menu."
                                     )
                                 )
                             }
@@ -292,8 +292,8 @@ fun HowToUseGuideDialog(
                                     iconColor = DirectCyan,
                                     title = config.tr("Mẹo giữ kết nối mượt và giảm độ trễ", "Tips for smooth connection and low latency"),
                                     content = config.tr(
-                                        "Khi truyền hình ảnh trò chơi trực tiếp qua mạng của bạn mà không đi vòng qua máy chủ trung gian, tín hiệu tay cầm và hình ảnh sẽ phản hồi nhanh hơn. Bạn có thể xem độ trễ (ping) thực tế ngay trên màn hình.",
-                                        "Streaming video directly over your own network without routing through an extra relay server keeps controls and video more responsive. You can check your real-time latency (ping) on screen."
+                                        "Khi truyền hình ảnh trò chơi trực tiếp qua mạng của bạn mà không đi vòng qua máy chủ trung gian, tín hiệu tay cầm và hình ảnh sẽ phản hồi nhanh hơn. Bạn có thể xem độ trễ (ping) thực tế ngay trong Menu nhanh.",
+                                        "Streaming video directly over your own network without routing through an extra relay server keeps controls and video more responsive. You can check your real-time latency (ping) in the Quick Menu."
                                     )
                                 )
                             }
@@ -317,8 +317,8 @@ fun HowToUseGuideDialog(
                                     iconColor = XboxNeonGreen,
                                     title = config.tr("Tay cầm rời (Bluetooth / USB-C)", "Physical Controller (Bluetooth / USB-C)"),
                                     content = config.tr(
-                                        "Khi bạn nối tay cầm Xbox, PlayStation hoặc tay cầm điện thoại qua Bluetooth/USB-C, trang Xbox sẽ tự nhận tín hiệu tay cầm.",
-                                        "When you connect an Xbox, PlayStation, or mobile controller via Bluetooth/USB-C, the Xbox page detects it automatically."
+                                        "Khi bạn nối tay cầm Xbox, PlayStation hoặc tay cầm điện thoại qua Bluetooth/USB-C, trang Xbox sẽ tự nhận tín hiệu tay cầm. Giữ đồng thời 2 nút View + Menu khoảng 0,6 giây để mở Menu nhanh bất kỳ lúc nào.",
+                                        "When you connect an Xbox, PlayStation, or mobile controller via Bluetooth/USB-C, the Xbox page detects it automatically. Hold View + Menu together for 0.6s to open the Quick Menu anytime."
                                     )
                                 )
                             }
@@ -326,10 +326,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.CheckCircle,
                                     iconColor = DirectCyan,
-                                    title = config.tr("Tay cầm ảo trên màn hình", "On-Screen Touch Gamepad"),
+                                    title = config.tr("Tay cầm ảo & Mở Menu trên điện thoại", "Touch Gamepad & Opening Menu on Phone"),
                                     content = config.tr(
-                                        "Bấm biểu tượng Tay cầm trên nút nổi khi đang chơi để bật/tắt nút ảo. Bạn có thể kéo đổi vị trí nút hoặc đặt lại bố cục mặc định trong mục Cài đặt.",
-                                        "Tap the Controller icon on the floating menu in-game to toggle virtual buttons. You can drag buttons to reposition them or reset the default layout in Settings."
+                                        "Vuốt/bấm nút Quay lại (Back) của điện thoại (hoặc giữ 2 nút View + Menu trên tay cầm ảo 0,6 giây) để mở Menu nhanh, bật/tắt Tay cầm ảo hoặc quay về Trang chủ. Bạn có thể kéo đổi vị trí nút trong mục Cài đặt.",
+                                        "Swipe/press your phone's Back button (or hold View + Menu on the virtual gamepad for 0.6s) to open the Quick Menu, toggle virtual buttons, or return Home. You can reposition buttons in Settings."
                                     )
                                 )
                             }
@@ -340,10 +340,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Language,
                                     iconColor = JapanRed,
-                                    title = config.tr("Đổi ngôn ngữ hoặc dịch menu trang Xbox", "Change language or translate Xbox menus"),
+                                    title = config.tr("Đổi Giao diện Cũ/Mới hoặc dịch menu trang Xbox", "Switch Classic/New UI or translate Xbox menus"),
                                     content = config.tr(
-                                        "Bạn có thể bật tính năng dịch các mục menu trên trang web Xbox sang tiếng Việt trong mục Cài đặt hoặc trên thanh công cụ nổi.",
-                                        "You can toggle menu translation or change the display language in the Settings tab or from the floating menu."
+                                        "Mở Menu nhanh (vuốt nút Quay lại trên điện thoại hoặc giữ View + Menu 0,6s) sang thẻ 'Điều khiển' để chuyển tức thì giữa Giao diện cũ (xbox.com/play) và Giao diện mới (play.xbox.com), hoặc bật dịch tiếng Việt.",
+                                        "Open the Quick Menu (swipe Back on phone or hold View + Menu for 0.6s) and go to 'Controls' to switch instantly between Classic UI (xbox.com/play) and New UI (play.xbox.com), or toggle menu translation."
                                     )
                                 )
                             }
@@ -362,10 +362,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Bolt,
                                     iconColor = DirectCyan,
-                                    title = config.tr("Đứng hình hoặc mất tiếng khi đang chơi?", "Frozen video or missing audio?"),
+                                    title = config.tr("Đứng hình, mất tiếng hoặc muốn thoát về Trang chủ?", "Frozen video, missing audio, or returning Home?"),
                                     content = config.tr(
-                                        "Mở menu nút nổi trên màn hình chơi và bấm 'Tải lại' để làm mới lại luồng phát mà không bị thoát khỏi trận đấu.",
-                                        "Open the floating menu in-game and tap 'Reload' to refresh the video stream without leaving your active session."
+                                        "Vuốt nút Quay lại (Back) trên điện thoại hoặc giữ View + Menu (0,6s) để mở Menu nhanh, sau đó bấm 'Tải lại' để làm mới luồng phát hoặc bấm 'Trang chủ' để thoát ra ngoài.",
+                                        "Swipe Back on phone or hold View + Menu (0.6s) to open the Quick Menu, then tap 'Reload' to refresh the stream or 'Home' to exit to the main screen."
                                     )
                                 )
                             }

@@ -1267,8 +1267,7 @@ object SettingsRepository {
     fun formatXboxUrlWithLocale(
         url: String,
         targetLocale: String,
-        uiMode: XboxWebUiMode = _config.value.xboxWebUiMode,
-        allowNewUiForGameLinks: Boolean = false
+        uiMode: XboxWebUiMode = _config.value.xboxWebUiMode
     ): String {
         if (!url.contains("xbox.com", ignoreCase = true)) return url
 
@@ -1278,9 +1277,8 @@ object SettingsRepository {
             url.contains("/games/", ignoreCase = true) ||
             url.contains("/launch/", ignoreCase = true)
 
-        // Mặc định các đường dẫn vào thẳng từng game (từ Thư viện / Trang chủ / Lịch sử) luôn dùng Giao diện cũ
-        // để không đẩy người dùng ngược về play.xbox.com khiến phải bấm Thoát xem trước lại từ đầu.
-        val effectiveUiMode = if (isSpecificGameOrLaunchUrl && !allowNewUiForGameLinks) {
+        // Luôn ưu tiên Giao diện cũ cho mọi đường dẫn vào từng game để không bị văng ngược sang play.xbox.com
+        val effectiveUiMode = if (isSpecificGameOrLaunchUrl) {
             XboxWebUiMode.CLASSIC
         } else {
             uiMode
@@ -1318,19 +1316,8 @@ object SettingsRepository {
         if (match != null) {
             val domain = match.groupValues[1]
             val rest = match.groupValues[3] ?: ""
-            if (effectiveUiMode == XboxWebUiMode.NEW_UI) {
-                if (rest.isBlank() || rest == "/play" || rest == "/play/") {
-                    return "https://play.xbox.com/"
-                }
-                val pid = GameLibraryRepository.extractProductId(url)
-                val slug = GameLibraryRepository.extractSlug(url)
-                if (pid.isNotBlank()) {
-                    return if (slug.isNotBlank()) {
-                        "https://play.xbox.com/products/$pid/$slug"
-                    } else {
-                        "https://play.xbox.com/products/$pid"
-                    }
-                }
+            if (effectiveUiMode == XboxWebUiMode.NEW_UI && (rest.isBlank() || rest == "/play" || rest == "/play/")) {
+                return "https://play.xbox.com/"
             }
             return "$domain/$targetLocale$rest"
         }
@@ -1340,19 +1327,8 @@ object SettingsRepository {
         if (noLocaleMatch != null) {
             val domain = noLocaleMatch.groupValues[1]
             val rest = noLocaleMatch.groupValues[2] ?: "/play"
-            if (effectiveUiMode == XboxWebUiMode.NEW_UI) {
-                if (rest == "/play" || rest == "/play/") {
-                    return "https://play.xbox.com/"
-                }
-                val pid = GameLibraryRepository.extractProductId(url)
-                val slug = GameLibraryRepository.extractSlug(url)
-                if (pid.isNotBlank()) {
-                    return if (slug.isNotBlank()) {
-                        "https://play.xbox.com/products/$pid/$slug"
-                    } else {
-                        "https://play.xbox.com/products/$pid"
-                    }
-                }
+            if (effectiveUiMode == XboxWebUiMode.NEW_UI && (rest == "/play" || rest == "/play/")) {
+                return "https://play.xbox.com/"
             }
             return "$domain/$targetLocale$rest"
         }

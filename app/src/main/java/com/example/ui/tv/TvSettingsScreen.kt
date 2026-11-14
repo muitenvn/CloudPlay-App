@@ -197,7 +197,7 @@ internal fun TvSettingsScreen(
                 text = config.tr("Cài đặt", "Settings"),
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (28f * scale).coerceAtLeast(20f).sp,
+                fontSize = (22f * scale).coerceAtLeast(16.5f).sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1
             )
@@ -206,12 +206,12 @@ internal fun TvSettingsScreen(
             val selectedUiIdx = uiModes.indexOf(config.appUiMode).coerceAtLeast(0)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(6.dp))
+                horizontalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
             ) {
                 Text(
                     text = config.tr("Giao diện:", "Interface:"),
                     color = TvMuted,
-                    fontSize = (14.5f * scale).coerceAtLeast(12f).sp,
+                    fontSize = (12.5f * scale).coerceAtLeast(10.5f).sp,
                     fontWeight = FontWeight.SemiBold
                 )
                 TvSegmentedControl(
@@ -231,24 +231,24 @@ internal fun TvSettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            horizontalArrangement = Arrangement.spacedBy((18.dp * scale).coerceAtLeast(12.dp))
+            horizontalArrangement = Arrangement.spacedBy((14.dp * scale).coerceAtLeast(9.dp))
         ) {
             // Left Category Column (.set-cats)
-            val catWidth = (224.dp * scale).coerceIn(168.dp, 270.dp)
+            val catWidth = (182.dp * scale).coerceIn(136.dp, 218.dp)
             Column(
                 modifier = Modifier
                     .width(catWidth)
                     .fillMaxHeight()
                     .testTag("tv_settings_categories_column"),
-                verticalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
+                verticalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp))
             ) {
                 TvSettingsCategory.entries.forEach { cat ->
                     val isCurrent = selectedCat == cat
-                    val itemCorner = (13.dp * scale).coerceAtLeast(10.dp)
+                    val itemCorner = (10.dp * scale).coerceAtLeast(8.dp)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .defaultMinSize(minHeight = (46.dp * scale).coerceAtLeast(40.dp))
+                            .defaultMinSize(minHeight = (36.dp * scale).coerceAtLeast(30.dp))
                             .clip(RoundedCornerShape(itemCorner))
                             .background(if (isCurrent) TvSurface2 else Color.Transparent)
                             .gamepadClickable(
@@ -256,8 +256,8 @@ internal fun TvSettingsScreen(
                                 onClick = { selectedCat = cat }
                             )
                             .padding(
-                                horizontal = (14.dp * scale).coerceAtLeast(10.dp),
-                                vertical = (10.dp * scale).coerceAtLeast(7.dp)
+                                horizontal = (11.dp * scale).coerceAtLeast(8.dp),
+                                vertical = (6.dp * scale).coerceAtLeast(4.dp)
                             )
                             .testTag("tv_settings_cat_${cat.name.lowercase()}"),
                         contentAlignment = Alignment.CenterStart
@@ -266,7 +266,7 @@ internal fun TvSettingsScreen(
                             text = config.tr(cat.titleVi, cat.titleEn),
                             color = if (isCurrent) TvAccent else TvMuted,
                             fontFamily = SpaceGroteskFontFamily,
-                            fontSize = (16.5f * scale).coerceAtLeast(13f).sp,
+                            fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -281,8 +281,8 @@ internal fun TvSettingsScreen(
                     .weight(1f)
                     .fillMaxHeight()
                     .testTag("tv_settings_pane_${selectedCat.name.lowercase()}"),
-                verticalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(7.dp)),
-                contentPadding = PaddingValues(bottom = (14.dp * scale).coerceAtLeast(8.dp))
+                verticalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(5.dp)),
+                contentPadding = PaddingValues(bottom = (10.dp * scale).coerceAtLeast(6.dp))
             ) {
                 when (selectedCat) {
                     TvSettingsCategory.GRAPHICS -> {
@@ -1405,11 +1405,11 @@ private fun TvSettingToggleRow(
     scale: Float,
     testTag: String
 ) {
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (64.dp * scale).coerceAtLeast(52.dp))
+            .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface)
             .gamepadClickable(
@@ -1421,8 +1421,8 @@ private fun TvSettingToggleRow(
                 onClick = { onCheckedChange(!checked) }
             )
             .padding(
-                horizontal = (20.dp * scale).coerceAtLeast(14.dp),
-                vertical = (12.dp * scale).coerceAtLeast(9.dp)
+                horizontal = (14.dp * scale).coerceAtLeast(10.dp),
+                vertical = (8.dp * scale).coerceAtLeast(6.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1430,13 +1430,13 @@ private fun TvSettingToggleRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
+            verticalArrangement = Arrangement.spacedBy((2.dp * scale).coerceAtLeast(1.dp))
         ) {
             Text(
                 text = title,
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (17.5f * scale).coerceAtLeast(14f).sp,
+                fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1445,13 +1445,13 @@ private fun TvSettingToggleRow(
                 Text(
                     text = subtitle,
                     color = TvMuted,
-                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11f * scale).coerceAtLeast(9.5f).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
-        Spacer(modifier = Modifier.width((14.dp * scale).coerceAtLeast(8.dp)))
+        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
         TvSwitch(checked = checked, scale = scale)
     }
 }
@@ -1466,11 +1466,11 @@ private fun TvSettingSegmentRow(
     scale: Float,
     testTag: String
 ) {
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (64.dp * scale).coerceAtLeast(52.dp))
+            .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface)
             .gamepadClickable(
@@ -1485,8 +1485,8 @@ private fun TvSettingSegmentRow(
                 }
             )
             .padding(
-                horizontal = (20.dp * scale).coerceAtLeast(14.dp),
-                vertical = (12.dp * scale).coerceAtLeast(9.dp)
+                horizontal = (14.dp * scale).coerceAtLeast(10.dp),
+                vertical = (8.dp * scale).coerceAtLeast(6.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1494,13 +1494,13 @@ private fun TvSettingSegmentRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
+            verticalArrangement = Arrangement.spacedBy((2.dp * scale).coerceAtLeast(1.dp))
         ) {
             Text(
                 text = title,
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (17.5f * scale).coerceAtLeast(14f).sp,
+                fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1509,13 +1509,13 @@ private fun TvSettingSegmentRow(
                 Text(
                     text = subtitle,
                     color = TvMuted,
-                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11f * scale).coerceAtLeast(9.5f).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
-        Spacer(modifier = Modifier.width((14.dp * scale).coerceAtLeast(8.dp)))
+        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
         TvSegmentedControl(
             options = options,
             selectedIndex = selectedIndex,
@@ -1536,11 +1536,11 @@ private fun TvSettingSliderRow(
     scale: Float,
     testTag: String
 ) {
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (64.dp * scale).coerceAtLeast(52.dp))
+            .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface)
             .gamepadClickable(
@@ -1549,8 +1549,8 @@ private fun TvSettingSliderRow(
                 onClick = { onStep(1) }
             )
             .padding(
-                horizontal = (20.dp * scale).coerceAtLeast(14.dp),
-                vertical = (12.dp * scale).coerceAtLeast(9.dp)
+                horizontal = (14.dp * scale).coerceAtLeast(10.dp),
+                vertical = (8.dp * scale).coerceAtLeast(6.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1558,13 +1558,13 @@ private fun TvSettingSliderRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
+            verticalArrangement = Arrangement.spacedBy((2.dp * scale).coerceAtLeast(1.dp))
         ) {
             Text(
                 text = title,
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (17.5f * scale).coerceAtLeast(14f).sp,
+                fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1573,21 +1573,21 @@ private fun TvSettingSliderRow(
                 Text(
                     text = subtitle,
                     color = TvMuted,
-                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11f * scale).coerceAtLeast(9.5f).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
-        Spacer(modifier = Modifier.width((14.dp * scale).coerceAtLeast(8.dp)))
+        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(6.dp))
+            horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(5.dp))
         ) {
             Box(
                 modifier = Modifier
-                    .width((120.dp * scale).coerceIn(80.dp, 160.dp))
-                    .height((10.dp * scale).coerceAtLeast(7.dp))
+                    .width((96.dp * scale).coerceIn(68.dp, 130.dp))
+                    .height((8.dp * scale).coerceAtLeast(6.dp))
                     .clip(CircleShape)
                     .background(Color(0xFF233029))
             ) {
@@ -1603,7 +1603,7 @@ private fun TvSettingSliderRow(
                 text = valueText,
                 color = TvInk,
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = (15.5f * scale).coerceAtLeast(12.5f).sp,
+                fontSize = (12.5f * scale).coerceAtLeast(10.5f).sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1
             )
@@ -1621,11 +1621,11 @@ private fun TvSettingActionRow(
     onClick: () -> Unit,
     testTag: String
 ) {
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (64.dp * scale).coerceAtLeast(52.dp))
+            .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface)
             .gamepadClickable(
@@ -1633,8 +1633,8 @@ private fun TvSettingActionRow(
                 onClick = onClick
             )
             .padding(
-                horizontal = (20.dp * scale).coerceAtLeast(14.dp),
-                vertical = (12.dp * scale).coerceAtLeast(9.dp)
+                horizontal = (14.dp * scale).coerceAtLeast(10.dp),
+                vertical = (8.dp * scale).coerceAtLeast(6.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1642,13 +1642,13 @@ private fun TvSettingActionRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
+            verticalArrangement = Arrangement.spacedBy((2.dp * scale).coerceAtLeast(1.dp))
         ) {
             Text(
                 text = title,
                 color = titleColor,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (17.5f * scale).coerceAtLeast(14f).sp,
+                fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1657,13 +1657,13 @@ private fun TvSettingActionRow(
                 Text(
                     text = subtitle,
                     color = TvMuted,
-                    fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11f * scale).coerceAtLeast(9.5f).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
-        Spacer(modifier = Modifier.width((14.dp * scale).coerceAtLeast(8.dp)))
+        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
         TvPill(
             text = actionLabel,
             scale = scale * 0.92f,

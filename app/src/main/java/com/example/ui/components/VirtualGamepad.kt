@@ -435,6 +435,7 @@ fun VirtualGamepadOverlay(
     }
 
     fun dispatchRawButtonJs(buttonIndex: Int, pressed: Boolean, analogValue: Float? = null) {
+        GamepadUiNavigation.observeVirtualSelectStartPassively(buttonIndex, pressed)
         val v = analogValue ?: if (pressed) 1f else 0f
         val rv = (v * 100f).roundToInt() / 100f
         webView?.evaluateJavascript(

@@ -220,7 +220,7 @@ internal fun TvLibraryScreen(
                     text = config.tr("Thư viện", "Library"),
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (28f * scale).coerceAtLeast(20f).sp,
+                    fontSize = (22f * scale).coerceAtLeast(16.5f).sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1
                 )
@@ -313,7 +313,7 @@ internal fun TvLibraryScreen(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
-                        .width((270.dp * scale).coerceIn(190.dp, 340.dp))
+                        .width((215.dp * scale).coerceIn(155.dp, 265.dp))
                         .gamepadTextFieldFocus(
                             cornerRadius = searchCorner,
                             focusRequester = searchFocusRequester
@@ -323,7 +323,7 @@ internal fun TvLibraryScreen(
                         Text(
                             text = config.tr("Tìm tên game... (phím X)", "Search games... (X)"),
                             color = TvMuted,
-                            fontSize = (14.5f * scale).coerceAtLeast(12f).sp,
+                            fontSize = (12.5f * scale).coerceAtLeast(10.5f).sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -331,7 +331,7 @@ internal fun TvLibraryScreen(
                     textStyle = TextStyle(
                         color = TvInk,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = (15.5f * scale).coerceAtLeast(12.5f).sp,
+                        fontSize = (13f * scale).coerceAtLeast(11f).sp,
                         fontWeight = FontWeight.SemiBold
                     ),
                     leadingIcon = {
@@ -508,10 +508,10 @@ internal fun TvLibraryScreen(
 
                 LazyVerticalGrid(
                     state = gridState,
-                    columns = GridCells.Adaptive(minSize = (175.dp * scale).coerceIn(135.dp, 220.dp)),
-                    contentPadding = PaddingValues(bottom = (10.dp * scale).coerceAtLeast(6.dp)),
-                    horizontalArrangement = Arrangement.spacedBy((14.dp * scale).coerceAtLeast(10.dp)),
-                    verticalArrangement = Arrangement.spacedBy((14.dp * scale).coerceAtLeast(10.dp)),
+                    columns = GridCells.Adaptive(minSize = (145.dp * scale).coerceIn(112.dp, 180.dp)),
+                    contentPadding = PaddingValues(bottom = (8.dp * scale).coerceAtLeast(6.dp)),
+                    horizontalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(8.dp)),
+                    verticalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(8.dp)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -585,8 +585,8 @@ private fun TvLibraryGameCard(
     onLongClickOrDetail: () -> Unit
 ) {
     val context = LocalContext.current
-    val cardH = (118.dp * scale).coerceIn(92.dp, 150.dp)
-    val corner = (16.dp * scale).coerceAtLeast(12.dp)
+    val cardH = (96.dp * scale).coerceIn(74.dp, 118.dp)
+    val corner = (12.dp * scale).coerceAtLeast(9.dp)
 
     val imageRequest = remember(game.imageUrl) {
         game.imageUrl?.takeIf { it.isNotBlank() }?.let { url ->
@@ -693,7 +693,7 @@ private fun TvLibraryGameCard(
                         text = game.title,
                         color = TvInk,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = (17f * scale).coerceAtLeast(13.5f).sp,
+                        fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -701,7 +701,7 @@ private fun TvLibraryGameCard(
                     Text(
                         text = subtitle,
                         color = TvMuted,
-                        fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
+                        fontSize = (11.5f * scale).coerceAtLeast(9.5f).sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

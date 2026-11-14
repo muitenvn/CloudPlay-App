@@ -269,12 +269,24 @@ fun FloatingHud(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
 
-    // Cảnh báo nhỏ tự ẩn sau vài giây (nhiệt độ / pin yếu / đổi mạng)
+    // Cảnh báo nhỏ tự ẩn sau vài giây (nhiệt độ / pin yếu / đổi mạng / mẹo mở menu)
     var hasShownSevereThermalAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
     var hasShownLowBatteryAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
+    var hasShownMenuShortcutHint by rememberSaveable { mutableStateOf(false) }
     var lastStreamNetworkIsWifi by rememberSaveable(isGameActive) { mutableStateOf<Boolean?>(null) }
     var autoHudBannerText by remember { mutableStateOf<String?>(null) }
     var autoHudBannerTag by remember { mutableStateOf("hud_transient_alert_banner") }
+
+    LaunchedEffect(isGameActive, config.appLanguage) {
+        if (isGameActive && !hasShownMenuShortcutHint) {
+            hasShownMenuShortcutHint = true
+            autoHudBannerTag = "hud_menu_shortcut_hint_banner"
+            autoHudBannerText = config.tr(
+                "Đã ẩn nút menu nổi. Vuốt nút Quay lại (Back) hoặc giữ View + Menu (0,6s) để mở menu / về Trang chủ.",
+                "Floating menu button hidden. Swipe Back or hold View + Menu (0.6s) to open menu / go Home."
+            )
+        }
+    }
 
     LaunchedEffect(isGameActive, isThermalSupported, thermalStatus, batteryPercent, isBatteryCharging, config.appLanguage) {
         if (!isGameActive) {
@@ -428,91 +440,23 @@ fun FloatingHud(
         val isNearEdgeForDock = isDragging && hudMode != HudMode.EXPANDED &&
             (offsetX <= edgeDockThresholdPx || offsetX >= (rightScreenEdgeX - edgeDockThresholdPx))
 
-        if (dockedEdge != HudDockedEdge.NONE) {
-            // Thanh gờ khi dính sát mép trái / phải
-            val handleWidthDp = 30.dp
-            val handleHeightDp = 56.dp
-            val handleWidthPx = with(density) { handleWidthDp.toPx() }
-            val handleHeightPx = with(density) { handleHeightDp.toPx() }
-            val swipeUnlockThresholdPx = with(density) { 10.dp.toPx() }
-            val handleX = if (dockedEdge == HudDockedEdge.LEFT) {
-                0
-            } else {
-                (maxWidthPx - handleWidthPx).roundToInt().coerceAtLeast(0)
-            }
-            val handleMaxY = (maxHeightPx - safeBottomPx - handleHeightPx).coerceAtLeast(safeTopPx)
-            val handleY = animatedOffsetY.coerceIn(safeTopPx, handleMaxY).roundToInt()
-
-            val handleShape = if (dockedEdge == HudDockedEdge.LEFT) {
-                RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
-            } else {
-                RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
-            }
-
-            fun restoreFromEdge() {
-                markUserInteraction()
-                val restoredX = if (dockedEdge == HudDockedEdge.LEFT) {
-                    (safeLeftPx + restorePaddingPx).coerceAtMost(rightScreenEdgeX)
-                } else {
-                    (rightScreenEdgeX - safeRightPx - restorePaddingPx).coerceAtLeast(safeLeftPx)
-                }
-                offsetX = restoredX
-                dockedEdge = HudDockedEdge.NONE
-            }
-
-            Surface(
-                modifier = Modifier
-                    .offset { IntOffset(handleX, handleY) }
-                    .size(width = handleWidthDp, height = handleHeightDp)
-                    .graphicsLayer { alpha = if (isInteracting || isDragging) 0.96f else idleAlpha.coerceAtLeast(0.45f) }
-                    .pointerInput(dockedEdge, maxWidthPx, maxHeightPx, rightScreenEdgeX, safeLeftPx, safeRightPx, safeTopPx, handleMaxY) {
-                        var accumulatedSwipeX = 0f
-                        detectDragGestures(
-                            onDragStart = {
-                                isDragging = true
-                                accumulatedSwipeX = 0f
-                                markUserInteraction()
-                            },
-                            onDragEnd = {
-                                isDragging = false
-                                markUserInteraction()
-                            },
-                            onDragCancel = {
-                                isDragging = false
-                                markUserInteraction()
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                markUserInteraction()
-                                accumulatedSwipeX += dragAmount.x
-                                offsetY = (offsetY + dragAmount.y).coerceIn(safeTopPx, handleMaxY)
-                                val swipedInward = (dockedEdge == HudDockedEdge.LEFT && accumulatedSwipeX > swipeUnlockThresholdPx) ||
-                                    (dockedEdge == HudDockedEdge.RIGHT && accumulatedSwipeX < -swipeUnlockThresholdPx)
-                                if (swipedInward) {
-                                    isDragging = false
-                                    restoreFromEdge()
-                                }
-                            }
-                        )
-                    }
-                    .clip(handleShape)
-                    .clickable { restoreFromEdge() }
-                    .border(1.dp, HudLine, handleShape)
-                    .testTag("hud_edge_dock_handle"),
-                shape = handleShape,
-                color = HudPanelBg,
-                shadowElevation = 0.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (dockedEdge == HudDockedEdge.LEFT) {
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight
-                        } else {
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft
-                        },
-                        contentDescription = config.tr("Mở menu nổi", "Open floating menu"),
-                        tint = HudAccent,
-                        modifier = Modifier.size(20.dp)
+        if (hudMode == HudMode.MINIMIZED) {
+            // Đã bỏ hoàn toàn nút menu nổi khi thu gọn để không che màn hình chơi game.
+            // Chỉ hiển thị thông báo cảnh báo ngắn (nếu có) rồi tự tắt.
+            val currentBanner = autoHudBannerText
+            if (currentBanner != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                ) {
+                    HudNoteCard(
+                        text = currentBanner,
+                        isWarning = false,
+                        onClick = { autoHudBannerText = null },
+                        modifier = Modifier
+                            .widthIn(max = 360.dp)
+                            .testTag(autoHudBannerTag)
                     )
                 }
             }
@@ -542,16 +486,8 @@ fun FloatingHud(
                             onDragEnd = {
                                 isDragging = false
                                 markUserInteraction()
-                                if (hudMode != HudMode.EXPANDED && offsetX <= edgeDockThresholdPx) {
-                                    offsetX = 0f
-                                    dockedEdge = HudDockedEdge.LEFT
-                                } else if (hudMode != HudMode.EXPANDED && offsetX >= (rightScreenEdgeX - edgeDockThresholdPx)) {
-                                    offsetX = rightScreenEdgeX
-                                    dockedEdge = HudDockedEdge.RIGHT
-                                } else {
-                                    offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
-                                    offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
-                                }
+                                offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                             },
                             onDragCancel = {
                                 isDragging = false
@@ -583,18 +519,7 @@ fun FloatingHud(
                     shadowElevation = 0.dp
                 ) {
                     when (hudMode) {
-                        HudMode.MINIMIZED -> {
-                            HudMinimizedPill(
-                                config = config,
-                                telemetry = telemetry,
-                                isAnchoredRight = isAnchoredRight,
-                                motionEnabled = motionEnabled,
-                                onExpandToCompact = {
-                                    markUserInteraction()
-                                    hudMode = HudMode.COMPACT
-                                }
-                            )
-                        }
+                        HudMode.MINIMIZED -> {}
 
                         HudMode.COMPACT -> {
                             GamepadSurfaceController(
@@ -853,6 +778,20 @@ fun FloatingHud(
                                         )
                                     }
                                 }
+
+                                // Hướng dẫn mở lại menu khi đã ẩn nút nổi
+                                Text(
+                                    text = config.tr(
+                                        "Mẹo: Vuốt Quay lại (Back) trên điện thoại hoặc giữ View + Menu (0,6s) để bật/tắt menu này.",
+                                        "Tip: Swipe Back on phone or hold View + Menu (0.6s) to toggle this menu."
+                                    ),
+                                    color = HudMuted,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                                )
 
                                 // Sticky Footer (.p-foot): Tải lại | Trang chủ | Cài đặt | Thoát
                                 Box(

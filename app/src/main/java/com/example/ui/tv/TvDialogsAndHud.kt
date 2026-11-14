@@ -247,50 +247,11 @@ internal fun TvInGameFloatingHud(
             NetworkMode.DISCONNECTED -> config.tr("Trực tiếp", "Direct")
         }
 
-        if (!isHudExpanded) {
-            // Viên thuốc nhỏ gọn ở góc trên trái khi đang chơi trên TV
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(
-                        start = (24.dp * scale).coerceAtLeast(14.dp),
-                        top = (18.dp * scale).coerceAtLeast(10.dp)
-                    )
-                    .clip(CircleShape)
-                    .background(TvSurface.copy(alpha = 0.86f))
-                    .border(1.dp, TvLine, CircleShape)
-                    .clickable { isHudExpanded = true }
-                    .padding(
-                        horizontal = (14.dp * scale).coerceAtLeast(10.dp),
-                        vertical = (7.dp * scale).coerceAtLeast(5.dp)
-                    )
-                    .testTag("tv_hud_minimized_pill"),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(6.dp))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size((8.dp * scale).coerceAtLeast(6.dp))
-                        .clip(CircleShape)
-                        .background(if (recorderState.isRecording) TvDanger else TvAccent)
-                )
-                Text(
-                    text = if (telemetry.rttMs > 0) {
-                        "$pingText · $fpsText FPS"
-                    } else {
-                        config.tr("Menu (View+Menu)", "Menu (View+Menu)")
-                    },
-                    color = TvInk,
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = (13f * scale).coerceAtLeast(11f).sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        } else {
+        if (isHudExpanded) {
             // Lớp nền mờ + Bảng Menu nhanh chuẩn TV (#s-game -> .hud trong tv-mockup.html)
-            val hudWidth = (390.dp * scale).coerceIn(290.dp, 460.dp)
-            val hudCorner = (20.dp * scale).coerceAtLeast(14.dp)
-            val rowCorner = (14.dp * scale).coerceAtLeast(10.dp)
+            val hudWidth = (330.dp * scale).coerceIn(250.dp, 380.dp)
+            val hudCorner = (16.dp * scale).coerceAtLeast(11.dp)
+            val rowCorner = (11.dp * scale).coerceAtLeast(8.dp)
 
             GamepadSurfaceController(
                 enabled = !showExitConfirmDialog,
@@ -606,7 +567,7 @@ private fun TvHudToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (54.dp * scale).coerceAtLeast(46.dp))
+            .defaultMinSize(minHeight = (42.dp * scale).coerceAtLeast(36.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface2)
             .gamepadClickable(
@@ -619,8 +580,8 @@ private fun TvHudToggleRow(
                 onClick = onToggle
             )
             .padding(
-                horizontal = (16.dp * scale).coerceAtLeast(12.dp),
-                vertical = (10.dp * scale).coerceAtLeast(8.dp)
+                horizontal = (13.dp * scale).coerceAtLeast(10.dp),
+                vertical = (7.dp * scale).coerceAtLeast(5.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -630,13 +591,13 @@ private fun TvHudToggleRow(
             text = title,
             color = TvInk,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (16.5f * scale).coerceAtLeast(13.5f).sp,
+            fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
+        Spacer(modifier = Modifier.width((8.dp * scale).coerceAtLeast(5.dp)))
         TvSwitch(checked = checked, scale = scale * 0.92f)
     }
 }
@@ -655,7 +616,7 @@ private fun TvHudActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (54.dp * scale).coerceAtLeast(46.dp))
+            .defaultMinSize(minHeight = (42.dp * scale).coerceAtLeast(36.dp))
             .clip(RoundedCornerShape(corner))
             .background(TvSurface2)
             .gamepadClickable(
@@ -663,8 +624,8 @@ private fun TvHudActionRow(
                 onClick = onClick
             )
             .padding(
-                horizontal = (16.dp * scale).coerceAtLeast(12.dp),
-                vertical = (10.dp * scale).coerceAtLeast(8.dp)
+                horizontal = (13.dp * scale).coerceAtLeast(10.dp),
+                vertical = (7.dp * scale).coerceAtLeast(5.dp)
             )
             .testTag(testTag),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -674,18 +635,18 @@ private fun TvHudActionRow(
             text = title,
             color = titleColor,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (16.5f * scale).coerceAtLeast(13.5f).sp,
+            fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
+        Spacer(modifier = Modifier.width((8.dp * scale).coerceAtLeast(5.dp)))
         Text(
             text = trailingText,
             color = trailingColor,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (16f * scale).coerceAtLeast(13f).sp,
+            fontSize = (13f * scale).coerceAtLeast(10.5f).sp,
             fontWeight = FontWeight.ExtraBold,
             maxLines = 1
         )

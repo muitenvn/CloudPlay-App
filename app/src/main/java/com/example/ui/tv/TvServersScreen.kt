@@ -200,7 +200,7 @@ internal fun TvServersScreen(
                     text = config.tr("Máy chủ", "Servers"),
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (28f * scale).coerceAtLeast(20f).sp,
+                    fontSize = (22f * scale).coerceAtLeast(16.5f).sp,
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1
                 )
@@ -251,7 +251,7 @@ internal fun TvServersScreen(
                     },
                     variant = if (isVpnActive) TvButtonVariant.DANGER else TvButtonVariant.PRIMARY,
                     scale = scale * 0.9f,
-                    heightDp = (40.dp * scale).coerceAtLeast(36.dp),
+                    heightDp = (32.dp * scale).coerceAtLeast(28.dp),
                     onClick = {
                         if (isVpnActive) VpnManager.disconnect(context) else VpnManager.connect(context)
                     },
@@ -397,7 +397,7 @@ private fun TvServerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = (66.dp * scale).coerceAtLeast(52.dp))
+            .defaultMinSize(minHeight = (50.dp * scale).coerceAtLeast(40.dp))
             .clip(RoundedCornerShape(corner))
             .background(rowBg)
             .gamepadClickable(
@@ -405,8 +405,8 @@ private fun TvServerRow(
                 onClick = onSelect
             )
             .padding(
-                horizontal = (20.dp * scale).coerceAtLeast(14.dp),
-                vertical = (12.dp * scale).coerceAtLeast(9.dp)
+                horizontal = (15.dp * scale).coerceAtLeast(11.dp),
+                vertical = (8.dp * scale).coerceAtLeast(6.dp)
             )
             .testTag("tv_server_row_${server.id}"),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -414,17 +414,17 @@ private fun TvServerRow(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
+            verticalArrangement = Arrangement.spacedBy((2.dp * scale).coerceAtLeast(1.dp))
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(6.dp))
+                horizontalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
             ) {
                 Text(
                     text = "${server.flag} ${server.name}",
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (18f * scale).coerceAtLeast(14f).sp,
+                    fontSize = (14.5f * scale).coerceAtLeast(12f).sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -448,24 +448,24 @@ private fun TvServerRow(
             Text(
                 text = subtitleText,
                 color = TvMuted,
-                fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
+                fontSize = (11.5f * scale).coerceAtLeast(9.5f).sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        Spacer(modifier = Modifier.width((12.dp * scale).coerceAtLeast(8.dp)))
+        Spacer(modifier = Modifier.width((10.dp * scale).coerceAtLeast(6.dp)))
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(7.dp))
+            horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(5.dp))
         ) {
             Text(
                 text = pingText,
                 color = pingColor,
                 fontFamily = JetBrainsMonoFontFamily,
-                fontSize = (19f * scale).coerceAtLeast(14.5f).sp,
+                fontSize = (15f * scale).coerceAtLeast(12f).sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1
             )

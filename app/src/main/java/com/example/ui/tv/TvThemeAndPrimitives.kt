@@ -84,11 +84,11 @@ data class TvKeyHint(
 )
 
 internal fun computeTvScale(maxWidth: Dp, maxHeight: Dp, fontScale: Float): Float {
-    val wRatio = maxWidth.value / 960f
-    val hRatio = maxHeight.value / 540f
-    val rawScale = min(wRatio, hRatio).coerceIn(0.62f, 1.35f)
-    val safeFontDiv = fontScale.coerceIn(0.9f, 1.25f)
-    return (rawScale / safeFontDiv).coerceIn(0.60f, 1.30f)
+    val wRatio = maxWidth.value / 1180f
+    val hRatio = maxHeight.value / 664f
+    val rawScale = min(wRatio, hRatio).coerceIn(0.55f, 0.88f)
+    val safeFontDiv = fontScale.coerceIn(0.92f, 1.25f)
+    return (rawScale / safeFontDiv).coerceIn(0.54f, 0.86f)
 }
 
 @Composable
@@ -100,7 +100,7 @@ internal fun TvButton(
     variant: TvButtonVariant = TvButtonVariant.DEFAULT,
     leadingText: String? = null,
     focusRequester: FocusRequester? = null,
-    heightDp: Dp = (50.dp * scale).coerceAtLeast(48.dp)
+    heightDp: Dp = (38.dp * scale).coerceAtLeast(32.dp)
 ) {
     val bgColor = when (variant) {
         TvButtonVariant.PRIMARY -> TvAccent
@@ -112,7 +112,7 @@ internal fun TvButton(
         TvButtonVariant.DANGER -> TvDanger
         TvButtonVariant.DEFAULT -> TvInk
     }
-    val corner = (14.dp * scale).coerceAtLeast(10.dp)
+    val corner = (10.dp * scale).coerceAtLeast(8.dp)
 
     Row(
         modifier = modifier
@@ -124,7 +124,7 @@ internal fun TvButton(
                 focusRequester = focusRequester,
                 onClick = onClick
             )
-            .padding(horizontal = (22.dp * scale).coerceAtLeast(14.dp), vertical = (8.dp * scale).coerceAtLeast(6.dp)),
+            .padding(horizontal = (14.dp * scale).coerceAtLeast(10.dp), vertical = (5.dp * scale).coerceAtLeast(4.dp)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -132,16 +132,16 @@ internal fun TvButton(
             Text(
                 text = leadingText,
                 color = fgColor,
-                fontSize = (16f * scale).coerceAtLeast(13f).sp,
+                fontSize = (13f * scale).coerceAtLeast(10.5f).sp,
                 fontWeight = FontWeight.ExtraBold
             )
-            Spacer(modifier = Modifier.width((8.dp * scale).coerceAtLeast(5.dp)))
+            Spacer(modifier = Modifier.width((6.dp * scale).coerceAtLeast(4.dp)))
         }
         Text(
             text = text,
             color = fgColor,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (17f * scale).coerceAtLeast(13.5f).sp,
+            fontSize = (13.5f * scale).coerceAtLeast(11f).sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -160,7 +160,7 @@ internal fun TvChip(
 ) {
     val bgColor = if (selected) TvSel else TvSurface
     val fgColor = if (selected) TvAccent else TvMuted
-    val heightDp = (40.dp * scale).coerceAtLeast(36.dp)
+    val heightDp = (32.dp * scale).coerceAtLeast(26.dp)
 
     Box(
         modifier = modifier
@@ -172,14 +172,14 @@ internal fun TvChip(
                 focusRequester = focusRequester,
                 onClick = onClick
             )
-            .padding(horizontal = (16.dp * scale).coerceAtLeast(12.dp), vertical = (6.dp * scale).coerceAtLeast(4.dp)),
+            .padding(horizontal = (12.dp * scale).coerceAtLeast(9.dp), vertical = (4.dp * scale).coerceAtLeast(3.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = fgColor,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (15f * scale).coerceAtLeast(12.5f).sp,
+            fontSize = (12.5f * scale).coerceAtLeast(10.5f).sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -201,7 +201,7 @@ internal fun TvPill(
         TvPillTone.WARN -> Color(0xFF33290C) to TvWarn
         TvPillTone.NEUTRAL -> TvSurface2 to TvMuted
     }
-    val minH = (30.dp * scale).coerceAtLeast(26.dp)
+    val minH = (24.dp * scale).coerceAtLeast(20.dp)
 
     Box(
         modifier = modifier
@@ -215,14 +215,14 @@ internal fun TvPill(
                     Modifier
                 }
             )
-            .padding(horizontal = (12.dp * scale).coerceAtLeast(9.dp), vertical = (4.dp * scale).coerceAtLeast(3.dp)),
+            .padding(horizontal = (9.dp * scale).coerceAtLeast(7.dp), vertical = (3.dp * scale).coerceAtLeast(2.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             color = fgColor,
             fontFamily = SpaceGroteskFontFamily,
-            fontSize = (13.5f * scale).coerceAtLeast(11.5f).sp,
+            fontSize = (11.5f * scale).coerceAtLeast(9.5f).sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -236,10 +236,10 @@ internal fun TvSwitch(
     scale: Float = 1f,
     modifier: Modifier = Modifier
 ) {
-    val trackW = (56.dp * scale).coerceAtLeast(46.dp)
-    val trackH = (32.dp * scale).coerceAtLeast(26.dp)
-    val knobSize = (24.dp * scale).coerceAtLeast(18.dp)
-    val pad = (4.dp * scale).coerceAtLeast(3.dp)
+    val trackW = (42.dp * scale).coerceAtLeast(34.dp)
+    val trackH = (24.dp * scale).coerceAtLeast(19.dp)
+    val knobSize = (18.dp * scale).coerceAtLeast(14.dp)
+    val pad = (3.dp * scale).coerceAtLeast(2.dp)
 
     Box(
         modifier = modifier
@@ -267,16 +267,16 @@ internal fun TvSegmentedControl(
     scale: Float = 1f,
     containerColor: Color = TvSurface
 ) {
-    val corner = (13.dp * scale).coerceAtLeast(10.dp)
-    val itemCorner = (10.dp * scale).coerceAtLeast(8.dp)
-    val itemMinH = (38.dp * scale).coerceAtLeast(32.dp)
+    val corner = (10.dp * scale).coerceAtLeast(7.dp)
+    val itemCorner = (8.dp * scale).coerceAtLeast(6.dp)
+    val itemMinH = (28.dp * scale).coerceAtLeast(24.dp)
 
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(corner))
             .background(containerColor)
-            .padding((4.dp * scale).coerceAtLeast(3.dp)),
-        horizontalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp)),
+            .padding((3.dp * scale).coerceAtLeast(2.dp)),
+        horizontalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         options.forEachIndexed { idx, label ->
@@ -294,14 +294,14 @@ internal fun TvSegmentedControl(
                         },
                         onClick = { onSelect(idx) }
                     )
-                    .padding(horizontal = (15.dp * scale).coerceAtLeast(10.dp), vertical = (5.dp * scale).coerceAtLeast(4.dp)),
+                    .padding(horizontal = (11.dp * scale).coerceAtLeast(8.dp), vertical = (3.dp * scale).coerceAtLeast(2.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = label,
                     color = if (selected) TvAccent else TvMuted,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (15f * scale).coerceAtLeast(12f).sp,
+                    fontSize = (12.5f * scale).coerceAtLeast(10f).sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -323,7 +323,7 @@ internal fun TvLeftNavigationRail(
     onVpnChipClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val railWidth = (196.dp * scale).coerceIn(148.dp, 240.dp)
+    val railWidth = (158.dp * scale).coerceIn(118.dp, 182.dp)
     val navItems: List<Triple<DashboardTab, ImageVector, String>> = listOf(
         Triple(DashboardTab.HOME, Icons.Default.Home, config.tr("Trang chủ", "Home")),
         Triple(DashboardTab.LIBRARY, Icons.Default.SportsEsports, config.tr("Thư viện", "Library")),
@@ -336,27 +336,27 @@ internal fun TvLeftNavigationRail(
             .width(railWidth)
             .fillMaxHeight()
             .testTag("tv_left_navigation_rail"),
-        verticalArrangement = Arrangement.spacedBy((5.dp * scale).coerceAtLeast(4.dp))
+        verticalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp))
     ) {
         // Brand Header (.brand)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = (14.dp * scale).coerceAtLeast(8.dp)),
+                .padding(bottom = (10.dp * scale).coerceAtLeast(6.dp)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(7.dp))
+            horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(5.dp))
         ) {
             Box(
                 modifier = Modifier
-                    .size((34.dp * scale).coerceAtLeast(28.dp))
-                    .clip(RoundedCornerShape((10.dp * scale).coerceAtLeast(8.dp)))
+                    .size((26.dp * scale).coerceAtLeast(22.dp))
+                    .clip(RoundedCornerShape((8.dp * scale).coerceAtLeast(6.dp)))
                     .background(TvAccent),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "▶",
                     color = TvOnAccent,
-                    fontSize = (17f * scale).coerceAtLeast(13f).sp,
+                    fontSize = (13f * scale).coerceAtLeast(10.5f).sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
@@ -364,7 +364,7 @@ internal fun TvLeftNavigationRail(
                 text = "CloudPlay",
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
-                fontSize = (21f * scale).coerceAtLeast(16f).sp,
+                fontSize = (16.5f * scale).coerceAtLeast(13f).sp,
                 fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -374,34 +374,34 @@ internal fun TvLeftNavigationRail(
         // 4 Navigation Items (.nav)
         navItems.forEach { (tab, icon, label) ->
             val isCurrent = currentTab == tab
-            val itemShape = RoundedCornerShape((13.dp * scale).coerceAtLeast(10.dp))
+            val itemShape = RoundedCornerShape((10.dp * scale).coerceAtLeast(8.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(42.dp))
+                    .defaultMinSize(minHeight = (38.dp * scale).coerceAtLeast(32.dp))
                     .clip(itemShape)
                     .background(if (isCurrent) TvSurface2 else Color.Transparent)
                     .gamepadClickable(
-                        cornerRadius = (13.dp * scale).coerceAtLeast(10.dp),
+                        cornerRadius = (10.dp * scale).coerceAtLeast(8.dp),
                         focusRequester = if (isCurrent) activeRailFocusRequester else null,
                         onClick = { onSelectTab(tab) }
                     )
-                    .padding(horizontal = (13.dp * scale).coerceAtLeast(10.dp), vertical = (6.dp * scale).coerceAtLeast(4.dp))
+                    .padding(horizontal = (10.dp * scale).coerceAtLeast(8.dp), vertical = (5.dp * scale).coerceAtLeast(3.dp))
                     .testTag("tv_nav_tab_${tab.name.lowercase()}"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((11.dp * scale).coerceAtLeast(8.dp))
+                horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(6.dp))
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
                     tint = if (isCurrent) TvAccent else TvMuted,
-                    modifier = Modifier.size((22.dp * scale).coerceAtLeast(18.dp))
+                    modifier = Modifier.size((17.dp * scale).coerceAtLeast(14.dp))
                 )
                 Text(
                     text = label,
                     color = if (isCurrent) TvInk else TvMuted,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (17.5f * scale).coerceAtLeast(13.5f).sp,
+                    fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -424,7 +424,7 @@ internal fun TvLeftNavigationRail(
             NetworkMode.DISCONNECTED -> config.tr("Sẵn sàng", "Ready")
         }
         val pingSuffix = if (measuredPingMs != null && measuredPingMs > 0) " · $measuredPingMs ms" else ""
-        val chipCorner = (13.dp * scale).coerceAtLeast(10.dp)
+        val chipCorner = (10.dp * scale).coerceAtLeast(8.dp)
 
         Row(
             modifier = Modifier
@@ -435,14 +435,14 @@ internal fun TvLeftNavigationRail(
                     cornerRadius = chipCorner,
                     onClick = onVpnChipClick
                 )
-                .padding(horizontal = (12.dp * scale).coerceAtLeast(9.dp), vertical = (10.dp * scale).coerceAtLeast(7.dp))
+                .padding(horizontal = (10.dp * scale).coerceAtLeast(7.dp), vertical = (7.dp * scale).coerceAtLeast(5.dp))
                 .testTag("tv_rail_vpn_chip"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy((9.dp * scale).coerceAtLeast(6.dp))
+            horizontalArrangement = Arrangement.spacedBy((7.dp * scale).coerceAtLeast(5.dp))
         ) {
             Box(
                 modifier = Modifier
-                    .size((9.dp * scale).coerceAtLeast(7.dp))
+                    .size((7.dp * scale).coerceAtLeast(5.dp))
                     .clip(CircleShape)
                     .background(dotColor)
             )
@@ -451,7 +451,7 @@ internal fun TvLeftNavigationRail(
                     text = vpnState.currentServer.name,
                     color = TvInk,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (14.5f * scale).coerceAtLeast(12f).sp,
+                    fontSize = (12f * scale).coerceAtLeast(10f).sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -459,7 +459,7 @@ internal fun TvLeftNavigationRail(
                 Text(
                     text = "$statusText$pingSuffix",
                     color = if (isVpnActive) TvAccent else TvMuted,
-                    fontSize = (13f * scale).coerceAtLeast(11f).sp,
+                    fontSize = (11f * scale).coerceAtLeast(9f).sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -478,37 +478,37 @@ internal fun TvBottomKeyHintBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height((34.dp * scale).coerceAtLeast(26.dp))
+            .height((26.dp * scale).coerceAtLeast(20.dp))
             .testTag("tv_bottom_key_hint_bar"),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy((20.dp * scale).coerceAtLeast(12.dp))
+        horizontalArrangement = Arrangement.spacedBy((16.dp * scale).coerceAtLeast(10.dp))
     ) {
         hints.forEach { hint ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
+                horizontalArrangement = Arrangement.spacedBy((5.dp * scale).coerceAtLeast(3.dp))
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp))
+                    horizontalArrangement = Arrangement.spacedBy((3.dp * scale).coerceAtLeast(2.dp))
                 ) {
                     hint.badges.forEach { (badgeText, badgeBg) ->
                         Box(
                             modifier = Modifier
                                 .defaultMinSize(
-                                    minWidth = (24.dp * scale).coerceAtLeast(20.dp),
-                                    minHeight = (24.dp * scale).coerceAtLeast(20.dp)
+                                    minWidth = (19.dp * scale).coerceAtLeast(16.dp),
+                                    minHeight = (19.dp * scale).coerceAtLeast(16.dp)
                                 )
                                 .clip(CircleShape)
                                 .background(badgeBg)
-                                .padding(horizontal = (6.dp * scale).coerceAtLeast(4.dp)),
+                                .padding(horizontal = (5.dp * scale).coerceAtLeast(3.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = badgeText,
                                 color = TvInk,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = (12.5f * scale).coerceAtLeast(10f).sp,
+                                fontSize = (10.5f * scale).coerceAtLeast(8.5f).sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 maxLines = 1
                             )
@@ -519,7 +519,7 @@ internal fun TvBottomKeyHintBar(
                     text = hint.label,
                     color = TvMuted,
                     fontFamily = SpaceGroteskFontFamily,
-                    fontSize = (14.5f * scale).coerceAtLeast(11.5f).sp,
+                    fontSize = (12f * scale).coerceAtLeast(9.5f).sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

@@ -276,10 +276,10 @@ fun HowToUseGuideDialog(
                                 GuideStepCard(
                                     stepNum = "3",
                                     badge = config.tr("Menu & Điều khiển", "Menu & Controls"),
-                                    title = config.tr("Cách mở Menu nhanh & quay về Trang chủ", "How to open Quick Menu & return Home"),
+                                    title = config.tr("Cách mở Menu nhanh trong game", "How to open in-game Quick Menu"),
                                     desc = config.tr(
-                                        "• Nút nổi đã được ẩn hoàn toàn để không che màn hình chơi game.\n• Trên điện thoại: Vuốt/bấm nút Quay lại (Back) của máy để mở hoặc đóng Menu nhanh (tại đây có thể bật Tay cầm ảo, đổi giao diện Cũ/Mới, hoặc bấm 'Trang chủ' để thoát).\n• Trên tay cầm / TV: Giữ đồng thời 2 nút View + Menu khoảng 0,6 giây để mở/đóng Menu nhanh.",
-                                        "• The floating button is hidden for an unobstructed game screen.\n• On phone: Swipe/press the system Back button to toggle the Quick Menu (toggle virtual buttons, switch Classic/New UI, or tap 'Home' to exit).\n• On controller / TV: Hold View + Menu together for 0.6s to toggle the Quick Menu."
+                                        "• Giao diện thường (Điện thoại): Bấm vào nút nổi nhỏ ở góc màn hình (hoặc vuốt nút Quay lại) để mở Menu nhanh.\n• Giao diện TV: Nút nổi được tắt hẳn để không che màn hình chơi game. Hãy giữ đồng thời 2 nút View + Menu khoảng 0,6 giây trên tay cầm (hoặc bấm nút Quay lại) để mở/đóng Menu nhanh.",
+                                        "• Normal UI (Phone): Tap the small floating button at the corner of the screen (or swipe Back) to open the Quick Menu.\n• TV UI: The floating button is turned off so it never blocks gameplay. Hold View + Menu together for 0.6s on your controller (or press Back) to toggle the Quick Menu."
                                     )
                                 )
                             }
@@ -292,8 +292,8 @@ fun HowToUseGuideDialog(
                                     iconColor = DirectCyan,
                                     title = config.tr("Mẹo giữ kết nối mượt và giảm độ trễ", "Tips for smooth connection and low latency"),
                                     content = config.tr(
-                                        "Khi truyền hình ảnh trò chơi trực tiếp qua mạng của bạn mà không đi vòng qua máy chủ trung gian, tín hiệu tay cầm và hình ảnh sẽ phản hồi nhanh hơn. Bạn có thể xem độ trễ (ping) thực tế ngay trong Menu nhanh.",
-                                        "Streaming video directly over your own network without routing through an extra relay server keeps controls and video more responsive. You can check your real-time latency (ping) in the Quick Menu."
+                                        "Khi truyền hình ảnh trò chơi trực tiếp qua mạng của bạn mà không đi vòng qua máy chủ trung gian, tín hiệu tay cầm và hình ảnh sẽ phản hồi nhanh hơn. Bạn có thể xem độ trễ (ping) thực tế ngay trên viên thuốc ở góc màn hình.",
+                                        "Streaming video directly over your own network without routing through an extra relay server keeps controls and video more responsive. You can check your real-time latency (ping) on the corner pill."
                                     )
                                 )
                             }
@@ -326,10 +326,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.CheckCircle,
                                     iconColor = DirectCyan,
-                                    title = config.tr("Tay cầm ảo & Mở Menu trên điện thoại", "Touch Gamepad & Opening Menu on Phone"),
+                                    title = config.tr("Tay cầm ảo trên màn hình", "On-Screen Touch Gamepad"),
                                     content = config.tr(
-                                        "Vuốt/bấm nút Quay lại (Back) của điện thoại (hoặc giữ 2 nút View + Menu trên tay cầm ảo 0,6 giây) để mở Menu nhanh, bật/tắt Tay cầm ảo hoặc quay về Trang chủ. Bạn có thể kéo đổi vị trí nút trong mục Cài đặt.",
-                                        "Swipe/press your phone's Back button (or hold View + Menu on the virtual gamepad for 0.6s) to open the Quick Menu, toggle virtual buttons, or return Home. You can reposition buttons in Settings."
+                                        "Bấm vào nút nổi ở góc màn hình để bật hoặc tắt các nút bấm ảo. Bạn có thể chọn bố cục sẵn có hoặc kéo đổi vị trí nút trong mục Cài đặt.",
+                                        "Tap the floating button at the corner of the screen to show or hide virtual buttons. You can choose a preset layout or reposition buttons in Settings."
                                     )
                                 )
                             }
@@ -340,10 +340,10 @@ fun HowToUseGuideDialog(
                                 GuideDetailCard(
                                     icon = Icons.Default.Language,
                                     iconColor = JapanRed,
-                                    title = config.tr("Đổi Giao diện Cũ/Mới hoặc dịch menu trang Xbox", "Switch Classic/New UI or translate Xbox menus"),
+                                    title = config.tr("Dịch tiếng Việt cho menu trang Xbox", "Translate Xbox web menus"),
                                     content = config.tr(
-                                        "Mở Menu nhanh (vuốt nút Quay lại trên điện thoại hoặc giữ View + Menu 0,6s) sang thẻ 'Điều khiển' để chuyển tức thì giữa Giao diện cũ (xbox.com/play) và Giao diện mới (play.xbox.com), hoặc bật dịch tiếng Việt.",
-                                        "Open the Quick Menu (swipe Back on phone or hold View + Menu for 0.6s) and go to 'Controls' to switch instantly between Classic UI (xbox.com/play) and New UI (play.xbox.com), or toggle menu translation."
+                                        "Bấm nút nổi ở góc màn hình (hoặc giữ View + Menu 0,6s trên TV) -> sang thẻ 'Điều khiển' để bật dịch các nút và thông báo của trang Xbox sang tiếng Việt.",
+                                        "Tap the corner floating button (or hold View + Menu 0.6s on TV) -> go to 'Controls' to translate Xbox web menus and prompts."
                                     )
                                 )
                             }

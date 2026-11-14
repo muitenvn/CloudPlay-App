@@ -269,24 +269,12 @@ fun FloatingHud(
         gpuLoadReductionEnabled = config.gpuLoadReductionEnabled
     )
 
-    // Cảnh báo nhỏ tự ẩn sau vài giây (nhiệt độ / pin yếu / đổi mạng / mẹo mở menu)
+    // Cảnh báo nhỏ tự ẩn sau vài giây (nhiệt độ / pin yếu / đổi mạng)
     var hasShownSevereThermalAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
     var hasShownLowBatteryAlert by rememberSaveable(isGameActive) { mutableStateOf(false) }
-    var hasShownMenuShortcutHint by rememberSaveable { mutableStateOf(false) }
     var lastStreamNetworkIsWifi by rememberSaveable(isGameActive) { mutableStateOf<Boolean?>(null) }
     var autoHudBannerText by remember { mutableStateOf<String?>(null) }
     var autoHudBannerTag by remember { mutableStateOf("hud_transient_alert_banner") }
-
-    LaunchedEffect(isGameActive, config.appLanguage) {
-        if (isGameActive && !hasShownMenuShortcutHint) {
-            hasShownMenuShortcutHint = true
-            autoHudBannerTag = "hud_menu_shortcut_hint_banner"
-            autoHudBannerText = config.tr(
-                "Đã ẩn nút menu nổi. Vuốt nút Quay lại (Back) hoặc giữ View + Menu (0,6s) để mở menu / về Trang chủ.",
-                "Floating menu button hidden. Swipe Back or hold View + Menu (0.6s) to open menu / go Home."
-            )
-        }
-    }
 
     LaunchedEffect(isGameActive, isThermalSupported, thermalStatus, batteryPercent, isBatteryCharging, config.appLanguage) {
         if (!isGameActive) {
@@ -440,23 +428,52 @@ fun FloatingHud(
         val isNearEdgeForDock = isDragging && hudMode != HudMode.EXPANDED &&
             (offsetX <= edgeDockThresholdPx || offsetX >= (rightScreenEdgeX - edgeDockThresholdPx))
 
-        if (hudMode == HudMode.MINIMIZED) {
-            // Đã bỏ hoàn toàn nút menu nổi khi thu gọn để không che màn hình chơi game.
-            // Chỉ hiển thị thông báo cảnh báo ngắn (nếu có) rồi tự tắt.
-            val currentBanner = autoHudBannerText
-            if (currentBanner != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp, start = 16.dp, end = 16.dp)
-                ) {
-                    HudNoteCard(
-                        text = currentBanner,
-                        isWarning = false,
-                        onClick = { autoHudBannerText = null },
-                        modifier = Modifier
-                            .widthIn(max = 360.dp)
-                            .testTag(autoHudBannerTag)
+        if (dockedEdge != HudDockedEdge.NONE && hudMode == HudMode.MINIMIZED) {
+            val isRight = dockedEdge == HudDockedEdge.RIGHT
+            val handleWidth = 22.dp
+            val handleHeight = 52.dp
+            val handleX = if (isRight) {
+                (maxWidthPx - with(density) { handleWidth.toPx() }).roundToInt().coerceAtLeast(0)
+            } else {
+                0
+            }
+            val handleShape = if (isRight) {
+                RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+            } else {
+                RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
+            }
+            Surface(
+                modifier = Modifier
+                    .offset { IntOffset(handleX, animatedOffsetY.roundToInt()) }
+                    .size(width = handleWidth, height = handleHeight)
+                    .graphicsLayer { alpha = hudAlpha }
+                    .clip(handleShape)
+                    .clickable {
+                        markUserInteraction()
+                        offsetX = if (isRight) {
+                            (rightScreenEdgeX - restorePaddingPx).coerceAtLeast(safeLeftPx)
+                        } else {
+                            safeLeftPx
+                        }
+                        dockedEdge = HudDockedEdge.NONE
+                        hudMode = HudMode.COMPACT
+                    }
+                    .testTag("hud_edge_dock_handle"),
+                shape = handleShape,
+                color = HudPanelBg,
+                border = BorderStroke(1.dp, HudLine),
+                shadowElevation = 0.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isRight) {
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                        } else {
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        },
+                        contentDescription = config.tr("Mở menu nhanh", "Open quick menu"),
+                        tint = HudAccent,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -486,7 +503,26 @@ fun FloatingHud(
                             onDragEnd = {
                                 isDragging = false
                                 markUserInteraction()
-                                offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                if (hudMode != HudMode.EXPANDED) {
+                                    when {
+                                        offsetX <= edgeDockThresholdPx -> {
+                                            offsetX = 0f
+                                            hudMode = HudMode.MINIMIZED
+                                            dockedEdge = HudDockedEdge.LEFT
+                                        }
+                                        offsetX >= (rightScreenEdgeX - edgeDockThresholdPx) -> {
+                                            offsetX = rightScreenEdgeX
+                                            hudMode = HudMode.MINIMIZED
+                                            dockedEdge = HudDockedEdge.RIGHT
+                                        }
+                                        else -> {
+                                            dockedEdge = HudDockedEdge.NONE
+                                            offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                        }
+                                    }
+                                } else {
+                                    offsetX = offsetX.coerceIn(0f, rightScreenEdgeX)
+                                }
                                 offsetY = offsetY.coerceIn(safeTopPx, maxBoundY)
                             },
                             onDragCancel = {
@@ -519,7 +555,18 @@ fun FloatingHud(
                     shadowElevation = 0.dp
                 ) {
                     when (hudMode) {
-                        HudMode.MINIMIZED -> {}
+                        HudMode.MINIMIZED -> {
+                            HudMinimizedPill(
+                                config = config,
+                                telemetry = telemetry,
+                                isAnchoredRight = isAnchoredRight,
+                                motionEnabled = motionEnabled,
+                                onExpandToCompact = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.COMPACT
+                                }
+                            )
+                        }
 
                         HudMode.COMPACT -> {
                             GamepadSurfaceController(
@@ -778,20 +825,6 @@ fun FloatingHud(
                                         )
                                     }
                                 }
-
-                                // Hướng dẫn mở lại menu khi đã ẩn nút nổi
-                                Text(
-                                    text = config.tr(
-                                        "Mẹo: Vuốt Quay lại (Back) trên điện thoại hoặc giữ View + Menu (0,6s) để bật/tắt menu này.",
-                                        "Tip: Swipe Back on phone or hold View + Menu (0.6s) to toggle this menu."
-                                    ),
-                                    color = HudMuted,
-                                    fontSize = 11.sp,
-                                    lineHeight = 14.sp,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 4.dp)
-                                )
 
                                 // Sticky Footer (.p-foot): Tải lại | Trang chủ | Cài đặt | Thoát
                                 Box(

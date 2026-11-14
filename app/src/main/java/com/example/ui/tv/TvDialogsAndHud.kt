@@ -231,6 +231,14 @@ internal fun TvInGameFloatingHud(
         }
     }
 
+    var showTvMenuGuideBanner by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(showTvMenuGuideBanner) {
+        if (showTvMenuGuideBanner) {
+            kotlinx.coroutines.delay(4000L)
+            showTvMenuGuideBanner = false
+        }
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -245,6 +253,39 @@ internal fun TvInGameFloatingHud(
             NetworkMode.VPN_JAPAN -> "VPN"
             NetworkMode.DIRECT_NETWORK -> config.tr("Trực tiếp", "Direct")
             NetworkMode.DISCONNECTED -> config.tr("Trực tiếp", "Direct")
+        }
+
+        if (!isHudExpanded && showTvMenuGuideBanner) {
+            val bannerCorner = (10.dp * scale).coerceAtLeast(8.dp)
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(
+                        top = (14.dp * scale).coerceAtLeast(10.dp),
+                        end = (18.dp * scale).coerceAtLeast(12.dp)
+                    )
+                    .clip(RoundedCornerShape(bannerCorner))
+                    .background(TvSurface.copy(alpha = 0.90f))
+                    .border(1.dp, TvLine, RoundedCornerShape(bannerCorner))
+                    .padding(
+                        horizontal = (12.dp * scale).coerceAtLeast(9.dp),
+                        vertical = (7.dp * scale).coerceAtLeast(5.dp)
+                    )
+                    .testTag("tv_hud_shortcut_guide_banner"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
+            ) {
+                Text(
+                    text = config.tr(
+                        "Giữ View + Menu (0,6s) hoặc bấm nút Quay lại để mở Menu nhanh",
+                        "Hold View + Menu (0.6s) or press Back to open Quick Menu"
+                    ),
+                    color = TvMuted,
+                    fontSize = (12f * scale).coerceAtLeast(10f).sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+            }
         }
 
         if (isHudExpanded) {

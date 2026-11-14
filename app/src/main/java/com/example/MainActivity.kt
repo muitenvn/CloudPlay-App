@@ -186,6 +186,24 @@ class MainActivity : ComponentActivity() {
 
     private var isBrowserScreenActive = false
 
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        if (ev != null && ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            if ((ev.source and android.view.InputDevice.SOURCE_TOUCHSCREEN) == android.view.InputDevice.SOURCE_TOUCHSCREEN) {
+                com.example.ui.components.GamepadUiNavigation.onTouchInteraction()
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    override fun dispatchGenericMotionEvent(ev: android.view.MotionEvent?): Boolean {
+        if (ev != null && (!isBrowserScreenActive || com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi)) {
+            if (com.example.ui.components.GamepadUiNavigation.handleGenericMotionEvent(ev)) {
+                return true
+            }
+        }
+        return super.dispatchGenericMotionEvent(ev)
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && isBrowserScreenActive) {

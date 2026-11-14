@@ -47,6 +47,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -62,8 +64,10 @@ import com.example.R
 import com.example.cloudplay.GamepadDetector
 import com.example.data.GameLibraryRepository
 import com.example.data.SettingsRepository
+import com.example.ui.components.GamepadSurfaceController
 import com.example.ui.components.GuideSection
 import com.example.ui.components.HowToUseGuideDialog
+import com.example.ui.components.gamepadClickable
 import com.example.ui.tabs.GameLibraryScreen
 import com.example.ui.tabs.HomeScreen
 import com.example.ui.tabs.ServersScreen
@@ -160,9 +164,34 @@ fun DashboardScreen(
         VpnManager.connect(context)
     }
 
-    Scaffold(
-        modifier = modifier.testTag("dashboard_screen"),
-        containerColor = XboxDark,
+    val activeTabFocusRequester = remember { FocusRequester() }
+    val isAnyDialogOpen = showGuideDialog || showTranslatorDialog || showWebPortalDialog || showOverflowMenu || showLanguageMenu
+
+    GamepadSurfaceController(
+        enabled = !isAnyDialogOpen,
+        defaultFocusRequester = activeTabFocusRequester,
+        onPreviousTab = {
+            val tabs = DashboardTab.entries
+            val prevIdx = (tabs.indexOf(currentTab) - 1 + tabs.size) % tabs.size
+            switchTab(tabs[prevIdx], "LB")
+        },
+        onNextTab = {
+            val tabs = DashboardTab.entries
+            val nextIdx = (tabs.indexOf(currentTab) + 1) % tabs.size
+            switchTab(tabs[nextIdx], "RB")
+        },
+        onBackPress = {
+            when {
+                showLanguageMenu -> showLanguageMenu = false
+                showOverflowMenu -> showOverflowMenu = false
+                currentTab != DashboardTab.HOME -> switchTab(DashboardTab.HOME, "nút B")
+            }
+        },
+        modifier = modifier
+    ) {
+        Scaffold(
+            modifier = Modifier.testTag("dashboard_screen"),
+            containerColor = XboxDark,
         topBar = {
             androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
@@ -265,7 +294,7 @@ fun DashboardScreen(
                                         .defaultMinSize(minWidth = 42.dp, minHeight = 42.dp)
                                         .clip(TOP_PILL_SHAPE)
                                         .background(Color.Transparent, TOP_PILL_SHAPE)
-                                        .clickable { showLanguageMenu = true }
+                                        .gamepadClickable(cornerRadius = 8.dp) { showLanguageMenu = true }
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                         .testTag("topbar_language_button"),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -332,7 +361,7 @@ fun DashboardScreen(
                                         if (isTranslateOn) Color(0xFF16352A) else Color.Transparent,
                                         TOP_PILL_SHAPE
                                     )
-                                    .clickable {
+                                    .gamepadClickable(cornerRadius = 8.dp) {
                                         com.example.data.AppLogger.info("UI", "Mở hộp thoại Dịch tự động từ thanh đầu")
                                         showTranslatorDialog = true
                                     }
@@ -354,7 +383,7 @@ fun DashboardScreen(
                                         .size(42.dp)
                                         .clip(TOP_PILL_SHAPE)
                                         .background(Color.Transparent, TOP_PILL_SHAPE)
-                                        .clickable { showOverflowMenu = true }
+                                        .gamepadClickable(cornerRadius = 8.dp) { showOverflowMenu = true }
                                         .testTag("topbar_overflow_menu_button"),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -443,6 +472,7 @@ fun DashboardScreen(
                 gamesCount = allGames.size,
                 isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED,
                 settingsTabLabel = config.tr("Cài đặt", "Settings"),
+                activeTabFocusRequester = activeTabFocusRequester,
                 onSelectTab = { switchTab(it) }
             )
         }
@@ -475,6 +505,7 @@ fun DashboardScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .focusProperties { canFocus = isSelectedTab }
                                 .layout { measurable, constraints ->
                                     if (isSelectedTab) {
                                         val placeable = measurable.measure(constraints)
@@ -554,6 +585,7 @@ fun DashboardScreen(
             }
         }
     }
+    }
 
     if (showGuideDialog) {
         HowToUseGuideDialog(
@@ -590,6 +622,7 @@ private fun ConsoleFloatingNavigationDock(
     gamesCount: Int,
     isVpnActive: Boolean,
     settingsTabLabel: String = "Cài đặt",
+    activeTabFocusRequester: FocusRequester? = null,
     onSelectTab: (DashboardTab) -> Unit
 ) {
     val config by SettingsRepository.config.collectAsState()
@@ -636,7 +669,11 @@ private fun ConsoleFloatingNavigationDock(
                         .weight(1f)
                         .defaultMinSize(minHeight = 56.dp)
                         .clip(NAV_TAB_SHAPE)
-                        .clickable { onSelectTab(tab) }
+                        .gamepadClickable(
+                            cornerRadius = 12.dp,
+                            focusRequester = if (isSelected) activeTabFocusRequester else null,
+                            onClick = { onSelectTab(tab) }
+                        )
                         .testTag("nav_tab_${tab.name.lowercase()}")
                         .padding(vertical = 6.dp, horizontal = 2.dp),
                     contentAlignment = Alignment.Center

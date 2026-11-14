@@ -142,6 +142,14 @@ fun CloudBrowserScreen(
     var exitPreviewSavedGameUrl by remember { mutableStateOf("") }
     var suppressLoadingOverlayAfterExitPreview by remember { mutableStateOf(false) }
 
+    DisposableEffect(showQuickSettingsDialog, showTranslatorDialog) {
+        com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi =
+            showQuickSettingsDialog || showTranslatorDialog
+        onDispose {
+            com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi = true
+        }
+    }
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, webViewInstance, context) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->

@@ -791,6 +791,154 @@ private fun SingleNodePopoverBody(
                 )
             }
 
+            // Directional Swipe ("Vuốt theo hướng") ONLY for LB and RB
+            if (nodeId == "btn_lb" || nodeId == "btn_rb") {
+                HudSwitchRow(
+                    title = config.tr("Vuốt theo hướng", "Directional Swipe"),
+                    subtitle = config.tr(
+                        "Vuốt lên/xuống/trái/phải trên nút vai để bấm nhanh nút khác",
+                        "Swipe up/down/left/right on bumper to trigger another button"
+                    ),
+                    checked = nodeBehavior.directionalSwipe,
+                    onCheckedChange = { enabled ->
+                        onBehaviorChange(nodeBehavior.copy(directionalSwipe = enabled))
+                    },
+                    bgColor = HudSurface
+                )
+
+                if (nodeBehavior.directionalSwipe) {
+                    var activeDirPicker by remember(nodeId) { mutableStateOf<String?>(null) }
+                    val primaryIdx = nodeInfo?.primaryButtonIndex ?: -1
+                    val directionRows = listOf(
+                        Triple("up", config.tr("↑ Lên", "↑ Up"), nodeBehavior.swipeUpBtn),
+                        Triple("down", config.tr("↓ Xuống", "↓ Down"), nodeBehavior.swipeDownBtn),
+                        Triple("left", config.tr("← Trái", "← Left"), nodeBehavior.swipeLeftBtn),
+                        Triple("right", config.tr("→ Phải", "→ Right"), nodeBehavior.swipeRightBtn)
+                    )
+
+                    directionRows.forEach { (dirKey, dirLabel, currentBtnIdx) ->
+                        val currentBadge = XBOX_TARGET_BUTTON_CHOICES.firstOrNull { it.index == currentBtnIdx }?.badge
+                            ?: config.tr("Không", "None")
+                        val isExpanded = activeDirPicker == dirKey
+
+                        HudSurfaceRow(
+                            minHeight = 32.dp,
+                            bgColor = if (isExpanded) HudSelBg else HudSurface,
+                            onClick = { activeDirPicker = if (isExpanded) null else dirKey }
+                        ) {
+                            Text(
+                                text = dirLabel,
+                                color = HudInk,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(7.dp),
+                                color = if (currentBtnIdx in 0..16) HudSelBg else HudSurface2,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (currentBtnIdx in 0..16) HudAccent else HudLine
+                                ),
+                                shadowElevation = 0.dp
+                            ) {
+                                Text(
+                                    text = if (isExpanded) "$currentBadge ▾" else "$currentBadge ▸",
+                                    color = if (currentBtnIdx in 0..16) HudAccent else HudMuted,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        if (isExpanded) {
+                            FlowRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 2.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                val noneSelected = currentBtnIdx !in 0..16
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (noneSelected) HudSelBg else HudSurface,
+                                    border = BorderStroke(1.dp, if (noneSelected) HudAccent else HudLine),
+                                    modifier = Modifier.clickable {
+                                        val updated = when (dirKey) {
+                                            "up" -> nodeBehavior.copy(swipeUpBtn = -1)
+                                            "down" -> nodeBehavior.copy(swipeDownBtn = -1)
+                                            "left" -> nodeBehavior.copy(swipeLeftBtn = -1)
+                                            else -> nodeBehavior.copy(swipeRightBtn = -1)
+                                        }
+                                        onBehaviorChange(updated)
+                                        activeDirPicker = null
+                                    },
+                                    shadowElevation = 0.dp
+                                ) {
+                                    Text(
+                                        text = config.tr("Không", "None"),
+                                        color = if (noneSelected) HudAccent else HudMuted,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                XBOX_TARGET_BUTTON_CHOICES.filter { it.index != primaryIdx }.forEach { choice ->
+                                    val selected = currentBtnIdx == choice.index
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (selected) HudSelBg else HudSurface,
+                                        border = BorderStroke(1.dp, if (selected) HudAccent else HudLine),
+                                        modifier = Modifier.clickable {
+                                            val updated = when (dirKey) {
+                                                "up" -> nodeBehavior.copy(swipeUpBtn = choice.index)
+                                                "down" -> nodeBehavior.copy(swipeDownBtn = choice.index)
+                                                "left" -> nodeBehavior.copy(swipeLeftBtn = choice.index)
+                                                else -> nodeBehavior.copy(swipeRightBtn = choice.index)
+                                            }
+                                            onBehaviorChange(updated)
+                                            activeDirPicker = null
+                                        },
+                                        shadowElevation = 0.dp
+                                    ) {
+                                        Text(
+                                            text = choice.badge,
+                                            color = if (selected) HudAccent else HudMuted,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HudSwitchRow(
+                        title = config.tr("Gửi kèm nút vai", "Include Shoulder Button"),
+                        subtitle = if (nodeBehavior.swipeIncludeShoulder) {
+                            config.tr(
+                                "Giữ nút vai trong lúc vuốt (ra tổ hợp)",
+                                "Hold shoulder button while swiping (combo)"
+                            )
+                        } else {
+                            config.tr(
+                                "Vuốt chỉ gửi nút hướng; chạm rồi nhấc mới gửi nút vai",
+                                "Swipe sends direction only; tap & release sends bumper"
+                            )
+                        },
+                        checked = nodeBehavior.swipeIncludeShoulder,
+                        onCheckedChange = { include ->
+                            onBehaviorChange(nodeBehavior.copy(swipeIncludeShoulder = include))
+                        },
+                        bgColor = HudSurface
+                    )
+                }
+            }
+
             // Optional Combo Button Picker for standard single buttons
             if (customButtonDef == null && nodeInfo?.primaryButtonIndex != null) {
                 val primaryIdx = nodeInfo.primaryButtonIndex

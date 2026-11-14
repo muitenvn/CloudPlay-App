@@ -70,7 +70,13 @@ data class GamepadButtonBehavior(
     val analogSwipe: Boolean? = null,
     val extraButtons: Set<Int> = emptySet(),
     val widthScale: Float = 1.0f,
-    val heightScale: Float = 1.0f
+    val heightScale: Float = 1.0f,
+    val directionalSwipe: Boolean = false,
+    val swipeIncludeShoulder: Boolean = true,
+    val swipeUpBtn: Int = -1,
+    val swipeDownBtn: Int = -1,
+    val swipeLeftBtn: Int = -1,
+    val swipeRightBtn: Int = -1
 ) {
     fun hasCustomDimensions(): Boolean {
         return abs(widthScale - 1.0f) >= 0.02f || abs(heightScale - 1.0f) >= 0.02f
@@ -81,7 +87,13 @@ data class GamepadButtonBehavior(
             turboHz == 10 &&
             analogSwipe == null &&
             extraButtons.isEmpty() &&
-            !hasCustomDimensions()
+            !hasCustomDimensions() &&
+            !directionalSwipe &&
+            swipeIncludeShoulder &&
+            swipeUpBtn == -1 &&
+            swipeDownBtn == -1 &&
+            swipeLeftBtn == -1 &&
+            swipeRightBtn == -1
     }
 }
 
@@ -240,7 +252,30 @@ internal fun parseButtonBehaviors(raw: String): Map<String, GamepadButtonBehavio
                     ?: emptySet()
                 val wScale = (fields.getOrNull(4)?.toFloatOrNull() ?: 1.0f).coerceIn(0.50f, 2.50f)
                 val hScale = (fields.getOrNull(5)?.toFloatOrNull() ?: 1.0f).coerceIn(0.50f, 2.50f)
-                val b = GamepadButtonBehavior(mode, hz, analog, extras, wScale, hScale)
+                val dirSwipe = fields.getOrNull(6) == "1"
+                val incShoulder = fields.getOrNull(7) != "0"
+                val dirParts = fields.getOrNull(8)
+                    ?.split(",")
+                    ?.map { it.trim().toIntOrNull() ?: -1 }
+                    ?: emptyList()
+                val upBtn = dirParts.getOrNull(0)?.takeIf { it in 0..16 } ?: -1
+                val downBtn = dirParts.getOrNull(1)?.takeIf { it in 0..16 } ?: -1
+                val leftBtn = dirParts.getOrNull(2)?.takeIf { it in 0..16 } ?: -1
+                val rightBtn = dirParts.getOrNull(3)?.takeIf { it in 0..16 } ?: -1
+                val b = GamepadButtonBehavior(
+                    pressMode = mode,
+                    turboHz = hz,
+                    analogSwipe = analog,
+                    extraButtons = extras,
+                    widthScale = wScale,
+                    heightScale = hScale,
+                    directionalSwipe = dirSwipe,
+                    swipeIncludeShoulder = incShoulder,
+                    swipeUpBtn = upBtn,
+                    swipeDownBtn = downBtn,
+                    swipeLeftBtn = leftBtn,
+                    swipeRightBtn = rightBtn
+                )
                 if (!b.isDefault()) {
                     result[nodeId] = b
                 }
@@ -262,7 +297,10 @@ internal fun serializeButtonBehaviors(map: Map<String, GamepadButtonBehavior>): 
             val extrasCode = v.extraButtons.sorted().joinToString(",")
             val wCode = ((v.widthScale.coerceIn(0.50f, 2.50f) * 100f).roundToInt() / 100f).toString()
             val hCode = ((v.heightScale.coerceIn(0.50f, 2.50f) * 100f).roundToInt() / 100f).toString()
-            "$k:${v.pressMode.name}|${v.turboHz.coerceIn(5, 20)}|$analogCode|$extrasCode|$wCode|$hCode"
+            val dirSwipeCode = if (v.directionalSwipe) "1" else "0"
+            val incShoulderCode = if (v.swipeIncludeShoulder) "1" else "0"
+            val dirBtnsCode = "${v.swipeUpBtn},${v.swipeDownBtn},${v.swipeLeftBtn},${v.swipeRightBtn}"
+            "$k:${v.pressMode.name}|${v.turboHz.coerceIn(5, 20)}|$analogCode|$extrasCode|$wCode|$hCode|$dirSwipeCode|$incShoulderCode|$dirBtnsCode"
         }
 }
 

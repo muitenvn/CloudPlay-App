@@ -460,6 +460,12 @@ fun VirtualGamepadOverlay(
         }
     }
 
+    fun sendDirectionButtonEvent(dirButtonIndex: Int, pressed: Boolean, sourceNodeId: String) {
+        if (dirButtonIndex !in 0..16) return
+        if (pressed) vibrate(nodeId = sourceNodeId, stronger = dirButtonIndex in setOf(6, 7, 10, 11))
+        dispatchRawButtonJs(dirButtonIndex, pressed, if (pressed) 1f else 0f)
+    }
+
     fun sendCustomButtonEvent(customDef: CustomGamepadButtonDef, pressed: Boolean) {
         val targets = customDef.targetButtons.filter { it in 0..16 }
         if (targets.isEmpty()) return
@@ -651,8 +657,17 @@ fun VirtualGamepadOverlay(
                             heightScale = lbBehavior.heightScale,
                             pressMode = lbBehavior.pressMode,
                             turboHz = lbBehavior.turboHz,
+                            directionalSwipe = lbBehavior.directionalSwipe,
+                            swipeIncludeShoulder = lbBehavior.swipeIncludeShoulder,
+                            swipeUpBtn = lbBehavior.swipeUpBtn,
+                            swipeDownBtn = lbBehavior.swipeDownBtn,
+                            swipeLeftBtn = lbBehavior.swipeLeftBtn,
+                            swipeRightBtn = lbBehavior.swipeRightBtn,
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(4, it, nodeId = "btn_lb") }
+                            onStateChange = { sendButtonEvent(4, it, nodeId = "btn_lb") },
+                            onDirectionButtonChange = { dirBtnIdx, pressed ->
+                                sendDirectionButtonEvent(dirBtnIdx, pressed, "btn_lb")
+                            }
                         )
                     }
                 }
@@ -709,8 +724,17 @@ fun VirtualGamepadOverlay(
                             heightScale = rbBehavior.heightScale,
                             pressMode = rbBehavior.pressMode,
                             turboHz = rbBehavior.turboHz,
+                            directionalSwipe = rbBehavior.directionalSwipe,
+                            swipeIncludeShoulder = rbBehavior.swipeIncludeShoulder,
+                            swipeUpBtn = rbBehavior.swipeUpBtn,
+                            swipeDownBtn = rbBehavior.swipeDownBtn,
+                            swipeLeftBtn = rbBehavior.swipeLeftBtn,
+                            swipeRightBtn = rbBehavior.swipeRightBtn,
                             isEditMode = isEditPositionMode,
-                            onStateChange = { sendButtonEvent(5, it, nodeId = "btn_rb") }
+                            onStateChange = { sendButtonEvent(5, it, nodeId = "btn_rb") },
+                            onDirectionButtonChange = { dirBtnIdx, pressed ->
+                                sendDirectionButtonEvent(dirBtnIdx, pressed, "btn_rb")
+                            }
                         )
                     }
                 }

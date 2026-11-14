@@ -777,6 +777,15 @@ internal fun GamepadTriggerButton(
     }
 }
 
+private enum class ShoulderSwipeDir {
+    NONE, UP, DOWN, LEFT, RIGHT
+}
+
+private fun shortDirectionBadge(buttonIndex: Int): String? {
+    if (buttonIndex !in 0..16) return null
+    return XBOX_TARGET_BUTTON_CHOICES.firstOrNull { it.index == buttonIndex }?.badge
+}
+
 @Composable
 internal fun GamepadShoulderButton(
     label: String,
@@ -787,29 +796,319 @@ internal fun GamepadShoulderButton(
     heightScale: Float = 1.0f,
     pressMode: GamepadButtonPressMode = GamepadButtonPressMode.NORMAL,
     turboHz: Int = 10,
+    directionalSwipe: Boolean = false,
+    swipeIncludeShoulder: Boolean = true,
+    swipeUpBtn: Int = -1,
+    swipeDownBtn: Int = -1,
+    swipeLeftBtn: Int = -1,
+    swipeRightBtn: Int = -1,
     isEditMode: Boolean,
-    onStateChange: (Boolean) -> Unit
+    onStateChange: (Boolean) -> Unit,
+    onDirectionButtonChange: (Int, Boolean) -> Unit = { _, _ -> }
 ) {
-    GamepadConfigurableButtonBox(
-        widthDp = 58.dp * scale * widthScale,
-        heightDp = 38.dp * scale * heightScale,
-        shape = RoundedCornerShape(12.dp),
-        opacity = opacity,
-        accentColor = HudAccent,
-        pressMode = pressMode,
-        turboHz = turboHz,
-        isEditMode = isEditMode,
-        onStateChange = onStateChange
-    ) { isActive, isLatched ->
+    if (!directionalSwipe) {
+        GamepadConfigurableButtonBox(
+            widthDp = 58.dp * scale * widthScale,
+            heightDp = 38.dp * scale * heightScale,
+            shape = RoundedCornerShape(12.dp),
+            opacity = opacity,
+            accentColor = HudAccent,
+            pressMode = pressMode,
+            turboHz = turboHz,
+            isEditMode = isEditMode,
+            onStateChange = onStateChange
+        ) { isActive, isLatched ->
+            Text(
+                text = if (isLatched) "$label •" else label,
+                color = when {
+                    isLatched -> HudCyan
+                    isActive -> HudAccent
+                    else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
+                },
+                fontWeight = FontWeight.Bold,
+                fontSize = (12f * scale).sp
+            )
+        }
+        return
+    }
+
+    var fingerDown by remember { mutableStateOf(false) }
+    var latched by remember { mutableStateOf(false) }
+    var emittedShoulder by remember { mutableStateOf(false) }
+    var activeDir by remember { mutableStateOf(ShoulderSwipeDir.NONE) }
+    var emittedDirBtn by remember { mutableStateOf(-1) }
+    var tapPulseSeq by remember { mutableStateOf(0) }
+
+    val currentOnStateChange by rememberUpdatedState(onStateChange)
+    val currentOnDirectionButtonChange by rememberUpdatedState(onDirectionButtonChange)
+
+    fun emitShoulder(next: Boolean) {
+        if (emittedShoulder != next) {
+            emittedShoulder = next
+            currentOnStateChange(next)
+        }
+    }
+
+    fun emitDirection(nextDir: ShoulderSwipeDir) {
+        activeDir = nextDir
+        val rawBtn = when (nextDir) {
+            ShoulderSwipeDir.UP -> swipeUpBtn
+            ShoulderSwipeDir.DOWN -> swipeDownBtn
+            ShoulderSwipeDir.LEFT -> swipeLeftBtn
+            ShoulderSwipeDir.RIGHT -> swipeRightBtn
+            ShoulderSwipeDir.NONE -> -1
+        }
+        val validBtn = if (rawBtn in 0..16) rawBtn else -1
+        if (emittedDirBtn != validBtn) {
+            if (emittedDirBtn in 0..16) {
+                currentOnDirectionButtonChange(emittedDirBtn, false)
+            }
+            emittedDirBtn = validBtn
+            if (validBtn in 0..16) {
+                currentOnDirectionButtonChange(validBtn, true)
+            }
+        }
+    }
+
+    LaunchedEffect(isEditMode, pressMode, directionalSwipe) {
+        if (isEditMode) {
+            fingerDown = false
+            latched = false
+            emitDirection(ShoulderSwipeDir.NONE)
+            emitShoulder(false)
+        } else if (pressMode != GamepadButtonPressMode.TOGGLE_HOLD && latched) {
+            latched = false
+            if (!fingerDown) emitShoulder(false)
+        }
+    }
+
+    LaunchedEffect(fingerDown, pressMode, turboHz, swipeIncludeShoulder, isEditMode) {
+        if (isEditMode) return@LaunchedEffect
+        if (pressMode == GamepadButtonPressMode.TURBO && swipeIncludeShoulder && fingerDown) {
+            val halfPeriodMs = (500L / turboHz.coerceIn(5, 20)).coerceAtLeast(22L)
+            while (fingerDown && swipeIncludeShoulder) {
+                emitShoulder(true)
+                delay(halfPeriodMs)
+                emitShoulder(false)
+                delay(halfPeriodMs)
+            }
+            emitShoulder(false)
+        }
+    }
+
+    LaunchedEffect(tapPulseSeq, isEditMode) {
+        if (isEditMode || tapPulseSeq <= 0) return@LaunchedEffect
+        emitShoulder(true)
+        delay(65L)
+        if (!fingerDown || !swipeIncludeShoulder) {
+            emitShoulder(false)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (emittedDirBtn in 0..16) {
+                currentOnDirectionButtonChange(emittedDirBtn, false)
+            }
+            if (emittedShoulder) {
+                currentOnStateChange(false)
+            }
+        }
+    }
+
+    val isShoulderVisualActive = when (pressMode) {
+        GamepadButtonPressMode.NORMAL -> (swipeIncludeShoulder && fingerDown) || emittedShoulder
+        GamepadButtonPressMode.TOGGLE_HOLD -> latched
+        GamepadButtonPressMode.TURBO -> (swipeIncludeShoulder && fingerDown) || emittedShoulder
+    }
+    val isAnyVisualActive = isShoulderVisualActive || activeDir != ShoulderSwipeDir.NONE
+
+    val bgAlpha = (opacity * 0.72f).coerceIn(0.16f, 0.90f)
+    val borderAlpha = (opacity * 0.28f).coerceIn(0.08f, 0.45f)
+    val shape = RoundedCornerShape(12.dp)
+
+    val upBadge = shortDirectionBadge(swipeUpBtn)
+    val downBadge = shortDirectionBadge(swipeDownBtn)
+    val leftBadge = shortDirectionBadge(swipeLeftBtn)
+    val rightBadge = shortDirectionBadge(swipeRightBtn)
+
+    Box(
+        modifier = Modifier
+            .size(width = 58.dp * scale * widthScale, height = 38.dp * scale * heightScale)
+            .clip(shape)
+            .background(
+                if (isAnyVisualActive) {
+                    HudAccent.copy(alpha = 0.26f)
+                } else {
+                    HudSurface.copy(alpha = bgAlpha)
+                }
+            )
+            .border(
+                width = if (isAnyVisualActive) 1.5.dp else 1.dp,
+                color = when {
+                    activeDir != ShoulderSwipeDir.NONE -> HudCyan
+                    latched -> HudCyan
+                    isAnyVisualActive -> HudAccent
+                    else -> Color.White.copy(alpha = borderAlpha)
+                },
+                shape = shape
+            )
+            .then(
+                if (isEditMode) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(
+                        pressMode,
+                        turboHz,
+                        swipeIncludeShoulder,
+                        swipeUpBtn,
+                        swipeDownBtn,
+                        swipeLeftBtn,
+                        swipeRightBtn,
+                        scale
+                    ) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            val pointerId = down.id
+                            val startPos = down.position
+                            val enterThresholdPx = (14.dp * scale.coerceIn(0.85f, 1.25f)).toPx()
+                            val exitThresholdPx = enterThresholdPx * 0.72f
+                            var hasSwipedOut = false
+
+                            fingerDown = true
+                            emitDirection(ShoulderSwipeDir.NONE)
+
+                            if (swipeIncludeShoulder) {
+                                when (pressMode) {
+                                    GamepadButtonPressMode.NORMAL -> emitShoulder(true)
+                                    GamepadButtonPressMode.TOGGLE_HOLD -> {
+                                        latched = !latched
+                                        emitShoulder(latched)
+                                    }
+                                    GamepadButtonPressMode.TURBO -> {}
+                                }
+                            }
+
+                            do {
+                                val event = awaitPointerEvent()
+                                val ch = event.changes.firstOrNull { it.id == pointerId }
+                                if (ch != null && ch.pressed) {
+                                    ch.consume()
+                                    val dx = ch.position.x - startPos.x
+                                    val dy = ch.position.y - startPos.y
+                                    val dist = sqrt(dx * dx + dy * dy)
+                                    val threshold = if (activeDir == ShoulderSwipeDir.NONE) {
+                                        enterThresholdPx
+                                    } else {
+                                        exitThresholdPx
+                                    }
+                                    if (dist >= threshold) {
+                                        hasSwipedOut = true
+                                        val nextDir = if (abs(dx) >= abs(dy)) {
+                                            if (dx > 0f) ShoulderSwipeDir.RIGHT else ShoulderSwipeDir.LEFT
+                                        } else {
+                                            if (dy > 0f) ShoulderSwipeDir.DOWN else ShoulderSwipeDir.UP
+                                        }
+                                        emitDirection(nextDir)
+                                    } else {
+                                        emitDirection(ShoulderSwipeDir.NONE)
+                                    }
+                                }
+                            } while (event.changes.any { it.id == pointerId && it.pressed })
+
+                            fingerDown = false
+                            emitDirection(ShoulderSwipeDir.NONE)
+
+                            if (swipeIncludeShoulder) {
+                                if (pressMode == GamepadButtonPressMode.NORMAL) {
+                                    emitShoulder(false)
+                                }
+                            } else if (!hasSwipedOut) {
+                                when (pressMode) {
+                                    GamepadButtonPressMode.TOGGLE_HOLD -> {
+                                        latched = !latched
+                                        emitShoulder(latched)
+                                    }
+                                    GamepadButtonPressMode.NORMAL, GamepadButtonPressMode.TURBO -> {
+                                        tapPulseSeq++
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (upBadge != null) {
+            Text(
+                text = upBadge,
+                color = if (activeDir == ShoulderSwipeDir.UP) HudCyan else HudMuted.copy(alpha = (opacity * 0.78f).coerceIn(0.25f, 0.9f)),
+                fontSize = (7.5f * scale).sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 1.dp)
+            )
+        }
+        if (downBadge != null) {
+            Text(
+                text = downBadge,
+                color = if (activeDir == ShoulderSwipeDir.DOWN) HudCyan else HudMuted.copy(alpha = (opacity * 0.78f).coerceIn(0.25f, 0.9f)),
+                fontSize = (7.5f * scale).sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 1.dp)
+            )
+        }
+        if (leftBadge != null) {
+            Text(
+                text = leftBadge,
+                color = if (activeDir == ShoulderSwipeDir.LEFT) HudCyan else HudMuted.copy(alpha = (opacity * 0.78f).coerceIn(0.25f, 0.9f)),
+                fontSize = (7.5f * scale).sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 3.dp)
+            )
+        }
+        if (rightBadge != null) {
+            Text(
+                text = rightBadge,
+                color = if (activeDir == ShoulderSwipeDir.RIGHT) HudCyan else HudMuted.copy(alpha = (opacity * 0.78f).coerceIn(0.25f, 0.9f)),
+                fontSize = (7.5f * scale).sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 3.dp)
+            )
+        }
+
+        val activeDirBadge = when (activeDir) {
+            ShoulderSwipeDir.UP -> upBadge
+            ShoulderSwipeDir.DOWN -> downBadge
+            ShoulderSwipeDir.LEFT -> leftBadge
+            ShoulderSwipeDir.RIGHT -> rightBadge
+            ShoulderSwipeDir.NONE -> null
+        }
+        val centerText = when {
+            activeDirBadge != null && swipeIncludeShoulder -> "$label+$activeDirBadge"
+            activeDirBadge != null -> activeDirBadge
+            latched -> "$label •"
+            else -> label
+        }
         Text(
-            text = if (isLatched) "$label •" else label,
+            text = centerText,
             color = when {
-                isLatched -> HudCyan
-                isActive -> HudAccent
+                activeDir != ShoulderSwipeDir.NONE -> HudCyan
+                latched -> HudCyan
+                isShoulderVisualActive -> HudAccent
                 else -> PadBtnText.copy(alpha = opacity.coerceIn(0.25f, 1.0f))
             },
             fontWeight = FontWeight.Bold,
-            fontSize = (12f * scale).sp
+            fontSize = (11.5f * scale).sp
         )
     }
 }

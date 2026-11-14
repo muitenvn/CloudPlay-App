@@ -539,16 +539,21 @@ object GameLibraryRepository {
             val idKey = item.id.lowercase(Locale.ROOT)
             val isCustom = idKey.startsWith("custom_")
             val pid = extractProductId(item.playUrl)
+            // Loại bỏ các mục đồng bộ bị nhiễm link play.xbox.com mà không có ProductId hợp lệ
+            if (!isCustom && pid.isBlank() && item.playUrl.contains("play.xbox.com", ignoreCase = true)) {
+                return
+            }
+            val normalizedPlayUrl = normalizeToClassicGameUrl(item.playUrl, item.title)
             val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
 
-            val trulyFree = isFreeToPlayTitle(item.title, pid, item.playUrl) || (isCustom && item.freeToPlay)
-            val trulyTouch = if (isCustom) item.supportsTouch else isTouchSupportedTitle(pid, item.playUrl)
-            val trulyRecent = if (isCustom) false else isRecentlyAddedTitle(pid, item.playUrl)
-            val trulyPopular = if (isCustom) false else isPopularTitle(pid, item.playUrl)
+            val trulyFree = isFreeToPlayTitle(item.title, pid, normalizedPlayUrl) || (isCustom && item.freeToPlay)
+            val trulyTouch = if (isCustom) item.supportsTouch else isTouchSupportedTitle(pid, normalizedPlayUrl)
+            val trulyRecent = if (isCustom) false else isRecentlyAddedTitle(pid, normalizedPlayUrl)
+            val trulyPopular = if (isCustom) false else isPopularTitle(pid, normalizedPlayUrl)
             val (resolvedCatVi, resolvedCatEn) = if (isCustom) {
                 item.category to item.categoryEn
             } else {
@@ -558,6 +563,7 @@ object GameLibraryRepository {
             val finalId = if (isFortnite) "fortnite" else item.id
             val finalItem = if (
                 item.id != finalId ||
+                item.playUrl != normalizedPlayUrl ||
                 item.drawableResId != null ||
                 item.freeToPlay != trulyFree ||
                 item.supportsTouch != trulyTouch ||
@@ -568,6 +574,7 @@ object GameLibraryRepository {
             ) {
                 item.copy(
                     id = finalId,
+                    playUrl = normalizedPlayUrl,
                     drawableResId = null,
                     freeToPlay = trulyFree,
                     supportsTouch = trulyTouch,
@@ -619,33 +626,39 @@ object GameLibraryRepository {
         )
     }
 
+    private fun isLikelyStoreProductId(seg: String): Boolean {
+        val candidate = seg.trim().uppercase(Locale.ROOT)
+        if (candidate.length == 12 && candidate.all { it.isLetterOrDigit() } && candidate.any { it.isDigit() }) {
+            return true
+        }
+        return candidate.length in 10..14 &&
+            candidate.all { it.isLetterOrDigit() } &&
+            candidate.count { it.isDigit() } >= 2
+    }
+
     fun extractProductId(url: String?): String {
         if (url.isNullOrBlank()) return ""
         val clean = url.substringBefore("?").substringBefore("#").trimEnd('/')
-        // Hỗ trợ cả Giao diện mới (play.xbox.com/products/<productId>/<slug>)
-        val afterProducts = clean.substringAfter("/products/", "").trim('/')
-        if (afterProducts.isNotBlank()) {
-            val firstSeg = afterProducts.substringBefore("/").uppercase(Locale.ROOT)
-            if (firstSeg.length in 10..14 && firstSeg.all { it.isLetterOrDigit() }) {
-                return firstSeg
-            }
-        }
-        val afterGames = clean.substringAfter("/play/games/", "")
+        val afterRoute = clean.substringAfter("/products/", "")
+            .ifBlank { clean.substringAfter("/play/games/", "") }
             .ifBlank { clean.substringAfter("/play/launch/", "") }
             .ifBlank { clean.substringAfter("/games/", "") }
             .ifBlank { clean.substringAfter("/launch/", "") }
             .trim('/')
-        if (afterGames.isBlank()) return ""
-        val segments = afterGames.split("/").filter { it.isNotBlank() }
+        if (afterRoute.isBlank()) return ""
+        val segments = afterRoute.split("/").filter { it.isNotBlank() }
+        // Ưu tiên chuẩn BigId 12 ký tự chữ + số của Microsoft Store ở bất kỳ vị trí nào sau route
         for (seg in segments.asReversed()) {
             val candidate = seg.uppercase(Locale.ROOT)
             if (candidate.length == 12 && candidate.all { it.isLetterOrDigit() } && candidate.any { it.isDigit() }) {
                 return candidate
             }
         }
-        val lastSeg = segments.lastOrNull()?.uppercase(Locale.ROOT).orEmpty()
-        if (lastSeg.length in 10..14 && lastSeg.all { it.isLetterOrDigit() } && lastSeg.any { it.isDigit() }) {
-            return lastSeg
+        for (seg in segments.asReversed()) {
+            val candidate = seg.uppercase(Locale.ROOT)
+            if (isLikelyStoreProductId(candidate)) {
+                return candidate
+            }
         }
         return ""
     }
@@ -653,23 +666,131 @@ object GameLibraryRepository {
     fun extractSlug(url: String?): String {
         if (url.isNullOrBlank()) return ""
         val clean = url.substringBefore("?").substringBefore("#").trimEnd('/')
-        val afterProducts = clean.substringAfter("/products/", "").trim('/')
-        if (afterProducts.isNotBlank()) {
-            val secondSeg = afterProducts.substringAfter("/", "").substringBefore("/").lowercase(Locale.ROOT).trim()
-            if (secondSeg.isNotBlank()) return secondSeg
-        }
-        val afterGames = clean.substringAfter("/play/games/", "")
+        val afterRoute = clean.substringAfter("/products/", "")
+            .ifBlank { clean.substringAfter("/play/games/", "") }
             .ifBlank { clean.substringAfter("/play/launch/", "") }
             .ifBlank { clean.substringAfter("/games/", "") }
             .ifBlank { clean.substringAfter("/launch/", "") }
             .trim('/')
-        if (afterGames.isBlank()) return ""
-        val firstSeg = afterGames.substringBefore("/").lowercase(Locale.ROOT).trim()
-        // Nếu segment đầu tiên là ProductId 12 ký tự (ví dụ /launch/BT5P2X999VH2) thì không coi là slug
-        if (firstSeg.length == 12 && firstSeg.all { it.isLetterOrDigit() } && firstSeg.any { it.isDigit() }) {
-            return ""
+        if (afterRoute.isBlank()) return ""
+        val segments = afterRoute.split("/").filter { it.isNotBlank() }
+        for (seg in segments) {
+            val trimmed = seg.trim()
+            if (trimmed.isBlank()) continue
+            if (isLikelyStoreProductId(trimmed)) continue
+            if (trimmed.length == 5 && trimmed[2] == '-') continue
+            return trimmed.lowercase(Locale.ROOT)
         }
-        return firstSeg
+        return ""
+    }
+
+    /**
+     * Chuẩn hóa mọi đường dẫn game (kể cả link play.xbox.com/products/...) về định dạng Giao diện cũ chuẩn:
+     * https://www.xbox.com/en-US/play/games/<slug>/<productId>
+     */
+    fun normalizeToClassicGameUrl(rawUrl: String, fallbackTitle: String? = null, locale: String = "en-US"): String {
+        val trimmed = rawUrl.trim()
+        if (trimmed.isBlank()) return trimmed
+        val pid = extractProductId(trimmed)
+        val rawSlug = extractSlug(trimmed)
+        val cleanedTitle = fallbackTitle
+            ?.replace(XBOX_CLOUD_SUFFIX_REGEX, "")
+            ?.replace(XBOX_PIPE_SUFFIX_REGEX, "")
+            ?.replace(XBOX_BULLET_SUFFIX_REGEX, "")
+            ?.trim()
+            .orEmpty()
+        if (pid.isNotBlank()) {
+            val isFortnite = pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+            val resolvedSlug = when {
+                isFortnite -> "fortnite"
+                rawSlug.isNotBlank() -> rawSlug
+                cleanedTitle.isNotBlank() -> slugifyTitle(cleanedTitle)
+                else -> {
+                    _games.value.firstOrNull {
+                        extractProductId(it.playUrl).equals(pid, ignoreCase = true)
+                    }?.let { extractSlug(it.playUrl).ifBlank { slugifyTitle(it.title) } }
+                        .orEmpty()
+                        .ifBlank { "xbox-game" }
+                }
+            }
+            return "https://www.xbox.com/$locale/play/games/$resolvedSlug/$pid"
+        }
+        // Nếu URL thiếu ProductId (ví dụ play.xbox.com/products/<slug>), tra cứu trong kho game đã đồng bộ
+        val matched = _games.value.firstOrNull { item ->
+            val itemSlug = extractSlug(item.playUrl)
+            (rawSlug.length > 2 && (itemSlug.equals(rawSlug, ignoreCase = true) || slugifyTitle(item.title).equals(rawSlug, ignoreCase = true))) ||
+                (cleanedTitle.length > 2 && item.title.equals(cleanedTitle, ignoreCase = true))
+        }
+        if (matched != null) {
+            val matchedPid = extractProductId(matched.playUrl)
+            val matchedSlug = extractSlug(matched.playUrl).ifBlank { slugifyTitle(matched.title) }
+            if (matchedPid.isNotBlank()) {
+                return "https://www.xbox.com/$locale/play/games/$matchedSlug/$matchedPid"
+            }
+        }
+        return trimmed
+    }
+
+    /**
+     * Phân giải URL hoặc tên game đang mở trên giao diện mới (play.xbox.com) sang URL chi tiết game ở Giao diện cũ (www.xbox.com/<locale>/play/games/<slug>/<productId>).
+     * Trả về null nếu không xác định được game cụ thể nào.
+     */
+    fun resolveClassicGameUrl(rawUrl: String?, fallbackTitle: String? = null, locale: String = "en-US"): String? {
+        val cleanUrl = rawUrl?.trim().orEmpty()
+        val pid = extractProductId(cleanUrl)
+        val rawSlug = extractSlug(cleanUrl)
+        val cleanedTitle = fallbackTitle
+            ?.replace(XBOX_CLOUD_SUFFIX_REGEX, "")
+            ?.replace(XBOX_PIPE_SUFFIX_REGEX, "")
+            ?.replace(XBOX_BULLET_SUFFIX_REGEX, "")
+            ?.trim()
+            ?.takeIf {
+                it.isNotBlank() &&
+                    !it.equals("Xbox Cloud Gaming", ignoreCase = true) &&
+                    !it.equals("Xbox Cloud Game", ignoreCase = true) &&
+                    !it.equals("Xbox Game", ignoreCase = true) &&
+                    !it.equals("Xbox", ignoreCase = true)
+            }
+            .orEmpty()
+
+        if (pid.isNotBlank()) {
+            val isFortnite = pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
+            val resolvedSlug = when {
+                isFortnite -> "fortnite"
+                rawSlug.isNotBlank() -> rawSlug
+                cleanedTitle.isNotBlank() -> slugifyTitle(cleanedTitle)
+                else -> {
+                    _games.value.firstOrNull {
+                        extractProductId(it.playUrl).equals(pid, ignoreCase = true)
+                    }?.let { extractSlug(it.playUrl).ifBlank { slugifyTitle(it.title) } }
+                        .orEmpty()
+                        .ifBlank { "xbox-game" }
+                }
+            }
+            return "https://www.xbox.com/$locale/play/games/$resolvedSlug/$pid"
+        }
+
+        if (rawSlug.length > 2 || cleanedTitle.length > 2) {
+            val matched = _games.value.firstOrNull { item ->
+                val itemSlug = extractSlug(item.playUrl)
+                val titleSlug = slugifyTitle(item.title)
+                (rawSlug.length > 2 && (itemSlug.equals(rawSlug, ignoreCase = true) || titleSlug.equals(rawSlug, ignoreCase = true))) ||
+                    (cleanedTitle.length > 2 && item.title.equals(cleanedTitle, ignoreCase = true))
+            } ?: _games.value.firstOrNull { item ->
+                val itemSlug = extractSlug(item.playUrl)
+                val titleSlug = slugifyTitle(item.title)
+                (rawSlug.length > 3 && (itemSlug.contains(rawSlug, ignoreCase = true) || rawSlug.contains(itemSlug, ignoreCase = true) || titleSlug.contains(rawSlug, ignoreCase = true))) ||
+                    (cleanedTitle.length > 3 && (item.title.contains(cleanedTitle, ignoreCase = true) || cleanedTitle.contains(item.title, ignoreCase = true)))
+            }
+            if (matched != null) {
+                val matchedPid = extractProductId(matched.playUrl)
+                val matchedSlug = extractSlug(matched.playUrl).ifBlank { slugifyTitle(matched.title) }
+                if (matchedPid.isNotBlank()) {
+                    return "https://www.xbox.com/$locale/play/games/$matchedSlug/$matchedPid"
+                }
+            }
+        }
+        return null
     }
 
     private fun slugifyTitle(title: String): String {
@@ -837,7 +958,8 @@ object GameLibraryRepository {
         val isXboxGameUrl = cleanUrl.contains("/play/games/", ignoreCase = true) ||
             cleanUrl.contains("/play/launch/", ignoreCase = true) ||
             cleanUrl.contains("/products/", ignoreCase = true) ||
-            cleanUrl.contains("play.xbox.com", ignoreCase = true)
+            cleanUrl.contains("/games/", ignoreCase = true) ||
+            cleanUrl.contains("/launch/", ignoreCase = true)
 
         val cleanedTitle = rawTitle
             ?.replace(XBOX_CLOUD_SUFFIX_REGEX, "")
@@ -868,6 +990,10 @@ object GameLibraryRepository {
 
         if (matched != null) {
             var updatedItem = matched
+            val normalizedMatchedUrl = normalizeToClassicGameUrl(matched.playUrl, matched.title)
+            if (normalizedMatchedUrl != matched.playUrl) {
+                updatedItem = updatedItem.copy(playUrl = normalizedMatchedUrl)
+            }
             if (validImg != null && matched.imageUrl.isNullOrBlank()) {
                 updatedItem = updatedItem.copy(imageUrl = validImg)
             }
@@ -889,17 +1015,12 @@ object GameLibraryRepository {
         }
 
         if (!isXboxGameUrl && !hasValidTitle) return null
-        if (productId.isBlank() && slug.isBlank() && !hasValidTitle) return null
+        if (productId.isBlank()) return null
 
         val resolvedTitle = if (hasValidTitle) cleanedTitle else formatSlugToTitle(slug)
         val resolvedSlug = if (slug.isNotBlank()) slug else slugifyTitle(resolvedTitle)
-        val canonicalPlayUrl = if (productId.isNotBlank()) {
-            "https://www.xbox.com/en-US/play/games/$resolvedSlug/$productId"
-        } else if (isXboxGameUrl) {
-            cleanUrl.replace("/play/launch/", "/play/games/").substringBefore("?")
-        } else {
-            return null
-        }
+        // Luôn lưu link Giao diện cũ (www.xbox.com/en-US/play/games/...) vào Thư viện, tuyệt đối không lưu link play.xbox.com
+        val canonicalPlayUrl = "https://www.xbox.com/en-US/play/games/$resolvedSlug/$productId"
 
         val newId = if (productId.isNotBlank()) {
             "xbox_${productId.lowercase(Locale.ROOT)}"
@@ -1169,18 +1290,15 @@ object GameLibraryRepository {
                             )
                             changed = true
                         }
-                    } else if (rawImg != null || pid.isNotBlank()) {
+                    } else if (pid.isNotBlank()) {
                         val cleanTitle = rawTitle
                             .replace(XBOX_BULLET_SUFFIX_REGEX, "")
                             .trim()
                             .ifBlank { formatSlugToTitle(slug) }
                         if (cleanTitle.equals("Xbox Cloud Game", ignoreCase = true)) continue
-                        val canonicalUrl = if (pid.isNotBlank()) {
-                            "https://www.xbox.com/en-US/play/games/${slug.ifBlank { slugifyTitle(cleanTitle) }}/$pid"
-                        } else {
-                            rawUrl.replace("/play/launch/", "/play/games/").substringBefore("?")
-                        }
-                        val id = if (pid.isNotBlank()) "xbox_${pid.lowercase(Locale.ROOT)}" else "xbox_${slug.replace("-", "_")}"
+                        // Luôn lưu link Giao diện cũ (www.xbox.com/en-US/play/games/...) vào Thư viện
+                        val canonicalUrl = "https://www.xbox.com/en-US/play/games/${slug.ifBlank { slugifyTitle(cleanTitle) }}/$pid"
+                        val id = "xbox_${pid.lowercase(Locale.ROOT)}"
                         if (currentList.any { it.id == id }) continue
                         val accent = ACCENT_PALETTE[(cleanTitle.hashCode() and 0x7FFFFFFF) % ACCENT_PALETTE.size]
                         val isFree = webFreeFlag || isFreeToPlayTitle(cleanTitle, pid, canonicalUrl)
@@ -1956,11 +2074,15 @@ object GameLibraryRepository {
             for (i in 0 until arr.length()) {
                 val obj = arr.optJSONObject(i) ?: continue
                 val title = obj.optString("title", "").trim()
-                val playUrl = obj.optString("playUrl", "").trim()
-                if (title.isBlank() || playUrl.isBlank()) continue
+                val rawPlayUrl = obj.optString("playUrl", "").trim()
+                if (title.isBlank() || rawPlayUrl.isBlank()) continue
                 val id = obj.optString("id", "custom_$i")
                 val isCustom = id.startsWith("custom_")
-                val pid = extractProductId(playUrl)
+                val pid = extractProductId(rawPlayUrl)
+                if (!isCustom && pid.isBlank() && rawPlayUrl.contains("play.xbox.com", ignoreCase = true)) {
+                    continue
+                }
+                val playUrl = normalizeToClassicGameUrl(rawPlayUrl, title)
                 val isFortnite = id == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true) || title.equals("Fortnite", ignoreCase = true)
                 val rawCat = obj.optString("category", "Hành động & Phiêu lưu")
                 val rawCatEn = obj.optString("categoryEn", rawCat)
@@ -2098,14 +2220,15 @@ object GameLibraryRepository {
     fun addCustomGame(title: String, url: String) {
         if (title.isBlank() || url.isBlank()) return
         val pid = extractProductId(url)
+        val normalizedUrl = normalizeToClassicGameUrl(url.trim(), title.trim())
         val newGame = GameBookmark(
             id = "custom_${System.currentTimeMillis()}",
             title = title.trim(),
             category = "Game tùy chỉnh",
             categoryEn = "Custom Game",
-            playUrl = url.trim(),
-            freeToPlay = isFreeToPlayTitle(title, pid, url),
-            supportsTouch = isTouchSupportedTitle(pid, url),
+            playUrl = normalizedUrl,
+            freeToPlay = isFreeToPlayTitle(title, pid, normalizedUrl),
+            supportsTouch = isTouchSupportedTitle(pid, normalizedUrl),
             accentColorHex = 0xFF00E676,
             badge = "Tự thêm",
             badgeEn = "Custom",

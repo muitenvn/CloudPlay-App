@@ -108,6 +108,7 @@ fun CloudBrowserScreen(
             old.isGameActive == new.isGameActive &&
                 old.isStreamConnected == new.isStreamConnected &&
                 old.gameTitle == new.gameTitle &&
+                old.currentUrl == new.currentUrl &&
                 old.shortcutVirtualPadOverrideTick == new.shortcutVirtualPadOverrideTick &&
                 old.shortcutToggleRecordingTick == new.shortcutToggleRecordingTick
         }
@@ -140,7 +141,28 @@ fun CloudBrowserScreen(
     var exitPreviewArmedAtMs by remember { mutableStateOf(0L) }
     var exitPreviewOptOutStartedAtMs by remember { mutableStateOf(0L) }
     var exitPreviewSavedGameUrl by remember { mutableStateOf("") }
+    var exitPreviewSavedGameTitle by remember { mutableStateOf("") }
+    var lastVisitedGameUrl by remember(initialUrl) {
+        mutableStateOf(
+            if (initialUrl.contains("/play/games/", ignoreCase = true) ||
+                initialUrl.contains("/products/", ignoreCase = true) ||
+                initialUrl.contains("/games/", ignoreCase = true) ||
+                initialUrl.contains("/launch/", ignoreCase = true)
+            ) initialUrl else ""
+        )
+    }
     var suppressLoadingOverlayAfterExitPreview by remember { mutableStateOf(false) }
+
+    LaunchedEffect(streamUiState.currentUrl) {
+        val u = streamUiState.currentUrl
+        if (u.contains("/play/games/", ignoreCase = true) ||
+            u.contains("/products/", ignoreCase = true) ||
+            u.contains("/games/", ignoreCase = true) ||
+            u.contains("/launch/", ignoreCase = true)
+        ) {
+            lastVisitedGameUrl = u
+        }
+    }
 
     DisposableEffect(showQuickSettingsDialog, showTranslatorDialog) {
         com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi =
@@ -294,6 +316,9 @@ fun CloudBrowserScreen(
                     "Xbox tự chuyển hướng máy chủ/JS (www.xbox.com -> play.xbox.com dù setting=CLASSIC; sự kiện=$callbackSource)"
                 }
                 oldHost == "play.xbox.com" && newHost in listOf("www.xbox.com", "xbox.com") -> {
+                    if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+                        SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
+                    }
                     "Chuyển từ play.xbox.com về www.xbox.com (${appReason ?: "Xbox Exit preview / chuyển hướng"}; sự kiện=$callbackSource)"
                 }
                 appReason != null -> {
@@ -335,8 +360,10 @@ fun CloudBrowserScreen(
             val isLaunchUrl = targetUrl.contains("/play/launch/", ignoreCase = true) ||
                 targetUrl.contains("/launch/", ignoreCase = true)
             val isGameInfoUrl = targetUrl.contains("/play/games/", ignoreCase = true) ||
-                targetUrl.contains("/products/", ignoreCase = true)
+                targetUrl.contains("/products/", ignoreCase = true) ||
+                targetUrl.contains("/games/", ignoreCase = true)
             if (isLaunchUrl || isGameInfoUrl) {
+                lastVisitedGameUrl = targetUrl
                 com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
                     rawTitle = webViewInstance?.title,
                     rawUrl = targetUrl,
@@ -394,36 +421,72 @@ fun CloudBrowserScreen(
         }
 
         val curUrl = webViewInstance?.url ?: currentMainFrameUrl
-        val convertedFromSaved = SettingsRepository.formatXboxUrlWithLocale(
+        val liveStreamUrl = streamController.uiState.value.currentUrl
+        val bestTitleHint = exitPreviewSavedGameTitle
+            .ifBlank { streamController.uiState.value.gameTitle.orEmpty() }
+            .ifBlank { webViewInstance?.title.orEmpty() }
+
+        val candidateUrls = listOf(
             exitPreviewSavedGameUrl,
-            effectiveLocale,
-            com.example.data.XboxWebUiMode.CLASSIC
-        )
-        val convertedFromCur = SettingsRepository.formatXboxUrlWithLocale(
+            lastVisitedGameUrl,
+            liveStreamUrl,
             curUrl,
-            effectiveLocale,
-            com.example.data.XboxWebUiMode.CLASSIC
-        )
-        val convertedFromLast = SettingsRepository.formatXboxUrlWithLocale(
             lastXboxUrl,
-            effectiveLocale,
-            com.example.data.XboxWebUiMode.CLASSIC
+            initialUrl
         )
-        val convertedFromInit = SettingsRepository.formatXboxUrlWithLocale(
-            initialUrl,
-            effectiveLocale,
-            com.example.data.XboxWebUiMode.CLASSIC
-        )
-        // Mở thẳng trang chi tiết game (/play/games/...) ở Giao diện cũ sau khi opt-out
-        // để giữ vững Classic UI không bị router Xbox đẩy ngược về play.xbox.com
-        val targetClassicUrl = when {
-            convertedFromSaved.contains("/play/games/", ignoreCase = true) -> convertedFromSaved
-            convertedFromCur.contains("/play/games/", ignoreCase = true) -> convertedFromCur
-            convertedFromLast.contains("/play/games/", ignoreCase = true) -> convertedFromLast
-            convertedFromInit.contains("/play/games/", ignoreCase = true) -> convertedFromInit
-            else -> "https://www.xbox.com/$effectiveLocale/play/games/fortnite/BT5P2X999VH2"
+        var resolvedGameClassicUrl: String? = null
+        for (candidate in candidateUrls) {
+            if (candidate.isBlank()) continue
+            val directResolved = com.example.data.GameLibraryRepository.resolveClassicGameUrl(
+                rawUrl = candidate,
+                fallbackTitle = bestTitleHint,
+                locale = effectiveLocale
+            )
+            if (directResolved != null && directResolved.contains("/play/games/", ignoreCase = true)) {
+                resolvedGameClassicUrl = directResolved
+                break
+            }
+            val formatted = SettingsRepository.formatXboxUrlWithLocale(
+                candidate,
+                effectiveLocale,
+                com.example.data.XboxWebUiMode.CLASSIC
+            )
+            if (formatted.contains("/play/games/", ignoreCase = true)) {
+                resolvedGameClassicUrl = formatted
+                break
+            }
         }
+        if (resolvedGameClassicUrl == null && bestTitleHint.isNotBlank()) {
+            resolvedGameClassicUrl = com.example.data.GameLibraryRepository.resolveClassicGameUrl(
+                rawUrl = "",
+                fallbackTitle = bestTitleHint,
+                locale = effectiveLocale
+            )
+        }
+        if (resolvedGameClassicUrl == null) {
+            val lastPlayedId = com.example.data.GameLibraryRepository.lastPlayedId.value
+            val lastPlayedBookmark = if (!lastPlayedId.isNullOrBlank()) {
+                com.example.data.GameLibraryRepository.games.value.firstOrNull {
+                    it.id.equals(lastPlayedId, ignoreCase = true)
+                }
+            } else null
+            if (lastPlayedBookmark != null) {
+                val formattedLastPlayed = SettingsRepository.formatXboxUrlWithLocale(
+                    lastPlayedBookmark.playUrl,
+                    effectiveLocale,
+                    com.example.data.XboxWebUiMode.CLASSIC
+                )
+                if (formattedLastPlayed.contains("/play/games/", ignoreCase = true)) {
+                    resolvedGameClassicUrl = formattedLastPlayed
+                }
+            }
+        }
+
+        // Mở thẳng đúng trang chi tiết của tựa game người dùng đang xem ở Giao diện cũ sau khi opt-out
+        val targetClassicUrl = resolvedGameClassicUrl
+            ?: "https://www.xbox.com/$effectiveLocale/play/games/fortnite/BT5P2X999VH2"
         exitPreviewSavedGameUrl = ""
+        exitPreviewSavedGameTitle = ""
 
         com.example.data.AppLogger.info(
             "WEB-UI",
@@ -859,33 +922,52 @@ fun CloudBrowserScreen(
                     // Add JavaScript bridge for stream / launch detection & smart translation
                     val bridge = XboxBridge(streamController)
                     bridge.setWebView(this)
-                    bridge.setExitPreviewSignalListener { sig ->
+                    bridge.setExitPreviewSignalListener { rawSig ->
                         if (!SettingsRepository.config.value.autoExitPreviewHandlerEnabled) return@setExitPreviewSignalListener
                         val nowElapsed = android.os.SystemClock.elapsedRealtime()
                         val curWebUrl = this.url ?: currentMainFrameUrl
+                        val sig = rawSig.substringBefore("|").trim().uppercase()
+                        val payload = rawSig.substringAfter("|", "")
+                        val payloadUrl = payload.substringBefore("||").trim()
+                        val payloadTitle = payload.substringAfter("||", "").trim()
+
+                        fun captureActiveGameContext() {
+                            if (payloadUrl.isNotBlank()) {
+                                exitPreviewSavedGameUrl = payloadUrl
+                                lastVisitedGameUrl = payloadUrl
+                            } else if (curWebUrl.contains("/products/", ignoreCase = true) ||
+                                curWebUrl.contains("/play/games/", ignoreCase = true) ||
+                                curWebUrl.contains("/games/", ignoreCase = true)
+                            ) {
+                                exitPreviewSavedGameUrl = curWebUrl
+                                lastVisitedGameUrl = curWebUrl
+                            } else if (lastVisitedGameUrl.isNotBlank()) {
+                                exitPreviewSavedGameUrl = lastVisitedGameUrl
+                            } else if (lastXboxUrl.contains("/products/", ignoreCase = true) ||
+                                lastXboxUrl.contains("/play/games/", ignoreCase = true)
+                            ) {
+                                exitPreviewSavedGameUrl = lastXboxUrl
+                            }
+                            if (payloadTitle.isNotBlank()) {
+                                exitPreviewSavedGameTitle = payloadTitle
+                            }
+                        }
+
                         when (sig) {
                             "EXIT_PREVIEW_ARMED" -> {
                                 exitPreviewArmedAtMs = nowElapsed
                                 exitPreviewOptOutStartedAtMs = 0L
-                                if (curWebUrl.contains("/products/", ignoreCase = true) || curWebUrl.contains("/play/games/", ignoreCase = true)) {
-                                    exitPreviewSavedGameUrl = curWebUrl
-                                } else if (lastXboxUrl.contains("/products/", ignoreCase = true) || lastXboxUrl.contains("/play/games/", ignoreCase = true)) {
-                                    exitPreviewSavedGameUrl = lastXboxUrl
-                                }
+                                captureActiveGameContext()
                                 com.example.data.AppLogger.info(
                                     "WEB-UI",
-                                    "Người dùng bấm Thoát xem trước (Exit preview) trên play.xbox.com -> chờ đóng hộp thoại & hoàn tất opt-out (savedGame=${com.example.data.AppLogger.safeUrlHostPath(exitPreviewSavedGameUrl)})"
+                                    "Người dùng bấm Thoát khỏi chế độ xem trước (Exit preview) trên play.xbox.com -> chờ đóng hộp thoại & hoàn tất opt-out (savedGame=${com.example.data.AppLogger.safeUrlHostPath(exitPreviewSavedGameUrl)}, title=$exitPreviewSavedGameTitle)"
                                 )
                             }
                             "EXIT_PREVIEW_OPT_OUT_STARTED" -> {
                                 if (exitPreviewArmedAtMs == 0L) exitPreviewArmedAtMs = nowElapsed
                                 exitPreviewOptOutStartedAtMs = nowElapsed
-                                if (exitPreviewSavedGameUrl.isBlank()) {
-                                    if (curWebUrl.contains("/products/", ignoreCase = true) || curWebUrl.contains("/play/games/", ignoreCase = true)) {
-                                        exitPreviewSavedGameUrl = curWebUrl
-                                    } else if (lastXboxUrl.contains("/products/", ignoreCase = true) || lastXboxUrl.contains("/play/games/", ignoreCase = true)) {
-                                        exitPreviewSavedGameUrl = lastXboxUrl
-                                    }
+                                if (exitPreviewSavedGameUrl.isBlank() || payloadUrl.isNotBlank()) {
+                                    captureActiveGameContext()
                                 }
                                 com.example.data.AppLogger.info(
                                     "WEB-UI",
@@ -893,6 +975,9 @@ fun CloudBrowserScreen(
                                 )
                             }
                             "EXIT_PREVIEW_COMMIT" -> {
+                                if (exitPreviewSavedGameUrl.isBlank() || payloadUrl.isNotBlank()) {
+                                    captureActiveGameContext()
+                                }
                                 commitExitPreviewToClassicUi("EXIT_PREVIEW_COMMIT từ XboxBridge (Giai đoạn 2 Skeleton)")
                             }
                         }
@@ -1500,7 +1585,8 @@ fun CloudBrowserScreen(
                 val target = SettingsRepository.formatXboxUrlWithLocale(
                     rawCur.ifBlank { config.targetRegionUrl },
                     effectiveLocale,
-                    uiMode
+                    uiMode,
+                    allowNewUiForGameLinks = true
                 )
                 pendingAppNavReason = "chuyển nhanh Giao diện web Xbox (${uiMode.name})"
                 com.example.data.AppLogger.info(
@@ -1535,7 +1621,8 @@ fun CloudBrowserScreen(
                     val target = SettingsRepository.formatXboxUrlWithLocale(
                         rawCur,
                         effectiveLocale,
-                        uiMode
+                        uiMode,
+                        allowNewUiForGameLinks = true
                     )
                     pendingAppNavReason = "bấm chọn Giao diện web Xbox trong HUD (${uiMode.name})"
                     com.example.data.AppLogger.info(

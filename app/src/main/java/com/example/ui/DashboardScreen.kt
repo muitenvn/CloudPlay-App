@@ -561,7 +561,15 @@ fun DashboardScreen(
                                             onConnectVpn = { handleConnect() },
                                             onDisconnectVpn = { VpnManager.disconnect(context) },
                                             onSwitchEngine = { VpnManager.setEngine(it) },
-                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
+                                            onLaunchGame = {
+                                                onLaunchUrl(
+                                                    SettingsRepository.formatXboxUrlWithLocale(
+                                                        it,
+                                                        config.getEffectiveLocale(),
+                                                        com.example.data.XboxWebUiMode.CLASSIC
+                                                    )
+                                                )
+                                            },
                                             onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
                                             onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ") },
                                             onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ") },
@@ -580,7 +588,15 @@ fun DashboardScreen(
                                     DashboardTab.LIBRARY -> {
                                         GameLibraryScreen(
                                             games = allGames,
-                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
+                                            onLaunchGame = {
+                                                onLaunchUrl(
+                                                    SettingsRepository.formatXboxUrlWithLocale(
+                                                        it,
+                                                        config.getEffectiveLocale(),
+                                                        com.example.data.XboxWebUiMode.CLASSIC
+                                                    )
+                                                )
+                                            },
                                             focusSearchTrigger = librarySearchFocusTick
                                         )
                                     }

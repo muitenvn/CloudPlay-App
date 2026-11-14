@@ -1290,10 +1290,26 @@ class XboxBridge(
                         }
                     }
 
+                    function rememberActiveGameUrlAndTitle(urlCandidate, titleCandidate) {
+                        try {
+                            const u = (urlCandidate || '').trim();
+                            if (u && (u.indexOf('/products/') !== -1 || u.indexOf('/play/games/') !== -1 || u.indexOf('/games/') !== -1 || u.indexOf('/launch/') !== -1)) {
+                                window.__cpLastActiveGameUrl = u;
+                            }
+                            const t = (titleCandidate || '').trim();
+                            if (t && t.length >= 2 && !/^(xbox|xbox cloud gaming|xbox cloud game|play|chơi|chơi ngay)$/i.test(t)) {
+                                window.__cpLastActiveGameTitle = t;
+                            }
+                        } catch (e) {}
+                    }
+
                     function reportActiveWebGame(overrideUrl, clickedEl, forceLaunchFlag) {
                         const meta = extractActiveGameDomMetadata(overrideUrl, clickedEl, forceLaunchFlag);
                         if (meta) {
+                            rememberActiveGameUrlAndTitle(meta.url, meta.title);
                             notify('onWebGameDetected', JSON.stringify(meta));
+                        } else if (overrideUrl) {
+                            rememberActiveGameUrlAndTitle(overrideUrl, '');
                         }
                     }
 
@@ -1383,9 +1399,11 @@ class XboxBridge(
                     }
 
                     if (location.href.indexOf('/play/launch/') !== -1 || location.href.indexOf('/launch/') !== -1) {
+                        rememberActiveGameUrlAndTitle(location.href, document.title);
                         reportActiveWebGame(location.href, null, true);
                         notify('onGameLaunchInitiated', document.title || 'Xbox Game');
-                    } else if (location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1) {
+                    } else if (location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1 || location.href.indexOf('/games/') !== -1) {
+                        rememberActiveGameUrlAndTitle(location.href, document.title);
                         setTimeout(function() { reportActiveWebGame(location.href, null, false); }, 600);
                     }
 
@@ -1393,10 +1411,13 @@ class XboxBridge(
                         if (location.href !== lastUrl) {
                             const wasInLaunch = lastUrl.indexOf('/play/launch/') !== -1 || lastUrl.indexOf('/launch/') !== -1;
                             const nowInLaunch = location.href.indexOf('/play/launch/') !== -1 || location.href.indexOf('/launch/') !== -1;
-                            const nowInGamePage = location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1;
+                            const nowInGamePage = location.href.indexOf('/play/games/') !== -1 || location.href.indexOf('/products/') !== -1 || location.href.indexOf('/games/') !== -1;
                             lastUrl = location.href;
                             notifiedStreamConnection = false;
                             regionCheckCountForUrl = 0;
+                            if (nowInLaunch || nowInGamePage) {
+                                rememberActiveGameUrlAndTitle(location.href, document.title);
+                            }
                             notify('onUrlChanged', location.href);
                             if (nowInLaunch || nowInGamePage) {
                                 reportActiveWebGame(location.href, null, nowInLaunch);
@@ -1699,6 +1720,23 @@ class XboxBridge(
                         return null;
                     }
 
+                    function getBestExitPreviewGamePayload() {
+                        try {
+                            const cur = location.href || '';
+                            if (cur.indexOf('/products/') !== -1 || cur.indexOf('/play/games/') !== -1 || cur.indexOf('/games/') !== -1 || cur.indexOf('/launch/') !== -1) {
+                                rememberActiveGameUrlAndTitle(cur, document.title);
+                            }
+                            const h1 = document.querySelector('h1');
+                            const domTitle = (h1 && h1.textContent) ? h1.textContent.trim() : '';
+                            if (domTitle && domTitle.length >= 2) {
+                                rememberActiveGameUrlAndTitle('', domTitle);
+                            }
+                        } catch (e) {}
+                        const savedUrl = window.__cpLastActiveGameUrl || '';
+                        const savedTitle = window.__cpLastActiveGameTitle || '';
+                        return savedUrl + '||' + savedTitle;
+                    }
+
                     function commitExitPreviewNow() {
                         if (window.__cpExitPreviewStage === 'COMMITTED') return;
                         window.__cpExitPreviewStage = 'COMMITTED';
@@ -1709,7 +1747,7 @@ class XboxBridge(
                         try {
                             window.stop();
                         } catch (e) {}
-                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_COMMIT');
+                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_COMMIT|' + getBestExitPreviewGamePayload());
                     }
 
                     function startExitPreviewOptOutPhase() {
@@ -1720,7 +1758,7 @@ class XboxBridge(
                         window.__cpExitPreviewSawSpinner = false;
                         window.__cpExitPreviewInFlightFetches = 0;
                         window.__cpExitPreviewCompletedFetches = 0;
-                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_OPT_OUT_STARTED');
+                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_OPT_OUT_STARTED|' + getBestExitPreviewGamePayload());
                     }
 
                     function armExitPreviewModalWatcher() {
@@ -1730,7 +1768,7 @@ class XboxBridge(
                         window.__cpExitPreviewArmedAt = Date.now();
                         window.__cpExitPreviewInFlightFetches = 0;
                         window.__cpExitPreviewCompletedFetches = 0;
-                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_ARMED');
+                        notify('onRegionUnlockSignal', 'EXIT_PREVIEW_ARMED|' + getBestExitPreviewGamePayload());
                         ensureExitPreviewWatcher();
                     }
 
@@ -1872,16 +1910,30 @@ class XboxBridge(
 
                     function checkTargetForExitPreviewRow(target) {
                         if (!target || isGameplayStreamActiveNow() || location.hostname !== 'play.xbox.com' || !window.__autoExitPreviewEnabled) return false;
-                        // Duyệt ngược lên tối đa 9 cấp cha vì nút gạt (switch thumb) bên trong dòng "Thoát xem trước" là thẻ div rỗng không có chữ
+                        // Duyệt ngược lên tối đa 9 cấp cha vì nút gạt (switch thumb) bên trong dòng "Thoát khỏi chế độ xem trước" là thẻ div rỗng không có chữ
                         let node = target;
                         for (let depth = 0; node && node !== document.body && depth < 9; depth++, node = node.parentElement) {
                             const txt = ((node.textContent || '') + ' ' + ((node.getAttribute && node.getAttribute('aria-label')) || '')).trim().toLowerCase();
                             if (txt.length >= 6 && txt.length <= 160) {
+                                const hasPreviewKeyword = txt.includes('xem trước') ||
+                                    txt.includes('xem truoc') ||
+                                    txt.includes('preview');
+                                const hasExitAction = txt.includes('thoát') ||
+                                    txt.includes('thoat') ||
+                                    txt.includes('rời') ||
+                                    txt.includes('roi') ||
+                                    txt.includes('exit') ||
+                                    txt.includes('leave');
                                 if (txt.includes('exit preview') ||
+                                    txt.includes('leave preview') ||
+                                    txt.includes('thoát khỏi chế độ xem trước') ||
+                                    txt.includes('thoat khoi che do xem truoc') ||
+                                    txt.includes('thoát chế độ xem trước') ||
                                     txt.includes('thoát xem trước') ||
                                     txt.includes('thoat xem truoc') ||
-                                    txt.includes('leave preview') ||
-                                    txt.includes('rời bản xem trước')) {
+                                    txt.includes('rời khỏi bản xem trước') ||
+                                    txt.includes('rời bản xem trước') ||
+                                    (hasPreviewKeyword && hasExitAction)) {
                                     return true;
                                 }
                             }
@@ -3304,11 +3356,12 @@ class XboxBridge(
     @JavascriptInterface
     fun onRegionUnlockSignal(signal: String?) {
         if (!isCallerTrusted()) return
-        val cleanSignal = signal?.trim()?.uppercase() ?: return
+        val rawTrimmed = signal?.trim() ?: return
+        val cleanSignal = rawTrimmed.substringBefore("|").trim().uppercase()
         if (cleanSignal.startsWith("EXIT_PREVIEW_")) {
-            Log.d(TAG, "Exit preview signal: $cleanSignal")
+            Log.d(TAG, "Exit preview signal: $rawTrimmed")
             scope.launch(Dispatchers.Main) {
-                exitPreviewSignalListener?.invoke(cleanSignal)
+                exitPreviewSignalListener?.invoke(rawTrimmed)
             }
             return
         }

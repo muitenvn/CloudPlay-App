@@ -274,7 +274,8 @@ fun TvDashboardScreen(
                                                     onLaunchUrl(
                                                         SettingsRepository.formatXboxUrlWithLocale(
                                                             rawUrl,
-                                                            config.getEffectiveLocale()
+                                                            config.getEffectiveLocale(),
+                                                            com.example.data.XboxWebUiMode.CLASSIC
                                                         )
                                                     )
                                                 },
@@ -302,7 +303,8 @@ fun TvDashboardScreen(
                                                     onLaunchUrl(
                                                         SettingsRepository.formatXboxUrlWithLocale(
                                                             rawUrl,
-                                                            config.getEffectiveLocale()
+                                                            config.getEffectiveLocale(),
+                                                            com.example.data.XboxWebUiMode.CLASSIC
                                                         )
                                                     )
                                                 }

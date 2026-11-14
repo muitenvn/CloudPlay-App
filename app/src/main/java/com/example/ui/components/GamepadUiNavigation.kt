@@ -65,6 +65,8 @@ object GamepadUiNavigation {
     var activeAnalogDirection by mutableStateOf<FocusDirection?>(null)
         private set
 
+    var activeHorizontalStepper: ((Int) -> Unit)? = null
+
     private var hatOrStickDirection: FocusDirection? = null
     private var lastKeyDownCode: Int = KeyEvent.KEYCODE_UNKNOWN
     private var lastKeyDownTimeMs: Long = 0L
@@ -225,6 +227,11 @@ fun GamepadSurfaceController(
 
     fun stepFocus(direction: FocusDirection) {
         GamepadUiNavigation.onGamepadInteraction()
+        val horizontalStepper = GamepadUiNavigation.activeHorizontalStepper
+        if (horizontalStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
+            horizontalStepper(if (direction == FocusDirection.Left) -1 else 1)
+            return
+        }
         val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
         if (!moved) {
             runCatching { currentDefaultRequester?.requestFocus() }
@@ -354,6 +361,14 @@ fun Modifier.gamepadClickable(
     val currentOnFocused by rememberUpdatedState(onFocused)
     val interactionSource = remember { MutableInteractionSource() }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isFocused && currentOnStepHorizontal != null) {
+                GamepadUiNavigation.activeHorizontalStepper = null
+            }
+        }
+    }
+
     this
         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
         .onFocusChanged { state ->
@@ -361,8 +376,18 @@ fun Modifier.gamepadClickable(
             if (isFocused != next) {
                 isFocused = next
                 if (next) {
+                    if (currentOnStepHorizontal != null) {
+                        GamepadUiNavigation.activeHorizontalStepper = { dir ->
+                            currentOnStepHorizontal?.invoke(dir)
+                        }
+                    } else {
+                        GamepadUiNavigation.activeHorizontalStepper = null
+                    }
                     currentOnFocused?.invoke()
                 } else {
+                    if (currentOnStepHorizontal != null) {
+                        GamepadUiNavigation.activeHorizontalStepper = null
+                    }
                     aButtonDown = false
                 }
             }
@@ -386,19 +411,6 @@ fun Modifier.gamepadClickable(
                     return@onKeyEvent true
                 } else if (keyEvent.type == KeyEventType.KeyUp) {
                     aButtonDown = false
-                    return@onKeyEvent true
-                }
-            }
-
-            val stepHandler = currentOnStepHorizontal
-            if (stepHandler != null && keyEvent.type == KeyEventType.KeyDown) {
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-                    GamepadUiNavigation.onGamepadInteraction()
-                    stepHandler(-1)
-                    return@onKeyEvent true
-                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                    GamepadUiNavigation.onGamepadInteraction()
-                    stepHandler(1)
                     return@onKeyEvent true
                 }
             }

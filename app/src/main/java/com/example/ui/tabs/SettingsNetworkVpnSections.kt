@@ -45,10 +45,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.focusProperties
 import com.example.data.AppConfig
 import com.example.data.AppLanguage
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
@@ -121,7 +124,7 @@ internal fun SettingsNetworkVpnSection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .border(1.dp, if (isSelected) XboxNeonGreen else XboxCardBorder, RoundedCornerShape(10.dp))
-                        .clickable { VpnManager.setEngine(engine) },
+                        .gamepadClickable(cornerRadius = 10.dp) { VpnManager.setEngine(engine) },
                     color = if (isSelected) XboxSurfaceVariant else Color.Transparent
                 ) {
                     Row(
@@ -220,7 +223,9 @@ internal fun SettingsLanguageBasicSection(
                                     if (isSelected) DirectCyan else XboxCardBorder.copy(alpha = 0.6f),
                                     RoundedCornerShape(8.dp)
                                 )
-                                .clickable { SettingsRepository.updateTranslateLanguage(code) }
+                                .gamepadClickable(cornerRadius = 8.dp) {
+                                    SettingsRepository.updateTranslateLanguage(code)
+                                }
                                 .testTag(tag),
                             color = if (isSelected) DirectCyan.copy(alpha = 0.16f) else XboxSurfaceVariant.copy(alpha = 0.4f)
                         ) {
@@ -284,7 +289,7 @@ internal fun SettingsLanguageBasicSection(
                                     if (isSelected) XboxNeonGreen else XboxCardBorder,
                                     RoundedCornerShape(10.dp)
                                 )
-                                .clickable {
+                                .gamepadClickable(cornerRadius = 10.dp) {
                                     SettingsRepository.updateAppLanguage(lang)
                                     Toast.makeText(
                                         context,
@@ -340,7 +345,7 @@ internal fun SettingsLanguageBasicSection(
                                         if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.7f),
                                         RoundedCornerShape(10.dp)
                                     )
-                                    .clickable {
+                                    .gamepadClickable(cornerRadius = 10.dp) {
                                         SettingsRepository.updateAppLanguage(lang)
                                         Toast.makeText(
                                             context,
@@ -455,7 +460,9 @@ internal fun SettingsAdvancedSection(
                         if (isDefaultEnUs) XboxNeonGreen else XboxCardBorder,
                         RoundedCornerShape(10.dp)
                     )
-                    .clickable { SettingsRepository.resetXboxMarketToDefault() }
+                    .gamepadClickable(cornerRadius = 10.dp) {
+                        SettingsRepository.resetXboxMarketToDefault()
+                    }
                     .testTag("xbox_market_default_en_us_card"),
                 color = if (isDefaultEnUs) XboxSurfaceVariant else Color.Transparent
             ) {
@@ -512,6 +519,9 @@ internal fun SettingsAdvancedSection(
                             onClick = { SettingsRepository.resetXboxMarketToDefault() },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .gamepadActionButton(cornerRadius = 8.dp) {
+                                    SettingsRepository.resetXboxMarketToDefault()
+                                }
                                 .semantics {
                                     contentDescription = if (isEn) "Return to en-US market" else "Quay về thị trường en-US"
                                 }
@@ -535,7 +545,9 @@ internal fun SettingsAdvancedSection(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, XboxCardBorder.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                    .clickable { expandManualXboxMarket = !expandManualXboxMarket }
+                    .gamepadClickable(cornerRadius = 8.dp) {
+                        expandManualXboxMarket = !expandManualXboxMarket
+                    }
                     .testTag("toggle_advanced_manual_xbox_market_btn"),
                 color = Color.Black.copy(alpha = 0.25f)
             ) {
@@ -582,7 +594,9 @@ internal fun SettingsAdvancedSection(
                                     if (isSelected) XboxNeonGreen else XboxCardBorder.copy(alpha = 0.5f),
                                     RoundedCornerShape(8.dp)
                                 )
-                                .clickable { SettingsRepository.updateCustomLocale(lang.code) },
+                                .gamepadClickable(cornerRadius = 8.dp) {
+                                    SettingsRepository.updateCustomLocale(lang.code)
+                                },
                             color = if (isSelected) XboxSurfaceVariant else Color.Black.copy(alpha = 0.2f)
                         ) {
                             Row(
@@ -620,6 +634,14 @@ internal fun SettingsAdvancedSection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color.Black.copy(alpha = 0.35f))
+                        .gamepadClickable(
+                            cornerRadius = 10.dp,
+                            onStepHorizontal = { dir ->
+                                val nextSec = (config.autoBypassDelaySeconds + dir).coerceIn(1, 8)
+                                SettingsRepository.updateAutoBypassDelay(nextSec)
+                            },
+                            onClick = {}
+                        )
                         .padding(10.dp)
                 ) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -644,7 +666,8 @@ internal fun SettingsAdvancedSection(
                             thumbColor = DirectCyan,
                             activeTrackColor = DirectCyan,
                             inactiveTrackColor = Color.DarkGray
-                        )
+                        ),
+                        modifier = Modifier.focusProperties { canFocus = false }
                     )
                 }
             }
@@ -708,6 +731,7 @@ internal fun SettingsAdvancedSection(
                 onClick = onOpenAppLog,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .gamepadActionButton(cornerRadius = 10.dp, onClick = onOpenAppLog)
                     .semantics {
                         contentDescription = if (isEn) {
                             "System Activity Log"
@@ -730,44 +754,47 @@ internal fun SettingsAdvancedSection(
                 }
             }
 
-            Button(
-                onClick = {
-                    val reportText = com.example.data.AppLogger.buildDiagnosticReport(
-                        context = context,
-                        config = config,
-                        vpnState = vpnState
+            val copyDiagnosticReportAction = {
+                val reportText = com.example.data.AppLogger.buildDiagnosticReport(
+                    context = context,
+                    config = config,
+                    vpnState = vpnState
+                )
+                try {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                    clipboard?.setPrimaryClip(
+                        android.content.ClipData.newPlainText("CloudPlay Diagnostic Report", reportText)
                     )
-                    try {
-                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                        clipboard?.setPrimaryClip(
-                            android.content.ClipData.newPlainText("CloudPlay Diagnostic Report", reportText)
+                    Toast.makeText(
+                        context,
+                        if (isEn) "Copied diagnostic report to clipboard" else "Đã sao chép báo cáo chẩn đoán vào bộ nhớ tạm",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (_: Exception) {}
+                try {
+                    val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(
+                            android.content.Intent.EXTRA_SUBJECT,
+                            if (isEn) "CloudPlay Diagnostic Report" else "Báo cáo chẩn đoán CloudPlay"
                         )
-                        Toast.makeText(
-                            context,
-                            if (isEn) "Copied diagnostic report to clipboard" else "Đã sao chép báo cáo chẩn đoán vào bộ nhớ tạm",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } catch (_: Exception) {}
-                    try {
-                        val sendIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(
-                                android.content.Intent.EXTRA_SUBJECT,
-                                if (isEn) "CloudPlay Diagnostic Report" else "Báo cáo chẩn đoán CloudPlay"
-                            )
-                            putExtra(android.content.Intent.EXTRA_TEXT, reportText)
-                        }
-                        val chooser = android.content.Intent.createChooser(
-                            sendIntent,
-                            if (isEn) "Share Diagnostic Report" else "Chia sẻ báo cáo chẩn đoán"
-                        ).apply {
-                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(chooser)
-                    } catch (_: Exception) {}
-                },
+                        putExtra(android.content.Intent.EXTRA_TEXT, reportText)
+                    }
+                    val chooser = android.content.Intent.createChooser(
+                        sendIntent,
+                        if (isEn) "Share Diagnostic Report" else "Chia sẻ báo cáo chẩn đoán"
+                    ).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(chooser)
+                } catch (_: Exception) {}
+            }
+
+            Button(
+                onClick = copyDiagnosticReportAction,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .gamepadActionButton(cornerRadius = 10.dp, onClick = copyDiagnosticReportAction)
                     .semantics {
                         contentDescription = if (isEn) {
                             "Copy Diagnostic Report"
@@ -794,6 +821,9 @@ internal fun SettingsAdvancedSection(
                 onClick = { showResetAdvancedConfirmDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .gamepadActionButton(cornerRadius = 10.dp) {
+                        showResetAdvancedConfirmDialog = true
+                    }
                     .semantics {
                         contentDescription = if (isEn) {
                             "Restore Default Advanced Settings"
@@ -851,6 +881,15 @@ internal fun SettingsAdvancedSection(
                         ).show()
                     },
                     modifier = Modifier
+                        .gamepadActionButton(cornerRadius = 8.dp) {
+                            SettingsRepository.resetAdvancedSettingsOnly()
+                            showResetAdvancedConfirmDialog = false
+                            Toast.makeText(
+                                context,
+                                if (isEn) "Restored Advanced settings to default" else "Đã khôi phục mặc định các cài đặt Nâng cao",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                         .semantics {
                             contentDescription = if (isEn) "Confirm restore advanced defaults" else "Xác nhận khôi phục mặc định nâng cao"
                         }
@@ -867,6 +906,9 @@ internal fun SettingsAdvancedSection(
                 TextButton(
                     onClick = { showResetAdvancedConfirmDialog = false },
                     modifier = Modifier
+                        .gamepadActionButton(cornerRadius = 8.dp) {
+                            showResetAdvancedConfirmDialog = false
+                        }
                         .semantics {
                             contentDescription = if (isEn) "Cancel restore advanced defaults" else "Hủy khôi phục mặc định nâng cao"
                         }

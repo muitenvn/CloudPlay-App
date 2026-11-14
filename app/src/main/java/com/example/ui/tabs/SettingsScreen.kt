@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AppConfig
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
@@ -239,7 +241,8 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .clip(RoundedCornerShape(12.dp))
+                            .gamepadClickable(cornerRadius = 12.dp) {
                                 com.example.data.AppLogger.info("UI", "Mở hộp thoại Nhật ký hệ thống")
                                 showAppLogDialog = true
                             }
@@ -284,7 +287,11 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = updateState !is com.example.data.UpdateCheckState.Checking) {
+                            .clip(RoundedCornerShape(12.dp))
+                            .gamepadClickable(
+                                enabled = updateState !is com.example.data.UpdateCheckState.Checking,
+                                cornerRadius = 12.dp
+                            ) {
                                 com.example.data.UpdateChecker.checkNowManual(context)
                             }
                             .padding(horizontal = 14.dp, vertical = 12.dp)
@@ -341,7 +348,8 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { showWebPortalDialog = true }
+                            .clip(RoundedCornerShape(12.dp))
+                            .gamepadClickable(cornerRadius = 12.dp) { showWebPortalDialog = true }
                             .padding(horizontal = 14.dp, vertical = 12.dp)
                             .semantics {
                                 contentDescription = if (isEn) "Open Share and QR code dialog" else "Mở hộp thoại Mã QR và Chia sẻ"
@@ -383,7 +391,8 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { openExternalTermsPage() }
+                            .clip(RoundedCornerShape(12.dp))
+                            .gamepadClickable(cornerRadius = 12.dp) { openExternalTermsPage() }
                             .padding(horizontal = 14.dp, vertical = 12.dp)
                             .semantics {
                                 contentDescription = if (isEn) "View Terms and Privacy Policy" else "Xem điều khoản và quyền riêng tư"
@@ -425,7 +434,8 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onClearCookies() }
+                            .clip(RoundedCornerShape(12.dp))
+                            .gamepadClickable(cornerRadius = 12.dp) { onClearCookies() }
                             .padding(horizontal = 14.dp, vertical = 12.dp)
                             .semantics {
                                 contentDescription = if (isEn) "Sign Out and Clear Login Session" else "Xóa phiên và đăng nhập lại Xbox"
@@ -495,6 +505,9 @@ fun SettingsScreen(
                     onClick = { SettingsRepository.updateUserAcceptedTerms(false) },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .gamepadActionButton(cornerRadius = 10.dp) {
+                            SettingsRepository.updateUserAcceptedTerms(false)
+                        }
                         .semantics {
                             contentDescription = if (isEn) {
                                 "Review or revoke Terms of Use agreement"
@@ -600,6 +613,9 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
+                                .gamepadActionButton(cornerRadius = 12.dp) {
+                                    showResetGamepadConfirmDialog = false
+                                }
                                 .semantics {
                                     contentDescription = if (isEn) "Cancel reset default layout" else "Hủy đặt lại bố cục mặc định"
                                 }
@@ -629,6 +645,15 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
+                                .gamepadActionButton(cornerRadius = 12.dp) {
+                                    SettingsRepository.resetGamepadCustomOffsets()
+                                    showResetGamepadConfirmDialog = false
+                                    Toast.makeText(
+                                        context,
+                                        if (isEn) "Reset default button positions" else "Đã đặt lại vị trí nút mặc định",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                                 .semantics {
                                     contentDescription = if (isEn) "Confirm reset default layout" else "Xác nhận đặt lại bố cục mặc định"
                                 }
@@ -722,7 +747,13 @@ private fun FullTermsInAppDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        TextButton(onClick = onOpenExternalBrowser) {
+                        TextButton(
+                            onClick = onOpenExternalBrowser,
+                            modifier = Modifier.gamepadActionButton(
+                                cornerRadius = 8.dp,
+                                onClick = onOpenExternalBrowser
+                            )
+                        ) {
                             Text(
                                 text = if (isEn) "↗ Web" else "↗ Mở Web",
                                 color = DirectCyan,
@@ -730,7 +761,13 @@ private fun FullTermsInAppDialog(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        TextButton(onClick = onDismiss) {
+                        TextButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.gamepadActionButton(
+                                cornerRadius = 8.dp,
+                                onClick = onDismiss
+                            )
+                        ) {
                             Text(
                                 text = if (isEn) "✕ Close" else "✕ Đóng",
                                 color = XboxNeonGreen,

@@ -52,6 +52,8 @@ import com.example.data.AppConfig
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
@@ -213,7 +215,8 @@ internal fun SettingsGamepadTouchSection(
                     color = Color(0xFF16352A),
                     border = androidx.compose.foundation.BorderStroke(1.dp, XboxNeonGreen),
                     modifier = Modifier
-                        .clickable {
+                        .clip(RoundedCornerShape(8.dp))
+                        .gamepadClickable(cornerRadius = 8.dp) {
                             gamepadDetector.checkControllers()
                             triggerControllerTestRumble()
                         }
@@ -280,6 +283,18 @@ internal fun SettingsGamepadTouchSection(
                     },
                     modifier = Modifier
                         .weight(1f)
+                        .gamepadActionButton(cornerRadius = 10.dp) {
+                            SettingsRepository.updateUsePerGameGamepadLayout(false)
+                            Toast.makeText(
+                                context,
+                                if (isEn) {
+                                    "✓ Active: Global Layout applied to all games"
+                                } else {
+                                    "✓ Đang áp dụng bố cục chung cho tất cả game"
+                                },
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                         .semantics {
                             contentDescription = if (isEn) "Use Global Layout" else "Dùng bố cục chung"
                         }
@@ -318,6 +333,15 @@ internal fun SettingsGamepadTouchSection(
                     },
                     modifier = Modifier
                         .weight(1f)
+                        .gamepadActionButton(cornerRadius = 10.dp) {
+                            SettingsRepository.clearAllPerGameLayouts()
+                            SettingsRepository.resetGamepadCustomOffsets()
+                            Toast.makeText(
+                                context,
+                                if (isEn) "✓ Reset all gamepad layouts to default" else "✓ Đã đặt lại bố cục tay cầm ảo về mặc định",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                         .semantics {
                             contentDescription = if (isEn) "Reset Gamepad Layout" else "Đặt lại bố cục tay cầm"
                         }
@@ -393,7 +417,9 @@ internal fun SettingsGamepadTouchSection(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { SettingsRepository.updateGamepadHapticLevel(level) }
+                            .gamepadClickable(cornerRadius = 8.dp) {
+                                SettingsRepository.updateGamepadHapticLevel(level)
+                            }
                             .semantics {
                                 contentDescription = if (isEn) "Touch vibration ${level.localizedTitle(true)}" else "Rung khi bấm ${level.localizedTitle(false)}"
                             },
@@ -440,7 +466,9 @@ internal fun SettingsGamepadTouchSection(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { SettingsRepository.updateGameRumbleLevel(level) }
+                            .gamepadClickable(cornerRadius = 8.dp) {
+                                SettingsRepository.updateGameRumbleLevel(level)
+                            }
                             .semantics {
                                 contentDescription = if (isEn) "Game rumble ${level.localizedTitle(true)}" else "Rung của game ${level.localizedTitle(false)}"
                             }
@@ -475,6 +503,7 @@ internal fun SettingsGamepadTouchSection(
                     onClick = onRequestResetGamepadConfirm,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .gamepadActionButton(cornerRadius = 10.dp, onClick = onRequestResetGamepadConfirm)
                         .semantics {
                             contentDescription = if (isEn) "Reset Default Layout" else "Đặt lại bố cục mặc định"
                         }
@@ -539,7 +568,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .clickable { SettingsRepository.resetVirtualStickDeadzones() }
+                        .gamepadClickable(cornerRadius = 6.dp) {
+                            SettingsRepository.resetVirtualStickDeadzones()
+                        }
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                         .semantics {
                             contentDescription = if (isEn) "Reset virtual stick deadzones" else "Đặt lại vùng chết cần ảo"
@@ -620,7 +651,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .clickable { SettingsRepository.resetPhysicalStickDeadzones() }
+                        .gamepadClickable(cornerRadius = 6.dp) {
+                            SettingsRepository.resetPhysicalStickDeadzones()
+                        }
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                         .semantics {
                             contentDescription = if (isEn) "Reset physical stick deadzones" else "Đặt lại vùng chết tay cầm thật"
@@ -681,7 +714,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                             if (isSelected) XboxNeonGreen else XboxCardBorder,
                             RoundedCornerShape(10.dp)
                         )
-                        .clickable { SettingsRepository.updateGamepadLayoutPreset(preset) },
+                        .gamepadClickable(cornerRadius = 10.dp) {
+                            SettingsRepository.updateGamepadLayoutPreset(preset)
+                        },
                     color = if (isSelected) Color(0xFF16352A) else XboxSurface
                 ) {
                     Row(
@@ -746,6 +781,14 @@ internal fun SettingsAdvancedGamepadControlsCard(
                     ).show()
                 },
                 modifier = Modifier
+                    .gamepadActionButton(cornerRadius = 8.dp) {
+                        SettingsRepository.resetPhysicalGamepadButtonMap()
+                        Toast.makeText(
+                            context,
+                            if (isEn) "Reset physical controller button mapping" else "Đã đặt lại ánh xạ nút tay cầm thật",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                     .semantics {
                         contentDescription = if (isEn) "Reset physical button mapping" else "Đặt lại ánh xạ nút tay cầm thật"
                     }
@@ -778,7 +821,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { activeRemapSourceBtn = btnIdx }
+                            .gamepadClickable(cornerRadius = 8.dp) {
+                                activeRemapSourceBtn = btnIdx
+                            }
                             .semantics {
                                 contentDescription = if (isEn) {
                                     "Remap physical button $shortName, currently mapped to $targetLabel"
@@ -878,7 +923,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                         Surface(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { activeShortcutTargetAction = actionKey }
+                                .gamepadClickable(cornerRadius = 8.dp) {
+                                    activeShortcutTargetAction = actionKey
+                                }
                                 .semantics {
                                     contentDescription = if (isEn) {
                                         "Change shortcut button for $actionTitle, currently View plus $btnShort"
@@ -905,6 +952,9 @@ internal fun SettingsAdvancedGamepadControlsCard(
                     onClick = { SettingsRepository.resetControllerShortcuts() },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .gamepadActionButton(cornerRadius = 8.dp) {
+                            SettingsRepository.resetControllerShortcuts()
+                        }
                         .semantics {
                             contentDescription = if (isEn) "Reset controller shortcuts" else "Đặt lại tổ hợp phím tắt tay cầm"
                         }
@@ -966,7 +1016,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
+                                        .gamepadClickable(cornerRadius = 8.dp) {
                                             SettingsRepository.updatePhysicalGamepadSingleButtonMap(srcIdx, dstIdx)
                                             activeRemapSourceBtn = null
                                         }
@@ -999,9 +1049,11 @@ internal fun SettingsAdvancedGamepadControlsCard(
             confirmButton = {
                 TextButton(
                     onClick = { activeRemapSourceBtn = null },
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isEn) "Close button remap dialog" else "Đóng hộp thoại đổi nút"
-                    }
+                    modifier = Modifier
+                        .gamepadActionButton(cornerRadius = 8.dp) { activeRemapSourceBtn = null }
+                        .semantics {
+                            contentDescription = if (isEn) "Close button remap dialog" else "Đóng hộp thoại đổi nút"
+                        }
                 ) {
                     Text(text = if (isEn) "Close" else "Đóng", color = TextSecondary)
                 }
@@ -1048,7 +1100,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
+                                        .gamepadClickable(cornerRadius = 8.dp) {
                                             when (actionKey) {
                                                 "toggle_stats" -> SettingsRepository.updateShortcutToggleStatsButton(btnIdx)
                                                 "toggle_virtual_pad" -> SettingsRepository.updateShortcutToggleVirtualPadButton(btnIdx)
@@ -1082,9 +1134,11 @@ internal fun SettingsAdvancedGamepadControlsCard(
             confirmButton = {
                 TextButton(
                     onClick = { activeShortcutTargetAction = null },
-                    modifier = Modifier.semantics {
-                        contentDescription = if (isEn) "Close shortcut button dialog" else "Đóng hộp thoại chọn phím tắt"
-                    }
+                    modifier = Modifier
+                        .gamepadActionButton(cornerRadius = 8.dp) { activeShortcutTargetAction = null }
+                        .semantics {
+                            contentDescription = if (isEn) "Close shortcut button dialog" else "Đóng hộp thoại chọn phím tắt"
+                        }
                 ) {
                     Text(text = if (isEn) "Close" else "Đóng", color = TextSecondary)
                 }

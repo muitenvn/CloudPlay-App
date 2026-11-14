@@ -37,7 +37,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.focusProperties
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
@@ -72,7 +74,7 @@ internal fun CollapsibleSettingsGroup(
                     if (expanded) XboxNeonGreen else XboxCardBorder,
                     RoundedCornerShape(12.dp)
                 )
-                .clickable { onToggle() }
+                .gamepadClickable(cornerRadius = 12.dp) { onToggle() }
                 .semantics {
                     contentDescription = if (expanded) {
                         if (isEnGroup) "$displayTitle, expanded, tap to collapse" else "$displayTitle, đang mở, bấm để thu gọn"
@@ -161,7 +163,11 @@ internal fun SettingToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .clip(RoundedCornerShape(10.dp))
+            .gamepadClickable(cornerRadius = 10.dp) {
+                onCheckedChange(!checked)
+            }
+            .padding(horizontal = 4.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -190,7 +196,9 @@ internal fun SettingToggleRow(
                 uncheckedThumbColor = TextSecondary,
                 uncheckedTrackColor = XboxSurfaceVariant
             ),
-            modifier = if (switchTestTag != null) Modifier.testTag(switchTestTag) else Modifier
+            modifier = Modifier
+                .focusProperties { canFocus = false }
+                .then(if (switchTestTag != null) Modifier.testTag(switchTestTag) else Modifier)
         )
     }
 }
@@ -202,11 +210,37 @@ internal fun LabeledSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
-    accentColor: Color
+    accentColor: Color,
+    stepDelta: Float = 0f
 ) {
     val config = SettingsRepository.config.value
     val displayLabel = config.tr(label, label)
-    Column {
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.01f)
+    val effectiveStep = if (stepDelta > 0f) {
+        stepDelta
+    } else if (span >= 10f) {
+        2f
+    } else if (span >= 0.5f) {
+        0.05f
+    } else {
+        0.01f
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .gamepadClickable(
+                cornerRadius = 10.dp,
+                onStepHorizontal = { dir ->
+                    val next = (value + dir * effectiveStep)
+                        .coerceIn(valueRange.start, valueRange.endInclusive)
+                    onValueChange(next)
+                },
+                onClick = {}
+            )
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(text = displayLabel, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Text(
@@ -221,7 +255,8 @@ internal fun LabeledSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
-            colors = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor)
+            colors = SliderDefaults.colors(thumbColor = accentColor, activeTrackColor = accentColor),
+            modifier = Modifier.focusProperties { canFocus = false }
         )
     }
 }

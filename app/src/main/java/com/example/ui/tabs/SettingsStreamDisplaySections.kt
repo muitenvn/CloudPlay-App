@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.AppConfig
 import com.example.data.CellularOptimizationMode
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -99,7 +101,9 @@ internal fun SettingsGraphicsFpsSection(
                                 if (isSelected) XboxNeonGreen else XboxCardBorder,
                                 RoundedCornerShape(999.dp)
                             )
-                            .clickable { SettingsRepository.updateCellularMode(mode) }
+                            .gamepadClickable(cornerRadius = 999.dp) {
+                                SettingsRepository.updateCellularMode(mode)
+                            }
                             .testTag(tag),
                         color = if (isSelected) Color(0xFF0F2C1D) else Color(0xFF132019)
                     ) {
@@ -155,7 +159,9 @@ internal fun SettingsGraphicsFpsSection(
                                 .weight(1f)
                                 .heightIn(min = 38.dp)
                                 .clip(RoundedCornerShape(9.dp))
-                                .clickable { SettingsRepository.updateStreamFpsCap(fpsCap) }
+                                .gamepadClickable(cornerRadius = 9.dp) {
+                                    SettingsRepository.updateStreamFpsCap(fpsCap)
+                                }
                                 .testTag("settings_fps_cap_${fpsCap.fps}"),
                             color = if (isSelected) XboxNeonGreen else Color.Transparent
                         ) {
@@ -227,7 +233,9 @@ internal fun SettingsGraphicsFpsSection(
                                 .weight(1f)
                                 .heightIn(min = 38.dp)
                                 .clip(RoundedCornerShape(9.dp))
-                                .clickable { SettingsRepository.updateXboxWebUiMode(uiMode) }
+                                .gamepadClickable(cornerRadius = 9.dp) {
+                                    SettingsRepository.updateXboxWebUiMode(uiMode)
+                                }
                                 .testTag("settings_xbox_ui_mode_${uiMode.id}"),
                             color = if (isSelected) XboxNeonGreen else Color.Transparent
                         ) {
@@ -316,6 +324,14 @@ internal fun SettingsAdvancedVideoColorsAndPerfCard(
             },
             modifier = Modifier
                 .fillMaxWidth()
+                .gamepadActionButton(cornerRadius = 10.dp) {
+                    SettingsRepository.resetVideoDisplayDefaults()
+                    Toast.makeText(
+                        context,
+                        if (isEn) "Reset colors to default" else "Đã đặt lại màu sắc mặc định",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 .semantics {
                     contentDescription = if (isEn) "Reset Colors to Default" else "Đặt lại màu sắc mặc định"
                 }
@@ -374,7 +390,9 @@ internal fun SettingsScreenRecordingSection(
                                 if (isSelected) DirectCyan else XboxCardBorder,
                                 RoundedCornerShape(10.dp)
                             )
-                            .clickable { SettingsRepository.updateScreenRecordQuality(recQuality) }
+                            .gamepadClickable(cornerRadius = 10.dp) {
+                                SettingsRepository.updateScreenRecordQuality(recQuality)
+                            }
                             .testTag("settings_record_quality_${recQuality.id}"),
                         color = if (isSelected) Color(0xFF0F2327) else Color(0xFF0F1813)
                     ) {

@@ -373,35 +373,55 @@ fun MainContent(
         }
     }
 
-    // Fullscreen Immersive Mode controller for Cloud Gaming vs Dashboard
-    LaunchedEffect(currentScreen) {
+    val isTvUiMode = remember(config.appUiMode, context) { config.isEffectiveTvMode(context) }
+    val isRealTvHardware = remember(context) { com.example.data.isSystemTvDevice(context) }
+
+    // Fullscreen Immersive Mode & TV Landscape controller for Cloud Gaming vs Dashboard
+    LaunchedEffect(currentScreen, isTvUiMode) {
         val isBrowser = currentScreen is AppScreen.Browser
         activity.applyImmersiveFullscreen(isBrowser)
+        if (isTvUiMode) {
+            com.example.ui.components.GamepadUiNavigation.onGamepadInteraction()
+            if (!isBrowser && !isRealTvHardware) {
+                activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
+        } else if (!isBrowser) {
+            activity.resetOrientation()
+        }
+    }
+
+    val launchXboxUrl: (String) -> Unit = { url ->
+        val latestConfig = SettingsRepository.config.value
+        if (latestConfig.smartVpnEnabled) {
+            VpnManager.autoTurnOnForLaunch(context)
+        } else {
+            if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
+                VpnManager.connect(context)
+            }
+        }
+        val currentLocale = latestConfig.getEffectiveLocale()
+        val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
+        val uaMode = if (latestConfig.forceDesktopUserAgent) "desktop" else "mobile"
+        com.example.data.AppLogger.info(
+            "WEB-UI",
+            "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${latestConfig.xboxWebUiMode.name} | ua=$uaMode | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
+        )
+        currentScreen = AppScreen.Browser(finalUrl)
     }
 
     when (val screen = currentScreen) {
         is AppScreen.Dashboard -> {
-            DashboardScreen(
-                onLaunchUrl = { url ->
-                    val config = SettingsRepository.config.value
-                    if (config.smartVpnEnabled) {
-                        VpnManager.autoTurnOnForLaunch(context)
-                    } else {
-                        if (VpnManager.state.value.mode == com.example.vpn.NetworkMode.DISCONNECTED) {
-                            VpnManager.connect(context)
-                        }
-                    }
-                    val currentLocale = config.getEffectiveLocale()
-                    val finalUrl = SettingsRepository.formatXboxUrlWithLocale(url, currentLocale)
-                    val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-                    com.example.data.AppLogger.info(
-                        "WEB-UI",
-                        "Mở trình duyệt Xbox từ Trang chủ: đầu vào=${com.example.data.AppLogger.safeUrlHostPath(url)} -> đích=${com.example.data.AppLogger.safeUrlHostPath(finalUrl)} | chế độ=${config.xboxWebUiMode.name} | ua=$uaMode | thị trường=$currentLocale | nguồn=setting+formatXboxUrlWithLocale"
-                    )
-                    currentScreen = AppScreen.Browser(finalUrl)
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+            if (isTvUiMode) {
+                com.example.ui.tv.TvDashboardScreen(
+                    onLaunchUrl = launchXboxUrl,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                DashboardScreen(
+                    onLaunchUrl = launchXboxUrl,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
         is AppScreen.Browser -> {
             CloudBrowserScreen(

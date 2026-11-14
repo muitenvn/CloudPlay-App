@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- Background -->
+    <path
+        android:fillColor="#070B09"
+        android:pathData="M0,0h320v180h-320z" />
+    <!-- Subtle inner card surface -->
+    <path
+        android:fillColor="#0D1511"
+        android:pathData="M12,12h296v156h-296z" />
+    <!-- Accent left bar -->
+    <path
+        android:fillColor="#27D884"
+        android:pathData="M12,12h8v156h-8z" />
+    <!-- Play badge box -->
+    <path
+        android:fillColor="#27D884"
+        android:pathData="M56,58h64v64h-64z" />
+    <!-- Play triangle inside badge -->
+    <path
+        android:fillColor="#04130B"
+        android:pathData="M78,74L78,106L104,90Z" />
+    <!-- Stylized "CP" / CloudPlay bars on right -->
+    <path
+        android:fillColor="#EAF3EE"
+        android:pathData="M144,68h116v14h-116z" />
+    <path
+        android:fillColor="#27D884"
+        android:pathData="M144,92h84v10h-84z" />
+    <path
+        android:fillColor="#3FD8EE"
+        android:pathData="M236,92h36v10h-36z" />
+    <path
+        android:fillColor="#8FA79B"
+        android:pathData="M144,110h102v6h-102z" />
+</vector>

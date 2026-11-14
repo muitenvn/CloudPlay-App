@@ -484,7 +484,8 @@ fun CloudBrowserScreen(
         }
     }
 
-    val effectiveShowVirtualController = config.showVirtualController &&
+    val isTvMode = remember(config.appUiMode, context) { config.isEffectiveTvMode(context) }
+    val effectiveShowVirtualController = !isTvMode && config.showVirtualController &&
         (!config.autoHideVirtualOnPhysicalController || !gamepadStatus.hasPhysicalController || manualVirtualPadOverrideWithPhys)
 
     // Dynamically recompute injectionScript only when structural settings change (bitrate updates go through __updateNetworkProfile)

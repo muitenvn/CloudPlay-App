@@ -673,6 +673,34 @@ enum class XboxWebUiMode(
     fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
 }
 
+enum class AppUiMode(
+    val id: String,
+    val titleVi: String,
+    val titleEn: String
+) {
+    AUTO("AUTO", "Tự động", "Auto"),
+    PHONE("PHONE", "Điện thoại", "Phone"),
+    TV("TV", "TV", "TV");
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+}
+
+fun isSystemTvDevice(context: Context): Boolean {
+    return try {
+        val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        val isUiModeTv = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+            (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
+            android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        val pm = context.packageManager
+        val isLeanback = pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+            pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEVISION)
+        val hasTouchscreen = pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
+        isUiModeTv || isLeanback || !hasTouchscreen
+    } catch (_: Exception) {
+        false
+    }
+}
+
 @androidx.compose.runtime.Immutable
 data class PerGameGamepadLayout(
     val offsets: String = "",
@@ -778,8 +806,17 @@ data class AppConfig(
     val allowDbIpCellularDownload: Boolean = false,
     val allowCellularLiveProxySync: Boolean = false,
     val xboxWebUiMode: XboxWebUiMode = XboxWebUiMode.CLASSIC,
-    val autoExitPreviewHandlerEnabled: Boolean = true
+    val autoExitPreviewHandlerEnabled: Boolean = true,
+    val appUiMode: AppUiMode = AppUiMode.AUTO
 ) {
+    fun isEffectiveTvMode(context: Context): Boolean {
+        return when (appUiMode) {
+            AppUiMode.TV -> true
+            AppUiMode.PHONE -> false
+            AppUiMode.AUTO -> isSystemTvDevice(context)
+        }
+    }
+
     val targetRegionUrl: String
         get() = if (xboxWebUiMode == XboxWebUiMode.NEW_UI) {
             "https://play.xbox.com/"
@@ -1071,7 +1108,12 @@ object SettingsRepository {
                         ?: XboxWebUiMode.CLASSIC.name
                 )
             } catch (_: Exception) { XboxWebUiMode.CLASSIC },
-            autoExitPreviewHandlerEnabled = sp.getBoolean("auto_exit_preview_handler_enabled", true)
+            autoExitPreviewHandlerEnabled = sp.getBoolean("auto_exit_preview_handler_enabled", true),
+            appUiMode = try {
+                AppUiMode.valueOf(
+                    sp.getString("app_ui_mode", AppUiMode.AUTO.name) ?: AppUiMode.AUTO.name
+                )
+            } catch (_: Exception) { AppUiMode.AUTO }
         )
         // Đồng bộ tự động độ phân giải theo mức chất lượng đồ họa đã chọn; giữ nguyên lựa chọn User-Agent của người dùng
         val synced = loaded.copy(
@@ -1180,6 +1222,7 @@ object SettingsRepository {
             putBoolean("allow_cellular_live_proxy_sync", c.allowCellularLiveProxySync)
             putString("xbox_web_ui_mode", c.xboxWebUiMode.name)
             putBoolean("auto_exit_preview_handler_enabled", c.autoExitPreviewHandlerEnabled)
+            putString("app_ui_mode", c.appUiMode.name)
             apply()
         }
     }
@@ -1366,6 +1409,14 @@ object SettingsRepository {
             "WEB-UI",
             "Đổi cài đặt Bộ xử lý tự động thoát Giao diện mới: $old -> $enabled"
         )
+    }
+
+    fun updateAppUiMode(mode: AppUiMode) {
+        val old = _config.value.appUiMode
+        if (old == mode) return
+        _config.update { it.copy(appUiMode = mode) }
+        persist(_config.value)
+        logSettingChange("Giao diện ứng dụng (Tự động / Điện thoại / TV)", old.name, mode.name)
     }
 
     fun update(newConfig: AppConfig) {
@@ -2514,7 +2565,8 @@ object SettingsRepository {
                 allowCellularLiveProxySync = false,
                 enableGlobalpingProbe = false,
                 enableGeoIpHttpsFallback = true,
-                allowDbIpCellularDownload = false
+                allowDbIpCellularDownload = false,
+                appUiMode = AppUiMode.AUTO
             )
         }
         persist(_config.value)

@@ -416,17 +416,87 @@ internal fun SettingsAdvancedSection(
     var showResetAdvancedConfirmDialog by remember { mutableStateOf(false) }
 
     CollapsibleSettingsGroup(
-        title = if (isEn) "Advanced Settings" else "Nâng cao",
+        title = if (isEn) "Advanced Settings" else "Chế độ nâng cao",
         subtitle = if (isEn) {
-            "Image colors, stick deadzones, Xbox market & technical network options"
+            "Interface mode (Auto/Phone/TV), image colors, deadzones & network options"
         } else {
-            "Chỉnh màu, vùng chết cần, thị trường Xbox & tùy chọn mạng kỹ thuật"
+            "Giao diện (Tự động/Điện thoại/TV), chỉnh màu, vùng chết cần & mạng kỹ thuật"
         },
         icon = Icons.Default.Tune,
         expanded = expandAdvanced,
         onToggle = onToggleExpand,
         testTag = "settings_group_advanced"
     ) {
+        // Nâng cao 0: Chuyển đổi Giao diện (Tự động / Điện thoại / TV)
+        SettingsCard(title = config.tr("Giao diện", "Interface")) {
+            val modes = com.example.data.AppUiMode.entries
+            val selectedIndex = modes.indexOf(config.appUiMode).coerceAtLeast(0)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .gamepadClickable(
+                        cornerRadius = 10.dp,
+                        onStepHorizontal = { dir ->
+                            val nextIdx = (selectedIndex + dir).coerceIn(0, modes.lastIndex)
+                            SettingsRepository.updateAppUiMode(modes[nextIdx])
+                        },
+                        onClick = {
+                            val nextIdx = (selectedIndex + 1) % modes.size
+                            SettingsRepository.updateAppUiMode(modes[nextIdx])
+                        }
+                    )
+                    .padding(4.dp)
+                    .testTag("settings_app_ui_mode_row"),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = config.tr(
+                        "Tự động nhận biết TV hoặc chuyển thủ công ngay lập tức giữa Điện thoại và TV",
+                        "Auto-detect TV or switch immediately between Phone and TV interface"
+                    ),
+                    color = TextSecondary,
+                    fontSize = 11.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    modes.forEach { modeOption ->
+                        val isSelected = config.appUiMode == modeOption
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(
+                                    1.dp,
+                                    if (isSelected) XboxNeonGreen else XboxCardBorder,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .gamepadClickable(cornerRadius = 8.dp) {
+                                    SettingsRepository.updateAppUiMode(modeOption)
+                                }
+                                .testTag("settings_ui_mode_${modeOption.name.lowercase()}"),
+                            color = if (isSelected) Color(0xFF16352A) else XboxSurfaceVariant
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = config.tr(modeOption.titleVi, modeOption.titleEn),
+                                    color = if (isSelected) XboxNeonGreen else TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Nâng cao 1: 3 thanh chỉnh màu hình ảnh & Chế độ máy yếu
         SettingsAdvancedVideoColorsAndPerfCard(
             config = config,

@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -186,6 +187,7 @@ internal fun HudSurfaceRow(
     modifier: Modifier = Modifier,
     minHeight: Dp = 38.dp,
     bgColor: Color = HudSurface,
+    onStepHorizontal: ((Int) -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
 ) {
@@ -196,7 +198,15 @@ internal fun HudSurfaceRow(
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .then(
-                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+                if (onClick != null) {
+                    Modifier.gamepadClickable(
+                        cornerRadius = 12.dp,
+                        onStepHorizontal = onStepHorizontal,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
             )
             .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -210,6 +220,7 @@ internal fun HudSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     contentDescription: String,
+    enableGamepadFocus: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val trackColor by animateColorAsState(
@@ -227,11 +238,23 @@ internal fun HudSwitch(
             .size(width = 42.dp, height = 26.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(trackColor)
-            .clickable(
-                role = Role.Switch,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { onCheckedChange(!checked) }
+            .then(
+                if (enableGamepadFocus) {
+                    Modifier.gamepadClickable(
+                        cornerRadius = 999.dp,
+                        onStepHorizontal = { dir ->
+                            val next = dir > 0
+                            if (next != checked) onCheckedChange(next)
+                        }
+                    ) { onCheckedChange(!checked) }
+                } else {
+                    Modifier.clickable(
+                        role = Role.Switch,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onCheckedChange(!checked) }
+                }
+            )
             .semantics { this.contentDescription = contentDescription }
             .padding(3.dp),
         contentAlignment = Alignment.CenterStart
@@ -260,6 +283,10 @@ internal fun HudSwitchRow(
         modifier = modifier.then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         minHeight = if (subtitle != null) 46.dp else 40.dp,
         bgColor = bgColor,
+        onStepHorizontal = { dir ->
+            val next = dir > 0
+            if (next != checked) onCheckedChange(next)
+        },
         onClick = { onCheckedChange(!checked) }
     ) {
         Column(
@@ -289,7 +316,8 @@ internal fun HudSwitchRow(
         HudSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            contentDescription = title
+            contentDescription = title,
+            enableGamepadFocus = false
         )
     }
 }
@@ -321,7 +349,13 @@ internal fun HudSegmentedControl(
                     .heightIn(min = minButtonHeight)
                     .clip(RoundedCornerShape(9.dp))
                     .background(if (selected) HudSelBg else Color.Transparent)
-                    .clickable { onSelect(idx) }
+                    .gamepadClickable(
+                        cornerRadius = 9.dp,
+                        onStepHorizontal = { dir ->
+                            val next = (selectedIndex + dir).coerceIn(0, options.lastIndex)
+                            if (next != selectedIndex) onSelect(next)
+                        }
+                    ) { onSelect(idx) }
                     .then(if (tagPrefix != null) Modifier.testTag("${tagPrefix}_$idx") else Modifier)
                     .padding(horizontal = 4.dp, vertical = 5.dp),
                 contentAlignment = Alignment.Center
@@ -351,11 +385,28 @@ internal fun HudSliderRow(
     accentColor: Color = HudAccent,
     modifier: Modifier = Modifier
 ) {
+    val stepSize = ((valueRange.endInclusive - valueRange.start) / 20f).coerceAtLeast(0.01f)
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
+            .gamepadClickable(
+                cornerRadius = 12.dp,
+                focusBorderColor = accentColor,
+                onStepHorizontal = { dir ->
+                    val next = (value + dir * stepSize).coerceIn(valueRange.start, valueRange.endInclusive)
+                    onValueChange(next)
+                },
+                onClick = {
+                    val next = if (value + stepSize > valueRange.endInclusive) {
+                        valueRange.start
+                    } else {
+                        (value + stepSize).coerceIn(valueRange.start, valueRange.endInclusive)
+                    }
+                    onValueChange(next)
+                }
+            )
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
@@ -387,7 +438,10 @@ internal fun HudSliderRow(
             valueRange = valueRange,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(26.dp),
+                .height(26.dp)
+                .then(
+                    androidx.compose.ui.Modifier.focusProperties { canFocus = false }
+                ),
             colors = SliderDefaults.colors(
                 thumbColor = accentColor,
                 activeTrackColor = accentColor,
@@ -422,7 +476,7 @@ internal fun HudButton(
             .defaultMinSize(minHeight = minHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(finalBg)
-            .clickable(onClick = onClick)
+            .gamepadClickable(cornerRadius = 12.dp, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -462,7 +516,13 @@ internal fun HudNoteCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bg)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier.gamepadClickable(cornerRadius = 12.dp, onClick = onClick)
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -504,7 +564,11 @@ internal fun HudStepperControl(
             modifier = Modifier
                 .size(30.dp)
                 .clip(RoundedCornerShape(9.dp))
-                .clickable(onClick = onDecrement)
+                .gamepadClickable(
+                    cornerRadius = 9.dp,
+                    onStepHorizontal = { dir -> if (dir < 0) onDecrement() else onIncrement() },
+                    onClick = onDecrement
+                )
                 .then(if (decTag != null) Modifier.testTag(decTag) else Modifier),
             shape = RoundedCornerShape(9.dp),
             color = btnBg,
@@ -527,7 +591,11 @@ internal fun HudStepperControl(
             modifier = Modifier
                 .size(30.dp)
                 .clip(RoundedCornerShape(9.dp))
-                .clickable(onClick = onIncrement)
+                .gamepadClickable(
+                    cornerRadius = 9.dp,
+                    onStepHorizontal = { dir -> if (dir < 0) onDecrement() else onIncrement() },
+                    onClick = onIncrement
+                )
                 .then(if (incTag != null) Modifier.testTag(incTag) else Modifier),
             shape = RoundedCornerShape(9.dp),
             color = btnBg,
@@ -549,13 +617,20 @@ internal fun HudPanelIconButton(
     bgColor: Color = HudSurface2,
     tint: Color = HudMuted,
     border: BorderStroke? = null,
+    enableGamepadFocus: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .then(
+                if (enableGamepadFocus) {
+                    Modifier.gamepadClickable(cornerRadius = 12.dp, onClick = onClick)
+                } else {
+                    Modifier.clickable(onClick = onClick)
+                }
+            ),
         shape = RoundedCornerShape(12.dp),
         color = bgColor,
         border = border,

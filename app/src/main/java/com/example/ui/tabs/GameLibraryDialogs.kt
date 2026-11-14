@@ -47,8 +47,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.focus.FocusRequester
 import com.example.data.GameBookmark
 import com.example.data.GameLibraryRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
+import com.example.ui.components.gamepadControllerScope
+import com.example.ui.components.gamepadTextFieldFocus
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.GoldStar
 import com.example.ui.theme.JapanRed
@@ -76,9 +81,18 @@ internal fun XboxGameDetailDialog(
     val isEn = config.isEnglishUI()
     val productId = remember(game.playUrl) { GameLibraryRepository.extractProductId(game.playUrl) }
     val heroUrl = game.heroImageUrl ?: game.imageUrl
+    val playBtnFocusRequester = remember { FocusRequester() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.gamepadControllerScope(
+            enabled = true,
+            defaultFocusRequester = playBtnFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss,
+            onSecondaryY = onToggleFavorite
+        ),
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(
@@ -220,6 +234,11 @@ internal fun XboxGameDetailDialog(
         confirmButton = {
             Button(
                 onClick = onPlay,
+                modifier = Modifier.gamepadActionButton(
+                    cornerRadius = 12.dp,
+                    focusRequester = playBtnFocusRequester,
+                    onClick = onPlay
+                ),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = XboxNeonGreen,
@@ -237,7 +256,13 @@ internal fun XboxGameDetailDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onToggleFavorite) {
+                TextButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.gamepadActionButton(
+                        cornerRadius = 8.dp,
+                        onClick = onToggleFavorite
+                    )
+                ) {
                     Text(
                         text = if (isFavorite) {
                             config.tr("♥ Đã thích", "♥ Saved")
@@ -248,7 +273,13 @@ internal fun XboxGameDetailDialog(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                TextButton(onClick = onDismiss) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.gamepadActionButton(
+                        cornerRadius = 8.dp,
+                        onClick = onDismiss
+                    )
+                ) {
                     Text(config.tr("Đóng", "Close"), color = TextSecondary, fontWeight = FontWeight.Bold)
                 }
             }
@@ -270,9 +301,17 @@ internal fun AddGameDialog(
     var title by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("https://www.xbox.com/en-US/play/games/") }
     var liveResults by remember { mutableStateOf<List<GameBookmark>>(emptyList()) }
+    val addBtnFocusRequester = remember { FocusRequester() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.gamepadControllerScope(
+            enabled = true,
+            defaultFocusRequester = addBtnFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
+        ),
         title = {
             Text(
                 text = if (isEn) "Add Xbox Cloud Game" else "Thêm game vào thư viện",
@@ -301,7 +340,9 @@ internal fun AddGameDialog(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .gamepadTextFieldFocus(cornerRadius = 12.dp),
                         label = { Text(if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên game (VD: Black Ops 6)") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -314,19 +355,26 @@ internal fun AddGameDialog(
                             unfocusedTextColor = TextPrimary
                         )
                     )
-                    Button(
-                        onClick = {
-                            if (title.trim().length >= 2) {
-                                GameLibraryRepository.searchMicrosoftXboxCatalog(title) { found ->
-                                    liveResults = found.take(5)
-                                    found.firstOrNull()?.let { first ->
-                                        title = first.title
-                                        url = first.playUrl
-                                    }
+                    val canSearch = !isSearchingLiveXbox && title.trim().length >= 2
+                    val triggerSearch: () -> Unit = {
+                        if (title.trim().length >= 2) {
+                            GameLibraryRepository.searchMicrosoftXboxCatalog(title) { found ->
+                                liveResults = found.take(5)
+                                found.firstOrNull()?.let { first ->
+                                    title = first.title
+                                    url = first.playUrl
                                 }
                             }
-                        },
-                        enabled = !isSearchingLiveXbox && title.trim().length >= 2,
+                        }
+                    }
+                    Button(
+                        onClick = triggerSearch,
+                        enabled = canSearch,
+                        modifier = Modifier.gamepadActionButton(
+                            enabled = canSearch,
+                            cornerRadius = 12.dp,
+                            onClick = triggerSearch
+                        ),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxSurface,
                             contentColor = XboxNeonGreen
@@ -359,7 +407,7 @@ internal fun AddGameDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onLaunchDirect(item) }
+                                    .gamepadClickable(cornerRadius = 12.dp) { onLaunchDirect(item) }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
@@ -399,7 +447,9 @@ internal fun AddGameDialog(
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .gamepadTextFieldFocus(cornerRadius = 12.dp),
                     label = { Text(if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -415,12 +465,18 @@ internal fun AddGameDialog(
             }
         },
         confirmButton = {
+            val submitAdd: () -> Unit = {
+                if (title.isNotBlank() && url.isNotBlank()) {
+                    onAdd(title.trim(), url.trim())
+                }
+            }
             Button(
-                onClick = {
-                    if (title.isNotBlank() && url.isNotBlank()) {
-                        onAdd(title.trim(), url.trim())
-                    }
-                },
+                onClick = submitAdd,
+                modifier = Modifier.gamepadActionButton(
+                    cornerRadius = 12.dp,
+                    focusRequester = addBtnFocusRequester,
+                    onClick = submitAdd
+                ),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = XboxNeonGreen,
@@ -431,7 +487,13 @@ internal fun AddGameDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.gamepadActionButton(
+                    cornerRadius = 8.dp,
+                    onClick = onDismiss
+                )
+            ) {
                 Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontWeight = FontWeight.Bold)
             }
         },

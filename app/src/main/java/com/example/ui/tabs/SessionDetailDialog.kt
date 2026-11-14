@@ -46,9 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.FocusRequester
 import com.example.data.PlaySessionRecord
 import com.example.data.SettingsRepository
+import com.example.ui.components.GamepadSurfaceController
 import com.example.ui.components.PingSparklineChart
+import com.example.ui.components.gamepadActionButton
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -87,11 +90,19 @@ internal fun SessionDetailDialog(
     val maxPing = remember(chartSamples) { chartSamples.maxOrNull() ?: session.avgPingMs }
     val lagDiagnosis = remember(session, isEn) { diagnoseSessionLag(session, isEn) }
     var selectedMetricKey by remember { mutableStateOf<String?>(null) }
+    val primaryFocusRequester = remember { FocusRequester() }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = primaryFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
+        ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
@@ -141,6 +152,7 @@ internal fun SessionDetailDialog(
                             .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(XboxSurface)
+                            .gamepadActionButton(cornerRadius = 10.dp, onClick = onDismiss)
                             .testTag("session_detail_close_button")
                     ) {
                         Icon(
@@ -518,6 +530,11 @@ internal fun SessionDetailDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(46.dp)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                focusRequester = primaryFocusRequester,
+                                onClick = onPlayAgain
+                            )
                             .testTag("detail_play_again_button")
                     ) {
                         Icon(
@@ -550,6 +567,10 @@ internal fun SessionDetailDialog(
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                onClick = onDelete
+                            )
                             .testTag("delete_session_button")
                     ) {
                         Icon(
@@ -577,6 +598,11 @@ internal fun SessionDetailDialog(
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                focusRequester = if (onPlayAgain == null) primaryFocusRequester else null,
+                                onClick = onDismiss
+                            )
                     ) {
                         Text(
                             text = if (isEn) "Close" else "Đóng",
@@ -590,6 +616,7 @@ internal fun SessionDetailDialog(
                 }
                 }
             }
+        }
         }
     }
 }

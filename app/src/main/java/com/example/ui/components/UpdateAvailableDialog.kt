@@ -77,7 +77,16 @@ fun UpdateAvailableDialog(
     var selectedMirrorId by remember { mutableStateOf("auto") }
     val mirrorNodes = remember { UpdateChecker.FAST_MIRROR_NODES.filter { !it.isDirectGitHub } }
 
+    val primaryFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
     Dialog(onDismissRequest = onDismiss) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = primaryFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
+        ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,6 +261,10 @@ fun UpdateAvailableDialog(
                                         onClick = { UpdateChecker.skipToNextMirror() },
                                         modifier = Modifier
                                             .weight(1f)
+                                            .gamepadActionButton(
+                                                cornerRadius = 10.dp,
+                                                onClick = { UpdateChecker.skipToNextMirror() }
+                                            )
                                             .testTag("update_dialog_skip_mirror_btn"),
                                         shape = RoundedCornerShape(10.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.75f))
@@ -269,6 +282,10 @@ fun UpdateAvailableDialog(
                                     onClick = { UpdateChecker.cancelApkDownload() },
                                     modifier = Modifier
                                         .weight(1f)
+                                        .gamepadActionButton(
+                                            cornerRadius = 10.dp,
+                                            onClick = { UpdateChecker.cancelApkDownload() }
+                                        )
                                         .testTag("update_dialog_cancel_download_btn"),
                                     shape = RoundedCornerShape(10.dp),
                                     border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.7f))
@@ -349,6 +366,11 @@ fun UpdateAvailableDialog(
                             onClick = { UpdateChecker.launchApkInstaller(context, dl.apkFile) },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .gamepadActionButton(
+                                    cornerRadius = 12.dp,
+                                    focusRequester = primaryFocusRequester,
+                                    onClick = { UpdateChecker.launchApkInstaller(context, dl.apkFile) }
+                                )
                                 .testTag("update_dialog_install_verified_btn"),
                             colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
                             shape = RoundedCornerShape(12.dp)
@@ -392,7 +414,7 @@ fun UpdateAvailableDialog(
                             Surface(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { selectedMirrorId = "auto" }
+                                    .gamepadClickable(cornerRadius = 8.dp) { selectedMirrorId = "auto" }
                                     .testTag("update_mirror_chip_auto"),
                                 shape = RoundedCornerShape(8.dp),
                                 color = if (isAutoSelected) XboxNeonGreen.copy(alpha = 0.20f) else XboxSurfaceVariant,
@@ -415,7 +437,7 @@ fun UpdateAvailableDialog(
                                 Surface(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable { selectedMirrorId = node.id }
+                                        .gamepadClickable(cornerRadius = 8.dp) { selectedMirrorId = node.id }
                                         .testTag("update_mirror_chip_${node.id}"),
                                     shape = RoundedCornerShape(8.dp),
                                     color = if (isSelected) DirectCyan.copy(alpha = 0.20f) else XboxSurfaceVariant,
@@ -439,16 +461,22 @@ fun UpdateAvailableDialog(
 
                     // Nút 1: Tải nhanh qua máy chủ phụ (tự động chuyển sang máy chủ phụ tiếp theo nếu lỗi)
                     val selectedNodeName = mirrorNodes.firstOrNull { it.id == selectedMirrorId }?.name
+                    val startFastDownload: () -> Unit = {
+                        UpdateChecker.startVerifiedApkDownload(
+                            context = context,
+                            updateInfo = updateInfo,
+                            preferredMirrorId = selectedMirrorId
+                        )
+                    }
                     Button(
-                        onClick = {
-                            UpdateChecker.startVerifiedApkDownload(
-                                context = context,
-                                updateInfo = updateInfo,
-                                preferredMirrorId = selectedMirrorId
-                            )
-                        },
+                        onClick = startFastDownload,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                focusRequester = if (downloadState !is ApkDownloadState.VerifiedReadyToInstall) primaryFocusRequester else null,
+                                onClick = startFastDownload
+                            )
                             .testTag("update_dialog_fast_cdn_btn"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = XboxNeonGreen,
@@ -469,16 +497,21 @@ fun UpdateAvailableDialog(
                     }
 
                     // Nút 2: Tải thường trực tiếp từ GitHub ngay trong ứng dụng (nếu GitHub lỗi vẫn có máy chủ phụ đỡ)
+                    val startNormalDownload: () -> Unit = {
+                        UpdateChecker.startVerifiedApkDownload(
+                            context = context,
+                            updateInfo = updateInfo,
+                            preferredMirrorId = "github_direct"
+                        )
+                    }
                     OutlinedButton(
-                        onClick = {
-                            UpdateChecker.startVerifiedApkDownload(
-                                context = context,
-                                updateInfo = updateInfo,
-                                preferredMirrorId = "github_direct"
-                            )
-                        },
+                        onClick = startNormalDownload,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                onClick = startNormalDownload
+                            )
                             .testTag("update_dialog_normal_direct_btn"),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.2.dp, DirectCyan)
@@ -507,6 +540,10 @@ fun UpdateAvailableDialog(
                         onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                onClick = onDismiss
+                            )
                             .testTag("update_dialog_later_btn"),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
@@ -519,26 +556,31 @@ fun UpdateAvailableDialog(
                         )
                     }
 
-                    OutlinedButton(
-                        onClick = {
-                            try {
-                                val targetUrl = updateInfo.releaseUrl.takeIf {
-                                    it.startsWith("https://github.com/muitenvn/CloudPlay-App/releases")
-                                } ?: githubReleasesUrl
-                                com.example.data.AppLogger.info("UI", "Mở trang bản phát hành GitHub trên trình duyệt ngoài")
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                }
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                com.example.data.AppLogger.error(
-                                    "UI",
-                                    "Lỗi mở trình duyệt tới trang GitHub Releases (${com.example.data.AppLogger.shortThrowable(e)})"
-                                )
+                    val openBrowserAction: () -> Unit = {
+                        try {
+                            val targetUrl = updateInfo.releaseUrl.takeIf {
+                                it.startsWith("https://github.com/muitenvn/CloudPlay-App/releases")
+                            } ?: githubReleasesUrl
+                            com.example.data.AppLogger.info("UI", "Mở trang bản phát hành GitHub trên trình duyệt ngoài")
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                        },
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            com.example.data.AppLogger.error(
+                                "UI",
+                                "Lỗi mở trình duyệt tới trang GitHub Releases (${com.example.data.AppLogger.shortThrowable(e)})"
+                            )
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = openBrowserAction,
                         modifier = Modifier
                             .weight(1.35f)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                onClick = openBrowserAction
+                            )
                             .testTag("update_dialog_open_browser_btn"),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan.copy(alpha = 0.65f))
@@ -563,6 +605,7 @@ fun UpdateAvailableDialog(
                     }
                 }
             }
+        }
         }
     }
 }

@@ -104,11 +104,21 @@ fun SmartTranslatorDialog(
     var translationResult by remember { mutableStateOf<GoogleGamingTranslator.SmartTranslationResult?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
     var copiedFeedback by remember { mutableStateOf(false) }
+    val firstTabFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = firstTabFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onPreviousTab = { selectedTab = (selectedTab - 1 + 3) % 3 },
+            onNextTab = { selectedTab = (selectedTab + 1) % 3 },
+            onBackPress = onDismissRequest
+        ) {
         Surface(
             modifier = modifier
                 .fillMaxWidth(0.95f)
@@ -165,7 +175,9 @@ fun SmartTranslatorDialog(
 
                     IconButton(
                         onClick = onDismissRequest,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .gamepadActionButton(cornerRadius = 16.dp, onClick = onDismissRequest)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -195,6 +207,11 @@ fun SmartTranslatorDialog(
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
+                        modifier = Modifier.gamepadActionButton(
+                            cornerRadius = 8.dp,
+                            focusRequester = firstTabFocusRequester,
+                            onClick = { selectedTab = 0 }
+                        ),
                         text = {
                             Text(
                                 text = if (isEn) "Quick Translate" else "Dịch Nhanh",
@@ -206,6 +223,10 @@ fun SmartTranslatorDialog(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
+                        modifier = Modifier.gamepadActionButton(
+                            cornerRadius = 8.dp,
+                            onClick = { selectedTab = 1 }
+                        ),
                         text = {
                             Text(
                                 text = if (isEn) "Rules" else "Quy Tắc Dịch",
@@ -217,6 +238,10 @@ fun SmartTranslatorDialog(
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
+                        modifier = Modifier.gamepadActionButton(
+                            cornerRadius = 8.dp,
+                            onClick = { selectedTab = 2 }
+                        ),
                         text = {
                             Text(
                                 text = if (isEn) "xCloud Options" else "Cài Đặt xCloud",
@@ -310,6 +335,7 @@ fun SmartTranslatorDialog(
                 }
             }
         }
+        }
     }
 }
 
@@ -355,7 +381,7 @@ private fun LiveTranslateSection(
                     color = XboxNeonGreen.copy(alpha = 0.16f),
                     modifier = Modifier
                         .clip(RoundedCornerShape(7.dp))
-                        .clickable { onPasteAndTranslate() }
+                        .gamepadClickable(cornerRadius = 7.dp) { onPasteAndTranslate() }
                         .testTag("translator_paste_button")
                 ) {
                     Text(
@@ -372,7 +398,7 @@ private fun LiveTranslateSection(
                         color = Color(0xFF1E1416),
                         modifier = Modifier
                             .clip(RoundedCornerShape(7.dp))
-                            .clickable { onClearInput() }
+                            .gamepadClickable(cornerRadius = 7.dp) { onClearInput() }
                             .testTag("translator_clear_button")
                     ) {
                         Text(
@@ -401,7 +427,9 @@ private fun LiveTranslateSection(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = Color(0xFF14241B),
-                    modifier = Modifier.clickable { onSelectSample(sample) }
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .gamepadClickable(cornerRadius = 8.dp) { onSelectSample(sample) }
                 ) {
                     Text(
                         text = sample,
@@ -422,7 +450,8 @@ private fun LiveTranslateSection(
             onValueChange = onInputTextChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 90.dp),
+                .heightIn(min = 90.dp)
+                .gamepadTextFieldFocus(cornerRadius = 12.dp),
             label = { Text(if (isEn) "Enter or paste English text (Game, Menu, Story...)" else "Nhập hoặc dán văn bản tiếng Anh (Game, Menu, Cốt truyện...)") },
             placeholder = { Text(if (isEn) "e.g., Press RT to boost speed in Forza Horizon..." else "VD: Press RT to boost speed in Forza Horizon...") },
             colors = OutlinedTextFieldDefaults.colors(
@@ -442,10 +471,17 @@ private fun LiveTranslateSection(
         )
 
         // Action Button
+        val canTranslate = !isTranslating && inputText.isNotBlank()
         Button(
             onClick = onTranslate,
-            enabled = !isTranslating && inputText.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
+            enabled = canTranslate,
+            modifier = Modifier
+                .fillMaxWidth()
+                .gamepadActionButton(
+                    enabled = canTranslate,
+                    cornerRadius = 10.dp,
+                    onClick = onTranslate
+                ),
             colors = ButtonDefaults.buttonColors(
                 containerColor = XboxNeonGreen,
                 contentColor = Color.Black
@@ -500,7 +536,12 @@ private fun LiveTranslateSection(
 
                         IconButton(
                             onClick = { onCopy(translationResult.translatedText) },
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier
+                                .size(28.dp)
+                                .gamepadActionButton(
+                                    cornerRadius = 14.dp,
+                                    onClick = { onCopy(translationResult.translatedText) }
+                                )
                         ) {
                             Icon(
                                 imageVector = if (copiedFeedback) Icons.Default.Check else Icons.Default.ContentCopy,
@@ -608,7 +649,8 @@ private fun SmartRulesSection(isEn: Boolean) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, JapanRed.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                .border(1.dp, JapanRed.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .gamepadClickable(cornerRadius = 12.dp) {},
             color = Color(0xFF1B1012)
         ) {
             Column(
@@ -661,7 +703,8 @@ private fun SmartRulesSection(isEn: Boolean) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, XboxNeonGreen.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                .border(1.dp, XboxNeonGreen.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                .gamepadClickable(cornerRadius = 12.dp) {},
             color = Color(0xFF101C15)
         ) {
             Column(
@@ -714,7 +757,8 @@ private fun SmartRulesSection(isEn: Boolean) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .border(1.dp, DirectCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                .border(1.dp, DirectCyan.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                .gamepadClickable(cornerRadius = 12.dp) {},
             color = Color(0xFF0F1A1B)
         ) {
             Column(
@@ -775,7 +819,12 @@ private fun SettingsSection(
         Surface(
             shape = RoundedCornerShape(10.dp),
             color = Color(0xFF121F17),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .gamepadClickable(enabled = !isEn, cornerRadius = 10.dp) {
+                    if (!isEn) onToggleTranslation(!translationActive)
+                }
         ) {
             Row(
                 modifier = Modifier
@@ -800,7 +849,7 @@ private fun SettingsSection(
                 }
                 Switch(
                     checked = translationActive,
-                    onCheckedChange = onToggleTranslation,
+                    onCheckedChange = null,
                     enabled = !isEn,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = XboxNeonGreen,
@@ -814,7 +863,12 @@ private fun SettingsSection(
         Surface(
             shape = RoundedCornerShape(10.dp),
             color = Color(0xFF121F17),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .gamepadClickable(cornerRadius = 10.dp) {
+                    onTogglePreserveTitles(!preserveTitles)
+                }
         ) {
             Row(
                 modifier = Modifier
@@ -833,7 +887,7 @@ private fun SettingsSection(
                 }
                 Switch(
                     checked = preserveTitles,
-                    onCheckedChange = onTogglePreserveTitles,
+                    onCheckedChange = null,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = DirectCyan,
                         checkedTrackColor = DirectCyan.copy(alpha = 0.3f)
@@ -846,7 +900,12 @@ private fun SettingsSection(
         Surface(
             shape = RoundedCornerShape(10.dp),
             color = Color(0xFF121F17),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .gamepadClickable(cornerRadius = 10.dp) {
+                    onToggleBilingual(!bilingualMode)
+                }
         ) {
             Row(
                 modifier = Modifier
@@ -865,7 +924,7 @@ private fun SettingsSection(
                 }
                 Switch(
                     checked = bilingualMode,
-                    onCheckedChange = onToggleBilingual,
+                    onCheckedChange = null,
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = XboxNeonGreen,
                         checkedTrackColor = XboxNeonGreen.copy(alpha = 0.3f)
@@ -880,7 +939,9 @@ private fun SettingsSection(
         if (onForceTranslatePage != null && !isEn) {
             Button(
                 onClick = onForceTranslatePage,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .gamepadActionButton(cornerRadius = 10.dp, onClick = onForceTranslatePage),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF163222),
                     contentColor = XboxNeonGreen
@@ -896,7 +957,9 @@ private fun SettingsSection(
         // Clear Cache Action
         Button(
             onClick = onClearCache,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .gamepadActionButton(cornerRadius = 10.dp, onClick = onClearCache),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFF241618),
                 contentColor = JapanRed

@@ -335,7 +335,15 @@ fun SessionHistoryScreen(
 
     // Hộp xác nhận xóa tất cả lịch sử theo khuôn .dlg
     if (showClearConfirmDialog) {
+        val cancelClearFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         Dialog(onDismissRequest = { showClearConfirmDialog = false }) {
+            com.example.ui.components.GamepadSurfaceController(
+                enabled = true,
+                defaultFocusRequester = cancelClearFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = { showClearConfirmDialog = false }
+            ) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -379,7 +387,10 @@ fun SessionHistoryScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
-                                .gamepadActionButton(cornerRadius = 12.dp) {
+                                .gamepadActionButton(
+                                    cornerRadius = 12.dp,
+                                    focusRequester = cancelClearFocusRequester
+                                ) {
                                     showClearConfirmDialog = false
                                 }
                         ) {
@@ -416,6 +427,7 @@ fun SessionHistoryScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

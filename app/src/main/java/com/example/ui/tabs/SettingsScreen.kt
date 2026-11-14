@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -565,87 +566,82 @@ fun SettingsScreen(
     }
 
     if (showResetGamepadConfirmDialog) {
+        val cancelResetFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         androidx.compose.ui.window.Dialog(
             onDismissRequest = {
                 com.example.data.AppLogger.info("UI", "Hủy hộp thoại Đặt lại bố cục tay cầm mặc định")
                 showResetGamepadConfirmDialog = false
             }
         ) {
-            androidx.compose.material3.Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp)),
-                shape = RoundedCornerShape(22.dp),
-                color = XboxSurfaceVariant
+            com.example.ui.components.GamepadSurfaceController(
+                enabled = true,
+                defaultFocusRequester = cancelResetFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = {
+                    com.example.data.AppLogger.info("UI", "Hủy hộp thoại Đặt lại bố cục tay cầm mặc định")
+                    showResetGamepadConfirmDialog = false
+                }
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                androidx.compose.material3.Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp)),
+                    shape = RoundedCornerShape(22.dp),
+                    color = XboxSurfaceVariant
                 ) {
-                    Text(
-                        text = if (isEn) "Reset Default Layout?" else "Đặt lại bố cục mặc định?",
-                        color = TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                    Text(
-                        text = if (isEn) {
-                            "Restore custom button coordinates to their default positions? Split modes and hidden buttons will be kept."
-                        } else {
-                            "Khôi phục tọa độ vị trí các nút về mặc định? Chế độ tách nút và danh sách nút ẩn sẽ được giữ nguyên."
-                        },
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            onClick = { showResetGamepadConfirmDialog = false },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = XboxSurface,
-                                contentColor = TextPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .gamepadActionButton(cornerRadius = 12.dp) {
-                                    showResetGamepadConfirmDialog = false
-                                }
-                                .semantics {
-                                    contentDescription = if (isEn) "Cancel reset default layout" else "Hủy đặt lại bố cục mặc định"
-                                }
-                                .testTag("cancel_reset_gamepad_btn")
-                        ) {
-                            Text(
-                                text = if (isEn) "Cancel" else "Hủy",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                SettingsRepository.resetGamepadCustomOffsets()
-                                showResetGamepadConfirmDialog = false
-                                Toast.makeText(
-                                    context,
-                                    if (isEn) "Reset default button positions" else "Đã đặt lại vị trí nút mặc định",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                        Text(
+                            text = if (isEn) "Reset Default Layout?" else "Đặt lại bố cục mặc định?",
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            text = if (isEn) {
+                                "Restore custom button coordinates to their default positions? Split modes and hidden buttons will be kept."
+                            } else {
+                                "Khôi phục tọa độ vị trí các nút về mặc định? Chế độ tách nút và danh sách nút ẩn sẽ được giữ nguyên."
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = XboxNeonGreen,
-                                contentColor = androidx.compose.ui.graphics.Color(0xFF03140B)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .gamepadActionButton(cornerRadius = 12.dp) {
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { showResetGamepadConfirmDialog = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = XboxSurface,
+                                    contentColor = TextPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(46.dp)
+                                    .focusRequester(cancelResetFocusRequester)
+                                    .gamepadActionButton(cornerRadius = 12.dp) {
+                                        showResetGamepadConfirmDialog = false
+                                    }
+                                    .semantics {
+                                        contentDescription = if (isEn) "Cancel reset default layout" else "Hủy đặt lại bố cục mặc định"
+                                    }
+                                    .testTag("cancel_reset_gamepad_btn")
+                            ) {
+                                Text(
+                                    text = if (isEn) "Cancel" else "Hủy",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            Button(
+                                onClick = {
                                     SettingsRepository.resetGamepadCustomOffsets()
                                     showResetGamepadConfirmDialog = false
                                     Toast.makeText(
@@ -653,17 +649,35 @@ fun SettingsScreen(
                                         if (isEn) "Reset default button positions" else "Đã đặt lại vị trí nút mặc định",
                                         Toast.LENGTH_SHORT
                                     ).show()
-                                }
-                                .semantics {
-                                    contentDescription = if (isEn) "Confirm reset default layout" else "Xác nhận đặt lại bố cục mặc định"
-                                }
-                                .testTag("confirm_reset_gamepad_btn")
-                        ) {
-                            Text(
-                                text = if (isEn) "Reset" else "Đặt lại",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = XboxNeonGreen,
+                                    contentColor = androidx.compose.ui.graphics.Color(0xFF03140B)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(46.dp)
+                                    .gamepadActionButton(cornerRadius = 12.dp) {
+                                        SettingsRepository.resetGamepadCustomOffsets()
+                                        showResetGamepadConfirmDialog = false
+                                        Toast.makeText(
+                                            context,
+                                            if (isEn) "Reset default button positions" else "Đã đặt lại vị trí nút mặc định",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    .semantics {
+                                        contentDescription = if (isEn) "Confirm reset default layout" else "Xác nhận đặt lại bố cục mặc định"
+                                    }
+                                    .testTag("confirm_reset_gamepad_btn")
+                            ) {
+                                Text(
+                                    text = if (isEn) "Reset" else "Đặt lại",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -679,6 +693,7 @@ private fun FullTermsInAppDialog(
     onOpenExternalBrowser: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val closeTermsFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val syncTermsThemeAndLangJs = remember(isEn) {
         val targetLang = if (isEn) "en" else "vi"
         """
@@ -697,86 +712,95 @@ private fun FullTermsInAppDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .height(620.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .testTag("full_terms_in_app_dialog"),
-            shape = RoundedCornerShape(22.dp),
-            color = XboxSurfaceVariant
+        com.example.ui.components.GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = closeTermsFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(XboxSurfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+            androidx.compose.material3.Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .height(620.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .testTag("full_terms_in_app_dialog"),
+                shape = RoundedCornerShape(22.dp),
+                color = XboxSurfaceVariant
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(XboxSurfaceVariant)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Shield,
-                            contentDescription = null,
-                            tint = XboxNeonGreen,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Column {
-                            Text(
-                                text = if (isEn) "Terms of Use & Privacy (15 Sections)" else "Điều khoản & Quyền riêng tư (15 mục)",
-                                color = TextPrimary,
-                                fontFamily = SpaceGroteskFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                maxLines = 1
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(18.dp)
                             )
-                            Text(
-                                text = if (isEn) "Tap '☰ Contents (15)' below to jump to any section" else "Bấm '☰ Mục lục (15)' bên dưới để nhảy nhanh từng mục",
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                maxLines = 1
-                            )
+                            Column {
+                                Text(
+                                    text = if (isEn) "Terms of Use & Privacy (15 Sections)" else "Điều khoản & Quyền riêng tư (15 mục)",
+                                    color = TextPrimary,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = if (isEn) "Tap '☰ Contents (15)' below to jump to any section" else "Bấm '☰ Mục lục (15)' bên dưới để nhảy nhanh từng mục",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            TextButton(
+                                onClick = onOpenExternalBrowser,
+                                modifier = Modifier.gamepadActionButton(
+                                    cornerRadius = 8.dp,
+                                    onClick = onOpenExternalBrowser
+                                )
+                            ) {
+                                Text(
+                                    text = if (isEn) "↗ Web" else "↗ Mở Web",
+                                    color = DirectCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            TextButton(
+                                onClick = onDismiss,
+                                modifier = Modifier
+                                    .focusRequester(closeTermsFocusRequester)
+                                    .gamepadActionButton(
+                                        cornerRadius = 8.dp,
+                                        onClick = onDismiss
+                                    )
+                            ) {
+                                Text(
+                                    text = if (isEn) "✕ Close" else "✕ Đóng",
+                                    color = XboxNeonGreen,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        TextButton(
-                            onClick = onOpenExternalBrowser,
-                            modifier = Modifier.gamepadActionButton(
-                                cornerRadius = 8.dp,
-                                onClick = onOpenExternalBrowser
-                            )
-                        ) {
-                            Text(
-                                text = if (isEn) "↗ Web" else "↗ Mở Web",
-                                color = DirectCyan,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        TextButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.gamepadActionButton(
-                                cornerRadius = 8.dp,
-                                onClick = onDismiss
-                            )
-                        ) {
-                            Text(
-                                text = if (isEn) "✕ Close" else "✕ Đóng",
-                                color = XboxNeonGreen,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
 
                 androidx.compose.ui.viewinterop.AndroidView(
                     modifier = Modifier
@@ -825,6 +849,7 @@ private fun FullTermsInAppDialog(
                     }
                 )
             }
+        }
         }
     }
 }

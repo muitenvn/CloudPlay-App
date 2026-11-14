@@ -121,6 +121,8 @@ fun UserTermsAgreementDialog(
         """.trimIndent()
     }
 
+    val defaultTermsFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
     Dialog(
         onDismissRequest = {
             if (isDismissible) onDismissRequest()
@@ -131,6 +133,17 @@ fun UserTermsAgreementDialog(
             usePlatformDefaultWidth = false
         )
     ) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = defaultTermsFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onPreviousTab = { showFullInAppReader = false },
+            onNextTab = { showFullInAppReader = true },
+            onBackPress = {
+                if (isDismissible) onDismissRequest() else onDecline()
+            }
+        ) {
         Surface(
             modifier = Modifier
                 .padding(horizontal = 12.dp, vertical = 14.dp)
@@ -201,7 +214,10 @@ fun UserTermsAgreementDialog(
                             .weight(1f)
                             .defaultMinSize(minHeight = 40.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { showFullInAppReader = false },
+                            .gamepadClickable(
+                                cornerRadius = 10.dp,
+                                onStepHorizontal = { dir -> if (dir > 0) showFullInAppReader = true }
+                            ) { showFullInAppReader = false },
                         shape = RoundedCornerShape(10.dp),
                         color = if (!showFullInAppReader) TermsSoft else TermsBg,
                         border = BorderStroke(1.dp, if (!showFullInAppReader) TermsAccent else TermsLine)
@@ -227,7 +243,10 @@ fun UserTermsAgreementDialog(
                             .weight(1f)
                             .defaultMinSize(minHeight = 40.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .clickable { showFullInAppReader = true },
+                            .gamepadClickable(
+                                cornerRadius = 10.dp,
+                                onStepHorizontal = { dir -> if (dir < 0) showFullInAppReader = false }
+                            ) { showFullInAppReader = true },
                         shape = RoundedCornerShape(10.dp),
                         color = if (showFullInAppReader) TermsSoft else TermsBg,
                         border = BorderStroke(1.dp, if (showFullInAppReader) TermsAccent else TermsLine)
@@ -252,6 +271,10 @@ fun UserTermsAgreementDialog(
                         onClick = { openFullTermsInBrowser() },
                         modifier = Modifier
                             .defaultMinSize(minHeight = 40.dp)
+                            .gamepadActionButton(
+                                cornerRadius = 10.dp,
+                                onClick = { openFullTermsInBrowser() }
+                            )
                             .testTag("open_full_terms_web_button"),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -406,13 +429,16 @@ fun UserTermsAgreementDialog(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (agreedToTerms) TermsSoft else TermsBg)
                         .border(1.dp, if (agreedToTerms) TermsAccent.copy(alpha = 0.5f) else TermsLine, RoundedCornerShape(10.dp))
-                        .clickable { agreedToTerms = !agreedToTerms }
+                        .gamepadClickable(
+                            cornerRadius = 10.dp,
+                            focusRequester = if (!isDismissible) defaultTermsFocusRequester else null
+                        ) { agreedToTerms = !agreedToTerms }
                         .padding(vertical = 6.dp, horizontal = 8.dp)
                         .testTag("terms_checkbox_row")
                 ) {
                     Checkbox(
                         checked = agreedToTerms,
-                        onCheckedChange = { agreedToTerms = it },
+                        onCheckedChange = null,
                         colors = CheckboxDefaults.colors(
                             checkedColor = TermsAccent,
                             uncheckedColor = TermsMuted,
@@ -446,6 +472,10 @@ fun UserTermsAgreementDialog(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
+                            .gamepadActionButton(
+                                cornerRadius = 12.dp,
+                                onClick = onDecline
+                            )
                             .testTag("decline_terms_button"),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(
@@ -476,6 +506,12 @@ fun UserTermsAgreementDialog(
                         modifier = Modifier
                             .weight(1.2f)
                             .height(48.dp)
+                            .gamepadActionButton(
+                                enabled = agreedToTerms,
+                                cornerRadius = 12.dp,
+                                focusRequester = if (isDismissible) defaultTermsFocusRequester else null,
+                                onClick = onAccept
+                            )
                             .testTag("accept_terms_button"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -496,6 +532,7 @@ fun UserTermsAgreementDialog(
                 }
             }
         }
+        }
     }
 }
 
@@ -508,8 +545,10 @@ private fun LegalSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
             .background(TermsCardBg, RoundedCornerShape(10.dp))
             .border(1.dp, TermsLine, RoundedCornerShape(10.dp))
+            .gamepadClickable(cornerRadius = 10.dp) {}
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

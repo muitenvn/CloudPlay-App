@@ -182,7 +182,8 @@ internal fun HudControlsTabContent(
                     onToggleOrientation()
                 },
                 size = 32.dp,
-                tint = HudInk
+                tint = HudInk,
+                enableGamepadFocus = false
             )
         }
     }

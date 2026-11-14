@@ -21,9 +21,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -50,82 +53,121 @@ internal fun QuickSettingsSheetDialog(
 ) {
     val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
     val isEn = config.isEnglishUI()
+    val closeFocusRequester = remember { FocusRequester() }
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            contentAlignment = Alignment.Center
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = closeFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
         ) {
-            val useMultiColumn = maxWidth >= 600.dp
-            val sheetMaxHeight = (maxHeight - 8.dp).coerceAtLeast(260.dp)
-
-            Surface(
+            BoxWithConstraints(
                 modifier = Modifier
-                    .widthIn(max = 840.dp)
                     .fillMaxWidth()
-                    .heightIn(max = sheetMaxHeight)
-                    .testTag("in_game_quick_settings_dialog"),
-                shape = RoundedCornerShape(22.dp),
-                color = HudSurface2,
-                shadowElevation = 0.dp
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Header (.s-head)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = config.tr("Cài đặt nhanh", "Quick settings"),
-                                color = HudInk,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = config.tr(
-                                    "Độ phân giải, khung hình, tay cầm và màu sắc",
-                                    "Resolution, frame rate, gamepad & image colors"
-                                ),
-                                color = HudFaint,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        HudPanelIconButton(
-                            icon = Icons.Default.Close,
-                            contentDescription = config.tr("Đóng", "Close"),
-                            onClick = onDismiss,
-                            size = 34.dp,
-                            bgColor = HudSurface,
-                            tint = HudMuted
-                        )
-                    }
+                val useMultiColumn = maxWidth >= 600.dp
+                val sheetMaxHeight = (maxHeight - 8.dp).coerceAtLeast(260.dp)
 
-                    // Body (.s-body)
-                    if (useMultiColumn) {
+                Surface(
+                    modifier = Modifier
+                        .widthIn(max = 840.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = sheetMaxHeight)
+                        .testTag("in_game_quick_settings_dialog"),
+                    shape = RoundedCornerShape(22.dp),
+                    color = HudSurface2,
+                    shadowElevation = 0.dp
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Header (.s-head)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.Top
+                                .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = config.tr("Cài đặt nhanh", "Quick settings"),
+                                    color = HudInk,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = config.tr(
+                                        "Độ phân giải, khung hình, tay cầm và màu sắc",
+                                        "Resolution, frame rate, gamepad & image colors"
+                                    ),
+                                    color = HudFaint,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            HudPanelIconButton(
+                                icon = Icons.Default.Close,
+                                contentDescription = config.tr("Đóng", "Close"),
+                                onClick = onDismiss,
+                                size = 34.dp,
+                                bgColor = HudSurface,
+                                tint = HudMuted,
+                                modifier = Modifier.focusRequester(closeFocusRequester)
+                            )
+                        }
+
+                        // Body (.s-body)
+                        if (useMultiColumn) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    QuickSettingsColControls(
+                                        config = config,
+                                        isEn = isEn,
+                                        recorderState = recorderState,
+                                        onToggleVirtualController = onToggleVirtualController,
+                                        onSelectXboxWebUiMode = onSelectXboxWebUiMode,
+                                        onToggleRecording = onToggleRecording
+                                    )
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1.05f),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    QuickSettingsColQuality(config = config, isEn = isEn)
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    QuickSettingsColDisplay(config = config)
+                                }
+                            }
+                        } else {
                             Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 QuickSettingsColControls(
                                     config = config,
@@ -135,38 +177,9 @@ internal fun QuickSettingsSheetDialog(
                                     onSelectXboxWebUiMode = onSelectXboxWebUiMode,
                                     onToggleRecording = onToggleRecording
                                 )
-                            }
-                            Column(
-                                modifier = Modifier.weight(1.05f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
                                 QuickSettingsColQuality(config = config, isEn = isEn)
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
                                 QuickSettingsColDisplay(config = config)
                             }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            QuickSettingsColControls(
-                                config = config,
-                                isEn = isEn,
-                                recorderState = recorderState,
-                                onToggleVirtualController = onToggleVirtualController,
-                                onSelectXboxWebUiMode = onSelectXboxWebUiMode,
-                                onToggleRecording = onToggleRecording
-                            )
-                            QuickSettingsColQuality(config = config, isEn = isEn)
-                            QuickSettingsColDisplay(config = config)
                         }
                     }
                 }
@@ -223,6 +236,7 @@ private fun QuickSettingsColControls(
     HudSectionLabel(config.tr("Quay màn hình (.MP4)", "Screen recording (.MP4)"))
 
     // Chọn mức chất lượng quay
+    val curRecordIdx = ScreenRecordQuality.entries.indexOf(config.screenRecordQuality).coerceAtLeast(0)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -239,7 +253,15 @@ private fun QuickSettingsColControls(
                     .heightIn(min = 32.dp)
                     .clip(RoundedCornerShape(9.dp))
                     .background(if (selected) HudSelBg else Color.Transparent)
-                    .clickable { SettingsRepository.updateScreenRecordQuality(q) }
+                    .gamepadClickable(
+                        cornerRadius = 9.dp,
+                        onStepHorizontal = { dir ->
+                            val nextIdx = (curRecordIdx + dir).coerceIn(0, ScreenRecordQuality.entries.lastIndex)
+                            if (nextIdx != curRecordIdx) {
+                                SettingsRepository.updateScreenRecordQuality(ScreenRecordQuality.entries[nextIdx])
+                            }
+                        }
+                    ) { SettingsRepository.updateScreenRecordQuality(q) }
                     .padding(horizontal = 3.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -313,6 +335,7 @@ private fun QuickSettingsColQuality(
         CellularOptimizationMode.HIGH to "1080p",
         CellularOptimizationMode.MAX_SPEED_UNCAPPED to "1080p+"
     )
+    val selectedModeIdx = modeOptions.indexOfFirst { it.first == config.cellularMode }.coerceAtLeast(0)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -329,6 +352,12 @@ private fun QuickSettingsColQuality(
                 QuickSettingsSegOption(
                     label = label,
                     selected = config.cellularMode == mode,
+                    onStepHorizontal = { dir ->
+                        val nextIdx = (selectedModeIdx + dir).coerceIn(0, modeOptions.lastIndex)
+                        if (nextIdx != selectedModeIdx) {
+                            SettingsRepository.updateCellularMode(modeOptions[nextIdx].first)
+                        }
+                    },
                     onClick = { SettingsRepository.updateCellularMode(mode) },
                     modifier = Modifier.weight(1f)
                 )
@@ -342,6 +371,12 @@ private fun QuickSettingsColQuality(
                 QuickSettingsSegOption(
                     label = label,
                     selected = config.cellularMode == mode,
+                    onStepHorizontal = { dir ->
+                        val nextIdx = (selectedModeIdx + dir).coerceIn(0, modeOptions.lastIndex)
+                        if (nextIdx != selectedModeIdx) {
+                            SettingsRepository.updateCellularMode(modeOptions[nextIdx].first)
+                        }
+                    },
                     onClick = { SettingsRepository.updateCellularMode(mode) },
                     modifier = Modifier.weight(1f)
                 )
@@ -379,6 +414,7 @@ private fun QuickSettingsColQuality(
 private fun QuickSettingsSegOption(
     label: String,
     selected: Boolean,
+    onStepHorizontal: ((Int) -> Unit)? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -387,7 +423,11 @@ private fun QuickSettingsSegOption(
             .heightIn(min = 34.dp)
             .clip(RoundedCornerShape(9.dp))
             .background(if (selected) HudSelBg else Color.Transparent)
-            .clickable(onClick = onClick)
+            .gamepadClickable(
+                cornerRadius = 9.dp,
+                onStepHorizontal = onStepHorizontal,
+                onClick = onClick
+            )
             .padding(horizontal = 4.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center
     ) {

@@ -122,10 +122,22 @@ fun WebDownloadPortalDialog(
         context.startActivity(Intent.createChooser(intent, if (isEn) "Share CloudPlay APK" else "Chia sẻ link tải CloudPlay"))
     }
 
+    val shareBtnFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val closeBtnFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = if (selectedTab == 0) shareBtnFocusRequester else closeBtnFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onPreviousTab = { selectedTab = (selectedTab - 1 + 2) % 2 },
+            onNextTab = { selectedTab = (selectedTab + 1) % 2 },
+            onBackPress = onDismiss
+        ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
@@ -187,7 +199,13 @@ fun WebDownloadPortalDialog(
                         }
                         IconButton(
                             onClick = onDismiss,
-                            modifier = Modifier.testTag("close_web_portal_button")
+                            modifier = Modifier
+                                .gamepadActionButton(
+                                    cornerRadius = 18.dp,
+                                    focusRequester = closeBtnFocusRequester,
+                                    onClick = onDismiss
+                                )
+                                .testTag("close_web_portal_button")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
@@ -220,7 +238,12 @@ fun WebDownloadPortalDialog(
                                     if (active) XboxNeonGreen else XboxCardBorder,
                                     RoundedCornerShape(11.dp)
                                 )
-                                .clickable { selectedTab = index }
+                                .gamepadClickable(
+                                    cornerRadius = 11.dp,
+                                    onStepHorizontal = { dir ->
+                                        selectedTab = (selectedTab + dir).coerceIn(0, 1)
+                                    }
+                                ) { selectedTab = index }
                                 .testTag("web_portal_tab_$index"),
                             color = if (active) Color(0xFF13261B) else XboxSurface
                         ) {
@@ -304,7 +327,10 @@ fun WebDownloadPortalDialog(
                                                 Surface(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(999.dp))
-                                                        .clickable { qrUseDirectApk = isDirectMode },
+                                                        .gamepadClickable(
+                                                            cornerRadius = 999.dp,
+                                                            onStepHorizontal = { dir -> qrUseDirectApk = dir > 0 }
+                                                        ) { qrUseDirectApk = isDirectMode },
                                                     shape = RoundedCornerShape(999.dp),
                                                     color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant,
                                                     border = androidx.compose.foundation.BorderStroke(
@@ -372,7 +398,7 @@ fun WebDownloadPortalDialog(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .clickable { qrUseDirectApk = false },
+                                                .gamepadClickable(cornerRadius = 10.dp) { qrUseDirectApk = false },
                                             shape = RoundedCornerShape(10.dp),
                                             color = if (!qrUseDirectApk) DirectCyan.copy(alpha = 0.14f) else XboxSurfaceVariant,
                                             border = androidx.compose.foundation.BorderStroke(
@@ -403,7 +429,11 @@ fun WebDownloadPortalDialog(
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) }
+                                                    onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) },
+                                                    modifier = Modifier.gamepadActionButton(
+                                                        cornerRadius = 18.dp,
+                                                        onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) }
+                                                    )
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.ContentCopy,
@@ -420,7 +450,7 @@ fun WebDownloadPortalDialog(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .clickable { qrUseDirectApk = true },
+                                                .gamepadClickable(cornerRadius = 10.dp) { qrUseDirectApk = true },
                                             shape = RoundedCornerShape(10.dp),
                                             color = if (qrUseDirectApk) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant,
                                             border = androidx.compose.foundation.BorderStroke(
@@ -451,7 +481,11 @@ fun WebDownloadPortalDialog(
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) }
+                                                    onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) },
+                                                    modifier = Modifier.gamepadActionButton(
+                                                        cornerRadius = 18.dp,
+                                                        onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) }
+                                                    )
                                                 ) {
                                                     Icon(
                                                         imageVector = Icons.Default.ContentCopy,
@@ -471,6 +505,11 @@ fun WebDownloadPortalDialog(
                                                 onClick = { sharePortalLink() },
                                                 modifier = Modifier
                                                     .weight(1f)
+                                                    .gamepadActionButton(
+                                                        cornerRadius = 12.dp,
+                                                        focusRequester = shareBtnFocusRequester,
+                                                        onClick = { sharePortalLink() }
+                                                    )
                                                     .testTag("share_apk_portal_btn"),
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = XboxNeonGreen,
@@ -488,23 +527,29 @@ fun WebDownloadPortalDialog(
                                                 )
                                             }
 
+                                            val openApkLink: () -> Unit = {
+                                                try {
+                                                    val browserIntent = Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse(config.customApkDownloadUrl)
+                                                    )
+                                                    context.startActivity(browserIntent)
+                                                } catch (_: Exception) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        config.tr("Link không hợp lệ", "Invalid URL"),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
                                             OutlinedButton(
-                                                onClick = {
-                                                    try {
-                                                        val browserIntent = Intent(
-                                                            Intent.ACTION_VIEW,
-                                                            Uri.parse(config.customApkDownloadUrl)
-                                                        )
-                                                        context.startActivity(browserIntent)
-                                                    } catch (_: Exception) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            config.tr("Link không hợp lệ", "Invalid URL"),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    }
-                                                },
-                                                modifier = Modifier.weight(1f),
+                                                onClick = openApkLink,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .gamepadActionButton(
+                                                        cornerRadius = 10.dp,
+                                                        onClick = openApkLink
+                                                    ),
                                                 shape = RoundedCornerShape(10.dp)
                                             ) {
                                                 Icon(Icons.Default.Download, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
@@ -601,6 +646,7 @@ fun WebDownloadPortalDialog(
                     }
                 }
             }
+        }
         }
     }
 }

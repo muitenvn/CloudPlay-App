@@ -91,10 +91,27 @@ fun HowToUseGuideDialog(
         )
     }
 
+    val gotItFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        GamepadSurfaceController(
+            enabled = true,
+            defaultFocusRequester = gotItFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onPreviousTab = {
+                val idx = visibleSections.indexOf(selectedSection).coerceAtLeast(0)
+                selectedSection = visibleSections[(idx - 1 + visibleSections.size) % visibleSections.size]
+            },
+            onNextTab = {
+                val idx = visibleSections.indexOf(selectedSection).coerceAtLeast(0)
+                selectedSection = visibleSections[(idx + 1) % visibleSections.size]
+            },
+            onBackPress = onDismiss
+        ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
@@ -156,6 +173,7 @@ fun HowToUseGuideDialog(
                             .size(32.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.08f))
+                            .gamepadActionButton(cornerRadius = 16.dp, onClick = onDismiss)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -188,7 +206,14 @@ fun HowToUseGuideDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(9.dp))
-                                .clickable { selectedSection = section }
+                                .gamepadClickable(
+                                    cornerRadius = 9.dp,
+                                    onStepHorizontal = { dir ->
+                                        val curIdx = visibleSections.indexOf(selectedSection).coerceAtLeast(0)
+                                        val nextIdx = (curIdx + dir).coerceIn(0, visibleSections.lastIndex)
+                                        selectedSection = visibleSections[nextIdx]
+                                    }
+                                ) { selectedSection = section }
                                 .padding(1.dp),
                             color = if (isSelected) Color(0xFF16352A) else Color.Transparent,
                             shape = RoundedCornerShape(9.dp)
@@ -353,7 +378,12 @@ fun HowToUseGuideDialog(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(46.dp),
+                        .height(46.dp)
+                        .gamepadActionButton(
+                            cornerRadius = 12.dp,
+                            focusRequester = gotItFocusRequester,
+                            onClick = onDismiss
+                        ),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XboxNeonGreen,
                         contentColor = Color(0xFF03140B)
@@ -369,6 +399,7 @@ fun HowToUseGuideDialog(
                 }
             }
         }
+        }
     }
 }
 
@@ -383,7 +414,8 @@ private fun GuideStepCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
+            .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp))
+            .gamepadClickable(cornerRadius = 14.dp) {},
         colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.9f))
     ) {
         Column(
@@ -456,7 +488,8 @@ private fun GuideDetailCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
+            .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp))
+            .gamepadClickable(cornerRadius = 14.dp) {},
         colors = CardDefaults.cardColors(containerColor = XboxSurface.copy(alpha = 0.9f))
     ) {
         Row(

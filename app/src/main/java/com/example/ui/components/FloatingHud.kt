@@ -64,6 +64,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -146,6 +148,7 @@ fun FloatingHud(
     onToggleRecording: () -> Unit = {},
     xboxWebUiMode: com.example.data.XboxWebUiMode = com.example.data.XboxWebUiMode.CLASSIC,
     onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {},
+    onHudOpenStateChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -163,10 +166,33 @@ fun FloatingHud(
     var isInteracting by remember { mutableStateOf(true) }
     var prevLoggedHudMode by remember { mutableStateOf(hudMode) }
 
-    LaunchedEffect(hudMode) {
+    val compactExpandFocusRequester = remember { FocusRequester() }
+    val expandedFirstTabFocusRequester = remember { FocusRequester() }
+    val cancelExitFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(hudMode, showExitConfirmDialog) {
+        onHudOpenStateChanged(hudMode != HudMode.MINIMIZED || showExitConfirmDialog)
         if (prevLoggedHudMode != hudMode) {
             AppLogger.info("UI", "Menu nhanh trong game (HUD): ${prevLoggedHudMode.name} -> ${hudMode.name}")
             prevLoggedHudMode = hudMode
+        }
+    }
+
+    val comboTick = GamepadUiNavigation.hudToggleComboTick
+    var lastHandledComboTick by remember { mutableIntStateOf(comboTick) }
+    LaunchedEffect(comboTick) {
+        if (comboTick != lastHandledComboTick) {
+            lastHandledComboTick = comboTick
+            lastInteractionTime = System.currentTimeMillis()
+            isInteracting = true
+            if (showExitConfirmDialog) {
+                showExitConfirmDialog = false
+            } else if (hudMode == HudMode.MINIMIZED) {
+                dockedEdge = HudDockedEdge.NONE
+                hudMode = HudMode.EXPANDED
+            } else {
+                hudMode = HudMode.MINIMIZED
+            }
         }
     }
 
@@ -571,38 +597,49 @@ fun FloatingHud(
                         }
 
                         HudMode.COMPACT -> {
-                            HudCompactRail(
-                                config = config,
-                                telemetry = telemetry,
-                                isAnchoredRight = isAnchoredRight,
-                                maxHeight = (screenMaxHeight - 16.dp).coerceAtLeast(220.dp),
-                                gamepadActive = virtualControllerEnabled || physicalControllerConnected,
-                                recorderState = recorderState,
-                                onExpand = {
-                                    markUserInteraction()
-                                    hudMode = HudMode.EXPANDED
-                                },
-                                onToggleGamepad = {
-                                    markUserInteraction()
-                                    onToggleVirtualController()
-                                },
-                                onToggleRecording = {
-                                    markUserInteraction()
-                                    onToggleRecording()
-                                },
-                                onReload = {
-                                    markUserInteraction()
-                                    onReloadPage()
-                                },
-                                onMinimize = {
+                            GamepadSurfaceController(
+                                enabled = !showExitConfirmDialog,
+                                defaultFocusRequester = compactExpandFocusRequester,
+                                autoRequestDefaultFocus = true,
+                                onBackPress = {
                                     markUserInteraction()
                                     hudMode = HudMode.MINIMIZED
-                                },
-                                onRequestExit = {
-                                    markUserInteraction()
-                                    showExitConfirmDialog = true
                                 }
-                            )
+                            ) {
+                                HudCompactRail(
+                                    config = config,
+                                    telemetry = telemetry,
+                                    isAnchoredRight = isAnchoredRight,
+                                    maxHeight = (screenMaxHeight - 16.dp).coerceAtLeast(220.dp),
+                                    gamepadActive = virtualControllerEnabled || physicalControllerConnected,
+                                    recorderState = recorderState,
+                                    expandFocusRequester = compactExpandFocusRequester,
+                                    onExpand = {
+                                        markUserInteraction()
+                                        hudMode = HudMode.EXPANDED
+                                    },
+                                    onToggleGamepad = {
+                                        markUserInteraction()
+                                        onToggleVirtualController()
+                                    },
+                                    onToggleRecording = {
+                                        markUserInteraction()
+                                        onToggleRecording()
+                                    },
+                                    onReload = {
+                                        markUserInteraction()
+                                        onReloadPage()
+                                    },
+                                    onMinimize = {
+                                        markUserInteraction()
+                                        hudMode = HudMode.MINIMIZED
+                                    },
+                                    onRequestExit = {
+                                        markUserInteraction()
+                                        showExitConfirmDialog = true
+                                    }
+                                )
+                            }
                         }
 
                         HudMode.EXPANDED -> {
@@ -611,112 +648,144 @@ fun FloatingHud(
                             val bodyScrollState = rememberScrollState()
                             val isThermalWarmOrHot = isThermalSupported && thermalStatus >= 1
 
-                            Column(
-                                modifier = Modifier
-                                    .width(panelWidth)
-                                    .heightIn(max = panelMaxHeight)
-                            ) {
-                                // Header (.p-head)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    HudPingDotIndicator(
-                                        pingMs = if (telemetry.rttMs > 0) telemetry.rttMs else null,
-                                        hasSample = telemetry.hasStatsSample,
-                                        fontSize = 15.sp,
-                                        showMsSuffix = true
-                                    )
-                                    if (recorderState.isRecording) {
-                                        val mins = recorderState.elapsedSeconds / 60
-                                        val secs = recorderState.elapsedSeconds % 60
-                                        Text(
-                                            text = "● %02d:%02d".format(mins, secs),
-                                            color = HudDanger,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            fontFamily = JetBrainsMonoFontFamily,
-                                            maxLines = 1
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    HudPanelIconButton(
-                                        icon = if (isAnchoredRight) {
-                                            Icons.AutoMirrored.Filled.KeyboardArrowRight
-                                        } else {
-                                            Icons.AutoMirrored.Filled.KeyboardArrowLeft
-                                        },
-                                        contentDescription = config.tr("Thu gọn", "Collapse"),
-                                        onClick = {
-                                            markUserInteraction()
-                                            hudMode = HudMode.COMPACT
-                                        },
-                                        modifier = Modifier.testTag("hud_collapse_48dp_button")
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .size(34.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(HudSurface2)
-                                            .clickable {
-                                                markUserInteraction()
-                                                hudMode = HudMode.MINIMIZED
-                                            }
-                                            .testTag("hud_minimize_48dp_button"),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "─",
-                                            color = HudMuted,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                            GamepadSurfaceController(
+                                enabled = !showExitConfirmDialog,
+                                defaultFocusRequester = expandedFirstTabFocusRequester,
+                                autoRequestDefaultFocus = true,
+                                onPreviousTab = {
+                                    markUserInteraction()
+                                    val allTabs = HudExpandedTab.entries
+                                    val curIdx = allTabs.indexOf(activeTab).coerceAtLeast(0)
+                                    activeTab = allTabs[(curIdx - 1 + allTabs.size) % allTabs.size]
+                                },
+                                onNextTab = {
+                                    markUserInteraction()
+                                    val allTabs = HudExpandedTab.entries
+                                    val curIdx = allTabs.indexOf(activeTab).coerceAtLeast(0)
+                                    activeTab = allTabs[(curIdx + 1) % allTabs.size]
+                                },
+                                onBackPress = {
+                                    markUserInteraction()
+                                    hudMode = HudMode.MINIMIZED
                                 }
-
-                                // 4 Tabs (.tabs)
-                                Row(
+                            ) {
+                                Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        .width(panelWidth)
+                                        .heightIn(max = panelMaxHeight)
                                 ) {
-                                    val tabs = listOf(
-                                        HudExpandedTab.NETWORK to config.tr("Mạng", "Net"),
-                                        HudExpandedTab.CONTROLS to config.tr("Điều khiển", "Controls"),
-                                        HudExpandedTab.IMAGE to config.tr("Hình ảnh", "Image"),
-                                        HudExpandedTab.DEVICE to config.tr("Máy", "Device")
-                                    )
-                                    tabs.forEach { (tab, title) ->
-                                        val selected = activeTab == tab
+                                    // Header (.p-head)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        HudPingDotIndicator(
+                                            pingMs = if (telemetry.rttMs > 0) telemetry.rttMs else null,
+                                            hasSample = telemetry.hasStatsSample,
+                                            fontSize = 15.sp,
+                                            showMsSuffix = true
+                                        )
+                                        if (recorderState.isRecording) {
+                                            val mins = recorderState.elapsedSeconds / 60
+                                            val secs = recorderState.elapsedSeconds % 60
+                                            Text(
+                                                text = "● %02d:%02d".format(mins, secs),
+                                                color = HudDanger,
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = JetBrainsMonoFontFamily,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        HudPanelIconButton(
+                                            icon = if (isAnchoredRight) {
+                                                Icons.AutoMirrored.Filled.KeyboardArrowRight
+                                            } else {
+                                                Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                                            },
+                                            contentDescription = config.tr("Thu gọn", "Collapse"),
+                                            onClick = {
+                                                markUserInteraction()
+                                                hudMode = HudMode.COMPACT
+                                            },
+                                            modifier = Modifier.testTag("hud_collapse_48dp_button")
+                                        )
                                         Box(
                                             modifier = Modifier
-                                                .weight(1f)
-                                                .heightIn(min = 34.dp)
-                                                .clip(RoundedCornerShape(11.dp))
-                                                .background(if (selected) HudSelBg else HudSurface)
-                                                .clickable {
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(HudSurface2)
+                                                .gamepadClickable(cornerRadius = 12.dp) {
                                                     markUserInteraction()
-                                                    activeTab = tab
+                                                    hudMode = HudMode.MINIMIZED
                                                 }
-                                                .testTag("hud_tab_${tab.name.lowercase()}")
-                                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                                                .testTag("hud_minimize_48dp_button"),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = title,
-                                                color = if (selected) HudAccent else HudMuted,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                text = "─",
+                                                color = HudMuted,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
-                                }
+
+                                    // 4 Tabs (.tabs)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        val tabs = listOf(
+                                            HudExpandedTab.NETWORK to config.tr("Mạng", "Net"),
+                                            HudExpandedTab.CONTROLS to config.tr("Điều khiển", "Controls"),
+                                            HudExpandedTab.IMAGE to config.tr("Hình ảnh", "Image"),
+                                            HudExpandedTab.DEVICE to config.tr("Máy", "Device")
+                                        )
+                                        tabs.forEach { (tab, title) ->
+                                            val selected = activeTab == tab
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .heightIn(min = 34.dp)
+                                                    .clip(RoundedCornerShape(11.dp))
+                                                    .background(if (selected) HudSelBg else HudSurface)
+                                                    .gamepadClickable(
+                                                        cornerRadius = 11.dp,
+                                                        focusRequester = if (selected) expandedFirstTabFocusRequester else null,
+                                                        onStepHorizontal = { dir ->
+                                                            markUserInteraction()
+                                                            val curIdx = tabs.indexOfFirst { it.first == activeTab }.coerceAtLeast(0)
+                                                            val nextIdx = (curIdx + dir).coerceIn(0, tabs.lastIndex)
+                                                            if (nextIdx != curIdx) {
+                                                                activeTab = tabs[nextIdx].first
+                                                            }
+                                                        }
+                                                    ) {
+                                                        markUserInteraction()
+                                                        activeTab = tab
+                                                    }
+                                                    .testTag("hud_tab_${tab.name.lowercase()}")
+                                                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = title,
+                                                    color = if (selected) HudAccent else HudMuted,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
 
                                 // Body (.p-body)
                                 Column(
@@ -846,6 +915,7 @@ fun FloatingHud(
                                     )
                                 }
                             }
+                            }
                         }
                     }
                 }
@@ -875,74 +945,97 @@ fun FloatingHud(
                 showExitConfirmDialog = false
             }
         ) {
-            Surface(
-                modifier = Modifier
-                    .widthIn(max = 340.dp)
-                    .fillMaxWidth()
-                    .testTag("hud_exit_confirm_dialog"),
-                shape = RoundedCornerShape(22.dp),
-                color = HudSurface2,
-                shadowElevation = 0.dp
+            GamepadSurfaceController(
+                enabled = true,
+                defaultFocusRequester = cancelExitFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = {
+                    AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                    showExitConfirmDialog = false
+                }
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Surface(
+                    modifier = Modifier
+                        .widthIn(max = 340.dp)
+                        .fillMaxWidth()
+                        .testTag("hud_exit_confirm_dialog"),
+                    shape = RoundedCornerShape(22.dp),
+                    color = HudSurface2,
+                    shadowElevation = 0.dp
                 ) {
-                    Text(
-                        text = stringResource(R.string.dialog_exit_title),
-                        color = HudInk,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 17.sp
-                    )
-                    Text(
-                        text = stringResource(R.string.dialog_exit_message),
-                        color = HudDialogBody,
-                        fontSize = 14.sp,
-                        lineHeight = 19.sp
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
-                                showExitConfirmDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = HudSurface,
-                                contentColor = HudInk
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.heightIn(min = 42.dp)
+                        Text(
+                            text = stringResource(R.string.dialog_exit_title),
+                            color = HudInk,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 17.sp
+                        )
+                        Text(
+                            text = stringResource(R.string.dialog_exit_message),
+                            color = HudDialogBody,
+                            fontSize = 14.sp,
+                            lineHeight = 19.sp
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = stringResource(R.string.btn_cancel),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
-                                showExitConfirmDialog = false
-                                onNavigateHome()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = HudDanger,
-                                contentColor = HudDangerOn
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.heightIn(min = 42.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.btn_confirm_exit),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.5.sp
-                            )
+                            Button(
+                                onClick = {
+                                    AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                                    showExitConfirmDialog = false
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = HudSurface,
+                                    contentColor = HudInk
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .heightIn(min = 42.dp)
+                                    .focusRequester(cancelExitFocusRequester)
+                                    .gamepadActionButton(cornerRadius = 12.dp) {
+                                        AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
+                                        showExitConfirmDialog = false
+                                    }
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.btn_cancel),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                            }
+                            Button(
+                                onClick = {
+                                    AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
+                                    showExitConfirmDialog = false
+                                    onNavigateHome()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = HudDanger,
+                                    contentColor = HudDangerOn
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .heightIn(min = 42.dp)
+                                    .gamepadActionButton(cornerRadius = 12.dp) {
+                                        AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
+                                        showExitConfirmDialog = false
+                                        onNavigateHome()
+                                    }
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.btn_confirm_exit),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp
+                                )
+                            }
                         }
                     }
                 }
@@ -1010,6 +1103,7 @@ private fun HudCompactRail(
     maxHeight: androidx.compose.ui.unit.Dp,
     gamepadActive: Boolean,
     recorderState: com.example.cloudplay.ScreenRecorderState,
+    expandFocusRequester: FocusRequester,
     onExpand: () -> Unit,
     onToggleGamepad: () -> Unit,
     onToggleRecording: () -> Unit,
@@ -1041,7 +1135,9 @@ private fun HudCompactRail(
             bgColor = HudSelBg,
             tint = HudAccent,
             onClick = onExpand,
-            modifier = Modifier.testTag("hud_expand_button")
+            modifier = Modifier
+                .focusRequester(expandFocusRequester)
+                .testTag("hud_expand_button")
         )
 
         // Tay cầm ảo
@@ -1060,7 +1156,7 @@ private fun HudCompactRail(
                 .size(44.dp)
                 .clip(RoundedCornerShape(13.dp))
                 .background(if (recorderState.isRecording) HudDangerBg else Color.Transparent)
-                .clickable(onClick = onToggleRecording)
+                .gamepadClickable(cornerRadius = 13.dp, onClick = onToggleRecording)
                 .testTag("hud_record_button"),
             contentAlignment = Alignment.Center
         ) {
@@ -1145,7 +1241,7 @@ private fun HudRailButton(
             .size(44.dp)
             .clip(RoundedCornerShape(13.dp))
             .background(bgColor)
-            .clickable(onClick = onClick),
+            .gamepadClickable(cornerRadius = 13.dp, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -1172,7 +1268,7 @@ private fun HudFooterActionButton(
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(13.dp))
             .background(bg)
-            .clickable(onClick = onClick)
+            .gamepadClickable(cornerRadius = 13.dp, onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)

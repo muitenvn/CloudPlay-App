@@ -67,9 +67,61 @@ object GamepadUiNavigation {
 
     var activeHorizontalStepper: ((Int) -> Unit)? = null
 
+    /**
+     * Tăng lên mỗi khi người dùng giữ đồng thời View (SELECT) + Menu (START) khoảng 0,6 giây.
+     * Nhận tổ hợp phím theo kiểu nghe lén (passive): không chặn hay tiêu thụ phím của game.
+     */
+    var hudToggleComboTick by mutableIntStateOf(0)
+        private set
+
     private var hatOrStickDirection: FocusDirection? = null
     private var lastKeyDownCode: Int = KeyEvent.KEYCODE_UNKNOWN
     private var lastKeyDownTimeMs: Long = 0L
+
+    private var isSelectHeld: Boolean = false
+    private var isStartHeld: Boolean = false
+    private var comboFiredForCurrentHold: Boolean = false
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val comboHoldRunnable = Runnable {
+        if (isSelectHeld && isStartHeld && !comboFiredForCurrentHold) {
+            comboFiredForCurrentHold = true
+            onGamepadInteraction()
+            hudToggleComboTick++
+        }
+    }
+
+    /**
+     * Nghe lén tổ hợp phím giữ View (KEYCODE_BUTTON_SELECT) + Menu (KEYCODE_BUTTON_START) trong ~0,6 giây (600ms).
+     * Hàm này KHÔNG bao giờ tiêu thụ sự kiện phím để mọi nút vẫn đi thẳng vào WebView game bình thường.
+     */
+    fun observeKeyEventPassively(event: KeyEvent) {
+        val keyCode = event.keyCode
+        if (keyCode != KeyEvent.KEYCODE_BUTTON_SELECT && keyCode != KeyEvent.KEYCODE_BUTTON_START) {
+            return
+        }
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                if (event.repeatCount == 0) {
+                    val wasBothHeld = isSelectHeld && isStartHeld
+                    if (keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) isSelectHeld = true
+                    if (keyCode == KeyEvent.KEYCODE_BUTTON_START) isStartHeld = true
+                    val nowBothHeld = isSelectHeld && isStartHeld
+                    if (!wasBothHeld && nowBothHeld && !comboFiredForCurrentHold) {
+                        mainHandler.removeCallbacks(comboHoldRunnable)
+                        mainHandler.postDelayed(comboHoldRunnable, 600L)
+                    }
+                }
+            }
+            KeyEvent.ACTION_UP -> {
+                if (keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) isSelectHeld = false
+                if (keyCode == KeyEvent.KEYCODE_BUTTON_START) isStartHeld = false
+                if (!isSelectHeld || !isStartHeld) {
+                    comboFiredForCurrentHold = false
+                    mainHandler.removeCallbacks(comboHoldRunnable)
+                }
+            }
+        }
+    }
 
     fun onTouchInteraction() {
         if (isGamepadModeActive) {
@@ -146,7 +198,7 @@ object GamepadUiNavigation {
         val stickX = event.getAxisValue(MotionEvent.AXIS_X)
         val stickY = event.getAxisValue(MotionEvent.AXIS_Y)
 
-        val rawX = if ( kotlin.math.abs(hatX) > 0.5f) hatX else stickX
+        val rawX = if (kotlin.math.abs(hatX) > 0.5f) hatX else stickX
         val rawY = if (kotlin.math.abs(hatY) > 0.5f) hatY else stickY
 
         val deadzone = 0.48f
@@ -186,25 +238,26 @@ object GamepadUiNavigation {
 }
 
 /**
- * Bọc một vùng giao diện của App để hỗ trợ:
+ * Modifier gắn điều khiển tay cầm cho một vùng giao diện hoặc hộp thoại (kể cả AlertDialog tạo cửa sổ riêng):
  * - Tự động lặp khi giữ cần trái / D-Pad (initial delay 300ms, bước lặp 105ms).
- * - Tự động cấp focus vào [defaultFocusRequester] nếu chưa có phần tử nào đang được chọn.
- * - Phím LB / RB để chuyển tab ở thanh dưới.
- * - Phím B để đóng hộp thoại / quay lại.
+ * - Tự động cấp focus vào [defaultFocusRequester] khi mở hộp thoại/bảng ([autoRequestDefaultFocus] == true)
+ *   hoặc khi chưa có phần tử nào đang được chọn.
+ * - Gắn OnGenericMotionListener cho cửa sổ Dialog để cần analog trái hoạt động trong mọi hộp thoại.
+ * - Phím LB / RB để chuyển tab, phím B để đóng hộp thoại / quay lại, phím X / Y cho thao tác phụ.
  */
-@Composable
-fun GamepadSurfaceController(
-    enabled: Boolean,
+fun Modifier.gamepadControllerScope(
+    enabled: Boolean = true,
     defaultFocusRequester: FocusRequester? = null,
+    autoRequestDefaultFocus: Boolean = false,
+    attachWindowMotionListener: Boolean = false,
     onPreviousTab: (() -> Unit)? = null,
     onNextTab: (() -> Unit)? = null,
     onBackPress: (() -> Unit)? = null,
     onSecondaryX: (() -> Unit)? = null,
-    onSecondaryY: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
+    onSecondaryY: (() -> Unit)? = null
+): Modifier = composed {
     val focusManager = LocalFocusManager.current
+    val view = androidx.compose.ui.platform.LocalView.current
     val currentOnPrevTab by rememberUpdatedState(onPreviousTab)
     val currentOnNextTab by rememberUpdatedState(onNextTab)
     val currentOnBack by rememberUpdatedState(onBackPress)
@@ -216,12 +269,36 @@ fun GamepadSurfaceController(
     var dpadPressSeq by remember { mutableIntStateOf(0) }
 
     DisposableEffect(enabled) {
-        GamepadUiNavigation.shouldRouteToAppUi = enabled
         if (!enabled) {
             heldDpadDirection = null
         }
         onDispose {
             heldDpadDirection = null
+        }
+    }
+
+    DisposableEffect(view, enabled, attachWindowMotionListener) {
+        if (!enabled || !attachWindowMotionListener) {
+            onDispose { }
+        } else {
+            val listener = android.view.View.OnGenericMotionListener { _, event ->
+                if (event != null && GamepadUiNavigation.shouldRouteToAppUi) {
+                    GamepadUiNavigation.handleGenericMotionEvent(event)
+                } else {
+                    false
+                }
+            }
+            view.setOnGenericMotionListener(listener)
+            onDispose {
+                view.setOnGenericMotionListener(null)
+            }
+        }
+    }
+
+    LaunchedEffect(enabled, autoRequestDefaultFocus, defaultFocusRequester) {
+        if (enabled && autoRequestDefaultFocus && defaultFocusRequester != null) {
+            delay(40L)
+            runCatching { defaultFocusRequester.requestFocus() }
         }
     }
 
@@ -255,85 +332,126 @@ fun GamepadSurfaceController(
         }
     }
 
-    androidx.compose.foundation.layout.Box(
-        modifier = modifier.onKeyEvent { keyEvent ->
-            if (!enabled) return@onKeyEvent false
-            val native = keyEvent.nativeKeyEvent
-            if (!GamepadUiNavigation.isFromGamepadOrKeyboard(native)) {
-                return@onKeyEvent false
-            }
-
-            val keyCode = native.keyCode
-            val dir = when (keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> FocusDirection.Up
-                KeyEvent.KEYCODE_DPAD_DOWN -> FocusDirection.Down
-                KeyEvent.KEYCODE_DPAD_LEFT -> FocusDirection.Left
-                KeyEvent.KEYCODE_DPAD_RIGHT -> FocusDirection.Right
-                else -> null
-            }
-
-            if (dir != null) {
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    GamepadUiNavigation.onGamepadInteraction()
-                    if (native.repeatCount == 0) {
-                        heldDpadDirection = dir
-                        dpadPressSeq++
-                    }
-                    return@onKeyEvent true
-                } else if (keyEvent.type == KeyEventType.KeyUp) {
-                    if (heldDpadDirection == dir) {
-                        heldDpadDirection = null
-                    }
-                    return@onKeyEvent true
-                }
-            }
-
-            if (keyEvent.type == KeyEventType.KeyDown && native.repeatCount == 0) {
-                when (keyCode) {
-                    KeyEvent.KEYCODE_BUTTON_L1 -> {
-                        val prev = currentOnPrevTab
-                        if (prev != null) {
-                            GamepadUiNavigation.onGamepadInteraction()
-                            prev()
-                            return@onKeyEvent true
-                        }
-                    }
-                    KeyEvent.KEYCODE_BUTTON_R1 -> {
-                        val next = currentOnNextTab
-                        if (next != null) {
-                            GamepadUiNavigation.onGamepadInteraction()
-                            next()
-                            return@onKeyEvent true
-                        }
-                    }
-                    KeyEvent.KEYCODE_BUTTON_B -> {
-                        val back = currentOnBack
-                        if (back != null) {
-                            GamepadUiNavigation.onGamepadInteraction()
-                            back()
-                            return@onKeyEvent true
-                        }
-                    }
-                    KeyEvent.KEYCODE_BUTTON_X -> {
-                        val actX = currentOnX
-                        if (actX != null) {
-                            GamepadUiNavigation.onGamepadInteraction()
-                            actX()
-                            return@onKeyEvent true
-                        }
-                    }
-                    KeyEvent.KEYCODE_BUTTON_Y -> {
-                        val actY = currentOnY
-                        if (actY != null) {
-                            GamepadUiNavigation.onGamepadInteraction()
-                            actY()
-                            return@onKeyEvent true
-                        }
-                    }
-                }
-            }
-            false
+    this.onKeyEvent { keyEvent ->
+        val native = keyEvent.nativeKeyEvent
+        GamepadUiNavigation.observeKeyEventPassively(native)
+        if (!enabled) return@onKeyEvent false
+        if (!GamepadUiNavigation.isFromGamepadOrKeyboard(native)) {
+            return@onKeyEvent false
         }
+
+        val keyCode = native.keyCode
+        val dir = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> FocusDirection.Up
+            KeyEvent.KEYCODE_DPAD_DOWN -> FocusDirection.Down
+            KeyEvent.KEYCODE_DPAD_LEFT -> FocusDirection.Left
+            KeyEvent.KEYCODE_DPAD_RIGHT -> FocusDirection.Right
+            else -> null
+        }
+
+        if (dir != null) {
+            if (keyEvent.type == KeyEventType.KeyDown) {
+                GamepadUiNavigation.onGamepadInteraction()
+                if (native.repeatCount == 0) {
+                    heldDpadDirection = dir
+                    dpadPressSeq++
+                }
+                return@onKeyEvent true
+            } else if (keyEvent.type == KeyEventType.KeyUp) {
+                if (heldDpadDirection == dir) {
+                    heldDpadDirection = null
+                }
+                return@onKeyEvent true
+            }
+        }
+
+        if (keyEvent.type == KeyEventType.KeyDown && native.repeatCount == 0) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_BUTTON_A,
+                KeyEvent.KEYCODE_DPAD_CENTER -> {
+                    GamepadUiNavigation.onGamepadInteraction()
+                    runCatching { currentDefaultRequester?.requestFocus() }
+                    return@onKeyEvent true
+                }
+                KeyEvent.KEYCODE_BUTTON_L1 -> {
+                    val prev = currentOnPrevTab
+                    if (prev != null) {
+                        GamepadUiNavigation.onGamepadInteraction()
+                        prev()
+                        return@onKeyEvent true
+                    }
+                }
+                KeyEvent.KEYCODE_BUTTON_R1 -> {
+                    val next = currentOnNextTab
+                    if (next != null) {
+                        GamepadUiNavigation.onGamepadInteraction()
+                        next()
+                        return@onKeyEvent true
+                    }
+                }
+                KeyEvent.KEYCODE_BUTTON_B -> {
+                    val back = currentOnBack
+                    if (back != null) {
+                        GamepadUiNavigation.onGamepadInteraction()
+                        back()
+                        return@onKeyEvent true
+                    }
+                }
+                KeyEvent.KEYCODE_BUTTON_X -> {
+                    val actX = currentOnX
+                    if (actX != null) {
+                        GamepadUiNavigation.onGamepadInteraction()
+                        actX()
+                        return@onKeyEvent true
+                    }
+                }
+                KeyEvent.KEYCODE_BUTTON_Y -> {
+                    val actY = currentOnY
+                    if (actY != null) {
+                        GamepadUiNavigation.onGamepadInteraction()
+                        actY()
+                        return@onKeyEvent true
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
+/**
+ * Bọc một vùng giao diện của App hoặc hộp thoại để hỗ trợ:
+ * - Tự động lặp khi giữ cần trái / D-Pad (initial delay 300ms, bước lặp 105ms).
+ * - Tự động cấp focus vào [defaultFocusRequester] nếu chưa có phần tử nào đang được chọn.
+ * - Phím LB / RB để chuyển tab.
+ * - Phím B để đóng hộp thoại / quay lại.
+ */
+@Composable
+fun GamepadSurfaceController(
+    enabled: Boolean,
+    defaultFocusRequester: FocusRequester? = null,
+    autoRequestDefaultFocus: Boolean = false,
+    attachWindowMotionListener: Boolean = false,
+    onPreviousTab: (() -> Unit)? = null,
+    onNextTab: (() -> Unit)? = null,
+    onBackPress: (() -> Unit)? = null,
+    onSecondaryX: (() -> Unit)? = null,
+    onSecondaryY: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier.gamepadControllerScope(
+            enabled = enabled,
+            defaultFocusRequester = defaultFocusRequester,
+            autoRequestDefaultFocus = autoRequestDefaultFocus,
+            attachWindowMotionListener = attachWindowMotionListener,
+            onPreviousTab = onPreviousTab,
+            onNextTab = onNextTab,
+            onBackPress = onBackPress,
+            onSecondaryX = onSecondaryX,
+            onSecondaryY = onSecondaryY
+        )
     ) {
         content()
     }

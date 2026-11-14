@@ -97,10 +97,28 @@ fun AppLogDialog(
         }
     }
 
+    val closeFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val filterKeys = remember { listOf("ALL", "ERRORS", "UI", "PROBE", "VPN", "STREAM", "PERF") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier
             .fillMaxWidth()
+            .gamepadControllerScope(
+                enabled = true,
+                defaultFocusRequester = closeFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onPreviousTab = {
+                    val curIdx = filterKeys.indexOf(selectedFilter).coerceAtLeast(0)
+                    selectedFilter = filterKeys[(curIdx - 1 + filterKeys.size) % filterKeys.size]
+                },
+                onNextTab = {
+                    val curIdx = filterKeys.indexOf(selectedFilter).coerceAtLeast(0)
+                    selectedFilter = filterKeys[(curIdx + 1) % filterKeys.size]
+                },
+                onBackPress = onDismiss
+            )
             .testTag("app_log_dialog"),
         shape = RoundedCornerShape(22.dp),
         containerColor = XboxSurfaceVariant,
@@ -182,7 +200,7 @@ fun AppLogDialog(
                         Surface(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
-                                .clickable { selectedFilter = key }
+                                .gamepadClickable(cornerRadius = 10.dp) { selectedFilter = key }
                                 .testTag("app_log_filter_$key"),
                             shape = RoundedCornerShape(10.dp),
                             color = when {
@@ -357,27 +375,29 @@ fun AppLogDialog(
                 }
 
                 // Action row: Copy + Clear
+                val copyLogsAction: () -> Unit = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    val exportedText = if (selectedFilter == "PERF") {
+                        com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
+                    } else {
+                        AppLogger.exportAsText() + "\n\n" + com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
+                    }
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Log", exportedText))
+                    Toast.makeText(
+                        context,
+                        if (isEn) "Copied logs to clipboard" else "Đã sao chép nhật ký vào bộ nhớ tạm",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            val exportedText = if (selectedFilter == "PERF") {
-                                com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
-                            } else {
-                                AppLogger.exportAsText() + "\n\n" + com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
-                            }
-                            clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Log", exportedText))
-                            Toast.makeText(
-                                context,
-                                if (isEn) "Copied logs to clipboard" else "Đã sao chép nhật ký vào bộ nhớ tạm",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
+                        onClick = copyLogsAction,
                         modifier = Modifier
                             .weight(1f)
+                            .gamepadActionButton(cornerRadius = 10.dp, onClick = copyLogsAction)
                             .testTag("copy_app_log_btn"),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
@@ -402,6 +422,7 @@ fun AppLogDialog(
                         onClick = { AppLogger.clear() },
                         modifier = Modifier
                             .weight(1f)
+                            .gamepadActionButton(cornerRadius = 10.dp, onClick = { AppLogger.clear() })
                             .testTag("clear_app_log_btn"),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
@@ -432,7 +453,13 @@ fun AppLogDialog(
                     contentColor = Color(0xFF03140B)
                 ),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.testTag("close_app_log_btn")
+                modifier = Modifier
+                    .gamepadActionButton(
+                        cornerRadius = 12.dp,
+                        focusRequester = closeFocusRequester,
+                        onClick = onDismiss
+                    )
+                    .testTag("close_app_log_btn")
             ) {
                 Text(
                     text = if (isEn) "Close" else "Đóng",
@@ -442,16 +469,19 @@ fun AppLogDialog(
             }
         },
         dismissButton = {
+            val retestPingAction: () -> Unit = {
+                AppLogger.info("UI", "Bấm nút Đo ping lại (trong Nhật ký hệ thống)")
+                VpnManager.testAllServers(
+                    autoPickBest = false,
+                    context = context,
+                    reason = "bấm nút Đo ping lại (trong Nhật ký hệ thống)"
+                )
+            }
             TextButton(
-                onClick = {
-                    AppLogger.info("UI", "Bấm nút Đo ping lại (trong Nhật ký hệ thống)")
-                    VpnManager.testAllServers(
-                        autoPickBest = false,
-                        context = context,
-                        reason = "bấm nút Đo ping lại (trong Nhật ký hệ thống)"
-                    )
-                },
-                modifier = Modifier.testTag("retest_ping_from_log_btn")
+                onClick = retestPingAction,
+                modifier = Modifier
+                    .gamepadActionButton(cornerRadius = 8.dp, onClick = retestPingAction)
+                    .testTag("retest_ping_from_log_btn")
             ) {
                 Text(
                     text = if (isEn) "Run Ping Test" else "Đo ping lại",

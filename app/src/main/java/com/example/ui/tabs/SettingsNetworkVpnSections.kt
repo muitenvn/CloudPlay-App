@@ -46,12 +46,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import com.example.data.AppConfig
 import com.example.data.AppLanguage
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.SettingsRepository
 import com.example.ui.components.gamepadActionButton
 import com.example.ui.components.gamepadClickable
+import com.example.ui.components.gamepadControllerScope
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
@@ -846,8 +848,16 @@ internal fun SettingsAdvancedSection(
     }
 
     if (showResetAdvancedConfirmDialog) {
+        val cancelAdvResetFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         AlertDialog(
             onDismissRequest = { showResetAdvancedConfirmDialog = false },
+            modifier = Modifier.gamepadControllerScope(
+                enabled = true,
+                defaultFocusRequester = cancelAdvResetFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = { showResetAdvancedConfirmDialog = false }
+            ),
             containerColor = XboxSurface,
             titleContentColor = TextPrimary,
             textContentColor = TextSecondary,
@@ -906,6 +916,7 @@ internal fun SettingsAdvancedSection(
                 TextButton(
                     onClick = { showResetAdvancedConfirmDialog = false },
                     modifier = Modifier
+                        .focusRequester(cancelAdvResetFocusRequester)
                         .gamepadActionButton(cornerRadius = 8.dp) {
                             showResetAdvancedConfirmDialog = false
                         }

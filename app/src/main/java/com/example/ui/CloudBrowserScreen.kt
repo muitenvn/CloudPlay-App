@@ -1186,9 +1186,20 @@ fun CloudBrowserScreen(
             }
         }
 
+        val isLoadingOverlayVisible = !suppressLoadingOverlayAfterExitPreview && isPageLoading && pageLoadingProgress < 0.80f
+        var isHudOpen by remember { mutableStateOf(false) }
+        val shouldRouteGamepadToAppUi = isHudOpen || showQuickSettingsDialog || showTranslatorDialog || isLoadingOverlayVisible
+
+        LaunchedEffect(shouldRouteGamepadToAppUi, webViewInstance) {
+            com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi = shouldRouteGamepadToAppUi
+            if (!shouldRouteGamepadToAppUi) {
+                webViewInstance?.requestFocus()
+            }
+        }
+
         // Dedicated Game Loading Screen (Optimized for Portrait & Landscape, isolated state collection)
         IsolatedInGameLoadingOverlay(
-            isLoading = !suppressLoadingOverlayAfterExitPreview && isPageLoading && pageLoadingProgress < 0.80f,
+            isLoading = isLoadingOverlayVisible,
             progress = pageLoadingProgress,
             hasGamepad = gamepadStatus.hasPhysicalController,
             gameProfile = gameProfile,
@@ -1502,7 +1513,8 @@ fun CloudBrowserScreen(
                     config.tr("Đã chuyển sang Giao diện mới (play.xbox.com)", "Switched to New UI (play.xbox.com)")
                 }
                 android.widget.Toast.makeText(context, toastMsg, android.widget.Toast.LENGTH_SHORT).show()
-            }
+            },
+            onHudOpenStateChanged = { open -> isHudOpen = open }
         )
 
         // In-Game Quick Settings Sheet (Opened from "Cài đặt" in Expanded HUD)
@@ -1696,7 +1708,8 @@ private fun IsolatedFloatingHud(
     onSelectFortniteControlMode: (Boolean) -> Unit,
     onToggleRecording: () -> Unit,
     xboxWebUiMode: com.example.data.XboxWebUiMode = com.example.data.XboxWebUiMode.CLASSIC,
-    onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {}
+    onSelectXboxWebUiMode: (com.example.data.XboxWebUiMode) -> Unit = {},
+    onHudOpenStateChanged: (Boolean) -> Unit = {}
 ) {
     val vpnState by VpnManager.state.collectAsState()
     val translationInfo by XboxBridge.translationInfo.collectAsState()
@@ -1739,7 +1752,8 @@ private fun IsolatedFloatingHud(
         recorderState = recorderState,
         onToggleRecording = onToggleRecording,
         xboxWebUiMode = xboxWebUiMode,
-        onSelectXboxWebUiMode = onSelectXboxWebUiMode
+        onSelectXboxWebUiMode = onSelectXboxWebUiMode,
+        onHudOpenStateChanged = onHudOpenStateChanged
     )
 }
 

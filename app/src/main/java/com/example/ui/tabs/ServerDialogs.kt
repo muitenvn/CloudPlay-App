@@ -28,6 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.FocusRequester
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadControllerScope
+import com.example.ui.components.gamepadTextFieldFocus
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
@@ -63,6 +67,7 @@ internal fun CustomProxyDialog(
     var testResult by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val cancelFocusRequester = remember { FocusRequester() }
 
     val trimmedHost = host.trim()
     val isPrivateIp = remember(trimmedHost) {
@@ -71,6 +76,13 @@ internal fun CustomProxyDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.gamepadControllerScope(
+            enabled = true,
+            defaultFocusRequester = cancelFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
+        ),
         title = {
             Text(
                 config.tr("Thêm Proxy Tùy Chỉnh", "Add Custom Proxy"),
@@ -99,7 +111,9 @@ internal fun CustomProxyDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(if (isEn) "Display Name (Optional)" else "Tên gợi nhớ (Tùy chọn)") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .gamepadTextFieldFocus(cornerRadius = 8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
@@ -120,7 +134,9 @@ internal fun CustomProxyDialog(
                     },
                     label = { Text(if (isEn) "Public IPv4 Address" else "Địa chỉ IPv4 công cộng") },
                     placeholder = { Text(if (isEn) "e.g., 138.199.21.239" else "vd: 138.199.21.239") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .gamepadTextFieldFocus(cornerRadius = 8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
@@ -145,7 +161,9 @@ internal fun CustomProxyDialog(
                         value = port,
                         onValueChange = { port = it },
                         label = { Text(if (isEn) "Port" else "Cổng (Port)") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .gamepadTextFieldFocus(cornerRadius = 8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -157,7 +175,9 @@ internal fun CustomProxyDialog(
                         value = protocol,
                         onValueChange = { protocol = it.lowercase() },
                         label = { Text(if (isEn) "Protocol (http/socks5)" else "Giao thức (http/socks5)") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .gamepadTextFieldFocus(cornerRadius = 8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -170,7 +190,9 @@ internal fun CustomProxyDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(if (isEn) "Description / Notes" else "Ghi chú mô tả") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .gamepadTextFieldFocus(cornerRadius = 8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
@@ -183,7 +205,9 @@ internal fun CustomProxyDialog(
                         value = speedMbps,
                         onValueChange = { speedMbps = it },
                         label = { Text(if (isEn) "Estimated Speed (Mbps)" else "Tốc độ ước tính (Mbps)") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .gamepadTextFieldFocus(cornerRadius = 8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -200,7 +224,9 @@ internal fun CustomProxyDialog(
                             azureEndpoint = com.example.vpn.GeoIpDetector.getAzureEndpointForCountry(cleanCc)
                         },
                         label = { Text(if (isEn) "Country ISO (Auto/Manual)" else "Mã quốc gia (Tự nhận/Sửa tay)") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .gamepadTextFieldFocus(cornerRadius = 8.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -213,7 +239,9 @@ internal fun CustomProxyDialog(
                     value = azureEndpoint,
                     onValueChange = { azureEndpoint = it },
                     label = { Text(if (isEn) "Azure Endpoint (JP/KR only)" else "Azure Endpoint (Chỉ có cho JP/KR)") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .gamepadTextFieldFocus(cornerRadius = 8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
@@ -222,8 +250,8 @@ internal fun CustomProxyDialog(
                 )
 
                 // Test connection button
-                Button(
-                    onClick = {
+                val triggerTest: () -> Unit = {
+                    if (!isTesting) {
                         isTesting = true
                         testResult = null
                         scope.launch(Dispatchers.IO) {
@@ -237,10 +265,17 @@ internal fun CustomProxyDialog(
                             }
                             isTesting = false
                         }
-                    },
+                    }
+                }
+                Button(
+                    onClick = triggerTest,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 46.dp),
+                        .defaultMinSize(minHeight = 46.dp)
+                        .gamepadActionButton(
+                            cornerRadius = 12.dp,
+                            onClick = triggerTest
+                        ),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = XboxSurface)
                 ) {
@@ -257,8 +292,9 @@ internal fun CustomProxyDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
+            val canSave = trimmedHost.isNotBlank() && !isPrivateIp
+            val triggerSave: () -> Unit = {
+                if (canSave) {
                     val p = port.toIntOrNull() ?: 8080
                     val speed = speedMbps.toIntOrNull() ?: 200
                     val cc = countryCode.trim().uppercase().ifBlank {
@@ -284,9 +320,18 @@ internal fun CustomProxyDialog(
                         isVerified = false
                     )
                     onAddServer(server)
-                },
-                enabled = trimmedHost.isNotBlank() && !isPrivateIp,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp),
+                }
+            }
+            Button(
+                onClick = triggerSave,
+                enabled = canSave,
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
+                    .gamepadActionButton(
+                        enabled = canSave,
+                        cornerRadius = 12.dp,
+                        onClick = triggerSave
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = XboxNeonGreen,
@@ -299,7 +344,13 @@ internal fun CustomProxyDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
+                    .gamepadActionButton(
+                        cornerRadius = 8.dp,
+                        focusRequester = cancelFocusRequester,
+                        onClick = onDismiss
+                    )
             ) {
                 Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
@@ -319,6 +370,7 @@ internal fun ServerDetailDialog(
     onDismiss: () -> Unit
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
+    val closeBtnFocusRequester = remember { FocusRequester() }
     val detailBadge = measurement?.formatDisplayBadge(isEn = isEn, showPort = true)
         ?: if (pingMs > 0) "${pingMs}ms (:${server.port})" else "${config.tr("Chưa đo", "Not tested")} (:${server.port})"
     val unlockText = when (unlockStatus) {
@@ -330,6 +382,13 @@ internal fun ServerDetailDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.gamepadControllerScope(
+            enabled = true,
+            defaultFocusRequester = closeBtnFocusRequester,
+            autoRequestDefaultFocus = true,
+            attachWindowMotionListener = true,
+            onBackPress = onDismiss
+        ),
         title = {
             Text(
                 text = "${server.flag} ${server.name}",
@@ -374,7 +433,13 @@ internal fun ServerDetailDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 44.dp),
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
+                    .gamepadActionButton(
+                        cornerRadius = 12.dp,
+                        focusRequester = closeBtnFocusRequester,
+                        onClick = onDismiss
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = XboxNeonGreen,

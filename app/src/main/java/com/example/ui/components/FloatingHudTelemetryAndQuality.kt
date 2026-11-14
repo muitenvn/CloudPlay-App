@@ -269,7 +269,7 @@ internal fun HudNetworkTabContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 42.dp)
-                    .clickable {
+                    .gamepadClickable(cornerRadius = 12.dp) {
                         onInteraction()
                         showLagDiag = !showLagDiag
                     }
@@ -484,6 +484,7 @@ internal fun HudImageTabContent(
             CellularOptimizationMode.HIGH to "1080p",
             CellularOptimizationMode.MAX_SPEED_UNCAPPED to "1080p+"
         )
+        val selectedModeIdx = modeOptions.indexOfFirst { it.first == config.cellularMode }.coerceAtLeast(0)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -500,7 +501,16 @@ internal fun HudImageTabContent(
                         .heightIn(min = 34.dp)
                         .clip(RoundedCornerShape(9.dp))
                         .background(if (selected) HudSelBg else Color.Transparent)
-                        .clickable {
+                        .gamepadClickable(
+                            cornerRadius = 9.dp,
+                            onStepHorizontal = { dir ->
+                                val nextIdx = (selectedModeIdx + dir).coerceIn(0, modeOptions.lastIndex)
+                                if (nextIdx != selectedModeIdx) {
+                                    onInteraction()
+                                    onSelectCellularMode(modeOptions[nextIdx].first)
+                                }
+                            }
+                        ) {
                             onInteraction()
                             onSelectCellularMode(mode)
                         }
@@ -584,7 +594,7 @@ internal fun HudImageTabContent(
                     modifier = Modifier
                         .clip(RoundedCornerShape(9.dp))
                         .background(if (adaptiveQualityState.isAutoAdapting) HudSelBg else HudSurface2)
-                        .clickable {
+                        .gamepadClickable(cornerRadius = 9.dp) {
                             onInteraction()
                             onToggleAutoAdapting(!adaptiveQualityState.isAutoAdapting)
                         }

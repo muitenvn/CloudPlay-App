@@ -66,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -185,73 +186,84 @@ fun InGameLoadingOverlay(
             if (isEn) "Virtual Gamepad" else "Tay cầm ảo"
         }
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(ConsoleDeepBg)
-                .testTag("ingame_loading_overlay")
-        ) {
-            // Atmospheric game cover backdrop (subtle, moody console depth)
-            Image(
-                painter = painterResource(id = gameProfile.bannerResId),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.18f)
-            )
+        val skipFocusRequester = remember { FocusRequester() }
 
-            // Multi-stop dark emerald console vignette overlay
-            Box(
+        GamepadSurfaceController(
+            enabled = isLoading,
+            defaultFocusRequester = skipFocusRequester,
+            autoRequestDefaultFocus = true,
+            onBackPress = onNavigateHome
+        ) {
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xDE060C09),
-                                Color(0xC809140E),
-                                Color(0xF2060B08)
+                    .background(ConsoleDeepBg)
+                    .testTag("ingame_loading_overlay")
+            ) {
+                // Atmospheric game cover backdrop (subtle, moody console depth)
+                Image(
+                    painter = painterResource(id = gameProfile.bannerResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.18f)
+                )
+
+                // Multi-stop dark emerald console vignette overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xDE060C09),
+                                    Color(0xC809140E),
+                                    Color(0xF2060B08)
+                                )
                             )
                         )
+                )
+
+                val isLandscape = maxWidth > maxHeight || maxWidth >= 600.dp
+
+                if (isLandscape) {
+                    LandscapeLoadingContent(
+                        gameProfile = gameProfile,
+                        animatedProgress = animatedProgress,
+                        pulseAlpha = pulseAlpha,
+                        phaseStatusText = phaseStatusText,
+                        currentStep = currentStep,
+                        targetServerName = targetServerName,
+                        controllerStatus = controllerStatus,
+                        hasGamepad = hasGamepad,
+                        pingText = pingText,
+                        pingRating = pingRating,
+                        pingColor = pingColor,
+                        currentTip = currentTip,
+                        skipFocusRequester = skipFocusRequester,
+                        onNavigateHome = onNavigateHome,
+                        onSkip = onSkip
                     )
-            )
-
-            val isLandscape = maxWidth > maxHeight || maxWidth >= 600.dp
-
-            if (isLandscape) {
-                LandscapeLoadingContent(
-                    gameProfile = gameProfile,
-                    animatedProgress = animatedProgress,
-                    pulseAlpha = pulseAlpha,
-                    phaseStatusText = phaseStatusText,
-                    currentStep = currentStep,
-                    targetServerName = targetServerName,
-                    controllerStatus = controllerStatus,
-                    hasGamepad = hasGamepad,
-                    pingText = pingText,
-                    pingRating = pingRating,
-                    pingColor = pingColor,
-                    currentTip = currentTip,
-                    onNavigateHome = onNavigateHome,
-                    onSkip = onSkip
-                )
-            } else {
-                PortraitLoadingContent(
-                    gameProfile = gameProfile,
-                    animatedProgress = animatedProgress,
-                    pulseAlpha = pulseAlpha,
-                    phaseStatusText = phaseStatusText,
-                    currentStep = currentStep,
-                    targetServerName = targetServerName,
-                    controllerStatus = controllerStatus,
-                    hasGamepad = hasGamepad,
-                    pingText = pingText,
-                    pingRating = pingRating,
-                    pingColor = pingColor,
-                    currentTip = currentTip,
-                    onNavigateHome = onNavigateHome,
-                    onSkip = onSkip
-                )
+                } else {
+                    PortraitLoadingContent(
+                        gameProfile = gameProfile,
+                        animatedProgress = animatedProgress,
+                        pulseAlpha = pulseAlpha,
+                        phaseStatusText = phaseStatusText,
+                        currentStep = currentStep,
+                        targetServerName = targetServerName,
+                        controllerStatus = controllerStatus,
+                        hasGamepad = hasGamepad,
+                        pingText = pingText,
+                        pingRating = pingRating,
+                        pingColor = pingColor,
+                        currentTip = currentTip,
+                        skipFocusRequester = skipFocusRequester,
+                        onNavigateHome = onNavigateHome,
+                        onSkip = onSkip
+                    )
+                }
             }
         }
     }
@@ -271,6 +283,7 @@ private fun PortraitLoadingContent(
     pingRating: String,
     pingColor: Color,
     currentTip: String,
+    skipFocusRequester: FocusRequester,
     onNavigateHome: () -> Unit,
     onSkip: () -> Unit
 ) {
@@ -327,6 +340,7 @@ private fun PortraitLoadingContent(
 
         SkipLoadingButton(
             onSkip = onSkip,
+            focusRequester = skipFocusRequester,
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 480.dp)
@@ -349,6 +363,7 @@ private fun LandscapeLoadingContent(
     pingRating: String,
     pingColor: Color,
     currentTip: String,
+    skipFocusRequester: FocusRequester,
     onNavigateHome: () -> Unit,
     onSkip: () -> Unit
 ) {
@@ -412,6 +427,7 @@ private fun LandscapeLoadingContent(
 
                 SkipLoadingButton(
                     onSkip = onSkip,
+                    focusRequester = skipFocusRequester,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -444,7 +460,7 @@ private fun LoadingTopBar(
                 border = BorderStroke(1.dp, ConsoleSubtleBorder),
                 modifier = Modifier
                     .clip(RoundedCornerShape(11.dp))
-                    .clickable { onNavigateHome() }
+                    .gamepadClickable(cornerRadius = 11.dp) { onNavigateHome() }
                     .testTag("loading_home_button")
             ) {
                 Row(
@@ -1017,6 +1033,7 @@ private fun TelemetryMiniTile(
 @Composable
 private fun SkipLoadingButton(
     onSkip: () -> Unit,
+    focusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
@@ -1031,6 +1048,11 @@ private fun SkipLoadingButton(
         shape = RoundedCornerShape(12.dp),
         modifier = modifier
             .height(46.dp)
+            .gamepadActionButton(
+                cornerRadius = 12.dp,
+                focusRequester = focusRequester,
+                onClick = onSkip
+            )
             .testTag("skip_loading_button")
     ) {
         Icon(

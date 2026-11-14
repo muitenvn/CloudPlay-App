@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -54,6 +55,7 @@ import com.example.data.GamepadLayoutPreset
 import com.example.data.SettingsRepository
 import com.example.ui.components.gamepadActionButton
 import com.example.ui.components.gamepadClickable
+import com.example.ui.components.gamepadControllerScope
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
@@ -981,8 +983,16 @@ internal fun SettingsAdvancedGamepadControlsCard(
         val srcName = SettingsRepository.getGamepadButtonLabel(srcIdx, isEn)
         val currentMap = SettingsRepository.parsePhysicalButtonMap(config.physicalGamepadButtonMap)
         val currentDest = currentMap[srcIdx] ?: srcIdx
+        val closeRemapFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         AlertDialog(
             onDismissRequest = { activeRemapSourceBtn = null },
+            modifier = Modifier.gamepadControllerScope(
+                enabled = true,
+                defaultFocusRequester = closeRemapFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = { activeRemapSourceBtn = null }
+            ),
             containerColor = XboxSurfaceVariant,
             shape = RoundedCornerShape(22.dp),
             titleContentColor = TextPrimary,
@@ -1050,6 +1060,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                 TextButton(
                     onClick = { activeRemapSourceBtn = null },
                     modifier = Modifier
+                        .focusRequester(closeRemapFocusRequester)
                         .gamepadActionButton(cornerRadius = 8.dp) { activeRemapSourceBtn = null }
                         .semantics {
                             contentDescription = if (isEn) "Close button remap dialog" else "Đóng hộp thoại đổi nút"
@@ -1066,8 +1077,16 @@ internal fun SettingsAdvancedGamepadControlsCard(
         val selectableButtons = remember {
             SettingsRepository.STANDARD_GAMEPAD_BUTTONS.filter { it.first != 8 && it.first != 16 }
         }
+        val closeShortcutFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
         AlertDialog(
             onDismissRequest = { activeShortcutTargetAction = null },
+            modifier = Modifier.gamepadControllerScope(
+                enabled = true,
+                defaultFocusRequester = closeShortcutFocusRequester,
+                autoRequestDefaultFocus = true,
+                attachWindowMotionListener = true,
+                onBackPress = { activeShortcutTargetAction = null }
+            ),
             containerColor = XboxSurfaceVariant,
             shape = RoundedCornerShape(22.dp),
             titleContentColor = TextPrimary,
@@ -1135,6 +1154,7 @@ internal fun SettingsAdvancedGamepadControlsCard(
                 TextButton(
                     onClick = { activeShortcutTargetAction = null },
                     modifier = Modifier
+                        .focusRequester(closeShortcutFocusRequester)
                         .gamepadActionButton(cornerRadius = 8.dp) { activeShortcutTargetAction = null }
                         .semantics {
                             contentDescription = if (isEn) "Close shortcut button dialog" else "Đóng hộp thoại chọn phím tắt"

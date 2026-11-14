@@ -186,6 +186,11 @@ class MainActivity : ComponentActivity() {
 
     private var isBrowserScreenActive = false
 
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        com.example.ui.components.GamepadUiNavigation.observeKeyEventPassively(event)
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
         if (ev != null && ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
             if ((ev.source and android.view.InputDevice.SOURCE_TOUCHSCREEN) == android.view.InputDevice.SOURCE_TOUCHSCREEN) {
@@ -212,6 +217,9 @@ class MainActivity : ComponentActivity() {
     }
 
     fun applyImmersiveFullscreen(enable: Boolean) {
+        if (!enable) {
+            com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi = true
+        }
         if (!enable && !isBrowserScreenActive) return
         isBrowserScreenActive = enable
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)

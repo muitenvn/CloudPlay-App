@@ -49,6 +49,8 @@ import com.example.data.GameLibraryRepository
 import com.example.data.PlaySessionRecord
 import com.example.data.SessionHistoryRepository
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.SpaceGroteskFontFamily
@@ -164,7 +166,7 @@ fun SessionHistoryScreen(
                     modifier = Modifier
                         .xboxPressScale(enabled = motionEnabled, pressedScale = 0.96f)
                         .clip(CircleShape)
-                        .clickable { filterMode = mode }
+                        .gamepadClickable(cornerRadius = 999.dp) { filterMode = mode }
                         .testTag("history_filter_${mode.name.lowercase()}"),
                     shape = CircleShape,
                     color = filterChipBg
@@ -276,7 +278,7 @@ fun SessionHistoryScreen(
                                 .fillMaxWidth()
                                 .height(46.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable { showClearConfirmDialog = true }
+                                .gamepadClickable(cornerRadius = 12.dp) { showClearConfirmDialog = true }
                                 .testTag("clear_all_history_button"),
                             shape = RoundedCornerShape(12.dp),
                             color = XboxSurfaceVariant
@@ -377,6 +379,9 @@ fun SessionHistoryScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
+                                .gamepadActionButton(cornerRadius = 12.dp) {
+                                    showClearConfirmDialog = false
+                                }
                         ) {
                             Text(
                                 text = if (isEn) "Cancel" else "Hủy",
@@ -397,6 +402,10 @@ fun SessionHistoryScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
+                                .gamepadActionButton(cornerRadius = 12.dp) {
+                                    SessionHistoryRepository.clearAllSessions()
+                                    showClearConfirmDialog = false
+                                }
                                 .testTag("confirm_clear_history_button")
                         ) {
                             Text(

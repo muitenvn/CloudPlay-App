@@ -49,6 +49,7 @@ import coil.request.ImageRequest
 import com.example.data.GameLibraryRepository
 import com.example.data.PlaySessionRecord
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -156,7 +157,7 @@ internal fun SummaryStatTile(
                 if (onClick != null) {
                     Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onClick() }
+                        .gamepadClickable(cornerRadius = 12.dp) { onClick() }
                 } else {
                     Modifier
                 }
@@ -261,7 +262,7 @@ internal fun SessionHistoryItemCard(
             .fillMaxWidth()
             .xboxPressScale(enabled = motionEnabled, pressedScale = 0.97f)
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() }
+            .gamepadClickable(cornerRadius = 16.dp) { onClick() }
             .testTag("session_card_${session.id}"),
         shape = RoundedCornerShape(16.dp),
         color = XboxSurface
@@ -385,7 +386,7 @@ internal fun SessionHistoryItemCard(
                     color = XboxSurfaceVariant,
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .clickable { onPlayAgain() }
+                        .gamepadClickable(cornerRadius = 10.dp) { onPlayAgain() }
                         .testTag("session_play_again_${session.id}")
                 ) {
                     Box(

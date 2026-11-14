@@ -55,6 +55,7 @@ import com.example.R
 import com.example.data.GameBookmark
 import com.example.data.GameLibraryRepository
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.GoldStar
 import com.example.ui.theme.JapanRed
@@ -166,7 +167,7 @@ internal fun FeaturedGamesSection(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .clip(VIEW_ALL_SHAPE)
-                            .clickable { onClearPlayedGames() }
+                            .gamepadClickable(cornerRadius = 8.dp) { onClearPlayedGames() }
                             .padding(horizontal = 6.dp, vertical = 4.dp)
                             .testTag("clear_played_games_button")
                     )
@@ -182,7 +183,7 @@ internal fun FeaturedGamesSection(
                         .clip(QUICK_RESUME_SHAPE)
                         .background(XboxSurface, QUICK_RESUME_SHAPE)
                         .border(1.dp, XboxNeonGreen.copy(alpha = 0.65f), QUICK_RESUME_SHAPE)
-                        .clickable { onLaunchBookmark(primaryContinueGame) }
+                        .gamepadClickable(cornerRadius = 12.dp) { onLaunchBookmark(primaryContinueGame) }
                         .padding(10.dp)
                         .testTag("continue_last_game_button"),
                     verticalAlignment = Alignment.CenterVertically,
@@ -314,7 +315,7 @@ internal fun FeaturedGamesSection(
                                     if (isLatest) XboxNeonGreen.copy(alpha = 0.5f) else XboxCardBorder,
                                     QUICK_RESUME_SHAPE
                                 )
-                                .clickable { onLaunchBookmark(playedGame) }
+                                .gamepadClickable(cornerRadius = 12.dp) { onLaunchBookmark(playedGame) }
                                 .padding(8.dp)
                                 .testTag("continue_played_item_${playedGame.id}"),
                             verticalAlignment = Alignment.CenterVertically,
@@ -386,7 +387,7 @@ internal fun FeaturedGamesSection(
                                     .clip(CircleShape)
                                     .background(Color(0xFF0D1511), CircleShape)
                                     .border(1.dp, XboxCardBorder, CircleShape)
-                                    .clickable { onRemovePlayedGame(playedGame) }
+                                    .gamepadClickable(cornerRadius = 14.dp) { onRemovePlayedGame(playedGame) }
                                     .testTag("remove_played_${playedGame.id}"),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -474,7 +475,7 @@ internal fun FeaturedGamesSection(
             Row(
                 modifier = Modifier
                     .clip(VIEW_ALL_SHAPE)
-                    .clickable { onNavigateToLibrary() }
+                    .gamepadClickable(cornerRadius = 8.dp) { onNavigateToLibrary() }
                     .padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -605,7 +606,7 @@ internal fun FeaturedGameCard(
             .clip(GAME_CARD_SHAPE)
             .background(XboxSurfaceVariant, GAME_CARD_SHAPE)
             .border(1.dp, XboxCardBorder, GAME_CARD_SHAPE)
-            .clickable { onLaunch() }
+            .gamepadClickable(cornerRadius = 12.dp) { onLaunch() }
             .testTag("featured_game_${game.id}")
     ) {
         if ((game.imageUrl.isNullOrBlank() && game.drawableResId == null) || !coverImageLoaded) {
@@ -698,7 +699,7 @@ internal fun FeaturedGameCard(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .size(38.dp)
-                .clickable { onToggleFavorite() }
+                .gamepadClickable(cornerRadius = 19.dp) { onToggleFavorite() }
                 .testTag("fav_featured_${game.id}"),
             contentAlignment = Alignment.Center
         ) {

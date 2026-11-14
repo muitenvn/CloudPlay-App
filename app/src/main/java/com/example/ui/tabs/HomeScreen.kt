@@ -75,6 +75,7 @@ import com.example.data.GameLibraryRepository
 import com.example.data.SessionHistoryRepository
 import com.example.data.SettingsRepository
 import com.example.ui.components.GuideSection
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.EpicBlue
 import com.example.ui.theme.GoldStar
@@ -226,7 +227,7 @@ fun HomeScreen(
                             .clip(bannerShape)
                             .background(XboxNeonGreen.copy(alpha = 0.12f), bannerShape)
                             .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), bannerShape)
-                            .clickable {
+                            .gamepadClickable(cornerRadius = 10.dp) {
                                 com.example.data.AppLogger.info("UI", "Bấm thanh thông báo bản cập nhật mới từ Trang chủ")
                                 com.example.data.UpdateChecker.openUpdateDialog()
                             }

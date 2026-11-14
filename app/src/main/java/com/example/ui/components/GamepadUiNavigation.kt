@@ -5,6 +5,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
@@ -440,3 +441,232 @@ fun Modifier.gamepadClickable(
             }
         }
 }
+
+/**
+ * Dùng cho các thành phần Material 3 đã có sẵn clickable/focusTarget bên trong (như Button, TextButton, IconButton)
+ * để không tạo 2 điểm focus lồng nhau mà vẫn vẽ viền chọn phẳng và nhận phím A chuẩn xác.
+ */
+fun Modifier.gamepadActionButton(
+    enabled: Boolean = true,
+    cornerRadius: Dp = 12.dp,
+    focusBorderColor: Color = XboxNeonGreen,
+    focusRequester: FocusRequester? = null,
+    onFocused: (() -> Unit)? = null,
+    onClick: () -> Unit
+): Modifier = composed {
+    if (!enabled) return@composed this
+
+    var isFocused by remember { mutableStateOf(false) }
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnFocused by rememberUpdatedState(onFocused)
+
+    this
+        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        .onFocusChanged { state ->
+            val next = state.isFocused
+            if (isFocused != next) {
+                isFocused = next
+                if (next) {
+                    currentOnFocused?.invoke()
+                }
+            }
+        }
+        .onKeyEvent { keyEvent ->
+            val native = keyEvent.nativeKeyEvent
+            val keyCode = native.keyCode
+            val isConfirmKey = keyCode == KeyEvent.KEYCODE_BUTTON_A ||
+                keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                keyCode == KeyEvent.KEYCODE_ENTER ||
+                keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
+            if (isConfirmKey) {
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    GamepadUiNavigation.onGamepadInteraction()
+                    if (native.repeatCount == 0 && !GamepadUiNavigation.shouldIgnoreDuplicateDown(keyCode)) {
+                        currentOnClick()
+                    }
+                    return@onKeyEvent true
+                } else if (keyEvent.type == KeyEventType.KeyUp) {
+                    return@onKeyEvent true
+                }
+            }
+            false
+        }
+        .drawWithContent {
+            drawContent()
+            if (isFocused && GamepadUiNavigation.isGamepadModeActive) {
+                val strokeWidthPx = 2.dp.toPx()
+                val halfStroke = strokeWidthPx / 2f
+                val radiusPx = cornerRadius.toPx()
+                drawRoundRect(
+                    color = focusBorderColor.copy(alpha = 0.10f),
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(
+                        (size.width - strokeWidthPx).coerceAtLeast(0f),
+                        (size.height - strokeWidthPx).coerceAtLeast(0f)
+                    ),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx)
+                )
+                drawRoundRect(
+                    color = focusBorderColor,
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(
+                        (size.width - strokeWidthPx).coerceAtLeast(0f),
+                        (size.height - strokeWidthPx).coerceAtLeast(0f)
+                    ),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx),
+                    style = Stroke(width = strokeWidthPx)
+                )
+            }
+        }
+}
+
+/**
+ * Dùng cho OutlinedTextField để hiển thị viền chọn phẳng đồng nhất khi focus bằng tay cầm.
+ */
+fun Modifier.gamepadTextFieldFocus(
+    cornerRadius: Dp = 14.dp,
+    focusBorderColor: Color = XboxNeonGreen,
+    focusRequester: FocusRequester? = null
+): Modifier = composed {
+    var isFocused by remember { mutableStateOf(false) }
+
+    this
+        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        .onFocusChanged { state ->
+            isFocused = state.isFocused || state.hasFocus
+        }
+        .drawWithContent {
+            drawContent()
+            if (isFocused && GamepadUiNavigation.isGamepadModeActive) {
+                val strokeWidthPx = 2.dp.toPx()
+                val halfStroke = strokeWidthPx / 2f
+                val radiusPx = cornerRadius.toPx()
+                drawRoundRect(
+                    color = focusBorderColor,
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(
+                        (size.width - strokeWidthPx).coerceAtLeast(0f),
+                        (size.height - strokeWidthPx).coerceAtLeast(0f)
+                    ),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx),
+                    style = Stroke(width = strokeWidthPx)
+                )
+            }
+        }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun Modifier.gamepadCombinedClickable(
+    enabled: Boolean = true,
+    cornerRadius: Dp = 12.dp,
+    focusBorderColor: Color = XboxNeonGreen,
+    focusRequester: FocusRequester? = null,
+    onFocused: (() -> Unit)? = null,
+    onKeyY: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit
+): Modifier = composed {
+    if (!enabled) return@composed this
+
+    var isFocused by remember { mutableStateOf(false) }
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val currentOnKeyY by rememberUpdatedState(onKeyY)
+    val currentOnFocused by rememberUpdatedState(onFocused)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    this
+        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        .onFocusChanged { state ->
+            val next = state.isFocused
+            if (isFocused != next) {
+                isFocused = next
+                if (next) {
+                    currentOnFocused?.invoke()
+                }
+            }
+        }
+        .onKeyEvent { keyEvent ->
+            val native = keyEvent.nativeKeyEvent
+            val keyCode = native.keyCode
+            val isConfirmKey = keyCode == KeyEvent.KEYCODE_BUTTON_A ||
+                keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                keyCode == KeyEvent.KEYCODE_ENTER ||
+                keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+
+            if (isConfirmKey) {
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    GamepadUiNavigation.onGamepadInteraction()
+                    if (native.repeatCount == 0 && !GamepadUiNavigation.shouldIgnoreDuplicateDown(keyCode)) {
+                        currentOnClick()
+                    }
+                    return@onKeyEvent true
+                } else if (keyEvent.type == KeyEventType.KeyUp) {
+                    return@onKeyEvent true
+                }
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_Y && currentOnKeyY != null) {
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    GamepadUiNavigation.onGamepadInteraction()
+                    if (native.repeatCount == 0 && !GamepadUiNavigation.shouldIgnoreDuplicateDown(keyCode)) {
+                        currentOnKeyY?.invoke()
+                    }
+                    return@onKeyEvent true
+                } else if (keyEvent.type == KeyEventType.KeyUp) {
+                    return@onKeyEvent true
+                }
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_START && currentOnLongClick != null) {
+                if (keyEvent.type == KeyEventType.KeyDown) {
+                    GamepadUiNavigation.onGamepadInteraction()
+                    if (native.repeatCount == 0 && !GamepadUiNavigation.shouldIgnoreDuplicateDown(keyCode)) {
+                        currentOnLongClick?.invoke()
+                    }
+                    return@onKeyEvent true
+                } else if (keyEvent.type == KeyEventType.KeyUp) {
+                    return@onKeyEvent true
+                }
+            }
+            false
+        }
+        .focusable(enabled = enabled, interactionSource = interactionSource)
+        .combinedClickable(
+            enabled = enabled,
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = { currentOnClick() },
+            onLongClick = currentOnLongClick
+        )
+        .drawWithContent {
+            drawContent()
+            if (isFocused && GamepadUiNavigation.isGamepadModeActive) {
+                val strokeWidthPx = 2.dp.toPx()
+                val halfStroke = strokeWidthPx / 2f
+                val radiusPx = cornerRadius.toPx()
+                drawRoundRect(
+                    color = focusBorderColor.copy(alpha = 0.08f),
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(
+                        (size.width - strokeWidthPx).coerceAtLeast(0f),
+                        (size.height - strokeWidthPx).coerceAtLeast(0f)
+                    ),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx)
+                )
+                drawRoundRect(
+                    color = focusBorderColor,
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(
+                        (size.width - strokeWidthPx).coerceAtLeast(0f),
+                        (size.height - strokeWidthPx).coerceAtLeast(0f)
+                    ),
+                    cornerRadius = CornerRadius(radiusPx, radiusPx),
+                    style = Stroke(width = strokeWidthPx)
+                )
+            }
+        }
+}
+
+

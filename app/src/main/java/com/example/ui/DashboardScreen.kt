@@ -165,6 +165,7 @@ fun DashboardScreen(
     }
 
     val activeTabFocusRequester = remember { FocusRequester() }
+    var librarySearchFocusTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val isAnyDialogOpen = showGuideDialog || showTranslatorDialog || showWebPortalDialog || showOverflowMenu || showLanguageMenu
 
     GamepadSurfaceController(
@@ -185,6 +186,39 @@ fun DashboardScreen(
                 showLanguageMenu -> showLanguageMenu = false
                 showOverflowMenu -> showOverflowMenu = false
                 currentTab != DashboardTab.HOME -> switchTab(DashboardTab.HOME, "nút B")
+            }
+        },
+        onSecondaryX = {
+            when (currentTab) {
+                DashboardTab.HOME -> {
+                    // Không gán X bật/tắt VPN ở Trang chủ để tránh bấm nhầm làm đổi mạng
+                }
+                DashboardTab.LIBRARY -> {
+                    librarySearchFocusTick++
+                }
+                DashboardTab.SERVERS -> {
+                    if (!vpnState.isTestingPings) {
+                        com.example.data.AppLogger.info("UI", "Bấm phím X tay cầm: Đo lại ping trên tab Máy chủ")
+                        VpnManager.testAllServers(
+                            autoPickBest = false,
+                            context = context,
+                            forceRefresh = true,
+                            reason = "phím X tay cầm trên tab Máy chủ"
+                        )
+                    }
+                }
+                DashboardTab.SETTINGS -> {}
+            }
+        },
+        onSecondaryY = {
+            when (currentTab) {
+                DashboardTab.HOME -> {
+                    com.example.data.AppLogger.info("UI", "Bấm phím Y tay cầm: Mở trình duyệt Xbox Cloud từ Trang chủ")
+                    onLaunchUrl(config.targetRegionUrl)
+                }
+                DashboardTab.LIBRARY,
+                DashboardTab.SERVERS,
+                DashboardTab.SETTINGS -> {}
             }
         },
         modifier = modifier
@@ -546,7 +580,8 @@ fun DashboardScreen(
                                     DashboardTab.LIBRARY -> {
                                         GameLibraryScreen(
                                             games = allGames,
-                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) }
+                                            onLaunchGame = { onLaunchUrl(SettingsRepository.formatXboxUrlWithLocale(it, config.getEffectiveLocale())) },
+                                            focusSearchTrigger = librarySearchFocusTick
                                         )
                                     }
                                     DashboardTab.SERVERS -> {

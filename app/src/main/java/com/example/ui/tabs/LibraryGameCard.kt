@@ -47,6 +47,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.R
 import com.example.data.GameBookmark
+import com.example.ui.components.gamepadClickable
+import com.example.ui.components.gamepadCombinedClickable
 import com.example.ui.theme.GoldStar
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -64,6 +66,7 @@ internal fun LibraryGameCard(
     isFavorite: Boolean,
     isEn: Boolean = false,
     isImportingCatalog: Boolean = false,
+    onFocused: (() -> Unit)? = null,
     onToggleFavorite: () -> Unit,
     onShowDetail: () -> Unit,
     onPlay: () -> Unit,
@@ -100,9 +103,12 @@ internal fun LibraryGameCard(
             .clip(cardShape)
             .background(XboxSurfaceVariant, cardShape)
             .border(1.dp, XboxCardBorder, cardShape)
-            .combinedClickable(
-                onClick = onPlay,
-                onLongClick = onShowDetail
+            .gamepadCombinedClickable(
+                cornerRadius = 12.dp,
+                onFocused = onFocused,
+                onKeyY = onToggleFavorite,
+                onLongClick = onShowDetail,
+                onClick = onPlay
             )
             .testTag("library_card_${game.id}")
     ) {
@@ -206,7 +212,7 @@ internal fun LibraryGameCard(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(CircleShape)
-                            .clickable { onDeleteCustom() }
+                            .gamepadClickable(cornerRadius = 14.dp) { onDeleteCustom() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -229,7 +235,7 @@ internal fun LibraryGameCard(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .clickable { onToggleFavorite() }
+                        .gamepadClickable(cornerRadius = 14.dp) { onToggleFavorite() }
                         .testTag("fav_library_${game.id}")
                 ) {
                     Box(contentAlignment = Alignment.Center) {

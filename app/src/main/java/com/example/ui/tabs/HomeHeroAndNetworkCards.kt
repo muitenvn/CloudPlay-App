@@ -50,6 +50,8 @@ import com.example.R
 import com.example.cloudplay.GamepadStatus
 import com.example.data.SessionHistoryRepository
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.EpicBlue
 import com.example.ui.theme.GoldStar
@@ -179,7 +181,7 @@ internal fun HeroConsolePlayDeck(
                         .clip(CircleShape)
                         .background(Color(0xD9060A08), CircleShape)
                         .border(1.dp, XboxCardBorder, CircleShape)
-                        .clickable { onOpenGuide() },
+                        .gamepadClickable(cornerRadius = 17.dp) { onOpenGuide() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -229,6 +231,7 @@ internal fun HeroConsolePlayDeck(
                     modifier = Modifier
                         .weight(1f)
                         .defaultMinSize(minHeight = 46.dp)
+                        .gamepadActionButton(cornerRadius = 12.dp, onClick = onOpenXboxCloud)
                         .testTag("hero_launch_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = XboxNeonGreen,
@@ -264,6 +267,7 @@ internal fun HeroConsolePlayDeck(
                         .weight(1f)
                         .defaultMinSize(minHeight = 46.dp)
                         .border(1.dp, XboxCardBorder, HERO_BTN_SHAPE)
+                        .gamepadActionButton(cornerRadius = 12.dp, onClick = onLaunchFortnite)
                         .testTag("hero_launch_fortnite_button"),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xD9060A08),
@@ -331,7 +335,7 @@ internal fun HeroConsolePlayDeck(
                                 if (selected) XboxNeonGreen else XboxCardBorder,
                                 COCKPIT_BTN_SHAPE
                             )
-                            .clickable {
+                            .gamepadClickable(cornerRadius = 8.dp) {
                                 SettingsRepository.updateXboxWebUiMode(uiMode)
                             }
                             .padding(horizontal = 8.dp, vertical = 5.dp)
@@ -403,76 +407,85 @@ internal fun QuickNetworkCockpitCard(
             .clip(COCKPIT_CARD_SHAPE)
             .background(XboxSurface, COCKPIT_CARD_SHAPE)
             .border(1.dp, XboxCardBorder, COCKPIT_CARD_SHAPE)
-            .clickable { onNavigateToServers() }
-            .padding(12.dp)
-            .testTag("network_cockpit_card"),
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Flag
-        Text(
-            text = vpnState.currentServer.flag,
-            fontSize = 20.sp
-        )
-
-        // Server Name + Change Server Subtitle
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            Text(
-                text = vpnState.currentServer.name,
-                color = TextPrimary,
-                fontFamily = SpaceGroteskFontFamily,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = config.tr("Đổi máy chủ", "Change server"),
-                color = TextSecondary,
-                fontSize = 12.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        // Signal Bars + Ping
         Row(
+            modifier = Modifier
+                .weight(1f)
+                .clip(COCKPIT_BTN_SHAPE)
+                .gamepadClickable(cornerRadius = 8.dp) { onNavigateToServers() }
+                .padding(vertical = 2.dp, horizontal = 2.dp)
+                .testTag("network_cockpit_card"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Canvas(
-                modifier = Modifier
-                    .width(15.dp)
-                    .height(13.dp)
+            // Flag
+            Text(
+                text = vpnState.currentServer.flag,
+                fontSize = 20.sp
+            )
+
+            // Server Name + Change Server Subtitle
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
             ) {
-                val barW = 2.6.dp.toPx()
-                val gap = 1.5.dp.toPx()
-                val cr = CornerRadius(1.dp.toPx(), 1.dp.toPx())
-                for (bar in 1..4) {
-                    val barH = (3.5f + bar * 2.2f).dp.toPx()
-                    val x = (bar - 1) * (barW + gap)
-                    val y = size.height - barH
-                    drawRoundRect(
-                        color = if (bar <= activeBars) signalTint else Color(0xFF284237),
-                        topLeft = Offset(x, y),
-                        size = Size(barW, barH),
-                        cornerRadius = cr
-                    )
-                }
-            }
-            if (hasPing) {
                 Text(
-                    text = "$directPing ms",
-                    color = signalTint,
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontSize = 12.5.sp,
+                    text = vpnState.currentServer.name,
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
-                    softWrap = false
+                    overflow = TextOverflow.Ellipsis
                 )
+                Text(
+                    text = config.tr("Đổi máy chủ", "Change server"),
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Signal Bars + Ping
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .width(15.dp)
+                        .height(13.dp)
+                ) {
+                    val barW = 2.6.dp.toPx()
+                    val gap = 1.5.dp.toPx()
+                    val cr = CornerRadius(1.dp.toPx(), 1.dp.toPx())
+                    for (bar in 1..4) {
+                        val barH = (3.5f + bar * 2.2f).dp.toPx()
+                        val x = (bar - 1) * (barW + gap)
+                        val y = size.height - barH
+                        drawRoundRect(
+                            color = if (bar <= activeBars) signalTint else Color(0xFF284237),
+                            topLeft = Offset(x, y),
+                            size = Size(barW, barH),
+                            cornerRadius = cr
+                        )
+                    }
+                }
+                if (hasPing) {
+                    Text(
+                        text = "$directPing ms",
+                        color = signalTint,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
             }
         }
 
@@ -490,7 +503,9 @@ internal fun QuickNetworkCockpitCard(
                     color = if (isConnected) XboxNeonGreen else XboxCardBorder,
                     shape = COCKPIT_BTN_SHAPE
                 )
-                .clickable { if (isConnected) onDisconnectVpn() else onConnectVpn() }
+                .gamepadClickable(cornerRadius = 8.dp) {
+                    if (isConnected) onDisconnectVpn() else onConnectVpn()
+                }
                 .padding(horizontal = 12.dp, vertical = 7.dp)
                 .testTag("quick_vpn_toggle_button"),
             contentAlignment = Alignment.Center

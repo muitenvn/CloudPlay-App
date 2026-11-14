@@ -90,6 +90,8 @@ import com.example.ui.theme.rememberXboxMotionEnabled
 import com.example.ui.theme.xboxPressScale
 import com.example.ui.theme.xboxSlideFadeIn
 import com.example.data.SettingsRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.vpn.DEFAULT_SERVERS
 import com.example.vpn.EndpointPingMeasurement
 import com.example.vpn.LiveProxyFetcher
@@ -587,6 +589,7 @@ fun ServersScreen(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier
                             .defaultMinSize(minHeight = 36.dp)
+                            .gamepadActionButton(cornerRadius = 8.dp) { onSelectServer(fasterServer) }
                             .testTag("select_faster_server_button")
                     ) {
                         Text(
@@ -650,6 +653,12 @@ fun ServersScreen(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier
                                 .defaultMinSize(minHeight = 36.dp)
+                                .gamepadActionButton(cornerRadius = 8.dp) {
+                                    val switched = VpnManager.confirmSwitchToNextBestServer(context)
+                                    if (switched != null) {
+                                        onSelectServer(switched)
+                                    }
+                                }
                                 .testTag("confirm_switch_best_server_button")
                         ) {
                             Text(
@@ -664,7 +673,11 @@ fun ServersScreen(
                         TextButton(
                             onClick = { VpnManager.dismissUnlockFailPrompt() },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            modifier = Modifier.defaultMinSize(minHeight = 36.dp)
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = 36.dp)
+                                .gamepadActionButton(cornerRadius = 8.dp) {
+                                    VpnManager.dismissUnlockFailPrompt()
+                                }
                         ) {
                             Text(
                                 text = if (isEn) "Dismiss" else "Đóng",
@@ -757,7 +770,7 @@ fun ServersScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(modeChipShape)
-                            .clickable { detailServer = currentServer }
+                            .gamepadClickable(cornerRadius = 8.dp) { detailServer = currentServer }
                             .testTag("header_selected_server_pill"),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -840,7 +853,7 @@ fun ServersScreen(
                                 .defaultMinSize(minHeight = 42.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(XboxNeonGreen, RoundedCornerShape(10.dp))
-                                .clickable(enabled = !isTestingAll) {
+                                .gamepadClickable(enabled = !isTestingAll, cornerRadius = 10.dp) {
                                     com.example.data.AppLogger.info("UI", "Bấm nút Chọn tối ưu (trên tab Máy chủ)")
                                     android.widget.Toast.makeText(
                                         context,
@@ -894,7 +907,7 @@ fun ServersScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(XboxSurfaceVariant, RoundedCornerShape(10.dp))
                                 .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
-                                .clickable(enabled = !isTestingAll) {
+                                .gamepadClickable(enabled = !isTestingAll, cornerRadius = 10.dp) {
                                     com.example.data.AppLogger.info("UI", "Bấm nút Đo ping (trên tab Máy chủ)")
                                     testAllServers(
                                         autoPickBest = false,
@@ -960,7 +973,7 @@ fun ServersScreen(
                                 if (isAutoOff) XboxNeonGreen else Color.Transparent,
                                 RoundedCornerShape(9.dp)
                             )
-                            .clickable {
+                            .gamepadClickable(cornerRadius = 9.dp) {
                                 if (!isAutoOff) {
                                     SettingsRepository.updateAutoBypass(true)
                                     VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
@@ -996,7 +1009,7 @@ fun ServersScreen(
                                 if (!isAutoOff) XboxNeonGreen else Color.Transparent,
                                 RoundedCornerShape(9.dp)
                             )
-                            .clickable {
+                            .gamepadClickable(cornerRadius = 9.dp) {
                                 if (isAutoOff) {
                                     SettingsRepository.updateAutoBypass(false)
                                     VpnManager.runV130SmartRoutingUpgradeStep(context = context, force = true)
@@ -1053,7 +1066,7 @@ fun ServersScreen(
                                 if (isSelected) XboxNeonGreen else XboxCardBorder,
                                 RoundedCornerShape(999.dp)
                             )
-                            .clickable { selectedCategory = code }
+                            .gamepadClickable(cornerRadius = 999.dp) { selectedCategory = code }
                             .padding(horizontal = 12.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1077,7 +1090,7 @@ fun ServersScreen(
                             .clip(RoundedCornerShape(999.dp))
                             .background(XboxSurface, RoundedCornerShape(999.dp))
                             .border(1.dp, XboxCardBorder, RoundedCornerShape(999.dp))
-                            .clickable { showCustomDialog = true }
+                            .gamepadClickable(cornerRadius = 999.dp) { showCustomDialog = true }
                             .padding(horizontal = 12.dp, vertical = 7.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1109,7 +1122,7 @@ fun ServersScreen(
                                     if (isSelected) XboxNeonGreen else XboxCardBorder,
                                     RoundedCornerShape(999.dp)
                                 )
-                                .clickable { selectedCategory = "CUSTOM" }
+                                .gamepadClickable(cornerRadius = 999.dp) { selectedCategory = "CUSTOM" }
                                 .padding(horizontal = 12.dp, vertical = 7.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1142,7 +1155,7 @@ fun ServersScreen(
                                     if (hideActive) XboxNeonGreen else XboxCardBorder,
                                     RoundedCornerShape(999.dp)
                                 )
-                                .clickable {
+                                .gamepadClickable(cornerRadius = 999.dp) {
                                     val nextHide = !hideActive
                                     SettingsRepository.updateHideUnreachableDynamicServers(nextHide)
                                     android.widget.Toast.makeText(
@@ -1183,7 +1196,10 @@ fun ServersScreen(
                             .clip(RoundedCornerShape(999.dp))
                             .background(XboxSurface, RoundedCornerShape(999.dp))
                             .border(1.dp, XboxCardBorder, RoundedCornerShape(999.dp))
-                            .clickable(enabled = !vpnState.isAutoSyncingLiveProxies) {
+                            .gamepadClickable(
+                                enabled = !vpnState.isAutoSyncingLiveProxies,
+                                cornerRadius = 999.dp
+                            ) {
                                 com.example.data.AppLogger.info("UI", "Bấm nút Cập nhật danh sách proxy công cộng (trên tab Máy chủ)")
                                 android.widget.Toast.makeText(
                                     context,

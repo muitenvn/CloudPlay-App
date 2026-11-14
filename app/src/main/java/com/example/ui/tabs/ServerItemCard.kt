@@ -34,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -132,7 +134,7 @@ internal fun ServerCard(
                 color = if (isSelected) XboxNeonGreen else XboxCardBorder,
                 shape = SERVER_CARD_SHAPE
             )
-            .clickable(onClick = onClick)
+            .gamepadClickable(cornerRadius = 12.dp, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp)
             .testTag("server_card_${server.id}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -277,6 +279,7 @@ internal fun ServerCard(
                     onClick = onDelete,
                     modifier = Modifier
                         .size(34.dp)
+                        .gamepadActionButton(cornerRadius = 17.dp, onClick = onDelete)
                         .testTag("delete_server_${server.id}")
                 ) {
                     Icon(

@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,10 +79,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import androidx.compose.ui.focus.FocusRequester
 import com.example.R
 import com.example.data.GameBookmark
 import com.example.data.GameFilterTab
 import com.example.data.GameLibraryRepository
+import com.example.ui.components.gamepadActionButton
+import com.example.ui.components.gamepadClickable
+import com.example.ui.components.gamepadTextFieldFocus
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.GoldStar
 import com.example.ui.theme.JapanRed
@@ -111,6 +116,7 @@ private enum class GameTabSection {
 fun GameLibraryScreen(
     games: List<GameBookmark>,
     onLaunchGame: (String) -> Unit,
+    focusSearchTrigger: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val config by com.example.data.SettingsRepository.config.collectAsState()
@@ -131,6 +137,17 @@ fun GameLibraryScreen(
     var selectedGenre by remember { mutableStateOf("ALL") }
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedDetailGame by remember { mutableStateOf<GameBookmark?>(null) }
+    val searchFocusRequester = remember { FocusRequester() }
+
+    androidx.compose.runtime.LaunchedEffect(focusSearchTrigger) {
+        if (focusSearchTrigger > 0) {
+            if (activeSection != GameTabSection.LIBRARY) {
+                activeSection = GameTabSection.LIBRARY
+                kotlinx.coroutines.delay(60L)
+            }
+            runCatching { searchFocusRequester.requestFocus() }
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(games.size, isLoadingInitialCatalog) {
         if (!isLoadingInitialCatalog && !isSyncingCatalog && games.size < 120) {
@@ -247,7 +264,7 @@ fun GameLibraryScreen(
                                     .weight(1f)
                                     .heightIn(min = 38.dp)
                                     .clip(RoundedCornerShape(9.dp))
-                                    .clickable { activeSection = section }
+                                    .gamepadClickable(cornerRadius = 9.dp) { activeSection = section }
                                     .testTag(
                                         if (section == GameTabSection.LIBRARY) "segment_library_button"
                                         else "segment_history_button"
@@ -283,7 +300,7 @@ fun GameLibraryScreen(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = !isSyncingCatalog) {
+                            .gamepadClickable(enabled = !isSyncingCatalog, cornerRadius = 12.dp) {
                                 GameLibraryRepository.syncLiveXboxCatalog(force = true)
                             }
                             .testTag("sync_xbox_catalog_button")
@@ -305,7 +322,7 @@ fun GameLibraryScreen(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { showAddDialog = true }
+                            .gamepadClickable(cornerRadius = 12.dp) { showAddDialog = true }
                             .testTag("fab_add_game")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -353,6 +370,10 @@ fun GameLibraryScreen(
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .gamepadTextFieldFocus(
+                            cornerRadius = 14.dp,
+                            focusRequester = searchFocusRequester
+                        )
                         .testTag("library_search_input"),
                     textStyle = androidx.compose.ui.text.TextStyle(
                         color = TextPrimary,
@@ -379,7 +400,13 @@ fun GameLibraryScreen(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            IconButton(
+                                onClick = { searchQuery = "" },
+                                modifier = Modifier.gamepadActionButton(
+                                    cornerRadius = 16.dp,
+                                    onClick = { searchQuery = "" }
+                                )
+                            ) {
                                 Icon(
                                     Icons.Default.Clear,
                                     contentDescription = if (isEn) "Clear search" else "Xóa tìm kiếm",
@@ -443,7 +470,7 @@ fun GameLibraryScreen(
                             ),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
-                                .clickable {
+                                .gamepadClickable(cornerRadius = 999.dp) {
                                     selectedTab = tab
                                     selectedGenre = "ALL"
                                 }
@@ -475,7 +502,7 @@ fun GameLibraryScreen(
                             ),
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
-                                .clickable {
+                                .gamepadClickable(cornerRadius = 999.dp) {
                                     if (selectedGenre == genreCode) {
                                         selectedGenre = "ALL"
                                         selectedTab = GameFilterTab.ALL
@@ -586,7 +613,7 @@ fun GameLibraryScreen(
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable { GameLibraryRepository.clearPlayedGames() }
+                                        .gamepadClickable(cornerRadius = 8.dp) { GameLibraryRepository.clearPlayedGames() }
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
@@ -603,7 +630,7 @@ fun GameLibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = !isSearchingLiveXbox) {
+                            .gamepadClickable(enabled = !isSearchingLiveXbox, cornerRadius = 12.dp) {
                                 GameLibraryRepository.searchMicrosoftXboxCatalog(searchQuery)
                             }
                             .testTag("live_xbox_search_bar_button")
@@ -682,7 +709,12 @@ fun GameLibraryScreen(
                                     onClick = { GameLibraryRepository.searchMicrosoftXboxCatalog(searchQuery) },
                                     enabled = !isSearchingLiveXbox,
                                     colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.gamepadActionButton(
+                                        enabled = !isSearchingLiveXbox,
+                                        cornerRadius = 12.dp,
+                                        onClick = { GameLibraryRepository.searchMicrosoftXboxCatalog(searchQuery) }
+                                    )
                                 ) {
                                     Text(
                                         text = if (isSearchingLiveXbox) {
@@ -731,16 +763,21 @@ fun GameLibraryScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            items(
+                            itemsIndexed(
                                 items = displayedGames,
-                                key = { it.id },
-                                contentType = { "library_game_card" }
-                            ) { game ->
+                                key = { _, it -> it.id },
+                                contentType = { _, _ -> "library_game_card" }
+                            ) { index, game ->
                                 LibraryGameCard(
                                     game = game,
                                     isFavorite = game.id in favoriteIds,
                                     isEn = isEn,
                                     isImportingCatalog = isSyncingCatalog,
+                                    onFocused = {
+                                        if (index >= displayedGames.size - 8 && visibleLimit < filteredGames.size) {
+                                            visibleLimit = (visibleLimit + 36).coerceAtMost(filteredGames.size)
+                                        }
+                                    },
                                     onToggleFavorite = { GameLibraryRepository.toggleFavorite(game.id) },
                                     onShowDetail = { selectedDetailGame = game },
                                     onPlay = {

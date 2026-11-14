@@ -408,6 +408,20 @@ object ZeroLagScreenRecorder {
                         val window = currentActivity?.window
                         val decorView = window?.peekDecorView()
 
+                        // Periodically assert recording compositor mirror in case WebView navigated or recreated <video>
+                        if (encodedVideoFrameCount % 90 == 0 && webView != null) {
+                            webView.post {
+                                if (_state.value.isRecording) {
+                                    try {
+                                        webView.evaluateJavascript(
+                                            "if(window.__setRecordingPerformanceMode&&!window.__isRecordingPerformanceMode)window.__setRecordingPerformanceMode(true);",
+                                            null
+                                        )
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        }
+
                         // Adaptive thermal & decode pacing: give WebRTC video decoder extra breathing room if stream is degrading
                         val qualityState = AdaptiveQualityManager.state.value
                         val isDecoderBusy = qualityState.lastDegradeReason != null

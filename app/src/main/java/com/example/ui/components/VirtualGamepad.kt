@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -11,6 +12,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -67,6 +71,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
 import com.example.data.SettingsRepository
@@ -789,46 +794,12 @@ fun VirtualGamepadOverlay(
                 }
             }
 
-            // Tune ⚙ Icon Button (matching mockup .tune: tap or double-tap opens Global "Cả tay cầm" popover)
-            val isAllOpen = activePopoverNodeId == "all"
-            val tuneDesc = config.tr("Tinh chỉnh tay cầm ảo", "Virtual gamepad settings")
-            Box(
+            // Layout anchor for Tune ⚙ Icon Button (keeps exact Row layout while real ⚙ renders on top of all layers)
+            Spacer(
                 modifier = Modifier
                     .size(width = 38.dp, height = 30.dp)
                     .trackNodeBounds("all")
-                    .alpha(if (isEditPositionMode && !isAllOpen) 0.45f else 1f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isAllOpen) HudSelBg else PadBtnBg)
-                    .border(
-                        1.dp,
-                        if (isAllOpen) HudAccent else PadBtnBorder,
-                        RoundedCornerShape(10.dp)
-                    )
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = {
-                                vibrate()
-                                activePopoverNodeId = if (activePopoverNodeId == "all") null else "all"
-                                showAddButtonModal = false
-                            },
-                            onDoubleTap = {
-                                vibrate()
-                                activePopoverNodeId = "all"
-                                showAddButtonModal = false
-                            }
-                        )
-                    }
-                    .semantics { contentDescription = tuneDesc }
-                    .testTag("virtual_gamepad_tune_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = tuneDesc,
-                    tint = if (isAllOpen) HudAccent else PadBtnText,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            )
         }
 
         // Left Controls: Left Analog Stick & D-Pad
@@ -1318,7 +1289,8 @@ fun VirtualGamepadOverlay(
             val viewportW = rootSizePx.width.toFloat().coerceAtLeast(popWidthPx + marginPx * 2f)
             val viewportH = rootSizePx.height.toFloat().coerceAtLeast(popMaxHeightPx + marginPx * 2f)
 
-            val (popX, popY) = remember(popNodeId, anchorRect, viewportW, viewportH) {
+            val tuneAnchorRect = nodeBoundsMap["all"]
+            val (popX, popY) = remember(popNodeId, anchorRect, tuneAnchorRect, viewportW, viewportH) {
                 if (anchorRect == null) {
                     ((viewportW - popWidthPx) / 2f).roundToInt() to ((viewportH - popMaxHeightPx) / 2f).roundToInt()
                 } else if (popNodeId == "all") {
@@ -1337,7 +1309,17 @@ fun VirtualGamepadOverlay(
                     }
                     val clampedX = x.coerceIn(marginPx, (viewportW - popWidthPx - marginPx).coerceAtLeast(marginPx))
                     val rawY = anchorRect.top - marginPx
-                    val clampedY = rawY.coerceIn(marginPx, (viewportH - popMaxHeightPx - marginPx).coerceAtLeast(marginPx))
+                    var clampedY = rawY.coerceIn(marginPx, (viewportH - popMaxHeightPx - marginPx).coerceAtLeast(marginPx))
+                    if (tuneAnchorRect != null) {
+                        val overlapsTuneX = clampedX < tuneAnchorRect.right + 4f && (clampedX + popWidthPx) > tuneAnchorRect.left - 4f
+                        val overlapsTuneY = clampedY < tuneAnchorRect.bottom + 4f && (clampedY + popMaxHeightPx) > tuneAnchorRect.top - 4f
+                        if (overlapsTuneX && overlapsTuneY) {
+                            val shiftedY = tuneAnchorRect.bottom + marginPx
+                            if (shiftedY + 120f <= viewportH - marginPx) {
+                                clampedY = shiftedY.coerceIn(marginPx, (viewportH - popMaxHeightPx - marginPx).coerceAtLeast(marginPx))
+                            }
+                        }
+                    }
                     clampedX.roundToInt() to clampedY.roundToInt()
                 }
             }
@@ -1508,6 +1490,81 @@ fun VirtualGamepadOverlay(
                     )
                 }
             }
+        }
+
+        // Topmost Tune ⚙ Icon Button: always drawn above all buttons, sticks, clusters, edit bar, modals, and popovers
+        val isAllOpen = activePopoverNodeId == "all"
+        val tuneDesc = config.tr("Tinh chỉnh tay cầm ảo", "Virtual gamepad settings")
+        val tuneRect = nodeBoundsMap["all"]
+        var lastTuneOpenUptimeMs by remember { mutableStateOf(0L) }
+        val tunePositionModifier = if (tuneRect != null) {
+            Modifier.offset {
+                IntOffset(tuneRect.left.roundToInt(), tuneRect.top.roundToInt())
+            }
+        } else {
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+        }
+
+        Box(
+            modifier = tunePositionModifier
+                .zIndex(1000f)
+                .size(width = 38.dp, height = 30.dp)
+                .alpha(if (isEditPositionMode && !isAllOpen) 0.85f else 1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(if (isAllOpen) HudSelBg else HudSurface2)
+                .background(if (isAllOpen) HudSelBg else PadBtnBg)
+                .border(
+                    1.dp,
+                    if (isAllOpen) HudAccent else PadBtnBorder,
+                    RoundedCornerShape(10.dp)
+                )
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        down.consume()
+                        var movedOutside = false
+                        val slopPx = 14.dp.toPx()
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { ch ->
+                                ch.consume()
+                                if (ch.id == down.id && ch.pressed) {
+                                    if (ch.position.x < -slopPx ||
+                                        ch.position.x > size.width + slopPx ||
+                                        ch.position.y < -slopPx ||
+                                        ch.position.y > size.height + slopPx
+                                    ) {
+                                        movedOutside = true
+                                    }
+                                }
+                            }
+                        } while (event.changes.any { it.pressed })
+
+                        if (!movedOutside) {
+                            val now = SystemClock.uptimeMillis()
+                            vibrate()
+                            if (activePopoverNodeId != "all") {
+                                activePopoverNodeId = "all"
+                                lastTuneOpenUptimeMs = now
+                            } else if (now - lastTuneOpenUptimeMs >= 320L) {
+                                activePopoverNodeId = null
+                            }
+                            showAddButtonModal = false
+                        }
+                    }
+                }
+                .semantics { contentDescription = tuneDesc }
+                .testTag("virtual_gamepad_tune_button"),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Tune,
+                contentDescription = tuneDesc,
+                tint = if (isAllOpen) HudAccent else PadBtnText,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

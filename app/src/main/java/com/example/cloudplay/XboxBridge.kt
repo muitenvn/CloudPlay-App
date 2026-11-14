@@ -2406,12 +2406,12 @@ class XboxBridge(
                                 window.__clarityBoostActive = false;
                             }
                             const gt = window.__graphicsTuning || {};
-                            const isLowEndOrThermal = !!(gt.lowEndDeviceMode || gt.gpuLoadReduction || window.__deviceThermalThrottled || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
-                            // Khi bật Chế độ máy yếu, Giảm tải GPU hoặc máy đang quá nhiệt, tự động giữ <video> nguyên bản (không gắn CSS filter)
-                            // để Android SurfaceFlinger dùng Hardware Overlay zero-copy trực tiếp, giảm tối đa độ trễ khung hình.
+                            const isLowEndOrThermal = !!(gt.lowEndDeviceMode || window.__deviceThermalThrottled || (window.__networkProfile && window.__networkProfile.lowEndDeviceMode));
+                            // Khi bật Chế độ máy yếu hoặc máy đang quá nhiệt, tự động giữ <video> nguyên bản (không gắn CSS filter)
+                            // để Android SurfaceFlinger dùng Hardware Overlay zero-copy trực tiếp khi không quay video.
                             const css = isLowEndOrThermal ? '' : getPresetCss(preset);
                             const nextBlock = css ? (`
-                                video#stream-video, video[data-testid="stream-video"], #segmented-video video {
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video, canvas#__cp_record_mirror_canvas {
                                     ` + css + `
                                 }
                             `) : '';
@@ -2464,7 +2464,7 @@ class XboxBridge(
                             }
 
                             const nextCss = `
-                                video#stream-video, video[data-testid="stream-video"], #segmented-video video {
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video, canvas#__cp_record_mirror_canvas {
                                     filter: contrast(` + contrast.toFixed(2) + `) saturate(` + saturation.toFixed(2) + `) brightness(` + brightness.toFixed(2) + `) !important;
                                 }
                             `;
@@ -2516,9 +2516,134 @@ class XboxBridge(
                         }
                     };
 
+                    let recordMirrorCanvas = null;
+                    let recordMirrorCtx = null;
+                    let recordMirrorRafId = null;
+                    let lastMirrorRectKey = '';
+
+                    function stopRecordingCanvasMirror() {
+                        if (recordMirrorRafId !== null) {
+                            cancelAnimationFrame(recordMirrorRafId);
+                            recordMirrorRafId = null;
+                        }
+                        if (recordMirrorCanvas) {
+                            try { recordMirrorCanvas.remove(); } catch (e) {}
+                            recordMirrorCanvas = null;
+                        }
+                        recordMirrorCtx = null;
+                        lastMirrorRectKey = '';
+                    }
+
+                    function startRecordingCanvasMirror() {
+                        stopRecordingCanvasMirror();
+
+                        function findActiveStreamVideo() {
+                            const candidates = document.querySelectorAll('video#stream-video, video[data-testid="stream-video"], #segmented-video video, #game-stream video, video');
+                            let best = null;
+                            let bestArea = 0;
+                            for (let i = 0; i < candidates.length; i++) {
+                                const v = candidates[i];
+                                if (!v) continue;
+                                const r = v.getBoundingClientRect ? v.getBoundingClientRect() : null;
+                                const area = r ? (r.width * r.height) : 0;
+                                if ((v.videoWidth > 0 && v.videoHeight > 0) || area > bestArea) {
+                                    best = v;
+                                    bestArea = area;
+                                    if (v.videoWidth > 0 && v.videoHeight > 0 && area > 10000) break;
+                                }
+                            }
+                            return best;
+                        }
+
+                        function renderMirrorTick() {
+                            if (!window.__isRecordingPerformanceMode) {
+                                stopRecordingCanvasMirror();
+                                return;
+                            }
+                            try {
+                                const video = findActiveStreamVideo();
+                                if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+                                    if (!recordMirrorCanvas || !recordMirrorCanvas.isConnected) {
+                                        const c = document.createElement('canvas');
+                                        c.id = '__cp_record_mirror_canvas';
+                                        c.style.cssText = 'position:fixed !important;left:0px;top:0px;width:100vw;height:100vh;pointer-events:none !important;user-select:none !important;opacity:0.998 !important;background:transparent !important;transform:translateZ(0) !important;';
+                                        const parent = video.parentElement || document.body || document.documentElement;
+                                        if (parent) {
+                                            if (video.nextSibling) {
+                                                parent.insertBefore(c, video.nextSibling);
+                                            } else {
+                                                parent.appendChild(c);
+                                            }
+                                        }
+                                        recordMirrorCanvas = c;
+                                        recordMirrorCtx = c.getContext('2d', { alpha: false, desynchronized: false }) || c.getContext('2d');
+                                        lastMirrorRectKey = '';
+                                    }
+
+                                    const vw = video.videoWidth;
+                                    const vh = video.videoHeight;
+                                    const maxH = 720;
+                                    const scale = vh > maxH ? (maxH / vh) : 1.0;
+                                    const targetW = Math.max(320, Math.round((vw * scale) / 2) * 2);
+                                    const targetH = Math.max(180, Math.round((vh * scale) / 2) * 2);
+                                    if (recordMirrorCanvas.width !== targetW || recordMirrorCanvas.height !== targetH) {
+                                        recordMirrorCanvas.width = targetW;
+                                        recordMirrorCanvas.height = targetH;
+                                    }
+
+                                    const rect = video.getBoundingClientRect ? video.getBoundingClientRect() : null;
+                                    if (rect && rect.width > 32 && rect.height > 32) {
+                                        const cs = window.getComputedStyle ? window.getComputedStyle(video) : null;
+                                        const objFit = (cs && cs.objectFit) ? cs.objectFit : 'contain';
+                                        const zIdx = (cs && cs.zIndex && cs.zIndex !== 'auto') ? cs.zIndex : 'auto';
+                                        let drawL = rect.left;
+                                        let drawT = rect.top;
+                                        let drawW = rect.width;
+                                        let drawH = rect.height;
+                                        if (objFit === 'contain' && vw > 0 && vh > 0) {
+                                            const videoAspect = vw / vh;
+                                            const boxAspect = rect.width / rect.height;
+                                            if (boxAspect > videoAspect) {
+                                                drawH = rect.height;
+                                                drawW = rect.height * videoAspect;
+                                                drawL = rect.left + (rect.width - drawW) * 0.5;
+                                            } else if (boxAspect < videoAspect) {
+                                                drawW = rect.width;
+                                                drawH = rect.width / videoAspect;
+                                                drawT = rect.top + (rect.height - drawH) * 0.5;
+                                            }
+                                        }
+                                        const rl = Math.round(drawL);
+                                        const rt = Math.round(drawT);
+                                        const rw = Math.round(drawW);
+                                        const rh = Math.round(drawH);
+                                        const nextKey = rl + ',' + rt + ',' + rw + ',' + rh + ',' + objFit + ',' + zIdx;
+                                        if (nextKey !== lastMirrorRectKey) {
+                                            lastMirrorRectKey = nextKey;
+                                            recordMirrorCanvas.style.left = rl + 'px';
+                                            recordMirrorCanvas.style.top = rt + 'px';
+                                            recordMirrorCanvas.style.width = rw + 'px';
+                                            recordMirrorCanvas.style.height = rh + 'px';
+                                            recordMirrorCanvas.style.zIndex = zIdx;
+                                        }
+                                    }
+
+                                    if (recordMirrorCtx) {
+                                        recordMirrorCtx.drawImage(video, 0, 0, recordMirrorCanvas.width, recordMirrorCanvas.height);
+                                    }
+                                }
+                            } catch (e) {}
+
+                            if (window.__isRecordingPerformanceMode) {
+                                recordMirrorRafId = requestAnimationFrame(renderMirrorTick);
+                            }
+                        }
+
+                        recordMirrorRafId = requestAnimationFrame(renderMirrorTick);
+                    }
+
                     window.__setRecordingPerformanceMode = function(active) {
                         window.__isRecordingPerformanceMode = !!active;
-                        // IMPORTANT: Never alter live <video> aspect ratio, transform, or filter when starting/stopping recording!
                         if (active) {
                             if (window.__pauseTranslator) window.__pauseTranslator();
                             if (document.documentElement) {
@@ -2526,7 +2651,17 @@ class XboxBridge(
                                 document.documentElement.style.userSelect = 'none';
                                 document.documentElement.style.webkitUserSelect = 'none';
                             }
+                            // Ngăn Chromium tách <video> sang SurfaceControl Hardware Underlay (gây lỗ đen VideoHoleDrawQuad khi PixelCopy chụp Window)
+                            window.__cpSetDynamicCss('recording-compositor-fix', `
+                                video#stream-video, video[data-testid="stream-video"], #segmented-video video, #game-stream video, video {
+                                    border-radius: 1.5px !important;
+                                    opacity: 0.998 !important;
+                                }
+                            `);
+                            startRecordingCanvasMirror();
                         } else {
+                            stopRecordingCanvasMirror();
+                            window.__cpSetDynamicCss('recording-compositor-fix', '');
                             const isLowEnd = !!(window.__networkProfile && window.__networkProfile.lowEndDeviceMode);
                             if (!isLowEnd && location.href.indexOf('/launch/') === -1 && window.__resumeTranslator) {
                                 window.__resumeTranslator();

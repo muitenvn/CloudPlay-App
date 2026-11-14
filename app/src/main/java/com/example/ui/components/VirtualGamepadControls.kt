@@ -151,7 +151,7 @@ internal fun VirtualAnalogStick(
                 } else {
                     Modifier.pointerInput(maxRadiusPx) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             isTouching = true
                             val centerX = size.width / 2f
@@ -382,7 +382,7 @@ internal fun VirtualDpadCross(
                 } else {
                     Modifier.pointerInput(scale) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             val cx = size.width / 2f
                             val cy = size.height / 2f
@@ -705,7 +705,7 @@ internal fun GamepadTriggerButton(
                 } else {
                     Modifier.pointerInput(buttonIndex, analogDragMode, pressMode, turboHz) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             fingerDown = true
                             val initLevel = if (analogDragMode) 0.35f else 1f
@@ -1111,7 +1111,7 @@ private fun GamepadConfigurableButtonBox(
                 } else {
                     Modifier.pointerInput(pressMode, turboHz) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
                             fingerDown = true
                             when (pressMode) {
@@ -1205,7 +1205,7 @@ internal fun VirtualAbxyPad(
                 } else {
                     Modifier.pointerInput(scale) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
 
                             fun evaluateTouchPoints(points: List<Offset>) {

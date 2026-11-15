@@ -86,6 +86,10 @@ fun TvDashboardScreen(
     val recentSessions by SessionHistoryRepository.sessions.collectAsState()
     val streamTelemetry by NetworkOptimizer.telemetry.collectAsState()
 
+    LaunchedEffect(Unit) {
+        com.example.cloudplay.RemotePadTvServer.startServerIfNeeded(context)
+    }
+
     val lastSessionPing = remember(vpnState.currentServer, recentSessions) {
         VpnManager.getLastSessionPingForServer(
             server = vpnState.currentServer,

@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cloudplay.GamepadDetector
+import com.example.cloudplay.RemotePadTvServer
 import com.example.data.AppConfig
 import com.example.data.AppLanguage
 import com.example.data.AppLogger
@@ -113,14 +114,17 @@ internal fun TvSettingsScreen(
     var showResetAdvancedConfirmDialog by remember { mutableStateOf(false) }
     var showResetGamepadConfirmDialog by remember { mutableStateOf(false) }
     var showClearCookiesConfirmDialog by remember { mutableStateOf(false) }
+    var showRemotePadDialog by rememberSaveable { mutableStateOf(false) }
     var activeRemapSourceBtn by remember { mutableStateOf<Int?>(null) }
     var activeShortcutTargetAction by remember { mutableStateOf<String?>(null) }
 
     val gamepadDetector = remember(context) { GamepadDetector(context) }
     DisposableEffect(gamepadDetector) {
+        RemotePadTvServer.startServerIfNeeded(context)
         onDispose { gamepadDetector.release() }
     }
     val gamepadStatus by gamepadDetector.status.collectAsState()
+    val remotePadServerState by RemotePadTvServer.state.collectAsState()
     val updateState by UpdateChecker.state.collectAsState()
     val currentVersionName = remember { UpdateChecker.getCurrentVersionName(context) }
 
@@ -493,6 +497,39 @@ internal fun TvSettingsScreen(
                                     triggerControllerTestRumble()
                                 },
                                 testTag = "tv_setting_test_rumble_row"
+                            )
+                        }
+
+                        item(key = "tv_set_remote_pad") {
+                            val isPhoneConnected = remotePadServerState.connectedDeviceName.isNotBlank()
+                            val remoteSub = if (isPhoneConnected) {
+                                config.tr(
+                                    "Đang kết nối: ${remotePadServerState.connectedDeviceName} (Tay cầm 1) · Bấm A để quản lý",
+                                    "Connected: ${remotePadServerState.connectedDeviceName} (Controller 1) · Press A to manage"
+                                )
+                            } else if (remotePadServerState.rememberedDevices.isNotEmpty()) {
+                                val rememberedNames = remotePadServerState.rememberedDevices.joinToString(", ") { it.deviceName }
+                                config.tr(
+                                    "Đã nhớ: $rememberedNames · Bấm A để lấy mã 4 số hoặc quản lý thiết bị",
+                                    "Remembered: $rememberedNames · Press A for 4-digit code or device management"
+                                )
+                            } else {
+                                config.tr(
+                                    "Kết nối ứng dụng CloudPlay Pad qua mạng Wi-Fi / LAN bằng mã 4 chữ số.",
+                                    "Connect CloudPlay Pad over Wi-Fi / LAN with a 4-digit pairing code."
+                                )
+                            }
+                            TvSettingActionRow(
+                                title = config.tr("📱 Dùng điện thoại làm tay cầm", "📱 Use Phone as Controller"),
+                                subtitle = remoteSub,
+                                actionLabel = if (isPhoneConnected) {
+                                    config.tr("Đang kết nối", "Connected")
+                                } else {
+                                    config.tr("Ghép đôi", "Pair Phone")
+                                },
+                                scale = scale,
+                                onClick = { showRemotePadDialog = true },
+                                testTag = "tv_setting_remote_pad_row"
                             )
                         }
 
@@ -1139,6 +1176,13 @@ internal fun TvSettingsScreen(
 
     if (showWebPortalDialog) {
         WebDownloadPortalDialog(onDismiss = { showWebPortalDialog = false })
+    }
+
+    if (showRemotePadDialog) {
+        TvRemotePadDialog(
+            config = config,
+            onDismiss = { showRemotePadDialog = false }
+        )
     }
 
     if (showAppLogDialog) {

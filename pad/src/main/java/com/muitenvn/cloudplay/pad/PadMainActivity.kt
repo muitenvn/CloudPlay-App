@@ -183,9 +183,8 @@ fun CloudPlayPadRootScreen() {
                 BackHandler {
                     PadNetworkClient.disconnectActiveSession(navigateToList = true)
                 }
-                PadConnectedReadyScreen(
+                PadLandscapeControllerScreen(
                     state = clientState,
-                    m = m,
                     onDisconnect = { PadNetworkClient.disconnectActiveSession(navigateToList = true) }
                 )
             }

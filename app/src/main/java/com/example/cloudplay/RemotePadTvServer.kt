@@ -5,13 +5,17 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.muitenvn.cloudplay.protocol.AuthFailReason
 import com.muitenvn.cloudplay.protocol.RemoteControlCodec
 import com.muitenvn.cloudplay.protocol.RemoteControlFrame
+import com.muitenvn.cloudplay.protocol.RemotePadButtons
 import com.muitenvn.cloudplay.protocol.RemotePadCrypto
 import com.muitenvn.cloudplay.protocol.RemotePadProtocol
 import com.muitenvn.cloudplay.protocol.RemotePadState
+import com.muitenvn.cloudplay.protocol.RemotePadUdpCodec
 import com.muitenvn.cloudplay.protocol.TvServiceStatus
 import com.muitenvn.cloudplay.protocol.VersionCheckResult
 import kotlinx.coroutines.CoroutineScope
@@ -31,13 +35,17 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 
 data class PairedPhoneDevice(
     val deviceId: String,
@@ -71,8 +79,10 @@ data class TvRemotePadServerState(
  * - Quảng bá dịch vụ qua NSD/mDNS kiểu `_cloudplaypad._tcp`.
  * - Kênh điều khiển TCP: sinh mã 4 số mới mỗi lần mở màn ghép đôi, xác thực HMAC-SHA256,
  *   khóa tạm 3 phút khi nhập sai 3 lần, cấp mã nhớ riêng và hỗ trợ "Quên thiết bị".
- * - Kiểm tra phiên bản giao thức v1 hai chiều.
- * - Chỉ chạy trong mạng nội bộ (LAN), không gửi dữ liệu ra internet, không ghi log nút bấm.
+ * - Kênh nút bấm UDP: nhận gói nhị phân 48 byte có mã phiên 16 byte và số thứ tự tăng dần;
+ *   tự nhả toàn bộ nút nếu đứt TCP hoặc không nhận gói UDP quá 450ms (Watchdog).
+ * - Đưa trạng thái nút/cần vào đúng đường của XboxBridge (__cpBtn / __cpStick / __cpReleaseAll).
+ * - Chỉ chạy trong mạng nội bộ (LAN), không gửi dữ liệu ra internet, không ghi nhật ký nút bấm.
  */
 object RemotePadTvServer {
     private const val PREFS_NAME = "cloudplay_remote_pad_tv_prefs"
@@ -81,6 +91,7 @@ object RemotePadTvServer {
     private const val KEY_PAIRED_DEVICES_JSON = "paired_devices_json"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _state = MutableStateFlow(TvRemotePadServerState())
     val state: StateFlow<TvRemotePadServerState> = _state.asStateFlow()
@@ -92,7 +103,16 @@ object RemotePadTvServer {
     private var serverSocket: ServerSocket? = null
 
     @Volatile
+    private var udpSocket: DatagramSocket? = null
+
+    @Volatile
     private var tcpAcceptJob: Job? = null
+
+    @Volatile
+    private var udpReceiveJob: Job? = null
+
+    @Volatile
+    private var watchdogJob: Job? = null
 
     @Volatile
     private var lockoutTickerJob: Job? = null
@@ -106,6 +126,12 @@ object RemotePadTvServer {
     @Volatile
     private var activeUdpSessionToken: ByteArray? = null
 
+    private val lastReceivedUdpSequence = AtomicLong(-1L)
+    private val lastUdpPacketElapsedMs = AtomicLong(0L)
+
+    @Volatile
+    private var lastAppliedPadState: RemotePadState = RemotePadState.NEUTRAL
+
     @Volatile
     private var nsdManager: NsdManager? = null
 
@@ -115,12 +141,38 @@ object RemotePadTvServer {
     @Volatile
     private var multicastLock: WifiManager.MulticastLock? = null
 
-    /** Callback cho Đợt 3 để đưa trạng thái tay cầm UDP vào XboxBridge hoặc nhả toàn bộ nút */
+    /**
+     * Đường điều khiển chuẩn đưa thẳng vào XboxBridge (và điều hướng UI khi cần):
+     * - [onRemotePadButton]: (buttonIndex 0..16, pressed, analogValue 0f..1f) -> window.__cpBtn
+     * - [onRemotePadStick]: (xAxisIndex, xVal, yAxisIndex, yVal) -> window.__cpStick
+     * - [onRemotePadReleaseAll]: () -> window.__cpReleaseAll
+     */
     @Volatile
-    var onRemotePadStateUpdate: ((RemotePadState) -> Unit)? = null
+    var onRemotePadButton: ((Int, Boolean, Float) -> Unit)? = null
+
+    @Volatile
+    var onRemotePadStick: ((Int, Float, Int, Float) -> Unit)? = null
 
     @Volatile
     var onRemotePadReleaseAll: (() -> Unit)? = null
+
+    private val DIGITAL_BUTTON_INDICES = intArrayOf(
+        0,  // A
+        1,  // B
+        2,  // X
+        3,  // Y
+        4,  // LB
+        5,  // RB
+        8,  // View
+        9,  // Menu
+        10, // L3
+        11, // R3
+        12, // D-Pad Up
+        13, // D-Pad Down
+        14, // D-Pad Left
+        15, // D-Pad Right
+        16  // Xbox Guide
+    )
 
     fun ensureInitialized(context: Context) {
         if (appContext == null) {
@@ -156,7 +208,7 @@ object RemotePadTvServer {
     /**
      * Gọi mỗi khi mở màn hình "Dùng điện thoại làm tay cầm" trong Cài đặt TV:
      * - Đổi mã 4 số mới theo đúng yêu cầu Giao thức v1 mục 4.
-     * - Bật máy chủ TCP + quảng bá NSD `_cloudplaypad._tcp` nếu chưa chạy.
+     * - Bật máy chủ TCP + UDP + quảng bá NSD `_cloudplaypad._tcp` nếu chưa chạy.
      */
     fun onPairingScreenOpened(context: Context) {
         ensureInitialized(context)
@@ -173,9 +225,6 @@ object RemotePadTvServer {
         startServerIfNeeded(context.applicationContext)
     }
 
-    /**
-     * Đổi mã 4 số mới theo yêu cầu của người dùng trên TV (nút "Đổi mã").
-     */
     fun regeneratePin() {
         val newPin = RemotePadCrypto.generateFourDigitPin()
         lockoutUntilElapsedMs = 0L
@@ -192,6 +241,9 @@ object RemotePadTvServer {
 
     fun startServerIfNeeded(context: Context) {
         ensureInitialized(context)
+        startUdpReceiverIfNeeded()
+        startWatchdogIfNeeded()
+
         if (tcpAcceptJob?.isActive == true && serverSocket?.isClosed == false) {
             refreshNsdRegistration()
             return
@@ -231,6 +283,124 @@ object RemotePadTvServer {
         }
     }
 
+    private fun startUdpReceiverIfNeeded() {
+        if (udpReceiveJob?.isActive == true && udpSocket?.isClosed == false) return
+        udpReceiveJob?.cancel()
+        udpReceiveJob = scope.launch {
+            val dSocket = bindUdpServerSocket() ?: return@launch
+            udpSocket = dSocket
+            val boundUdpPort = dSocket.localPort
+            _state.update { it.copy(udpPort = boundUdpPort) }
+
+            val buf = ByteArray(128)
+            val packet = DatagramPacket(buf, buf.size)
+            try {
+                while (isActive && !dSocket.isClosed) {
+                    try {
+                        dSocket.receive(packet)
+                    } catch (_: Exception) {
+                        break
+                    }
+                    val token = activeUdpSessionToken ?: continue
+                    val prevSeq = lastReceivedUdpSequence.get()
+                    val decoded = RemotePadUdpCodec.decodeAndVerify(
+                        packetBytes = packet.data,
+                        length = packet.length,
+                        expectedSessionToken = token,
+                        lastReceivedSequence = prevSeq
+                    ) ?: continue
+
+                    lastReceivedUdpSequence.set(decoded.sequenceNumber)
+                    lastUdpPacketElapsedMs.set(SystemClock.elapsedRealtime())
+                    applyIncomingPadState(decoded)
+                }
+            } finally {
+                runCatching { dSocket.close() }
+            }
+        }
+    }
+
+    /**
+     * Bộ canh gác an toàn nút bấm (Giao thức v1 mục 6):
+     * Nếu không nhận gói UDP mới trong 450ms khi đang có nút/cần khác 0 -> nhả toàn bộ nút ngay lập tức.
+     */
+    private fun startWatchdogIfNeeded() {
+        if (watchdogJob?.isActive == true) return
+        watchdogJob = scope.launch {
+            while (isActive) {
+                delay(80L)
+                val lastPktAt = lastUdpPacketElapsedMs.get()
+                if (!lastAppliedPadState.isNeutral() && lastPktAt > 0L) {
+                    val elapsed = SystemClock.elapsedRealtime() - lastPktAt
+                    if (elapsed >= RemotePadProtocol.WATCHDOG_RELEASE_TIMEOUT_MS) {
+                        forceReleaseAllInputsToNeutral()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyIncomingPadState(next: RemotePadState) {
+        val prev = lastAppliedPadState
+        lastAppliedPadState = next
+
+        if (next.isNeutral() && !prev.isNeutral()) {
+            mainHandler.post {
+                onRemotePadReleaseAll?.invoke()
+            }
+            return
+        }
+
+        mainHandler.post {
+            val btnCallback = onRemotePadButton
+            val stickCallback = onRemotePadStick
+
+            if (btnCallback != null) {
+                // 1. Các nút bấm số (A, B, X, Y, LB, RB, View, Menu, L3, R3, D-Pad 4 hướng, Xbox)
+                if (prev.buttonsBitmask != next.buttonsBitmask) {
+                    for (xboxIdx in DIGITAL_BUTTON_INDICES) {
+                        val wasPressed = RemotePadButtons.isXboxButtonPressed(prev.buttonsBitmask, xboxIdx)
+                        val nowPressed = RemotePadButtons.isXboxButtonPressed(next.buttonsBitmask, xboxIdx)
+                        if (wasPressed != nowPressed) {
+                            btnCallback(xboxIdx, nowPressed, if (nowPressed) 1f else 0f)
+                        }
+                    }
+                }
+
+                // 2. Hai cò LT (index 6) và RT (index 7) từ 0.0 -> 1.0
+                if (abs(prev.lt - next.lt) >= 0.005f) {
+                    val ltPressed = next.lt > 0.12f
+                    btnCallback(6, ltPressed, next.lt)
+                }
+                if (abs(prev.rt - next.rt) >= 0.005f) {
+                    val rtPressed = next.rt > 0.12f
+                    btnCallback(7, rtPressed, next.rt)
+                }
+            }
+
+            if (stickCallback != null) {
+                // 3. Cần trái (axes 0, 1)
+                if (abs(prev.lx - next.lx) >= 0.004f || abs(prev.ly - next.ly) >= 0.004f) {
+                    stickCallback(0, next.lx, 1, next.ly)
+                }
+                // 4. Cần phải (axes 2, 3)
+                if (abs(prev.rx - next.rx) >= 0.004f || abs(prev.ry - next.ry) >= 0.004f) {
+                    stickCallback(2, next.rx, 3, next.ry)
+                }
+            }
+        }
+    }
+
+    fun forceReleaseAllInputsToNeutral() {
+        val hadActiveInputs = !lastAppliedPadState.isNeutral()
+        lastAppliedPadState = RemotePadState.NEUTRAL
+        if (hadActiveInputs) {
+            mainHandler.post {
+                onRemotePadReleaseAll?.invoke()
+            }
+        }
+    }
+
     private fun bindTcpServerSocket(): ServerSocket? {
         return try {
             ServerSocket(RemotePadProtocol.DEFAULT_TCP_CONTROL_PORT).apply {
@@ -239,6 +409,22 @@ object RemotePadTvServer {
         } catch (_: Exception) {
             try {
                 ServerSocket(0).apply {
+                    reuseAddress = true
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun bindUdpServerSocket(): DatagramSocket? {
+        return try {
+            DatagramSocket(RemotePadProtocol.DEFAULT_UDP_INPUT_PORT).apply {
+                reuseAddress = true
+            }
+        } catch (_: Exception) {
+            try {
+                DatagramSocket(0).apply {
                     reuseAddress = true
                 }
             } catch (_: Exception) {
@@ -481,7 +667,6 @@ object RemotePadTvServer {
         rememberTokenHex: String,
         tvNonceHex: String
     ) {
-        // Đóng kết nối cũ nếu điện thoại kết nối lại
         activeClientSocketRef.getAndSet(client)?.let { oldSocket ->
             if (oldSocket !== client) {
                 runCatching { oldSocket.close() }
@@ -490,6 +675,9 @@ object RemotePadTvServer {
         activeClientWriterRef.set(writer)
 
         val sessionTokenBytes = RemotePadCrypto.deriveUdpSessionToken(rememberTokenHex, tvNonceHex)
+        lastReceivedUdpSequence.set(-1L)
+        lastUdpPacketElapsedMs.set(SystemClock.elapsedRealtime())
+        lastAppliedPadState = RemotePadState.NEUTRAL
         activeUdpSessionToken = sessionTokenBytes
         val sessionTokenHex = RemotePadCrypto.bytesToHex(sessionTokenBytes)
 
@@ -519,7 +707,6 @@ object RemotePadTvServer {
             )
         )
 
-        // Vòng lặp giữ kết nối TCP (xử lý PING/PONG, DISCONNECT)
         client.soTimeout = 15_000
         try {
             while (!client.isClosed) {
@@ -540,13 +727,16 @@ object RemotePadTvServer {
                 }
             }
         } catch (_: Exception) {
-            // Mất kết nối TCP
         } finally {
             if (activeClientSocketRef.compareAndSet(client, null)) {
                 activeClientWriterRef.set(null)
                 activeUdpSessionToken = null
+                lastReceivedUdpSequence.set(-1L)
                 // An toàn nút bấm (Giao thức v1 mục 6): mất kênh điều khiển -> nhả toàn bộ nút ngay lập tức
-                onRemotePadReleaseAll?.invoke()
+                lastAppliedPadState = RemotePadState.NEUTRAL
+                mainHandler.post {
+                    onRemotePadReleaseAll?.invoke()
+                }
                 _state.update { cur ->
                     cur.copy(
                         status = TvServiceStatus.WAITING_FOR_PAIR,
@@ -560,16 +750,13 @@ object RemotePadTvServer {
         }
     }
 
-    /**
-     * Gửi tín hiệu rung từ TV về điện thoại đang kết nối (hoặc thử rung từ Cài đặt TV).
-     */
     fun sendRumbleToPhone(durationMs: Int = 180, strongMagnitude: Float = 0.85f, weakMagnitude: Float = 0.65f): Boolean {
         val writer = activeClientWriterRef.get() ?: return false
         scope.launch {
             sendFrame(
                 writer,
                 RemoteControlFrame.Rumble(
-                    durationMs = durationMs.coerceIn(20, 2000),
+                    durationMs = durationMs.coerceIn(0, 2000),
                     strongMagnitude = strongMagnitude.coerceIn(0f, 1f),
                     weakMagnitude = weakMagnitude.coerceIn(0f, 1f)
                 )
@@ -578,14 +765,15 @@ object RemotePadTvServer {
         return true
     }
 
-    /**
-     * Ngắt kết nối phiên hiện tại nhưng vẫn giữ mã nhớ thiết bị.
-     */
     fun disconnectActivePhone() {
         val writer = activeClientWriterRef.getAndSet(null)
         val socket = activeClientSocketRef.getAndSet(null)
         activeUdpSessionToken = null
-        onRemotePadReleaseAll?.invoke()
+        lastReceivedUdpSequence.set(-1L)
+        lastAppliedPadState = RemotePadState.NEUTRAL
+        mainHandler.post {
+            onRemotePadReleaseAll?.invoke()
+        }
         scope.launch {
             if (writer != null) {
                 sendFrame(writer, RemoteControlFrame.Disconnect("TV_DISCONNECT"))
@@ -603,9 +791,6 @@ object RemotePadTvServer {
         refreshNsdRegistration()
     }
 
-    /**
-     * Thu hồi mã nhớ thiết bị ("Quên thiết bị" - Giao thức v1 mục 4) và ngắt kết nối ngay.
-     */
     fun forgetDevice(deviceId: String? = null) {
         val ctx = appContext ?: return
         val currentRemembered = _state.value.rememberedDevices
@@ -621,7 +806,11 @@ object RemotePadTvServer {
             val writer = activeClientWriterRef.getAndSet(null)
             val socket = activeClientSocketRef.getAndSet(null)
             activeUdpSessionToken = null
-            onRemotePadReleaseAll?.invoke()
+            lastReceivedUdpSequence.set(-1L)
+            lastAppliedPadState = RemotePadState.NEUTRAL
+            mainHandler.post {
+                onRemotePadReleaseAll?.invoke()
+            }
             scope.launch {
                 if (writer != null) {
                     sendFrame(writer, RemoteControlFrame.Disconnect("FORGOTTEN"))
@@ -641,8 +830,6 @@ object RemotePadTvServer {
         }
         refreshNsdRegistration()
     }
-
-    fun currentUdpSessionToken(): ByteArray? = activeUdpSessionToken
 
     @Synchronized
     private fun sendFrame(writer: BufferedWriter, frame: RemoteControlFrame) {

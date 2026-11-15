@@ -592,8 +592,11 @@ fun CloudBrowserScreen(
     }
 
     val isTvMode = remember(config.appUiMode, context) { config.isEffectiveTvMode(context) }
+    val remotePadServerState by com.example.cloudplay.RemotePadTvServer.state.collectAsState()
+    val isRemotePadConnected = remotePadServerState.status == com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER
     val effectiveShowVirtualController = !isTvMode && config.showVirtualController &&
         (!config.autoHideVirtualOnPhysicalController || !gamepadStatus.hasPhysicalController || manualVirtualPadOverrideWithPhys)
+    val effectiveSyntheticGamepadEnabled = effectiveShowVirtualController || isRemotePadConnected
 
     // Dynamically recompute injectionScript only when structural settings change (bitrate updates go through __updateNetworkProfile)
     val injectionScript = remember(
@@ -610,7 +613,7 @@ fun CloudBrowserScreen(
         config.networkTuningMode,
         config.wifiSpeedFirstPriority,
         config.lowEndDeviceMode,
-        effectiveShowVirtualController,
+        effectiveSyntheticGamepadEnabled,
         config.streamRenderScale,
         config.streamFpsCap,
         config.gpuLoadReductionEnabled,
@@ -642,7 +645,7 @@ fun CloudBrowserScreen(
             speedFirstPriority = config.wifiSpeedFirstPriority,
             effectiveBitrateMbps = if (config.lowEndDeviceMode) 5 else effectiveBitrateMbps,
             lowEndDeviceMode = config.lowEndDeviceMode,
-            virtualGamepadEnabled = effectiveShowVirtualController,
+            virtualGamepadEnabled = effectiveSyntheticGamepadEnabled,
             renderScaleFactor = config.streamRenderScale.scaleFactor,
             fpsCap = config.streamFpsCap.fps,
             gpuLoadReduction = config.gpuLoadReductionEnabled,
@@ -716,12 +719,72 @@ fun CloudBrowserScreen(
         )
     }
 
-    // Đồng bộ tức thì trạng thái Tay cầm ảo với WebView (Tắt tay cầm ảo -> ngắt kết nối Gamepad giả lập để Fortnite hiện HUD Cảm ứng Epic gốc)
-    LaunchedEffect(effectiveShowVirtualController, webViewInstance) {
+    // Đồng bộ tức thì trạng thái Tay cầm ảo / Tay cầm từ xa với WebView
+    LaunchedEffect(effectiveSyntheticGamepadEnabled, webViewInstance) {
         webViewInstance?.evaluateJavascript(
-            "if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($effectiveShowVirtualController);",
+            "if (window.__setVirtualGamepadEnabled) window.__setVirtualGamepadEnabled($effectiveSyntheticGamepadEnabled);",
             null
         )
+    }
+
+    // Đưa trạng thái Tay cầm từ xa (UDP) vào đúng đường chuẩn của XboxBridge (__cpBtn, __cpStick, __cpReleaseAll)
+    DisposableEffect(webViewInstance, activity) {
+        com.example.cloudplay.RemotePadTvServer.onRemotePadButton = { buttonIndex, pressed, analogValue ->
+            com.example.ui.components.GamepadUiNavigation.observeVirtualSelectStartPassively(buttonIndex, pressed)
+            if (com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi) {
+                val keyCode = when (buttonIndex) {
+                    0 -> android.view.KeyEvent.KEYCODE_BUTTON_A
+                    1 -> android.view.KeyEvent.KEYCODE_BUTTON_B
+                    12 -> android.view.KeyEvent.KEYCODE_DPAD_UP
+                    13 -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
+                    14 -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
+                    15 -> android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                    else -> null
+                }
+                if (keyCode != null) {
+                    val action = if (pressed) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP
+                    val now = android.os.SystemClock.uptimeMillis()
+                    val ev = android.view.KeyEvent(
+                        now,
+                        now,
+                        action,
+                        keyCode,
+                        0,
+                        0,
+                        android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
+                        0,
+                        0,
+                        android.view.InputDevice.SOURCE_GAMEPAD or android.view.InputDevice.SOURCE_DPAD
+                    )
+                    activity?.window?.decorView?.dispatchKeyEvent(ev)
+                }
+            }
+            val rv = (analogValue.coerceIn(0f, 1f) * 100f).let { kotlin.math.round(it) / 100f }
+            webViewInstance?.evaluateJavascript(
+                "if(window.__cpBtn){window.__cpBtn($buttonIndex,$pressed,$rv);}else if(window.dispatchEvent){window.dispatchEvent(new CustomEvent('virtual_gamepad_button',{detail:{index:$buttonIndex,pressed:$pressed,value:$rv}}));}",
+                null
+            )
+        }
+        com.example.cloudplay.RemotePadTvServer.onRemotePadStick = { xAxisIndex, xVal, yAxisIndex, yVal ->
+            val rx = (xVal.coerceIn(-1f, 1f) * 100f).let { kotlin.math.round(it) / 100f }
+            val ry = (yVal.coerceIn(-1f, 1f) * 100f).let { kotlin.math.round(it) / 100f }
+            webViewInstance?.evaluateJavascript(
+                "if(window.__cpStick){window.__cpStick($xAxisIndex,$rx,$yAxisIndex,$ry);}else if(window.dispatchEvent){window.dispatchEvent(new CustomEvent('virtual_gamepad_axes_pair',{detail:{xAxis:$xAxisIndex,xVal:$rx,yAxis:$yAxisIndex,yVal:$ry}}));}",
+                null
+            )
+        }
+        com.example.cloudplay.RemotePadTvServer.onRemotePadReleaseAll = {
+            webViewInstance?.evaluateJavascript(
+                "if(window.__cpReleaseAll){window.__cpReleaseAll();}",
+                null
+            )
+        }
+        onDispose {
+            webViewInstance?.evaluateJavascript(
+                "if(window.__cpReleaseAll){window.__cpReleaseAll();}",
+                null
+            )
+        }
     }
 
     // Đồng bộ tức thì cấu hình Tay cầm thật (đổi nút, vùng chết trong/ngoài từng cần, tổ hợp phím tắt View + nút)

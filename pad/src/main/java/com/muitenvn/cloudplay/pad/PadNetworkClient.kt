@@ -14,6 +14,8 @@ import com.muitenvn.cloudplay.protocol.RemoteControlCodec
 import com.muitenvn.cloudplay.protocol.RemoteControlFrame
 import com.muitenvn.cloudplay.protocol.RemotePadCrypto
 import com.muitenvn.cloudplay.protocol.RemotePadProtocol
+import com.muitenvn.cloudplay.protocol.RemotePadState
+import com.muitenvn.cloudplay.protocol.RemotePadUdpCodec
 import com.muitenvn.cloudplay.protocol.TvServiceStatus
 import com.muitenvn.cloudplay.protocol.VersionCheckResult
 import kotlinx.coroutines.CoroutineScope
@@ -32,14 +34,20 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 enum class PadScreenRoute {
@@ -85,6 +93,9 @@ data class PadClientUiState(
  * - Quét tìm TV qua NSD/mDNS (`_cloudplaypad._tcp`) + quét nhanh cổng TCP nội bộ khi cần.
  * - Ghép đôi mã 4 số bằng chữ ký HMAC-SHA256 (không bao giờ gửi mã 4 số dạng rõ).
  * - Lưu mã nhớ riêng theo từng TV để tự kết nối lại không cần nhập mã.
+ * - Gửi TOÀN BỘ trạng thái tay cầm qua gói UDP 48 byte kèm mã phiên 16 byte + số thứ tự tăng dần
+ *   mỗi khi có thay đổi và gửi nhịp tim mỗi 100ms khi giữ nguyên.
+ * - Nhả toàn bộ nút ngay lập tức khi vào nền hoặc ngắt kết nối.
  * - Đo Ping thật qua gói PING/PONG và nhận lệnh rung từ TV.
  */
 object PadNetworkClient {
@@ -123,15 +134,40 @@ object PadNetworkClient {
 
     private val activeControlSocketRef = AtomicReference<Socket?>(null)
     private val activeControlWriterRef = AtomicReference<BufferedWriter?>(null)
+    private val activeUdpSocketRef = AtomicReference<DatagramSocket?>(null)
 
     @Volatile
     private var activeUdpSessionToken: ByteArray? = null
 
     @Volatile
-    private var activeUdpTargetHost: String = ""
+    private var activeUdpTargetAddress: InetAddress? = null
 
     @Volatile
     private var activeUdpTargetPort: Int = RemotePadProtocol.DEFAULT_UDP_INPUT_PORT
+
+    private val udpSequenceCounter = AtomicLong(0L)
+    private val currentButtonsBitmask = AtomicInteger(0)
+
+    @Volatile
+    private var currentLx: Float = 0f
+
+    @Volatile
+    private var currentLy: Float = 0f
+
+    @Volatile
+    private var currentRx: Float = 0f
+
+    @Volatile
+    private var currentRy: Float = 0f
+
+    @Volatile
+    private var currentLt: Float = 0f
+
+    @Volatile
+    private var currentRt: Float = 0f
+
+    private val udpSendLock = Any()
+    private val reusableUdpBytes = ByteArray(RemotePadProtocol.UDP_PACKET_BYTES)
 
     fun ensureInitialized(context: Context) {
         if (appContext == null) {
@@ -169,6 +205,138 @@ object PadNetworkClient {
             .putString(KEY_LANG_CODE, next.code)
             .apply()
         _state.update { it.copy(language = next) }
+    }
+
+    fun updateButtonBit(bitMask: Int, pressed: Boolean) {
+        if (bitMask == 0) return
+        while (true) {
+            val prev = currentButtonsBitmask.get()
+            val next = if (pressed) (prev or bitMask) else (prev and bitMask.inv())
+            if (prev == next) return
+            if (currentButtonsBitmask.compareAndSet(prev, next)) {
+                dispatchCurrentPadStateOverUdp()
+                return
+            }
+        }
+    }
+
+    fun updateButtonsMask(maskToClear: Int, maskToSet: Int) {
+        while (true) {
+            val prev = currentButtonsBitmask.get()
+            val next = (prev and maskToClear.inv()) or maskToSet
+            if (prev == next) return
+            if (currentButtonsBitmask.compareAndSet(prev, next)) {
+                dispatchCurrentPadStateOverUdp()
+                return
+            }
+        }
+    }
+
+    fun updateLeftStick(x: Float, y: Float, sprintL3Bit: Int = 0) {
+        val cx = x.coerceIn(-1f, 1f)
+        val cy = y.coerceIn(-1f, 1f)
+        val axisChanged = abs(currentLx - cx) >= 0.004f || abs(currentLy - cy) >= 0.004f
+        currentLx = cx
+        currentLy = cy
+        var maskChanged = false
+        if (sprintL3Bit != 0) {
+            val prev = currentButtonsBitmask.get()
+            val next = prev or sprintL3Bit
+            if (prev != next && currentButtonsBitmask.compareAndSet(prev, next)) {
+                maskChanged = true
+            }
+        }
+        if (axisChanged || maskChanged) {
+            dispatchCurrentPadStateOverUdp()
+        }
+    }
+
+    fun updateRightStick(x: Float, y: Float) {
+        val cx = x.coerceIn(-1f, 1f)
+        val cy = y.coerceIn(-1f, 1f)
+        if (abs(currentRx - cx) < 0.004f && abs(currentRy - cy) < 0.004f) return
+        currentRx = cx
+        currentRy = cy
+        dispatchCurrentPadStateOverUdp()
+    }
+
+    fun updateLeftTrigger(value: Float) {
+        val cv = value.coerceIn(0f, 1f)
+        if (abs(currentLt - cv) < 0.005f) return
+        currentLt = cv
+        dispatchCurrentPadStateOverUdp()
+    }
+
+    fun updateRightTrigger(value: Float) {
+        val cv = value.coerceIn(0f, 1f)
+        if (abs(currentRt - cv) < 0.005f) return
+        currentRt = cv
+        dispatchCurrentPadStateOverUdp()
+    }
+
+    /**
+     * An toàn nút bấm (Giao thức v1 mục 6):
+     * Khi vào nền, mất kết nối hoặc thoát màn tay cầm -> đưa toàn bộ nút/cần/cò về 0 và bắn gói UDP NEUTRAL ngay.
+     */
+    fun releaseAllInputsImmediate() {
+        currentButtonsBitmask.set(0)
+        currentLx = 0f
+        currentLy = 0f
+        currentRx = 0f
+        currentRy = 0f
+        currentLt = 0f
+        currentRt = 0f
+        scope.launch {
+            repeat(3) {
+                sendUdpSnapshotNow()
+                if (it < 2) delay(12L)
+            }
+        }
+    }
+
+    private fun dispatchCurrentPadStateOverUdp() {
+        scope.launch {
+            sendUdpSnapshotNow()
+        }
+    }
+
+    private fun sendUdpSnapshotNow() {
+        val token = activeUdpSessionToken ?: return
+        val dSocket = activeUdpSocketRef.get() ?: return
+        val addr = activeUdpTargetAddress ?: return
+        val port = activeUdpTargetPort
+        if (dSocket.isClosed || token.size != RemotePadProtocol.SESSION_TOKEN_BYTES) return
+
+        val seq = udpSequenceCounter.incrementAndGet()
+        val stateSnapshot = RemotePadState(
+            sequenceNumber = seq,
+            playerIndex = _state.value.connectedPlayerIndex.coerceIn(1, 4),
+            buttonsBitmask = currentButtonsBitmask.get(),
+            lx = currentLx,
+            ly = currentLy,
+            rx = currentRx,
+            ry = currentRy,
+            lt = currentLt,
+            rt = currentRt
+        )
+
+        synchronized(udpSendLock) {
+            try {
+                RemotePadUdpCodec.encode(
+                    state = stateSnapshot,
+                    sessionToken = token,
+                    outBuffer = reusableUdpBytes
+                )
+                val packet = DatagramPacket(
+                    reusableUdpBytes,
+                    RemotePadProtocol.UDP_PACKET_BYTES,
+                    addr,
+                    port
+                )
+                dSocket.send(packet)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     fun startDiscovery(context: Context) {
@@ -228,7 +396,6 @@ object PadNetworkClient {
             _state.update { it.copy(isScanning = false) }
         }
 
-        // Bổ sung quét nhanh mạng con LAN để tìm TV ngay cả khi router chặn multicast mDNS
         triggerSubnetQuickProbe()
     }
 
@@ -254,6 +421,7 @@ object PadNetworkClient {
 
     private fun resolveDiscoveredService(manager: NsdManager, service: NsdServiceInfo) {
         try {
+            @Suppress("DEPRECATION")
             manager.resolveService(
                 service,
                 object : NsdManager.ResolveListener {
@@ -261,6 +429,7 @@ object PadNetworkClient {
                     }
 
                     override fun onServiceResolved(resolved: NsdServiceInfo) {
+                        @Suppress("DEPRECATION")
                         val host = resolved.host?.hostAddress ?: return
                         val tcpPort = resolved.port.takeIf { it > 0 } ?: RemotePadProtocol.DEFAULT_TCP_CONTROL_PORT
                         val attrs = resolved.attributes ?: emptyMap()
@@ -303,7 +472,6 @@ object PadNetworkClient {
             val prefix = myIp.substring(0, dotIdx + 1)
             val myLastOctet = myIp.substring(dotIdx + 1).toIntOrNull() ?: -1
 
-            // Chia nhóm quét song song cổng TCP mặc định 47991 trong mạng LAN /24
             val octets = (1..254).filter { it != myLastOctet }
             for (batch in octets.chunked(32)) {
                 if (!isActive) break
@@ -370,12 +538,6 @@ object PadNetworkClient {
         }
     }
 
-    /**
-     * Khi người dùng chạm vào một TV trong danh sách:
-     * 1. Kiểm tra phiên bản giao thức (nếu lệch -> hiện thông báo rõ, không kết nối).
-     * 2. Nếu đã có mã nhớ cho TV này -> tự động kết nối lại ngay không cần nhập mã 4 số.
-     * 3. Nếu chưa có mã nhớ -> mở màn hình Nhập mã 4 số (`ENTER_PIN`).
-     */
     fun onSelectTv(tv: DiscoveredTvDevice) {
         val verCheck = RemotePadProtocol.checkVersionCompatibility(
             localVersion = RemotePadProtocol.PROTOCOL_VERSION,
@@ -508,7 +670,6 @@ object PadNetworkClient {
                     return@launch
                 }
 
-                // Chứng minh biết mã 4 số bằng HMAC-SHA256 trên nonce của TV (không gửi mã thẳng!)
                 val pinHmac = RemotePadCrypto.computePinProofHmac(
                     pin4Digits = pin,
                     tvNonceHex = hello.nonceHex,
@@ -724,9 +885,20 @@ object PadNetworkClient {
             if (old !== socket) runCatching { old.close() }
         }
         activeControlWriterRef.set(writer)
+
+        val dSocket = runCatching { DatagramSocket() }.getOrNull()
+        activeUdpSocketRef.getAndSet(dSocket)?.close()
         activeUdpSessionToken = RemotePadCrypto.hexToBytes(authOk.udpSessionTokenHex)
-        activeUdpTargetHost = tv.hostAddress
+        activeUdpTargetAddress = runCatching { InetAddress.getByName(tv.hostAddress) }.getOrNull()
         activeUdpTargetPort = authOk.udpPort
+        udpSequenceCounter.set(0L)
+        currentButtonsBitmask.set(0)
+        currentLx = 0f
+        currentLy = 0f
+        currentRx = 0f
+        currentRy = 0f
+        currentLt = 0f
+        currentRt = 0f
 
         stopDiscovery()
 
@@ -743,7 +915,15 @@ object PadNetworkClient {
             )
         }
 
-        // Luồng gửi PING định kỳ mỗi 2 giây để đo Ping thực tế tới TV và giữ kênh TCP sống
+        // 1. Luồng nhịp tim UDP mỗi 100ms để TV biết tay cầm còn sống (Giao thức v1 mục 2)
+        val udpHeartbeatJob = scope.launch {
+            while (isActive && !socket.isClosed) {
+                sendUdpSnapshotNow()
+                delay(RemotePadProtocol.UDP_HEARTBEAT_INTERVAL_MS)
+            }
+        }
+
+        // 2. Luồng PING TCP mỗi 2 giây để đo Ping thực tế tới TV
         val pingJob = scope.launch {
             while (isActive && !socket.isClosed) {
                 sendFrame(writer, RemoteControlFrame.Ping(SystemClock.elapsedRealtime()))
@@ -778,10 +958,13 @@ object PadNetworkClient {
             }
         } catch (_: Exception) {
         } finally {
+            udpHeartbeatJob.cancel()
             pingJob.cancel()
+            releaseAllInputsImmediate()
             if (activeControlSocketRef.compareAndSet(socket, null)) {
                 activeControlWriterRef.set(null)
                 activeUdpSessionToken = null
+                activeUdpSocketRef.getAndSet(null)?.close()
                 _state.update { cur ->
                     if (cur.route == PadScreenRoute.GAMEPAD) {
                         cur.copy(
@@ -799,10 +982,13 @@ object PadNetworkClient {
     }
 
     fun disconnectActiveSession(navigateToList: Boolean = true) {
+        releaseAllInputsImmediate()
         val writer = activeControlWriterRef.getAndSet(null)
         val socket = activeControlSocketRef.getAndSet(null)
-        activeUdpSessionToken = null
         scope.launch {
+            delay(35L)
+            activeUdpSessionToken = null
+            activeUdpSocketRef.getAndSet(null)?.close()
             if (writer != null) {
                 sendFrame(writer, RemoteControlFrame.Disconnect("PHONE_DISCONNECT"))
             }
@@ -822,26 +1008,31 @@ object PadNetworkClient {
         }
     }
 
-    private fun triggerPhoneVibration(durationMs: Int, strongMag: Float, weakMag: Float) {
+    fun triggerPhoneVibration(durationMs: Int, strongMag: Float, weakMag: Float) {
         val ctx = appContext ?: return
         try {
-            val dur = durationMs.coerceIn(20, 1500).toLong()
-            val combined = (strongMag * 0.7f + weakMag * 0.3f).coerceIn(0.08f, 1f)
-            val amp = (combined * 255f).roundToInt().coerceIn(1, 255)
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator
             } else {
                 @Suppress("DEPRECATION")
                 ctx.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            } ?: return
+            if (!vibrator.hasVibrator()) return
+
+            if (durationMs <= 0 || (strongMag <= 0.01f && weakMag <= 0.01f)) {
+                vibrator.cancel()
+                return
             }
-            if (vibrator != null && vibrator.hasVibrator()) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createOneShot(dur, amp))
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator.vibrate(dur)
-                }
+
+            val dur = durationMs.coerceIn(12, 1500).toLong()
+            val combined = (strongMag * 0.7f + weakMag * 0.3f).coerceIn(0.08f, 1f)
+            val amp = (combined * 255f).roundToInt().coerceIn(1, 255)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(dur, amp))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(dur)
             }
         } catch (_: Exception) {
         }

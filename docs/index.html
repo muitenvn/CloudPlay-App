@@ -199,6 +199,9 @@
           <a id="dlMirror" class="btn btn-alt" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener noreferrer">
             <span data-i18n="dlMirror">Tải nhanh (mirror)</span>
           </a>
+          <a id="dlPad" class="btn btn-alt" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener" hidden>
+            <span data-i18n="dlPad">Tải CloudPlay Pad (Tay cầm TV)</span>
+          </a>
         </div>
         <p class="fine" data-i18n="mirrorNote">Mirror do bên thứ ba vận hành. Hãy so mã SHA-256 bên dưới với tệp nhận được.</p>
         <details class="sha">
@@ -263,8 +266,9 @@
       heroTitle: "Chơi Xbox Cloud Gaming gọn nhẹ trên Android",
       heroDesc: "Ứng dụng độc lập mở xbox.com/play trên điện thoại, với tay cầm cảm ứng tùy chỉnh, thông số thật và dịch giao diện.",
       relSubDefault: "Android 8.0 trở lên",
-      dlMain: "Tải APK",
+      dlMain: "Tải APK (Chính thức)",
       dlMirror: "Tải nhanh (mirror)",
+      dlPad: "Tải CloudPlay Pad (Tay cầm TV)",
       mirrorNote: "Mirror do bên thứ ba vận hành. Hãy so mã SHA-256 bên dưới với tệp nhận được.",
       shaTitle: "Mã kiểm tra SHA-256",
       shaDefault: "Xem tệp .sha256 trên trang Releases",
@@ -293,8 +297,9 @@
       heroTitle: "Xbox Cloud Gaming, light and quick on Android",
       heroDesc: "An independent app that opens xbox.com/play on your phone, with custom touch controls, real stream stats and translated menus.",
       relSubDefault: "Android 8.0 or newer",
-      dlMain: "Download APK",
+      dlMain: "Download APK (Official)",
       dlMirror: "Fast download (mirror)",
+      dlPad: "Download CloudPlay Pad (TV Controller)",
       mirrorNote: "Mirrors are run by third parties. Compare the SHA-256 below with the file you receive.",
       shaTitle: "SHA-256 checksum",
       shaDefault: "See the .sha256 file on the Releases page",
@@ -407,9 +412,18 @@
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
       if (!d) return;
-      var assets = Array.isArray(d.assets) ? d.assets : [], apk = null;
+      var assets = Array.isArray(d.assets) ? d.assets : [], apk = null, padApk = null;
       for (var i = 0; i < assets.length; i++) {
-        if (assets[i] && typeof assets[i].name === "string" && assets[i].name.toLowerCase().endsWith(".apk")) { apk = assets[i]; break; }
+        var a = assets[i];
+        if (!a || typeof a.name !== "string") continue;
+        var nm = a.name.toLowerCase();
+        if (!nm.endsWith(".apk")) continue;
+        var isPad = nm.indexOf("cloudplay-pad") !== -1 || nm.indexOf("-pad-") !== -1 || nm.indexOf("pad-") === 0;
+        if (isPad) {
+          if (!padApk) padApk = a;
+        } else if (nm.indexOf("cloudplay-xbox") !== -1 || !apk) {
+          apk = a;
+        }
       }
       var m = (d.body || "").match(/\b([a-fA-F0-9]{64})\b/);
       var url = apk ? apk.browser_download_url : (d.html_url || "https://github.com/muitenvn/CloudPlay-App/releases/latest");
@@ -422,6 +436,10 @@
       };
       $("dlMain").href = url;
       $("dlMirror").href = mirrors(url)[0];
+      if (padApk && padApk.browser_download_url && $("dlPad")) {
+        $("dlPad").href = padApk.browser_download_url;
+        $("dlPad").hidden = false;
+      }
       render();
     })
     .catch(function () {});

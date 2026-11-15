@@ -28,8 +28,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -243,6 +245,7 @@ internal fun TvSettingsScreen(
                 modifier = Modifier
                     .width(catWidth)
                     .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
                     .testTag("tv_settings_categories_column"),
                 verticalArrangement = Arrangement.spacedBy((4.dp * scale).coerceAtLeast(3.dp))
             ) {
@@ -290,6 +293,32 @@ internal fun TvSettingsScreen(
             ) {
                 when (selectedCat) {
                     TvSettingsCategory.GRAPHICS -> {
+                        item(key = "tv_set_quick_remote_pad") {
+                            val isPhoneConnected = remotePadServerState.connectedDeviceName.isNotBlank()
+                            TvSettingActionRow(
+                                title = config.tr("📱 Dùng điện thoại làm tay cầm", "📱 Use Phone as Controller"),
+                                subtitle = if (isPhoneConnected) {
+                                    config.tr(
+                                        "Đang kết nối: ${remotePadServerState.connectedDeviceName} (Tay cầm 1) · Bấm để quản lý",
+                                    "Connected: ${remotePadServerState.connectedDeviceName} (Controller 1) · Tap to manage"
+                                    )
+                                } else {
+                                    config.tr(
+                                        "Bấm vào đây để hiện mã 4 chữ số ghép đôi với ứng dụng CloudPlay Pad.",
+                                        "Tap here to show the 4-digit pairing code for CloudPlay Pad."
+                                    )
+                                },
+                                actionLabel = if (isPhoneConnected) {
+                                    config.tr("Đang kết nối", "Connected")
+                                } else {
+                                    config.tr("Hiện mã 4 số", "Show 4-Digit PIN")
+                                },
+                                scale = scale,
+                                onClick = { showRemotePadDialog = true },
+                                testTag = "tv_setting_quick_remote_pad_row"
+                            )
+                        }
+
                         item(key = "tv_set_res") {
                             val resModes = listOf(
                                 CellularOptimizationMode.AUTO to config.tr("Tự động", "Auto"),

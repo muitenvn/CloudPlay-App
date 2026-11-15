@@ -1375,6 +1375,9 @@ fun CloudBrowserScreen(
                         }
                     }
 
+                    if (config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC) {
+                        applyClassicPreviewOptOutCookies()
+                    }
                     val formattedInitialUrl = SettingsRepository.formatXboxUrlWithLocale(activeSessionInitialUrl, effectiveLocale)
                     val customHeaders = mapOf(
                         "Accept-Language" to "$effectiveLocale,en;q=0.9",

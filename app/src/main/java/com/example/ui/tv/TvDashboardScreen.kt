@@ -142,6 +142,17 @@ fun TvDashboardScreen(
     var showTranslatorDialog by remember { mutableStateOf(false) }
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showRemotePadDialog by rememberSaveable { mutableStateOf(false) }
+    val remotePadServerState by com.example.cloudplay.RemotePadTvServer.state.collectAsState()
+    var lastHandledPairPromptTick by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(0L) }
+
+    LaunchedEffect(remotePadServerState.pairPromptTick) {
+        val tick = remotePadServerState.pairPromptTick
+        if (tick > 0L && tick != lastHandledPairPromptTick) {
+            lastHandledPairPromptTick = tick
+            showRemotePadDialog = true
+        }
+    }
 
     val homePrimaryFocusRequester = remember { FocusRequester() }
     val activeRailFocusRequester = remember { FocusRequester() }
@@ -166,7 +177,7 @@ fun TvDashboardScreen(
         }
     }
 
-    val isAnyDialogOpen = showGuideDialog || showTranslatorDialog || showWebPortalDialog || showLanguageDialog
+    val isAnyDialogOpen = showGuideDialog || showTranslatorDialog || showWebPortalDialog || showLanguageDialog || showRemotePadDialog
 
     GamepadSurfaceController(
         enabled = !isAnyDialogOpen,
@@ -321,6 +332,7 @@ fun TvDashboardScreen(
                                                 onOpenLanguagePicker = { showLanguageDialog = true },
                                                 onOpenTranslator = { showTranslatorDialog = true },
                                                 onOpenWebPortal = { showWebPortalDialog = true },
+                                                onOpenRemotePad = { showRemotePadDialog = true },
                                                 onOpenGuide = { section ->
                                                     guideInitialSection = section
                                                     showGuideDialog = true
@@ -530,6 +542,13 @@ fun TvDashboardScreen(
     if (showWebPortalDialog) {
         WebDownloadPortalDialog(
             onDismiss = { showWebPortalDialog = false }
+        )
+    }
+
+    if (showRemotePadDialog) {
+        TvRemotePadDialog(
+            config = config,
+            onDismiss = { showRemotePadDialog = false }
         )
     }
 }

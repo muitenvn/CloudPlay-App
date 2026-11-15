@@ -584,6 +584,27 @@ object PadNetworkClient {
                     versionMismatchResult = VersionCheckResult.COMPATIBLE
                 )
             }
+            notifyTvShowPairPinPrompt(tv)
+        }
+    }
+
+    private fun notifyTvShowPairPinPrompt(tv: DiscoveredTvDevice) {
+        scope.launch {
+            var socket: Socket? = null
+            try {
+                socket = Socket()
+                socket.tcpNoDelay = true
+                socket.connect(InetSocketAddress(tv.hostAddress, tv.tcpPort), 1_500)
+                socket.soTimeout = 1_500
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
+                val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
+                reader.readLine()
+                writer.write("PAIR_PROMPT\n")
+                writer.flush()
+            } catch (_: Exception) {
+            } finally {
+                runCatching { socket?.close() }
+            }
         }
     }
 

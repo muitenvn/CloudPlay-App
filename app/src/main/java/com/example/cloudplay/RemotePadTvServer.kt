@@ -71,7 +71,8 @@ data class TvRemotePadServerState(
     val connectedPlayerIndex: Int = 1,
     val rememberedDevices: List<PairedPhoneDevice> = emptyList(),
     val versionMismatchNoticeVi: String = "",
-    val versionMismatchNoticeEn: String = ""
+    val versionMismatchNoticeEn: String = "",
+    val pairPromptTick: Long = 0L
 )
 
 /**
@@ -463,8 +464,15 @@ object RemotePadTvServer {
                 )
             )
 
-            // 2. Đọc yêu cầu xác thực (PAIR_PIN hoặc AUTH_TOKEN)
+            // 2. Đọc yêu cầu xác thực (PAIR_PIN, AUTH_TOKEN, hoặc PAIR_PROMPT báo mở màn mã 4 số)
             val firstLine = reader.readLine() ?: run {
+                runCatching { client.close() }
+                return
+            }
+            if (firstLine.trim() == "PAIR_PROMPT") {
+                _state.update { cur ->
+                    cur.copy(pairPromptTick = SystemClock.elapsedRealtime())
+                }
                 runCatching { client.close() }
                 return
             }

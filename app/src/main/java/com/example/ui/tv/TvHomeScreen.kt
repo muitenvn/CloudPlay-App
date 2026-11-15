@@ -73,6 +73,7 @@ internal fun TvHomeScreen(
     onOpenLanguagePicker: () -> Unit,
     onOpenTranslator: () -> Unit,
     onOpenWebPortal: () -> Unit,
+    onOpenRemotePad: () -> Unit = {},
     onOpenGuide: (GuideSection) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -244,6 +245,14 @@ internal fun TvHomeScreen(
                         scale = scale,
                         tone = if (config.isEffectiveTranslateEnabled()) TvPillTone.GREEN else TvPillTone.NEUTRAL,
                         onClick = onOpenTranslator
+                    )
+
+                    TvPill(
+                        text = config.tr("📱 Tay cầm", "📱 Pad"),
+                        scale = scale,
+                        tone = TvPillTone.GREEN,
+                        onClick = onOpenRemotePad,
+                        modifier = Modifier.testTag("tv_home_remote_pad_pill")
                     )
 
                     TvPill(

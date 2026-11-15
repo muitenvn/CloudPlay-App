@@ -1602,6 +1602,26 @@ fun CloudBrowserScreen(
                 ?: activeGameKey
         }
 
+        LaunchedEffect(activeGameKey, activeGameDisplayName, gameProfile.gameId, config.gamepadLayoutPreset, isRemotePadConnected) {
+            val keyLower = (activeGameKey ?: gameProfile.gameId).lowercase()
+            val presetId = when {
+                keyLower.contains("fortnite") || keyLower.contains("halo") || keyLower.contains("call_of_duty") || keyLower.contains("cod") || keyLower.contains("apex") || keyLower.contains("battlefield") -> "fps"
+                keyLower.contains("forza") || keyLower.contains("f1") || keyLower.contains("dirt") || keyLower.contains("need_for_speed") || keyLower.contains("asphalt") -> "racing"
+                keyLower.contains("starfield") || keyLower.contains("gta") || keyLower.contains("elden") || keyLower.contains("assassin") || keyLower.contains("mortal_kombat") -> "action"
+                else -> when (config.gamepadLayoutPreset) {
+                    com.example.data.GamepadLayoutPreset.FPS_PRO -> "fps"
+                    com.example.data.GamepadLayoutPreset.COMPACT -> "action"
+                    com.example.data.GamepadLayoutPreset.RACING -> "racing"
+                    com.example.data.GamepadLayoutPreset.STANDARD -> "standard"
+                }
+            }
+            com.example.cloudplay.RemotePadTvServer.notifyActiveGameChanged(
+                gameKey = activeGameKey.orEmpty(),
+                gameTitle = activeGameDisplayName.orEmpty(),
+                presetName = presetId
+            )
+        }
+
         // Virtual Gamepad Overlay (if toggled on and not auto-hidden by physical controller)
         if (effectiveShowVirtualController) {
             VirtualGamepadOverlay(

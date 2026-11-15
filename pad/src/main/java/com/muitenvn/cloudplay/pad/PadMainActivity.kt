@@ -197,7 +197,7 @@ fun CloudPlayPadRootScreen() {
                     state = clientState,
                     m = m,
                     onReconnect = {
-                        clientState.selectedTv?.let { PadNetworkClient.onSelectTv(it) }
+                        PadNetworkClient.reconnectSelectedTv()
                     },
                     onBackToList = { PadNetworkClient.backToTvList() }
                 )
@@ -879,6 +879,11 @@ private fun PadConnectedReadyScreen(
     }
 }
 
+/**
+ * Màn hình Điện thoại 4 (#s6 trong remote-pad-mockup.html): Mất kết nối với TV.
+ * Hiển thị rõ việc mọi nút bấm đã được tự động nhả về trạng thái nghỉ để nhân vật trong game không bị kẹt nút,
+ * hỗ trợ tự động kết nối lại bằng mã nhớ hoặc bấm "Thử kết nối lại" / "Chọn TV khác".
+ */
 @Composable
 private fun PadDisconnectedSummaryScreen(
     state: PadClientUiState,
@@ -888,6 +893,24 @@ private fun PadDisconnectedSummaryScreen(
 ) {
     val lang = state.language
     val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+
+    val subtitleText = when (state.disconnectReasonCode) {
+        "FORGOTTEN" -> PadStrings.tr(
+            lang = lang,
+            vi = "TV ($tvName) đã xóa thiết bị đã nhớ. Mọi nút bấm đã được tự động nhả về trạng thái nghỉ.",
+            en = "TV ($tvName) forgot this device. All buttons were automatically released to neutral."
+        )
+        "TV_DISCONNECT" -> PadStrings.tr(
+            lang = lang,
+            vi = "TV ($tvName) đã ngắt kết nối tay cầm từ xa. Mọi nút bấm đã được tự động nhả về trạng thái nghỉ.",
+            en = "TV ($tvName) disconnected the remote controller. All buttons were automatically released to neutral."
+        )
+        else -> PadStrings.tr(
+            lang = lang,
+            vi = "Mọi nút bấm đã được tự động nhả về trạng thái nghỉ để nhân vật trong game không bị kẹt nút.",
+            en = "All buttons were automatically released to neutral so your character doesn't get stuck in-game."
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -907,61 +930,92 @@ private fun PadDisconnectedSummaryScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(m.itemGap)
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.6f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(m.dotSize)
+                        .clip(CircleShape)
+                        .background(if (state.isAutoReconnecting || state.isConnecting) PadWarn else PadDanger)
+                )
+                Text(
+                    text = tvName,
+                    color = PadMuted,
+                    fontSize = m.captionFont,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Text(
                 text = PadStrings.tr(lang, "Đã mất kết nối với TV", "Disconnected from TV"),
-                color = PadDanger,
+                color = PadInk,
                 fontSize = m.headingFont,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center
             )
+
             Text(
-                text = PadStrings.tr(
-                    lang = lang,
-                    vi = "TV đã tự nhả toàn bộ nút bấm để nhân vật trong game không bị kẹt nút.",
-                    en = "TV automatically released all buttons to prevent stuck inputs in-game."
-                ),
+                text = subtitleText,
                 color = PadMuted,
                 fontSize = m.bodyFont,
                 textAlign = TextAlign.Center
             )
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(m.itemGap),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(m.buttonRadius))
-                        .background(PadAccentFill)
-                        .border(m.strokeThin, PadAccent, RoundedCornerShape(m.buttonRadius))
-                        .clickable(onClick = onReconnect)
-                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.7f)
-                        .testTag("pad_reconnect_btn")
-                ) {
-                    Text(
-                        text = PadStrings.tr(lang, "Kết nối lại $tvName", "Reconnect"),
-                        color = PadAccent,
-                        fontSize = m.bodyFont,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            if (state.isAutoReconnecting || state.isConnecting) {
+                Text(
+                    text = PadStrings.tr(
+                        lang = lang,
+                        vi = "Đang tự kết nối lại với $tvName...",
+                        en = "Automatically reconnecting to $tvName..."
+                    ),
+                    color = PadWarn,
+                    fontSize = m.captionFont,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("pad_auto_reconnecting_text")
+                )
+            }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(m.buttonRadius))
-                        .background(PadSurface2)
-                        .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
-                        .clickable(onClick = onBackToList)
-                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.7f)
-                        .testTag("pad_back_to_list_btn")
-                ) {
-                    Text(
-                        text = PadStrings.tr(lang, "Đổi TV khác", "Change TV"),
-                        color = PadInk,
-                        fontSize = m.bodyFont,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            Spacer(modifier = Modifier.height(m.itemGap * 0.4f))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(m.buttonRadius))
+                    .background(PadAccentFill)
+                    .border(m.strokeThin, PadAccent, RoundedCornerShape(m.buttonRadius))
+                    .clickable(onClick = onReconnect)
+                    .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
+                    .testTag("pad_reconnect_btn"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = PadStrings.tr(lang, "Thử kết nối lại", "Try reconnecting"),
+                    color = PadAccent,
+                    fontSize = m.bodyFont,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(m.buttonRadius))
+                    .background(PadSurface2)
+                    .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
+                    .clickable(onClick = onBackToList)
+                    .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
+                    .testTag("pad_back_to_list_btn"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = PadStrings.tr(lang, "Chọn TV khác", "Choose another TV"),
+                    color = PadInk,
+                    fontSize = m.bodyFont,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }

@@ -85,7 +85,11 @@ data class PadClientUiState(
     val versionMismatchResult: VersionCheckResult = VersionCheckResult.COMPATIBLE,
     val connectedPlayerIndex: Int = 1,
     val measuredPingMs: Int? = null,
-    val disconnectReasonCode: String = ""
+    val disconnectReasonCode: String = "",
+    val activeGameKey: String = "",
+    val activeGameTitle: String = "",
+    val suggestedPresetId: String = "",
+    val isAutoReconnecting: Boolean = false
 )
 
 /**
@@ -128,6 +132,9 @@ object PadNetworkClient {
 
     @Volatile
     private var lockoutCountdownJob: Job? = null
+
+    @Volatile
+    private var autoReconnectJob: Job? = null
 
     @Volatile
     private var lockoutUntilElapsedMs: Long = 0L
@@ -718,18 +725,35 @@ object PadNetworkClient {
         }
     }
 
-    private fun connectWithRememberToken(tv: DiscoveredTvDevice, rememberTokenHex: String) {
+    fun reconnectSelectedTv() {
+        autoReconnectJob?.cancel()
+        _state.update { it.copy(isAutoReconnecting = false) }
+        val tv = _state.value.selectedTv ?: return
+        onSelectTv(tv)
+    }
+
+    private fun connectWithRememberToken(
+        tv: DiscoveredTvDevice,
+        rememberTokenHex: String,
+        fromAutoReconnect: Boolean = false
+    ) {
         val cur = _state.value
         if (cur.isConnecting) return
-        _state.update { it.copy(isConnecting = true, pinErrorReason = null) }
+        _state.update {
+            it.copy(
+                isConnecting = true,
+                isAutoReconnecting = fromAutoReconnect,
+                pinErrorReason = null
+            )
+        }
 
         scope.launch {
             var socket: Socket? = null
             try {
                 socket = Socket()
                 socket.tcpNoDelay = true
-                socket.connect(InetSocketAddress(tv.hostAddress, tv.tcpPort), 4_000)
-                socket.soTimeout = 8_000
+                socket.connect(InetSocketAddress(tv.hostAddress, tv.tcpPort), 3_500)
+                socket.soTimeout = 6_000
 
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
                 val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
@@ -744,9 +768,11 @@ object PadNetworkClient {
                     isLocalTv = false
                 )
                 if (verCheck != VersionCheckResult.COMPATIBLE) {
+                    autoReconnectJob?.cancel()
                     _state.update {
                         it.copy(
                             isConnecting = false,
+                            isAutoReconnecting = false,
                             versionMismatchResult = verCheck,
                             pinErrorReason = AuthFailReason.VERSION_MISMATCH
                         )
@@ -774,6 +800,7 @@ object PadNetworkClient {
                 val replyLine = reader.readLine() ?: throw IllegalStateException("No auth response")
                 when (val reply = RemoteControlCodec.parse(replyLine)) {
                     is RemoteControlFrame.AuthOk -> {
+                        autoReconnectJob?.cancel()
                         runConnectedControlLoop(
                             socket = socket,
                             reader = reader,
@@ -783,6 +810,7 @@ object PadNetworkClient {
                         )
                     }
                     is RemoteControlFrame.AuthFail -> {
+                        autoReconnectJob?.cancel()
                         if (reply.reason == AuthFailReason.TOKEN_REVOKED) {
                             removeRememberToken(tv.tvId)
                             discoveredMap[tv.tvId] = tv.copy(hasRememberToken = false)
@@ -790,6 +818,7 @@ object PadNetworkClient {
                             _state.update {
                                 it.copy(
                                     isConnecting = false,
+                                    isAutoReconnecting = false,
                                     route = PadScreenRoute.ENTER_PIN,
                                     enteredPin = "",
                                     pinErrorReason = AuthFailReason.TOKEN_REVOKED
@@ -804,7 +833,8 @@ object PadNetworkClient {
                         _state.update {
                             it.copy(
                                 isConnecting = false,
-                                route = PadScreenRoute.ENTER_PIN,
+                                isAutoReconnecting = false,
+                                route = if (fromAutoReconnect) PadScreenRoute.DISCONNECTED else PadScreenRoute.ENTER_PIN,
                                 enteredPin = ""
                             )
                         }
@@ -815,7 +845,11 @@ object PadNetworkClient {
                 _state.update {
                     it.copy(
                         isConnecting = false,
-                        route = PadScreenRoute.ENTER_PIN,
+                        route = if (fromAutoReconnect || it.route == PadScreenRoute.DISCONNECTED) {
+                            PadScreenRoute.DISCONNECTED
+                        } else {
+                            PadScreenRoute.ENTER_PIN
+                        },
                         enteredPin = ""
                     )
                 }
@@ -901,17 +935,21 @@ object PadNetworkClient {
         currentRt = 0f
 
         stopDiscovery()
+        autoReconnectJob?.cancel()
 
         _state.update {
             it.copy(
                 isConnecting = false,
+                isAutoReconnecting = false,
                 route = PadScreenRoute.GAMEPAD,
                 selectedTv = tv,
                 enteredPin = "",
                 pinErrorReason = null,
                 connectedPlayerIndex = authOk.playerIndex,
                 measuredPingMs = null,
-                disconnectReasonCode = ""
+                disconnectReasonCode = "",
+                activeGameKey = authOk.activeGameKey,
+                activeGameTitle = authOk.activeGameTitle
             )
         }
 
@@ -941,10 +979,24 @@ object PadNetworkClient {
                         val rtt = (SystemClock.elapsedRealtime() - frame.clientSentRealtimeMs)
                             .coerceIn(1L, 9_999L)
                             .toInt()
-                        _state.update { it.copy(measuredPingMs = rtt) }
+                        _state.update { cur ->
+                            cur.copy(
+                                measuredPingMs = rtt,
+                                activeGameKey = frame.activeGameKey.ifBlank { cur.activeGameKey }
+                            )
+                        }
                     }
                     is RemoteControlFrame.Rumble -> {
                         triggerPhoneVibration(frame.durationMs, frame.strongMagnitude, frame.weakMagnitude)
+                    }
+                    is RemoteControlFrame.LayoutSync -> {
+                        _state.update { cur ->
+                            cur.copy(
+                                suggestedPresetId = frame.presetName.trim().lowercase(),
+                                activeGameKey = frame.gameKey.ifBlank { cur.activeGameKey },
+                                activeGameTitle = frame.gameTitle.ifBlank { cur.activeGameTitle }
+                            )
+                        }
                     }
                     is RemoteControlFrame.Disconnect -> {
                         disconnectReason = frame.reason
@@ -965,8 +1017,10 @@ object PadNetworkClient {
                 activeControlWriterRef.set(null)
                 activeUdpSessionToken = null
                 activeUdpSocketRef.getAndSet(null)?.close()
+                var transitionedToDisconnected = false
                 _state.update { cur ->
                     if (cur.route == PadScreenRoute.GAMEPAD) {
+                        transitionedToDisconnected = true
                         cur.copy(
                             route = PadScreenRoute.DISCONNECTED,
                             measuredPingMs = null,
@@ -976,12 +1030,37 @@ object PadNetworkClient {
                         cur.copy(measuredPingMs = null)
                     }
                 }
+                if (transitionedToDisconnected && disconnectReason == "CONNECTION_LOST") {
+                    startAutoReconnectIfEligible(tv)
+                }
             }
             runCatching { socket.close() }
         }
     }
 
+    private fun startAutoReconnectIfEligible(tv: DiscoveredTvDevice) {
+        val savedToken = getRememberToken(tv.tvId)
+        if (savedToken.isBlank()) return
+        autoReconnectJob?.cancel()
+        autoReconnectJob = scope.launch {
+            _state.update { it.copy(isAutoReconnecting = true) }
+            try {
+                for (attempt in 1..6) {
+                    delay(2_200L)
+                    val cur = _state.value
+                    if (cur.route != PadScreenRoute.DISCONNECTED) break
+                    if (!cur.isConnecting) {
+                        connectWithRememberToken(tv, savedToken, fromAutoReconnect = true)
+                    }
+                }
+            } finally {
+                _state.update { it.copy(isAutoReconnecting = false) }
+            }
+        }
+    }
+
     fun disconnectActiveSession(navigateToList: Boolean = true) {
+        autoReconnectJob?.cancel()
         releaseAllInputsImmediate()
         val writer = activeControlWriterRef.getAndSet(null)
         val socket = activeControlSocketRef.getAndSet(null)
@@ -998,6 +1077,7 @@ object PadNetworkClient {
             cur.copy(
                 route = if (navigateToList) PadScreenRoute.FIND_TV else PadScreenRoute.DISCONNECTED,
                 isConnecting = false,
+                isAutoReconnecting = false,
                 enteredPin = "",
                 measuredPingMs = null
             )

@@ -2032,7 +2032,7 @@ class XboxBridge(
                         type: "dual-rumble",
                         playEffect: function(type, params) {
                             try {
-                                if (window.__deviceThermalThrottled || window.__appInBackground || window.__hasPhysicalGamepadConnected) {
+                                if (window.__deviceThermalThrottled || window.__appInBackground || (window.__hasPhysicalGamepadConnected && !window.__virtualGamepadEnabled)) {
                                     return Promise.resolve("complete");
                                 }
                                 const p = params || {};
@@ -2054,7 +2054,7 @@ class XboxBridge(
                         },
                         reset: function() {
                             try {
-                                if (!window.__hasPhysicalGamepadConnected && window.CloudPlayBridge && typeof window.CloudPlayBridge.onGameRumble === 'function') {
+                                if ((!window.__hasPhysicalGamepadConnected || window.__virtualGamepadEnabled) && window.CloudPlayBridge && typeof window.CloudPlayBridge.onGameRumble === 'function') {
                                     window.CloudPlayBridge.onGameRumble(0, 0, 0);
                                 }
                             } catch (e) {}
@@ -2406,6 +2406,20 @@ class XboxBridge(
                                 outButtons = mergedButtons;
                             }
 
+                            const physVib = physPad.vibrationActuator;
+                            const combinedVibActuator = (shouldExposeVirtual && physVib && typeof physVib.playEffect === 'function') ? {
+                                type: physVib.type || "dual-rumble",
+                                playEffect: function(type, params) {
+                                    try { virtualVibrationActuator.playEffect(type, params); } catch (e) {}
+                                    try { return physVib.playEffect(type, params); } catch (e) { return Promise.resolve("complete"); }
+                                },
+                                reset: function() {
+                                    try { virtualVibrationActuator.reset(); } catch (e) {}
+                                    try { if (typeof physVib.reset === 'function') return physVib.reset(); } catch (e) {}
+                                    return Promise.resolve("complete");
+                                }
+                            } : (physVib || virtualVibrationActuator);
+
                             const mergedPadObj = {
                                 id: physPad.id || virtualGamepadState.id,
                                 index: padIdx,
@@ -2414,7 +2428,7 @@ class XboxBridge(
                                 mapping: physPad.mapping || "standard",
                                 axes: outAxes,
                                 buttons: outButtons,
-                                vibrationActuator: physPad.vibrationActuator || virtualVibrationActuator,
+                                vibrationActuator: combinedVibActuator,
                                 hapticActuators: physPad.hapticActuators
                             };
                             pads[padIdx] = mergedPadObj;

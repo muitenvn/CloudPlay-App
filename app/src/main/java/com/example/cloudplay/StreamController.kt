@@ -610,20 +610,25 @@ class StreamController(private val context: Context) {
         val level = SettingsRepository.config.value.gameRumbleLevel
         if (level == com.example.data.GamepadHapticLevel.OFF) return
         try {
-            val vib: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-            }
-            if (vib == null || !vib.hasVibrator()) return
+            val remotePadConnected =
+                RemotePadTvServer.state.value.status == com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER
             if (durationMs <= 0) {
-                vib.cancel()
+                if (remotePadConnected) {
+                    RemotePadTvServer.sendRumbleToPhone(0, 0f, 0f)
+                }
+                val vib: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                }
+                if (vib != null && vib.hasVibrator()) {
+                    vib.cancel()
+                }
                 return
             }
             val nowMs = System.currentTimeMillis()
             if (nowMs - lastGameRumbleAtMs < 60L) return
-            if (checkDeviceThermalModerateOrHigher()) return
             val combinedMag = maxOf(strongMag.coerceIn(0f, 1f), weakMag.coerceIn(0f, 1f) * 0.7f)
             if (combinedMag < 0.04f) return
             lastGameRumbleAtMs = nowMs
@@ -635,6 +640,24 @@ class StreamController(private val context: Context) {
                 com.example.data.GamepadHapticLevel.STRONG -> 1.0f
             }
             val dur = durationMs.toLong().coerceIn(15L, 500L)
+
+            // Gửi rung ngược về điện thoại làm tay cầm từ xa (ngay cả khi Android TV Box không có mô-tơ rung)
+            if (remotePadConnected) {
+                RemotePadTvServer.sendRumbleToPhone(
+                    durationMs = dur.toInt(),
+                    strongMagnitude = (strongMag.coerceIn(0f, 1f) * levelMult).coerceIn(0f, 1f),
+                    weakMagnitude = (weakMag.coerceIn(0f, 1f) * levelMult).coerceIn(0f, 1f)
+                )
+            }
+
+            if (checkDeviceThermalModerateOrHigher()) return
+            val vib: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (vib == null || !vib.hasVibrator()) return
             val amp = (combinedMag * levelMult * 255f).toInt().coerceIn(1, 255)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vib.vibrate(VibrationEffect.createOneShot(dur, amp))

@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -145,6 +146,16 @@ internal fun PadLandscapeControllerScreen(
     var currentPreset by remember {
         val savedId = prefs.getString("active_preset_id", PadLayoutPreset.STANDARD.id)
         mutableStateOf(PadLayoutPreset.entries.firstOrNull { it.id == savedId } ?: PadLayoutPreset.STANDARD)
+    }
+    LaunchedEffect(state.suggestedPresetId) {
+        val suggested = state.suggestedPresetId.trim().lowercase()
+        if (suggested.isNotBlank()) {
+            val matched = PadLayoutPreset.entries.firstOrNull { it.id == suggested }
+            if (matched != null && matched != currentPreset) {
+                currentPreset = matched
+                prefs.edit().putString("active_preset_id", matched.id).apply()
+            }
+        }
     }
     var isCustomizeMode by remember { mutableStateOf(false) }
     var selectedNodeKey by remember { mutableStateOf("abxy") }
@@ -320,8 +331,12 @@ internal fun PadLandscapeControllerScreen(
                             .clip(CircleShape)
                             .background(PadAccent)
                     )
+                    val tvTitle = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+                    val gameBadge = state.activeGameTitle.trim().takeIf {
+                        it.isNotEmpty() && !it.equals("generic", ignoreCase = true)
+                    }
                     Text(
-                        text = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" },
+                        text = if (gameBadge != null) "$tvTitle · $gameBadge" else tvTitle,
                         color = PadInk,
                         fontSize = fontBar,
                         fontWeight = FontWeight.Bold,

@@ -703,9 +703,21 @@ object RemotePadTvServer {
                 rememberTokenHex = rememberTokenHex,
                 udpSessionTokenHex = sessionTokenHex,
                 udpPort = _state.value.udpPort,
-                playerIndex = 1
+                playerIndex = 1,
+                activeGameKey = currentActiveGameKey,
+                activeGameTitle = currentActiveGameTitle
             )
         )
+        if (currentActivePresetName.isNotBlank() || currentActiveGameTitle.isNotBlank()) {
+            sendFrame(
+                writer,
+                RemoteControlFrame.LayoutSync(
+                    presetName = currentActivePresetName.ifBlank { "standard" },
+                    gameKey = currentActiveGameKey,
+                    gameTitle = currentActiveGameTitle
+                )
+            )
+        }
 
         client.soTimeout = 15_000
         try {
@@ -716,7 +728,8 @@ object RemotePadTvServer {
                         sendFrame(
                             writer,
                             RemoteControlFrame.Pong(
-                                clientSentRealtimeMs = frame.clientSentRealtimeMs
+                                clientSentRealtimeMs = frame.clientSentRealtimeMs,
+                                activeGameKey = currentActiveGameKey
                             )
                         )
                     }
@@ -747,6 +760,42 @@ object RemotePadTvServer {
                 refreshNsdRegistration()
             }
             runCatching { client.close() }
+        }
+    }
+
+    @Volatile
+    private var currentActiveGameKey: String = ""
+
+    @Volatile
+    private var currentActiveGameTitle: String = ""
+
+    @Volatile
+    private var currentActivePresetName: String = "standard"
+
+    fun notifyActiveGameChanged(gameKey: String, gameTitle: String, presetName: String) {
+        val cleanKey = gameKey.trim()
+        val cleanTitle = gameTitle.trim()
+        val cleanPreset = presetName.trim().ifBlank { "standard" }
+        if (
+            cleanKey == currentActiveGameKey &&
+            cleanTitle == currentActiveGameTitle &&
+            cleanPreset == currentActivePresetName
+        ) {
+            return
+        }
+        currentActiveGameKey = cleanKey
+        currentActiveGameTitle = cleanTitle
+        currentActivePresetName = cleanPreset
+        val writer = activeClientWriterRef.get() ?: return
+        scope.launch {
+            sendFrame(
+                writer,
+                RemoteControlFrame.LayoutSync(
+                    presetName = cleanPreset,
+                    gameKey = cleanKey,
+                    gameTitle = cleanTitle
+                )
+            )
         }
     }
 

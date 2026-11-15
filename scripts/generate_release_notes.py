@@ -550,6 +550,11 @@ def main() -> None:
     shutil.copy2(apk_file, os.path.join("release-output", apk_ver_name))
     shutil.copy2(apk_file, os.path.join("release-output", "app-debug.apk"))
 
+    pad_apk_candidates = sorted(glob.glob("pad/build/outputs/apk/debug/*.apk"))
+    if pad_apk_candidates:
+        pad_apk_ver_name = f"CloudPlay-Pad-v{app_ver}.apk"
+        shutil.copy2(pad_apk_candidates[0], os.path.join("release-output", pad_apk_ver_name))
+
     # Compute size and SHA-256
     size_mb = os.path.getsize(apk_file) / (1024 * 1024)
     apk_size_str = f"{size_mb:.1f} MB"

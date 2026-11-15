@@ -259,7 +259,8 @@ class XboxBridge(
         ): String {
             val currentConfig = com.example.data.SettingsRepository.config.value
             val isEnglishUi = currentConfig.isEnglishUI()
-            val autoExitPreviewEnabled = currentConfig.autoExitPreviewHandlerEnabled
+            val autoExitPreviewEnabled = currentConfig.autoExitPreviewHandlerEnabled &&
+                currentConfig.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
             val targetTranslateLang = currentConfig.getTargetTranslateLanguageCode()
             val cacheKey = "$clarityBoost|$clarityPreset|$maxBitrateMbps|$antiAfk|$targetCountry|$targetIp|$userLocale|$xcloudTranslate|$preserveTitles|$bilingualMode|$hideStreamStats|$cellularMode|$networkTuningMode|$speedFirstPriority|$effectiveBitrateMbps|$lowEndDeviceMode|$virtualGamepadEnabled|$renderScaleFactor|$fpsCap|$gpuLoadReduction|$isCellular|$isEnglishUi|$autoExitPreviewEnabled|$targetTranslateLang|${currentConfig.hashCode()}"
             if (cacheKey == lastInjectionCacheKey) {
@@ -312,6 +313,9 @@ class XboxBridge(
                     window.__autoExitPreviewEnabled = $autoExitPreviewEnabled;
                     window.__setAutoExitPreviewEnabled = function(enabled) {
                         window.__autoExitPreviewEnabled = !!enabled;
+                        if (!enabled) {
+                            window.__cpExitPreviewStage = 'IDLE';
+                        }
                     };
                     window.__isRecordingPerformanceMode = false;
                     window.__physControllerConfig = $initPhysConfJson;
@@ -1703,17 +1707,23 @@ class XboxBridge(
                             const r = dlg.getBoundingClientRect ? dlg.getBoundingClientRect() : null;
                             if (r && (r.width < 40 || r.height < 40)) continue;
                             const dTxt = (dlg.textContent || '').toLowerCase();
-                            const hasFeedbackText = dTxt.includes('feedback') ||
-                                dTxt.includes('phản hồi') ||
-                                dTxt.includes('phan hoi') ||
+                            // Loại trừ tuyệt đối bảng menu Tài khoản (Profile menu) vốn chứa "Thoát khỏi chế độ xem trước" / "Đăng xuất"
+                            const isProfileMenuDrawer = dTxt.includes('sign out') ||
+                                dTxt.includes('đăng xuất') ||
+                                dTxt.includes('exit preview') ||
+                                dTxt.includes('thoát khỏi chế độ xem trước') ||
+                                dTxt.includes('thoat khoi che do xem truoc') ||
+                                dTxt.includes('leave preview');
+                            if (isProfileMenuDrawer) continue;
+
+                            const hasTextarea = !!dlg.querySelector('textarea');
+                            const hasFeedbackText = dTxt.includes('give feedback') ||
+                                dTxt.includes('gửi phản hồi') ||
                                 dTxt.includes('what could we do better') ||
                                 dTxt.includes('làm gì tốt hơn');
-                            const hasActionButtons = dTxt.includes('cancel') ||
-                                dTxt.includes('hủy') ||
-                                dTxt.includes('huỷ') ||
-                                dTxt.includes('submit') ||
-                                dTxt.includes('nộp');
-                            if (hasFeedbackText && hasActionButtons) {
+                            const hasCancelAndSubmit = (dTxt.includes('cancel') || dTxt.includes('hủy') || dTxt.includes('huỷ')) &&
+                                (dTxt.includes('submit') || dTxt.includes('gửi') || dTxt.includes('nộp'));
+                            if (hasFeedbackText && (hasTextarea || hasCancelAndSubmit)) {
                                 return dlg;
                             }
                         }
@@ -1738,6 +1748,7 @@ class XboxBridge(
                     }
 
                     function commitExitPreviewNow() {
+                        if (!window.__autoExitPreviewEnabled) return;
                         if (window.__cpExitPreviewStage === 'COMMITTED') return;
                         window.__cpExitPreviewStage = 'COMMITTED';
                         if (exitPreviewWatcherId) {
@@ -1751,6 +1762,7 @@ class XboxBridge(
                     }
 
                     function startExitPreviewOptOutPhase() {
+                        if (!window.__autoExitPreviewEnabled) return;
                         if (window.__cpExitPreviewStage === 'OPTING_OUT' || window.__cpExitPreviewStage === 'COMMITTED') return;
                         window.__cpExitPreviewStage = 'OPTING_OUT';
                         window.__cpExitPreviewOptOutStartedAt = Date.now();
@@ -1762,6 +1774,7 @@ class XboxBridge(
                     }
 
                     function armExitPreviewModalWatcher() {
+                        if (!window.__autoExitPreviewEnabled) return;
                         if (window.__cpExitPreviewStage === 'OPTING_OUT' || window.__cpExitPreviewStage === 'COMMITTED') return;
                         window.__cpExitPreviewStage = 'MODAL_OPENING';
                         window.__cpExitPreviewArmedAt = Date.now();
@@ -1777,6 +1790,12 @@ class XboxBridge(
                         let autoClickedCancel = false;
                         exitPreviewWatcherId = setInterval(function() {
                             try {
+                                if (!window.__autoExitPreviewEnabled) {
+                                    window.__cpExitPreviewStage = 'IDLE';
+                                    clearInterval(exitPreviewWatcherId);
+                                    exitPreviewWatcherId = null;
+                                    return;
+                                }
                                 const stage = window.__cpExitPreviewStage;
                                 if (stage !== 'MODAL_OPENING' && stage !== 'OPTING_OUT') {
                                     clearInterval(exitPreviewWatcherId);
@@ -1802,9 +1821,7 @@ class XboxBridge(
                                 if (stage === 'MODAL_OPENING') {
                                     if (feedbackDialog) {
                                         if (modalFoundAt === 0) modalFoundAt = now;
-                                        // Nếu đang bật Tự động xử lý: đợi 280ms rồi tự bấm Hủy (Cancel).
-                                        // Nếu TẮT Tự động xử lý: không tự bấm hộ, nhưng vẫn theo dõi khi người dùng bấm Hủy/Nộp làm hộp thoại đóng lại để chuyển sang Giao diện cũ!
-                                        if (window.__autoExitPreviewEnabled && !autoClickedCancel && (now - modalFoundAt >= 280)) {
+                                        if (!autoClickedCancel && (now - modalFoundAt >= 280)) {
                                             const btns = feedbackDialog.querySelectorAll('button, [role="button"]');
                                             let cancelBtn = null;
                                             let closeBtn = null;
@@ -1829,10 +1846,6 @@ class XboxBridge(
                                             }
                                         }
                                     } else if (modalFoundAt > 0) {
-                                        // Người dùng đã tự bấm Hủy / Nộp / Đóng làm hộp thoại phản hồi biến mất (khi tắt tự động xử lý)
-                                        startExitPreviewOptOutPhase();
-                                    } else if (now - (window.__cpExitPreviewArmedAt || now) >= 1100 && window.__cpExitPreviewInFlightFetches > 0) {
-                                        // Trường hợp trang bắt đầu gửi opt-out ngay mà không hiện hộp thoại
                                         startExitPreviewOptOutPhase();
                                     }
                                     return;
@@ -1842,9 +1855,6 @@ class XboxBridge(
                                     const optElapsed = now - (window.__cpExitPreviewOptOutStartedAt || now);
                                     if (optElapsed < 500) return;
 
-                                    // Theo dõi 3 giai đoạn thực tế trên play.xbox.com sau khi đóng hộp thoại phản hồi:
-                                    // - Giai đoạn 1 (0.2s -> ~3.3s): Màn hình đen xoay logo Xbox toàn trang (đang gửi opt-out lên máy chủ).
-                                    // - Giai đoạn 2 (~3.4s -> ~8.5s): Màn hình khung xương (Skeleton) mới hiện ra, cắt phiên sang đúng game ở Giao diện cũ!
                                     const interactives = document.querySelectorAll('header button, nav button, nav a, a[href="/"], [role="navigation"] a, [role="navigation"] button');
                                     let visibleNavCount = 0;
                                     for (let i = 0; i < interactives.length && visibleNavCount < 5; i++) {
@@ -1887,9 +1897,10 @@ class XboxBridge(
                         return !!(notifiedStreamConnection || window.__activePeerConnection || (location.pathname && location.pathname.indexOf('/launch/') !== -1));
                     }
 
-                    // Tự động phát hiện hộp thoại "Gửi phản hồi tới Xbox" / "Give feedback to Xbox" (kể cả khi tắt tự động bấm nút)
+                    // Chỉ tự động phát hiện hộp thoại phản hồi khi người dùng BẬT tự động chuyển & chọn Giao diện cũ
                     setInterval(function() {
                         try {
+                            if (!window.__autoExitPreviewEnabled) return;
                             if (isGameplayStreamActiveNow()) return;
                             if (location.hostname !== 'play.xbox.com') return;
                             if (window.__cpExitPreviewStage === 'IDLE') {
@@ -1903,7 +1914,6 @@ class XboxBridge(
 
                     window.__prepareSwitchToClassicUi = function(targetClassicUrl) {
                         try {
-                            // Phương pháp 1: Ghi cờ opt-out preview vào localStorage & sessionStorage và xóa mọi cờ ép migrate sang play.xbox.com
                             const applyClassicStorageFlags = function(store) {
                                 if (!store) return;
                                 const keysToRemove = [];
@@ -1925,7 +1935,6 @@ class XboxBridge(
                             applyClassicStorageFlags(window.localStorage);
                             applyClassicStorageFlags(window.sessionStorage);
 
-                            // Phương pháp 2: Đặt cookie từ chối giao diện thử nghiệm (TakahashiOptOut) trên miền .xbox.com
                             try {
                                 document.cookie = 'TakahashiOptOut=true;domain=.xbox.com;path=/;max-age=31536000;SameSite=Lax';
                                 document.cookie = 'xcloud_preview_optout=true;domain=.xbox.com;path=/;max-age=31536000;SameSite=Lax';
@@ -1942,20 +1951,14 @@ class XboxBridge(
 
                     function checkTargetForExitPreviewRow(target) {
                         if (!target || isGameplayStreamActiveNow() || location.hostname !== 'play.xbox.com') return false;
-                        // Duyệt ngược lên tối đa 9 cấp cha vì nút gạt (switch thumb) bên trong dòng "Thoát khỏi chế độ xem trước" là thẻ div rỗng không có chữ
+                        // Chỉ kiểm tra tối đa 4 cấp cha và độ dài chữ <= 65 ký tự để không bao giờ bắt nhầm khung menu Tài khoản lớn
                         let node = target;
-                        for (let depth = 0; node && node !== document.body && depth < 9; depth++, node = node.parentElement) {
+                        for (let depth = 0; node && node !== document.body && depth < 4; depth++, node = node.parentElement) {
                             const txt = ((node.textContent || '') + ' ' + ((node.getAttribute && node.getAttribute('aria-label')) || '')).trim().toLowerCase();
-                            if (txt.length >= 6 && txt.length <= 160) {
-                                const hasPreviewKeyword = txt.includes('xem trước') ||
-                                    txt.includes('xem truoc') ||
-                                    txt.includes('preview');
-                                const hasExitAction = txt.includes('thoát') ||
-                                    txt.includes('thoat') ||
-                                    txt.includes('rời') ||
-                                    txt.includes('roi') ||
-                                    txt.includes('exit') ||
-                                    txt.includes('leave');
+                            if (txt.length >= 6 && txt.length <= 65) {
+                                if (txt.includes('sign out') || txt.includes('đăng xuất') || txt.includes('settings') || txt.includes('cài đặt')) {
+                                    continue;
+                                }
                                 if (txt.includes('exit preview') ||
                                     txt.includes('leave preview') ||
                                     txt.includes('thoát khỏi chế độ xem trước') ||
@@ -1964,8 +1967,7 @@ class XboxBridge(
                                     txt.includes('thoát xem trước') ||
                                     txt.includes('thoat xem truoc') ||
                                     txt.includes('rời khỏi bản xem trước') ||
-                                    txt.includes('rời bản xem trước') ||
-                                    (hasPreviewKeyword && hasExitAction)) {
+                                    txt.includes('rời bản xem trước')) {
                                     return true;
                                 }
                             }
@@ -1974,7 +1976,7 @@ class XboxBridge(
                     }
 
                     document.addEventListener('pointerdown', function(e) {
-                        if (isGameplayStreamActiveNow()) return;
+                        if (!window.__autoExitPreviewEnabled || isGameplayStreamActiveNow()) return;
                         const target = e.target;
                         if (checkTargetForExitPreviewRow(target)) {
                             armExitPreviewModalWatcher();
@@ -1985,13 +1987,12 @@ class XboxBridge(
                         if (isGameplayStreamActiveNow()) return;
                         const target = e.target;
                         if (target) {
-                            // Phát hiện thao tác bấm "Exit preview" / "Thoát xem trước" trên play.xbox.com (hoạt động cả khi bật lẫn khi tắt tự động bấm Hủy)
-                            if (location.hostname === 'play.xbox.com') {
+                            if (window.__autoExitPreviewEnabled && location.hostname === 'play.xbox.com') {
                                 if (checkTargetForExitPreviewRow(target)) {
                                     armExitPreviewModalWatcher();
                                 } else if (window.__cpExitPreviewStage === 'MODAL_OPENING') {
                                     const dlgBtn = target.closest('[role="dialog"] button, [aria-modal="true"] button, button, [role="button"]');
-                                    if (dlgBtn) {
+                                    if (dlgBtn && findExitPreviewFeedbackDialog()) {
                                         const bTxt = ((dlgBtn.textContent || '').trim()).toLowerCase();
                                         const bAria = (dlgBtn.getAttribute('aria-label') || '').toLowerCase();
                                         if (bTxt === 'cancel' || bTxt === 'hủy' || bTxt === 'huỷ' || bTxt === 'submit' || bTxt === 'nộp' || bAria.includes('close') || bAria.includes('đóng') || bTxt === '✕' || bTxt === '×') {

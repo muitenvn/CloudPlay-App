@@ -1,0 +1,2 @@
+-keep class com.muitenvn.cloudplay.protocol.** { *; }
+-keep class com.muitenvn.cloudplay.pad.** { *; }

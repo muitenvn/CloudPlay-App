@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 rootProject.name = "CloudPlay"
 
 include(":app")
+include(":remote-protocol")
+include(":pad")

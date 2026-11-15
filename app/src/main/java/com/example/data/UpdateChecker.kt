@@ -598,7 +598,10 @@ object UpdateChecker {
                     val name = assetObj.optString("name", "").trim()
                     val dlUrl = assetObj.optString("browser_download_url", "").trim()
                     val digest = assetObj.optString("digest", "").trim()
-                    if (name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
+                    val isPadAsset = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                        name.contains("-pad-", ignoreCase = true) ||
+                        name.startsWith("pad-", ignoreCase = true)
+                    if (!isPadAsset && name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
                         if (name.contains("CloudPlay-Xbox", ignoreCase = true) || apkDirectUrl.isBlank()) {
                             apkDirectUrl = dlUrl
                             apkAssetName = name
@@ -611,7 +614,10 @@ object UpdateChecker {
                     val assetObj = assetsArr.optJSONObject(i) ?: continue
                     val name = assetObj.optString("name", "").trim()
                     val dlUrl = assetObj.optString("browser_download_url", "").trim()
-                    if (name.endsWith(".sha256", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
+                    val isPadSha = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                        name.contains("-pad-", ignoreCase = true) ||
+                        name.startsWith("pad-", ignoreCase = true)
+                    if (!isPadSha && name.endsWith(".sha256", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
                         if (apkAssetName.isNotBlank() && name.equals("$apkAssetName.sha256", ignoreCase = true)) {
                             sha256AssetUrl = dlUrl
                             break
@@ -696,11 +702,19 @@ object UpdateChecker {
                         val name = assetObj.optString("name", "").trim()
                         val dlUrl = assetObj.optString("browser_download_url", "").trim()
                         val digest = assetObj.optString("digest", "").trim()
+                        val isPadAsset = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                            name.contains("-pad-", ignoreCase = true) ||
+                            name.startsWith("pad-", ignoreCase = true)
+                        if (isPadAsset) continue
                         if (name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
-                            val extracted = extractDigestSha256(digest)
-                            if (isValidSha256Hex(extracted)) return extracted
+                            if (name.contains("CloudPlay-Xbox", ignoreCase = true)) {
+                                val extracted = extractDigestSha256(digest)
+                                if (isValidSha256Hex(extracted)) return extracted
+                            }
                         } else if (name.endsWith(".sha256", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
-                            fallbackShaUrl = dlUrl
+                            if (name.contains("CloudPlay-Xbox", ignoreCase = true) || fallbackShaUrl.isBlank()) {
+                                fallbackShaUrl = dlUrl
+                            }
                         }
                     }
                 }

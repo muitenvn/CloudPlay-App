@@ -508,16 +508,16 @@ fun CloudBrowserScreen(
     }
 
     val commitExitPreviewToClassicUi: (String) -> Unit = commit@{ triggerReason ->
+        if (!config.autoExitPreviewHandlerEnabled || config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+            exitPreviewArmedAtMs = 0L
+            exitPreviewOptOutStartedAtMs = 0L
+            return@commit
+        }
         if (exitPreviewArmedAtMs == 0L && exitPreviewOptOutStartedAtMs == 0L) return@commit
         exitPreviewArmedAtMs = 0L
         exitPreviewOptOutStartedAtMs = 0L
 
         applyClassicPreviewOptOutCookies()
-
-        if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
-            lastAppliedUiMode = com.example.data.XboxWebUiMode.CLASSIC
-            SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
-        }
 
         // Mở thẳng đúng trang chi tiết của tựa game người dùng đang xem ở Giao diện cũ sau khi opt-out
         val targetClassicUrl = resolveTargetGameClassicUrl()
@@ -624,7 +624,8 @@ fun CloudBrowserScreen(
         config.shortcutToggleStatsButton,
         config.shortcutToggleVirtualPadButton,
         config.shortcutToggleRecordingButton,
-        config.autoExitPreviewHandlerEnabled
+        config.autoExitPreviewHandlerEnabled,
+        config.xboxWebUiMode
     ) {
         XboxBridge.getInjectionScript(
             clarityBoost = config.clarityBoostEnabled,
@@ -788,13 +789,15 @@ fun CloudBrowserScreen(
     }
 
     // Đồng bộ tức thì trạng thái Bộ xử lý tự động thoát Giao diện mới (Exit preview) với WebView đang chạy
-    LaunchedEffect(config.autoExitPreviewHandlerEnabled, webViewInstance) {
-        if (!config.autoExitPreviewHandlerEnabled) {
+    LaunchedEffect(config.autoExitPreviewHandlerEnabled, config.xboxWebUiMode, webViewInstance) {
+        val effectiveAutoExit = config.autoExitPreviewHandlerEnabled &&
+            config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+        if (!effectiveAutoExit) {
             exitPreviewArmedAtMs = 0L
             exitPreviewOptOutStartedAtMs = 0L
         }
         webViewInstance?.evaluateJavascript(
-            "if (window.__setAutoExitPreviewEnabled) window.__setAutoExitPreviewEnabled(${config.autoExitPreviewHandlerEnabled});",
+            "if (window.__setAutoExitPreviewEnabled) window.__setAutoExitPreviewEnabled($effectiveAutoExit);",
             null
         )
     }
@@ -1007,6 +1010,13 @@ fun CloudBrowserScreen(
                             return@setExitPreviewSignalListener
                         }
 
+                        val curCfg = SettingsRepository.config.value
+                        if (!curCfg.autoExitPreviewHandlerEnabled || curCfg.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+                            exitPreviewArmedAtMs = 0L
+                            exitPreviewOptOutStartedAtMs = 0L
+                            return@setExitPreviewSignalListener
+                        }
+
                         when (sig) {
                             "EXIT_PREVIEW_ARMED" -> {
                                 exitPreviewArmedAtMs = nowElapsed
@@ -1072,7 +1082,11 @@ fun CloudBrowserScreen(
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                            if (url != null &&
+                                exitPreviewOptOutStartedAtMs > 0L &&
+                                config.autoExitPreviewHandlerEnabled &&
+                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                            ) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
                                 // Chỉ cho phép cắt dự phòng sau >= 3800ms để không làm đứt Giai đoạn 1 (vòng xoay lưu opt-out ~3.2s)
@@ -1138,7 +1152,9 @@ fun CloudBrowserScreen(
                             val isMainFrame = request?.isForMainFrame == true
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
-                                if (exitPreviewOptOutStartedAtMs > 0L) {
+                                val isClassicAutoExitActive = config.autoExitPreviewHandlerEnabled &&
+                                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                                if (exitPreviewOptOutStartedAtMs > 0L && isClassicAutoExitActive) {
                                     val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                     val isMigrateStep = targetUrl.contains("/migrate", ignoreCase = true)
                                     if (optElapsed in 3800L..16000L && !isMigrateStep) {
@@ -1146,31 +1162,27 @@ fun CloudBrowserScreen(
                                         return true
                                     }
                                 }
-                                // Chặn việc trang gốc /play hoặc /migrate đẩy ngược người dùng từ Giao diện cũ về Giao diện mới (play.xbox.com)
-                                val prevHost = try { android.net.Uri.parse(currentMainFrameUrl).host?.lowercase() } catch (_: Exception) { null }
-                                val nextUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
-                                val nextHost = nextUri?.host?.lowercase()
-                                val nextPath = nextUri?.path?.trimEnd('/') ?: ""
-                                val isBareClassicRoot = (nextHost == "www.xbox.com" || nextHost == "xbox.com") &&
-                                    (nextPath.equals("/play", ignoreCase = true) || Regex("^/[a-zA-Z]{2}-[a-zA-Z]{2}/play$", RegexOption.IGNORE_CASE).matches(nextPath))
-                                val isBounceToNewUiMigrate = nextHost == "play.xbox.com" &&
-                                    nextPath.contains("/migrate", ignoreCase = true) &&
-                                    (prevHost == "www.xbox.com" || prevHost == "xbox.com") &&
-                                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
-                                if ((prevHost == "play.xbox.com" && isBareClassicRoot) || isBounceToNewUiMigrate) {
-                                    if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
-                                        lastAppliedUiMode = com.example.data.XboxWebUiMode.CLASSIC
-                                        SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
+                                if (isClassicAutoExitActive) {
+                                    val prevHost = try { android.net.Uri.parse(currentMainFrameUrl).host?.lowercase() } catch (_: Exception) { null }
+                                    val nextUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
+                                    val nextHost = nextUri?.host?.lowercase()
+                                    val nextPath = nextUri?.path?.trimEnd('/') ?: ""
+                                    val isBareClassicRoot = (nextHost == "www.xbox.com" || nextHost == "xbox.com") &&
+                                        (nextPath.equals("/play", ignoreCase = true) || Regex("^/[a-zA-Z]{2}-[a-zA-Z]{2}/play$", RegexOption.IGNORE_CASE).matches(nextPath))
+                                    val isBounceToNewUiMigrate = nextHost == "play.xbox.com" &&
+                                        nextPath.contains("/migrate", ignoreCase = true) &&
+                                        (prevHost == "www.xbox.com" || prevHost == "xbox.com")
+                                    if ((prevHost == "play.xbox.com" && isBareClassicRoot) || isBounceToNewUiMigrate) {
+                                        applyClassicPreviewOptOutCookies()
+                                        val directClassicGameUrl = resolveTargetGameClassicUrl()
+                                        exitPreviewSavedGameUrl = ""
+                                        exitPreviewSavedGameTitle = ""
+                                        pendingAppNavReason = "chuyển thẳng vào trang game Giao diện cũ khi rời play.xbox.com hoặc chặn /migrate"
+                                        lastXboxUrl = directClassicGameUrl
+                                        currentMainFrameUrl = directClassicGameUrl
+                                        view?.loadUrl(directClassicGameUrl)
+                                        return true
                                     }
-                                    applyClassicPreviewOptOutCookies()
-                                    val directClassicGameUrl = resolveTargetGameClassicUrl()
-                                    exitPreviewSavedGameUrl = ""
-                                    exitPreviewSavedGameTitle = ""
-                                    pendingAppNavReason = "chuyển thẳng vào trang game Giao diện cũ khi rời play.xbox.com hoặc chặn /migrate"
-                                    lastXboxUrl = directClassicGameUrl
-                                    currentMainFrameUrl = directClassicGameUrl
-                                    view?.loadUrl(directClassicGameUrl)
-                                    return true
                                 }
                                 val isRedirect = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                                     request.isRedirect
@@ -1186,7 +1198,11 @@ fun CloudBrowserScreen(
 
                         override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                             super.doUpdateVisitedHistory(view, url, isReload)
-                            if (url != null && exitPreviewOptOutStartedAtMs > 0L) {
+                            if (url != null &&
+                                exitPreviewOptOutStartedAtMs > 0L &&
+                                config.autoExitPreviewHandlerEnabled &&
+                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                            ) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
                                 if (optElapsed in 3800L..16000L && !isMigrateStep) {

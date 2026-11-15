@@ -139,7 +139,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python3 scripts/generate_release_notes.py
-          for apk in release-output/CloudPlay-Xbox-v*.apk; do
+          for apk in release-output/CloudPlay-Xbox-v*.apk release-output/CloudPlay-Pad-v*.apk; do
             if [ -f "$apk" ]; then
               sha256sum "$apk" | awk '{print $1}' > "${apk}.sha256"
               echo "Generated SHA-256 file: ${apk}.sha256 ($(cat "${apk}.sha256"))"
@@ -172,5 +172,7 @@ jobs:
           files: |
             release-output/CloudPlay-Xbox-v*.apk
             release-output/CloudPlay-Xbox-v*.apk.sha256
+            release-output/CloudPlay-Pad-v*.apk
+            release-output/CloudPlay-Pad-v*.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

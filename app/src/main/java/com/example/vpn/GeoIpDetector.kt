@@ -1,6 +1,7 @@
 package com.example.vpn
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -694,6 +695,9 @@ object GeoIpDetector {
                     tmpFile.delete()
                 }
             }
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            if (tmpFile.exists()) tmpFile.delete()
+            throw ce
         } catch (_: Exception) {
             if (tmpFile.exists()) tmpFile.delete()
         }
@@ -723,128 +727,141 @@ object GeoIpDetector {
      */
     suspend fun checkCurrentIp(): GeoIpResult? = withContext(Dispatchers.IO) {
         _isChecking.value = true
-        var result: GeoIpResult? = null
-
-        // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates globally (fast 1.2s timeout)
         try {
-            val req = Request.Builder()
-                .url("https://ipwho.is/")
-                .header("User-Agent", "Mozilla/5.0")
-                .build()
-            fastHttpClient.newCall(req).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val bodyStr = resp.body?.string() ?: ""
-                    val json = JSONObject(bodyStr)
-                    if (json.optBoolean("success", true)) {
-                        val ip = json.optString("ip", "")
-                        val countryCode = json.optString("country_code", "").trim().uppercase()
-                        if (countryCode.length == 2) {
-                            cacheResolvedIpCountry(ip, countryCode)
-                            val countryName = json.optString("country", getCountryDisplayName(countryCode))
-                            val city = json.optString("city", "")
-                            val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                            val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+            var result: GeoIpResult? = null
+            ensureActive()
 
-                            result = GeoIpResult(
-                                ip = ip,
-                                countryCode = countryCode,
-                                countryName = countryName,
-                                city = city,
-                                flagEmoji = getFlagEmoji(countryCode),
-                                isXboxSupported = isSupported,
-                                latitude = lat,
-                                longitude = lon
-                            )
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {
-        }
-
-        // 2. Fallback 1: api.country.is (ultra-fast, lightweight)
-        if (result == null) {
+            // 1. Try ipwho.is over HTTPS first to obtain accurate city + coordinates globally (fast 1.2s timeout)
             try {
                 val req = Request.Builder()
-                    .url("https://api.country.is/")
+                    .url("https://ipwho.is/")
                     .header("User-Agent", "Mozilla/5.0")
                     .build()
                 fastHttpClient.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val bodyStr = resp.body?.string() ?: ""
                         val json = JSONObject(bodyStr)
-                        val ip = json.optString("ip", "")
-                        val countryCode = json.optString("country", "").trim().uppercase()
-                        if (countryCode.length == 2) {
-                            cacheResolvedIpCountry(ip, countryCode)
-                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+                        if (json.optBoolean("success", true)) {
+                            val ip = json.optString("ip", "")
+                            val countryCode = json.optString("country_code", "").trim().uppercase()
+                            if (countryCode.length == 2) {
+                                cacheResolvedIpCountry(ip, countryCode)
+                                val countryName = json.optString("country", getCountryDisplayName(countryCode))
+                                val city = json.optString("city", "")
+                                val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                                val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                                val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                            result = GeoIpResult(
-                                ip = ip,
-                                countryCode = countryCode,
-                                countryName = getCountryDisplayName(countryCode),
-                                city = "",
-                                flagEmoji = getFlagEmoji(countryCode),
-                                isXboxSupported = isSupported
-                            )
+                                result = GeoIpResult(
+                                    ip = ip,
+                                    countryCode = countryCode,
+                                    countryName = countryName,
+                                    city = city,
+                                    flagEmoji = getFlagEmoji(countryCode),
+                                    isXboxSupported = isSupported,
+                                    latitude = lat,
+                                    longitude = lon
+                                )
+                            }
                         }
                     }
                 }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (_: Exception) {
             }
-        }
 
-        // 3. Fallback 2: ipapi.co
-        if (result == null) {
-            try {
-                val req = Request.Builder()
-                    .url("https://ipapi.co/json/")
-                    .header("User-Agent", "Mozilla/5.0")
-                    .build()
-                fastHttpClient.newCall(req).execute().use { resp ->
-                    if (resp.isSuccessful) {
-                        val bodyStr = resp.body?.string() ?: ""
-                        val json = JSONObject(bodyStr)
-                        val ip = json.optString("ip", "")
-                        val countryCode = json.optString("country_code", "").trim().uppercase()
-                        if (countryCode.length == 2) {
-                            cacheResolvedIpCountry(ip, countryCode)
-                            val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
-                            val city = json.optString("city", "")
-                            val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
-                            val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
-                            val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
+            // 2. Fallback 1: api.country.is (ultra-fast, lightweight)
+            if (result == null) {
+                ensureActive()
+                try {
+                    val req = Request.Builder()
+                        .url("https://api.country.is/")
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
+                    fastHttpClient.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val bodyStr = resp.body?.string() ?: ""
+                            val json = JSONObject(bodyStr)
+                            val ip = json.optString("ip", "")
+                            val countryCode = json.optString("country", "").trim().uppercase()
+                            if (countryCode.length == 2) {
+                                cacheResolvedIpCountry(ip, countryCode)
+                                val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-                            result = GeoIpResult(
-                                ip = ip,
-                                countryCode = countryCode,
-                                countryName = countryName,
-                                city = city,
-                                flagEmoji = getFlagEmoji(countryCode),
-                                isXboxSupported = isSupported,
-                                latitude = lat,
-                                longitude = lon
-                            )
+                                result = GeoIpResult(
+                                    ip = ip,
+                                    countryCode = countryCode,
+                                    countryName = getCountryDisplayName(countryCode),
+                                    city = "",
+                                    flagEmoji = getFlagEmoji(countryCode),
+                                    isXboxSupported = isSupported
+                                )
+                            }
                         }
                     }
+                } catch (ce: kotlinx.coroutines.CancellationException) {
+                    throw ce
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {
             }
-        }
 
-        val finalResult = result
-        if (finalResult != null) {
-            com.example.data.AppLogger.info(
-                "VPN",
-                "Phát hiện vị trí mạng: ${finalResult.ip} • ${finalResult.countryCode} ${finalResult.city.ifBlank { "(Chưa rõ tỉnh/thành)" }}"
-            )
-        } else {
-            com.example.data.AppLogger.warn("VPN", "Không lấy được thông tin GeoIP từ mạng hiện tại")
-        }
+            // 3. Fallback 2: ipapi.co
+            if (result == null) {
+                ensureActive()
+                try {
+                    val req = Request.Builder()
+                        .url("https://ipapi.co/json/")
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
+                    fastHttpClient.newCall(req).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val bodyStr = resp.body?.string() ?: ""
+                            val json = JSONObject(bodyStr)
+                            val ip = json.optString("ip", "")
+                            val countryCode = json.optString("country_code", "").trim().uppercase()
+                            if (countryCode.length == 2) {
+                                cacheResolvedIpCountry(ip, countryCode)
+                                val countryName = json.optString("country_name", getCountryDisplayName(countryCode))
+                                val city = json.optString("city", "")
+                                val lat = json.optDouble("latitude", Double.NaN).takeIf { !it.isNaN() }
+                                val lon = json.optDouble("longitude", Double.NaN).takeIf { !it.isNaN() }
+                                val isSupported = SUPPORTED_COUNTRIES.contains(countryCode)
 
-        _isChecking.value = false
-        _currentGeoIp.value = finalResult
-        finalResult
+                                result = GeoIpResult(
+                                    ip = ip,
+                                    countryCode = countryCode,
+                                    countryName = countryName,
+                                    city = city,
+                                    flagEmoji = getFlagEmoji(countryCode),
+                                    isXboxSupported = isSupported,
+                                    latitude = lat,
+                                    longitude = lon
+                                )
+                            }
+                        }
+                    }
+                } catch (ce: kotlinx.coroutines.CancellationException) {
+                    throw ce
+                } catch (_: Exception) {
+                }
+            }
+
+            ensureActive()
+            val finalResult = result
+            if (finalResult != null) {
+                com.example.data.AppLogger.info(
+                    "VPN",
+                    "Phát hiện vị trí mạng: ${finalResult.ip} • ${finalResult.countryCode} ${finalResult.city.ifBlank { "(Chưa rõ tỉnh/thành)" }}"
+                )
+            } else {
+                com.example.data.AppLogger.warn("VPN", "Không lấy được thông tin GeoIP từ mạng hiện tại")
+            }
+
+            _currentGeoIp.value = finalResult
+            finalResult
+        } finally {
+            _isChecking.value = false
+        }
     }
 }

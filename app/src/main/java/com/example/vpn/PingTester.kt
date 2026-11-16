@@ -285,6 +285,8 @@ object PingTester {
                 for ((fbPort, deferred) in fallbackDeferreds) {
                     val (fbRtt, fbIp) = try {
                         deferred.await()
+                    } catch (ce: CancellationException) {
+                        throw ce
                     } catch (_: Exception) {
                         Pair(-1, "")
                     }

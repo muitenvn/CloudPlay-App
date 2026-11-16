@@ -66,6 +66,142 @@ object GamepadUiNavigation {
         private set
 
     var activeHorizontalStepper: ((Int) -> Unit)? = null
+    var activeFocusedClickHandler: (() -> Unit)? = null
+    var activeFocusedKeyYHandler: (() -> Unit)? = null
+    var activeFocusedLongClickHandler: (() -> Unit)? = null
+
+    internal class ControllerScopeCallbacks(
+        val stepFocus: (FocusDirection) -> Unit,
+        val onConfirmA: () -> Unit,
+        val onBackB: (() -> Unit)?,
+        val onPrevTabLB: (() -> Unit)?,
+        val onNextTabRB: (() -> Unit)?,
+        val onSecondaryX: (() -> Unit)?,
+        val onSecondaryY: (() -> Unit)?
+    )
+
+    private val activeScopes = java.util.concurrent.CopyOnWriteArrayList<ControllerScopeCallbacks>()
+
+    internal fun registerScope(scope: ControllerScopeCallbacks) {
+        activeScopes.remove(scope)
+        activeScopes.add(scope)
+    }
+
+    internal fun unregisterScope(scope: ControllerScopeCallbacks) {
+        activeScopes.remove(scope)
+    }
+
+    /**
+     * Điều khiển giao diện trực tiếp từ CloudPlay Pad (UDP) tới scope/hộp thoại đang mở trên cùng,
+     * hoạt động kể cả khi Dialog tạo cửa sổ riêng hoặc khi WebView đang giữ focus gốc.
+     */
+    fun dispatchRemotePadButton(buttonIndex: Int, pressed: Boolean): Boolean {
+        if (!shouldRouteToAppUi) return false
+        val topScope = activeScopes.lastOrNull() ?: return false
+        val dir = when (buttonIndex) {
+            12 -> FocusDirection.Up
+            13 -> FocusDirection.Down
+            14 -> FocusDirection.Left
+            15 -> FocusDirection.Right
+            else -> null
+        }
+        if (dir != null) {
+            if (pressed) {
+                onGamepadInteraction()
+                activeAnalogDirection = dir
+            } else if (activeAnalogDirection == dir) {
+                activeAnalogDirection = null
+            }
+            return true
+        }
+        if (!pressed) return true
+        onGamepadInteraction()
+        when (buttonIndex) {
+            0 -> {
+                topScope.onConfirmA()
+                return true
+            }
+            1 -> {
+                val back = topScope.onBackB
+                if (back != null) {
+                    back()
+                    return true
+                }
+            }
+            2 -> {
+                val actX = topScope.onSecondaryX
+                if (actX != null) {
+                    actX()
+                    return true
+                }
+            }
+            3 -> {
+                val keyY = activeFocusedKeyYHandler ?: topScope.onSecondaryY
+                if (keyY != null) {
+                    keyY()
+                    return true
+                }
+            }
+            4 -> {
+                val prev = topScope.onPrevTabLB
+                if (prev != null) {
+                    prev()
+                    return true
+                }
+            }
+            5 -> {
+                val next = topScope.onNextTabRB
+                if (next != null) {
+                    next()
+                    return true
+                }
+            }
+            9 -> {
+                val longClick = activeFocusedLongClickHandler
+                if (longClick != null) {
+                    longClick()
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * Điều khiển giao diện trực tiếp bằng cần gạt trái (Left Stick) từ CloudPlay Pad (UDP).
+     */
+    fun dispatchRemotePadStick(lx: Float, ly: Float): Boolean {
+        if (!shouldRouteToAppUi) {
+            if (activeAnalogDirection != null) {
+                activeAnalogDirection = null
+                hatOrStickDirection = null
+            }
+            return false
+        }
+        val deadzone = 0.48f
+        val releaseZone = 0.30f
+        val currentDir = hatOrStickDirection
+        val threshold = if (currentDir != null) releaseZone else deadzone
+
+        val nextDir: FocusDirection? = when {
+            kotlin.math.abs(lx) < threshold && kotlin.math.abs(ly) < threshold -> null
+            kotlin.math.abs(ly) >= kotlin.math.abs(lx) -> {
+                if (ly < -threshold) FocusDirection.Up else FocusDirection.Down
+            }
+            else -> {
+                if (lx < -threshold) FocusDirection.Left else FocusDirection.Right
+            }
+        }
+
+        if (nextDir != hatOrStickDirection) {
+            hatOrStickDirection = nextDir
+            activeAnalogDirection = nextDir
+            if (nextDir != null) {
+                onGamepadInteraction()
+            }
+        }
+        return nextDir != null
+    }
 
     /**
      * Tăng lên mỗi khi người dùng giữ đồng thời View (SELECT) + Menu (START) khoảng 0,6 giây.
@@ -295,13 +431,64 @@ fun Modifier.gamepadControllerScope(
 
     var heldDpadDirection by remember { mutableStateOf<FocusDirection?>(null) }
     var dpadPressSeq by remember { mutableIntStateOf(0) }
+    var hasFocusInsideScope by remember { mutableStateOf(false) }
+
+    fun stepFocus(direction: FocusDirection) {
+        GamepadUiNavigation.onGamepadInteraction()
+        if (!view.hasFocus()) {
+            runCatching { view.requestFocus() }
+        }
+        val horizontalStepper = GamepadUiNavigation.activeHorizontalStepper
+        if (horizontalStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
+            horizontalStepper(if (direction == FocusDirection.Left) -1 else 1)
+            return
+        }
+        if (!hasFocusInsideScope && GamepadUiNavigation.activeFocusedClickHandler == null) {
+            val req = currentDefaultRequester
+            if (req != null) {
+                runCatching { req.requestFocus() }
+                return
+            }
+        }
+        val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
+        if (!moved && !hasFocusInsideScope && GamepadUiNavigation.activeFocusedClickHandler == null) {
+            runCatching { currentDefaultRequester?.requestFocus() }
+        }
+    }
+
+    val scopeCallbacks = remember {
+        GamepadUiNavigation.ControllerScopeCallbacks(
+            stepFocus = { dir -> stepFocus(dir) },
+            onConfirmA = {
+                GamepadUiNavigation.onGamepadInteraction()
+                if (!view.hasFocus()) {
+                    runCatching { view.requestFocus() }
+                }
+                val clickHandler = GamepadUiNavigation.activeFocusedClickHandler
+                if (clickHandler != null) {
+                    clickHandler()
+                } else {
+                    runCatching { currentDefaultRequester?.requestFocus() }
+                }
+            },
+            onBackB = { currentOnBack?.invoke() },
+            onPrevTabLB = { currentOnPrevTab?.invoke() },
+            onNextTabRB = { currentOnNextTab?.invoke() },
+            onSecondaryX = { currentOnX?.invoke() },
+            onSecondaryY = { currentOnY?.invoke() }
+        )
+    }
 
     DisposableEffect(enabled) {
         if (!enabled) {
             heldDpadDirection = null
+            GamepadUiNavigation.unregisterScope(scopeCallbacks)
+        } else {
+            GamepadUiNavigation.registerScope(scopeCallbacks)
         }
         onDispose {
             heldDpadDirection = null
+            GamepadUiNavigation.unregisterScope(scopeCallbacks)
         }
     }
 
@@ -325,21 +512,10 @@ fun Modifier.gamepadControllerScope(
 
     LaunchedEffect(enabled, autoRequestDefaultFocus, defaultFocusRequester) {
         if (enabled && autoRequestDefaultFocus && defaultFocusRequester != null) {
-            delay(40L)
+            GamepadUiNavigation.onGamepadInteraction()
+            delay(45L)
+            runCatching { view.requestFocus() }
             runCatching { defaultFocusRequester.requestFocus() }
-        }
-    }
-
-    fun stepFocus(direction: FocusDirection) {
-        GamepadUiNavigation.onGamepadInteraction()
-        val horizontalStepper = GamepadUiNavigation.activeHorizontalStepper
-        if (horizontalStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
-            horizontalStepper(if (direction == FocusDirection.Left) -1 else 1)
-            return
-        }
-        val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
-        if (!moved) {
-            runCatching { currentDefaultRequester?.requestFocus() }
         }
     }
 
@@ -360,91 +536,100 @@ fun Modifier.gamepadControllerScope(
         }
     }
 
-    this.onKeyEvent { keyEvent ->
-        val native = keyEvent.nativeKeyEvent
-        GamepadUiNavigation.observeKeyEventPassively(native)
-        if (!enabled) return@onKeyEvent false
-        if (!GamepadUiNavigation.isFromGamepadOrKeyboard(native)) {
-            return@onKeyEvent false
+    this
+        .onFocusChanged { state ->
+            hasFocusInsideScope = state.hasFocus || state.isFocused
         }
-
-        val keyCode = native.keyCode
-        val dir = when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> FocusDirection.Up
-            KeyEvent.KEYCODE_DPAD_DOWN -> FocusDirection.Down
-            KeyEvent.KEYCODE_DPAD_LEFT -> FocusDirection.Left
-            KeyEvent.KEYCODE_DPAD_RIGHT -> FocusDirection.Right
-            else -> null
-        }
-
-        if (dir != null) {
-            if (keyEvent.type == KeyEventType.KeyDown) {
-                GamepadUiNavigation.onGamepadInteraction()
-                if (native.repeatCount == 0) {
-                    heldDpadDirection = dir
-                    dpadPressSeq++
-                }
-                return@onKeyEvent true
-            } else if (keyEvent.type == KeyEventType.KeyUp) {
-                if (heldDpadDirection == dir) {
-                    heldDpadDirection = null
-                }
-                return@onKeyEvent true
+        .onKeyEvent { keyEvent ->
+            val native = keyEvent.nativeKeyEvent
+            GamepadUiNavigation.observeKeyEventPassively(native)
+            if (!enabled) return@onKeyEvent false
+            if (!GamepadUiNavigation.isFromGamepadOrKeyboard(native)) {
+                return@onKeyEvent false
             }
-        }
 
-        if (keyEvent.type == KeyEventType.KeyDown && native.repeatCount == 0) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_BUTTON_A,
-                KeyEvent.KEYCODE_DPAD_CENTER -> {
+            val keyCode = native.keyCode
+            val dir = when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> FocusDirection.Up
+                KeyEvent.KEYCODE_DPAD_DOWN -> FocusDirection.Down
+                KeyEvent.KEYCODE_DPAD_LEFT -> FocusDirection.Left
+                KeyEvent.KEYCODE_DPAD_RIGHT -> FocusDirection.Right
+                else -> null
+            }
+
+            if (dir != null) {
+                if (keyEvent.type == KeyEventType.KeyDown) {
                     GamepadUiNavigation.onGamepadInteraction()
-                    runCatching { currentDefaultRequester?.requestFocus() }
+                    if (native.repeatCount == 0) {
+                        heldDpadDirection = dir
+                        dpadPressSeq++
+                    }
+                    return@onKeyEvent true
+                } else if (keyEvent.type == KeyEventType.KeyUp) {
+                    if (heldDpadDirection == dir) {
+                        heldDpadDirection = null
+                    }
                     return@onKeyEvent true
                 }
-                KeyEvent.KEYCODE_BUTTON_L1 -> {
-                    val prev = currentOnPrevTab
-                    if (prev != null) {
+            }
+
+            if (keyEvent.type == KeyEventType.KeyDown && native.repeatCount == 0) {
+                when (keyCode) {
+                    KeyEvent.KEYCODE_BUTTON_A,
+                    KeyEvent.KEYCODE_DPAD_CENTER -> {
                         GamepadUiNavigation.onGamepadInteraction()
-                        prev()
+                        val clickHandler = GamepadUiNavigation.activeFocusedClickHandler
+                        if (clickHandler != null && !GamepadUiNavigation.shouldIgnoreDuplicateDown(keyCode)) {
+                            clickHandler()
+                        } else if (!hasFocusInsideScope) {
+                            runCatching { currentDefaultRequester?.requestFocus() }
+                        }
                         return@onKeyEvent true
                     }
-                }
-                KeyEvent.KEYCODE_BUTTON_R1 -> {
-                    val next = currentOnNextTab
-                    if (next != null) {
-                        GamepadUiNavigation.onGamepadInteraction()
-                        next()
-                        return@onKeyEvent true
+                    KeyEvent.KEYCODE_BUTTON_L1 -> {
+                        val prev = currentOnPrevTab
+                        if (prev != null) {
+                            GamepadUiNavigation.onGamepadInteraction()
+                            prev()
+                            return@onKeyEvent true
+                        }
                     }
-                }
-                KeyEvent.KEYCODE_BUTTON_B -> {
-                    val back = currentOnBack
-                    if (back != null) {
-                        GamepadUiNavigation.onGamepadInteraction()
-                        back()
-                        return@onKeyEvent true
+                    KeyEvent.KEYCODE_BUTTON_R1 -> {
+                        val next = currentOnNextTab
+                        if (next != null) {
+                            GamepadUiNavigation.onGamepadInteraction()
+                            next()
+                            return@onKeyEvent true
+                        }
                     }
-                }
-                KeyEvent.KEYCODE_BUTTON_X -> {
-                    val actX = currentOnX
-                    if (actX != null) {
-                        GamepadUiNavigation.onGamepadInteraction()
-                        actX()
-                        return@onKeyEvent true
+                    KeyEvent.KEYCODE_BUTTON_B -> {
+                        val back = currentOnBack
+                        if (back != null) {
+                            GamepadUiNavigation.onGamepadInteraction()
+                            back()
+                            return@onKeyEvent true
+                        }
                     }
-                }
-                KeyEvent.KEYCODE_BUTTON_Y -> {
-                    val actY = currentOnY
-                    if (actY != null) {
-                        GamepadUiNavigation.onGamepadInteraction()
-                        actY()
-                        return@onKeyEvent true
+                    KeyEvent.KEYCODE_BUTTON_X -> {
+                        val actX = currentOnX
+                        if (actX != null) {
+                            GamepadUiNavigation.onGamepadInteraction()
+                            actX()
+                            return@onKeyEvent true
+                        }
+                    }
+                    KeyEvent.KEYCODE_BUTTON_Y -> {
+                        val actY = currentOnY
+                        if (actY != null) {
+                            GamepadUiNavigation.onGamepadInteraction()
+                            actY()
+                            return@onKeyEvent true
+                        }
                     }
                 }
             }
+            false
         }
-        false
-    }
 }
 
 /**
@@ -506,11 +691,17 @@ fun Modifier.gamepadClickable(
     val currentOnStepHorizontal by rememberUpdatedState(onStepHorizontal)
     val currentOnFocused by rememberUpdatedState(onFocused)
     val interactionSource = remember { MutableInteractionSource() }
+    val selfClickDispatcher = remember { { currentOnClick() } }
 
     DisposableEffect(Unit) {
         onDispose {
-            if (isFocused && currentOnStepHorizontal != null) {
-                GamepadUiNavigation.activeHorizontalStepper = null
+            if (isFocused) {
+                if (currentOnStepHorizontal != null) {
+                    GamepadUiNavigation.activeHorizontalStepper = null
+                }
+                if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                    GamepadUiNavigation.activeFocusedClickHandler = null
+                }
             }
         }
     }
@@ -522,6 +713,9 @@ fun Modifier.gamepadClickable(
             if (isFocused != next) {
                 isFocused = next
                 if (next) {
+                    GamepadUiNavigation.activeFocusedClickHandler = selfClickDispatcher
+                    GamepadUiNavigation.activeFocusedKeyYHandler = null
+                    GamepadUiNavigation.activeFocusedLongClickHandler = null
                     if (currentOnStepHorizontal != null) {
                         GamepadUiNavigation.activeHorizontalStepper = { dir ->
                             currentOnStepHorizontal?.invoke(dir)
@@ -531,6 +725,9 @@ fun Modifier.gamepadClickable(
                     }
                     currentOnFocused?.invoke()
                 } else {
+                    if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                        GamepadUiNavigation.activeFocusedClickHandler = null
+                    }
                     if (currentOnStepHorizontal != null) {
                         GamepadUiNavigation.activeHorizontalStepper = null
                     }

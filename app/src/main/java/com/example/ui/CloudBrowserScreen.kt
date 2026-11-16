@@ -152,6 +152,59 @@ fun CloudBrowserScreen(
         )
     }
     var suppressLoadingOverlayAfterExitPreview by remember { mutableStateOf(false) }
+    var bounceTrackedGameKey by remember { mutableStateOf("") }
+    var consecutiveClassicBounceCount by remember { mutableStateOf(0) }
+    var classicBounceLoopStopped by remember { mutableStateOf(false) }
+    var isClassicBounceBannerDismissed by remember { mutableStateOf(false) }
+    var lastSeenWebMarketLocale by remember { mutableStateOf("") }
+    var dismissedAtWebMarket by remember { mutableStateOf("") }
+    var isAwaitingOrOnClassicSurface by remember { mutableStateOf(false) }
+    var lastClassicSwitchElapsedMs by remember { mutableStateOf(0L) }
+
+    val extractXboxUrlMarketLocale: (String) -> String = { rawUrl ->
+        try {
+            val u = android.net.Uri.parse(rawUrl)
+            val seg0 = u.pathSegments?.firstOrNull().orEmpty()
+            val localeRegex = Regex("^[a-zA-Z]{2}-[a-zA-Z]{2}$")
+            when {
+                localeRegex.matches(seg0) -> seg0.lowercase()
+                else -> {
+                    val qMkt = (u.getQueryParameter("mkt") ?: u.getQueryParameter("locale") ?: u.getQueryParameter("hl")).orEmpty()
+                    if (Regex("^[a-zA-Z]{2}(-[a-zA-Z]{2})?$").matches(qMkt)) qMkt.lowercase() else ""
+                }
+            }
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
+    val resolveBounceGameIdentity: (List<String>) -> String = { candidates ->
+        var found = ""
+        for (raw in candidates) {
+            if (raw.isBlank()) continue
+            val pid = com.example.data.GameLibraryRepository.extractProductId(raw)
+            if (pid.isNotBlank()) {
+                found = pid.lowercase()
+                break
+            }
+            val slug = Regex("/play/(?:games|launch)/([^/?#]+)", RegexOption.IGNORE_CASE)
+                .find(raw)?.groupValues?.getOrNull(1)?.lowercase().orEmpty()
+            if (slug.isNotBlank()) {
+                found = slug
+                break
+            }
+            val prodSlug = Regex("/products/([^/?#]+)", RegexOption.IGNORE_CASE)
+                .find(raw)?.groupValues?.getOrNull(1)?.lowercase().orEmpty()
+            if (prodSlug.isNotBlank()) {
+                found = prodSlug
+                break
+            }
+        }
+        if (found.isBlank()) {
+            found = streamController.uiState.value.gameTitle?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: "xbox_catalog"
+        }
+        found
+    }
 
     LaunchedEffect(streamUiState.currentUrl) {
         val u = streamUiState.currentUrl
@@ -293,103 +346,6 @@ fun CloudBrowserScreen(
         VpnManager.restoreProxyForGaming()
     }
 
-    val handleMainFrameNavigation: (String, String) -> Unit = { targetUrl, callbackSource ->
-        val oldUrl = currentMainFrameUrl
-        val oldSafePath = com.example.data.AppLogger.safeUrlHostPath(oldUrl)
-        val newSafePath = com.example.data.AppLogger.safeUrlHostPath(targetUrl)
-        val oldUri = try { android.net.Uri.parse(oldUrl) } catch (_: Exception) { null }
-        val newUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
-        val oldHost = oldUri?.host?.lowercase()
-        val newHost = newUri?.host?.lowercase()
-
-        if (newSafePath.isNotBlank() && oldSafePath != newSafePath) {
-            val actualSurface = when (newHost) {
-                "play.xbox.com" -> "NEW_UI (play.xbox.com)"
-                "www.xbox.com", "xbox.com" -> "CLASSIC (www.xbox.com)"
-                else -> "OTHER (${newHost ?: "unknown"})"
-            }
-            val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-            val appReason = pendingAppNavReason
-            val decisionSource = when {
-                oldHost in listOf("www.xbox.com", "xbox.com") && newHost == "play.xbox.com" &&
-                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC -> {
-                    "Xbox tự chuyển hướng máy chủ/JS (www.xbox.com -> play.xbox.com dù setting=CLASSIC; sự kiện=$callbackSource)"
-                }
-                oldHost == "play.xbox.com" && newHost in listOf("www.xbox.com", "xbox.com") -> {
-                    if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
-                        SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
-                    }
-                    "Chuyển từ play.xbox.com về www.xbox.com (${appReason ?: "Xbox Exit preview / chuyển hướng"}; sự kiện=$callbackSource)"
-                }
-                appReason != null -> {
-                    "App điều hướng ($appReason; sự kiện=$callbackSource)"
-                }
-                else -> {
-                    "Điều hướng web ($callbackSource)"
-                }
-            }
-            pendingAppNavReason = null
-            com.example.data.AppLogger.info(
-                "WEB-UI",
-                "Điều hướng chính: ${oldSafePath.ifBlank { "(khởi tạo)" }} -> $newSafePath | cài đặt=${config.xboxWebUiMode.name} | ua=$uaMode | thực tế=$actualSurface | nguồn=$decisionSource"
-            )
-        }
-
-        // Bỏ qua việc hiện nút khi chuyển hướng http -> https cùng tên miền
-        val isHttpToHttpsSameDomain = oldHost != null && oldHost == newHost &&
-            oldUri?.scheme?.lowercase() == "http" && newUri?.scheme?.lowercase() == "https"
-
-        val isTrustedDomainHost = XboxBridge.isTrustedDomainHost(newHost)
-        val isTrusted = XboxBridge.isTrustedHost(targetUrl)
-
-        // Chỉ lưu URL có host thuộc xbox.com (bỏ login.live.com, microsoftonline.com...)
-        if (XboxBridge.isXboxHost(targetUrl)) {
-            val prevLastSafe = com.example.data.AppLogger.safeUrlHostPath(lastXboxUrl)
-            val isUnwantedPreviewRedirect = newHost == "play.xbox.com" &&
-                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
-                !targetUrl.contains("/launch/")
-            if (!isUnwantedPreviewRedirect) {
-                lastXboxUrl = targetUrl
-            } else if (prevLastSafe != newSafePath) {
-                val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
-                com.example.data.AppLogger.info(
-                    "WEB-UI",
-                    "Giữ nguyên lastXboxUrl ở CLASSIC ($prevLastSafe), bỏ qua ghi đè từ redirect giao diện mới: $newSafePath (ua=$uaMode)"
-                )
-            }
-            val isLaunchUrl = targetUrl.contains("/play/launch/", ignoreCase = true) ||
-                targetUrl.contains("/launch/", ignoreCase = true)
-            val isGameInfoUrl = targetUrl.contains("/play/games/", ignoreCase = true) ||
-                targetUrl.contains("/products/", ignoreCase = true) ||
-                targetUrl.contains("/games/", ignoreCase = true)
-            if (isLaunchUrl || isGameInfoUrl) {
-                lastVisitedGameUrl = targetUrl
-                com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
-                    rawTitle = webViewInstance?.title,
-                    rawUrl = targetUrl,
-                    markAsLastPlayed = isLaunchUrl
-                )
-            }
-        }
-
-        if (isTrusted || isTrustedDomainHost) {
-            showReturnButton = false
-            VpnManager.restoreProxyForGaming()
-            // Khi người dùng thoát về trang danh mục Xbox (ngoài /launch/), nối lại bộ dịch nếu đang bật tiếng Việt và không bật Chế độ máy yếu
-            if (XboxBridge.isXboxHost(targetUrl) && !targetUrl.contains("/launch/") && !config.lowEndDeviceMode && config.isEffectiveTranslateEnabled()) {
-                webViewInstance?.evaluateJavascript(
-                    "if (window.__resumeTranslator) window.__resumeTranslator();",
-                    null
-                )
-            }
-        } else if (!isHttpToHttpsSameDomain) {
-            showReturnButton = true
-            VpnManager.pauseProxyForExternalNavigation()
-        }
-
-        currentMainFrameUrl = targetUrl
-    }
-
     val isCellular by remember {
         com.example.cloudplay.NetworkOptimizer.status.map { it.isCellular }.distinctUntilChanged()
     }.collectAsState(initial = com.example.cloudplay.NetworkOptimizer.status.value.isCellular)
@@ -478,6 +434,184 @@ fun CloudBrowserScreen(
         } catch (_: Exception) {}
     }
 
+    val handleMainFrameNavigation: (String, String) -> Unit = nav@{ targetUrl, callbackSource ->
+        val oldUrl = currentMainFrameUrl
+        val oldSafePath = com.example.data.AppLogger.safeUrlHostPath(oldUrl)
+        val newSafePath = com.example.data.AppLogger.safeUrlHostPath(targetUrl)
+        val oldUri = try { android.net.Uri.parse(oldUrl) } catch (_: Exception) { null }
+        val newUri = try { android.net.Uri.parse(targetUrl) } catch (_: Exception) { null }
+        val oldHost = oldUri?.host?.lowercase()
+        val newHost = newUri?.host?.lowercase()
+
+        if (newSafePath.isNotBlank() && oldSafePath != newSafePath) {
+            val actualSurface = when (newHost) {
+                "play.xbox.com" -> "NEW_UI (play.xbox.com)"
+                "www.xbox.com", "xbox.com" -> "CLASSIC (www.xbox.com)"
+                else -> "OTHER (${newHost ?: "unknown"})"
+            }
+            val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
+            val appReason = pendingAppNavReason
+            val decisionSource = when {
+                oldHost in listOf("www.xbox.com", "xbox.com") && newHost == "play.xbox.com" &&
+                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC -> {
+                    "Xbox tự chuyển hướng máy chủ/JS (www.xbox.com -> play.xbox.com dù setting=CLASSIC; sự kiện=$callbackSource)"
+                }
+                oldHost == "play.xbox.com" && newHost in listOf("www.xbox.com", "xbox.com") -> {
+                    if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+                        SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.CLASSIC)
+                    }
+                    "Chuyển từ play.xbox.com về www.xbox.com (${appReason ?: "Xbox Exit preview / chuyển hướng"}; sự kiện=$callbackSource)"
+                }
+                appReason != null -> {
+                    "App điều hướng ($appReason; sự kiện=$callbackSource)"
+                }
+                else -> {
+                    "Điều hướng web ($callbackSource)"
+                }
+            }
+            pendingAppNavReason = null
+            com.example.data.AppLogger.info(
+                "WEB-UI",
+                "Điều hướng chính: ${oldSafePath.ifBlank { "(khởi tạo)" }} -> $newSafePath | cài đặt=${config.xboxWebUiMode.name} | ua=$uaMode | thực tế=$actualSurface | nguồn=$decisionSource"
+            )
+        }
+
+        // Bỏ qua việc hiện nút khi chuyển hướng http -> https cùng tên miền
+        val isHttpToHttpsSameDomain = oldHost != null && oldHost == newHost &&
+            oldUri?.scheme?.lowercase() == "http" && newUri?.scheme?.lowercase() == "https"
+
+        val isTrustedDomainHost = XboxBridge.isTrustedDomainHost(newHost)
+        val isTrusted = XboxBridge.isTrustedHost(targetUrl)
+
+        // Chỉ lưu URL có host thuộc xbox.com (bỏ login.live.com, microsoftonline.com...)
+        if (XboxBridge.isXboxHost(targetUrl)) {
+            val detectedMkt = extractXboxUrlMarketLocale(targetUrl)
+            if (detectedMkt.isNotBlank() && detectedMkt != lastSeenWebMarketLocale) {
+                val prevMkt = lastSeenWebMarketLocale
+                lastSeenWebMarketLocale = detectedMkt
+                if (classicBounceLoopStopped && isClassicBounceBannerDismissed &&
+                    prevMkt.isNotBlank() && !detectedMkt.equals(dismissedAtWebMarket, ignoreCase = true)
+                ) {
+                    isClassicBounceBannerDismissed = false
+                    dismissedAtWebMarket = detectedMkt
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Xbox đổi sang thị trường khác ($prevMkt -> $detectedMkt) sau khi tắt nhắc nhở -> hiện lại thanh nhắc giao diện mới"
+                    )
+                }
+            }
+
+            if (newHost == "www.xbox.com" || newHost == "xbox.com") {
+                isAwaitingOrOnClassicSurface = true
+                if (targetUrl.contains("/launch/", ignoreCase = true)) {
+                    consecutiveClassicBounceCount = 0
+                    classicBounceLoopStopped = false
+                    isClassicBounceBannerDismissed = false
+                }
+            }
+
+            val prevLastSafe = com.example.data.AppLogger.safeUrlHostPath(lastXboxUrl)
+            val isUnwantedPreviewRedirect = newHost == "play.xbox.com" &&
+                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                !targetUrl.contains("/launch/")
+            if (!isUnwantedPreviewRedirect) {
+                lastXboxUrl = targetUrl
+            } else if (prevLastSafe != newSafePath) {
+                val uaMode = if (config.forceDesktopUserAgent) "desktop" else "mobile"
+                com.example.data.AppLogger.info(
+                    "WEB-UI",
+                    "Giữ nguyên lastXboxUrl ở CLASSIC ($prevLastSafe), bỏ qua ghi đè từ redirect giao diện mới: $newSafePath (ua=$uaMode)"
+                )
+            }
+            val isLaunchUrl = targetUrl.contains("/play/launch/", ignoreCase = true) ||
+                targetUrl.contains("/launch/", ignoreCase = true)
+            val isGameInfoUrl = targetUrl.contains("/play/games/", ignoreCase = true) ||
+                targetUrl.contains("/products/", ignoreCase = true) ||
+                targetUrl.contains("/games/", ignoreCase = true)
+            if (isLaunchUrl || isGameInfoUrl) {
+                lastVisitedGameUrl = targetUrl
+                com.example.data.GameLibraryRepository.onWebGamePlayedOrDiscovered(
+                    rawTitle = webViewInstance?.title,
+                    rawUrl = targetUrl,
+                    markAsLastPlayed = isLaunchUrl
+                )
+            }
+
+            val isPushbackToNewUi = newHost == "play.xbox.com" &&
+                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                !isLaunchUrl &&
+                (oldHost == "www.xbox.com" || oldHost == "xbox.com" || isAwaitingOrOnClassicSurface)
+            if (isPushbackToNewUi) {
+                isAwaitingOrOnClassicSurface = false
+                val nowElapsed = android.os.SystemClock.elapsedRealtime()
+                val gameKey = resolveBounceGameIdentity(
+                    listOf(oldUrl, targetUrl, lastVisitedGameUrl, exitPreviewSavedGameUrl, initialUrl)
+                )
+                if (gameKey == bounceTrackedGameKey) {
+                    consecutiveClassicBounceCount += 1
+                } else {
+                    bounceTrackedGameKey = gameKey
+                    consecutiveClassicBounceCount = 1
+                    classicBounceLoopStopped = false
+                }
+                if (consecutiveClassicBounceCount >= 2) {
+                    classicBounceLoopStopped = true
+                    isClassicBounceBannerDismissed = false
+                    dismissedAtWebMarket = lastSeenWebMarketLocale
+                    exitPreviewArmedAtMs = 0L
+                    exitPreviewOptOutStartedAtMs = 0L
+                    webViewInstance?.evaluateJavascript(
+                        "if (window.__setAutoExitPreviewEnabled) window.__setAutoExitPreviewEnabled(false);",
+                        null
+                    )
+                    com.example.data.AppLogger.warn(
+                        "WEB-UI",
+                        "Xbox đẩy ngược về play.xbox.com lần thứ $consecutiveClassicBounceCount liên tiếp (game=$gameKey) -> DỪNG tự thử lại và hiện nhắc nhở"
+                    )
+                } else if (config.autoExitPreviewHandlerEnabled &&
+                    !classicBounceLoopStopped &&
+                    lastClassicSwitchElapsedMs > 0L &&
+                    (nowElapsed - lastClassicSwitchElapsedMs) <= 6_000L
+                ) {
+                    applyClassicPreviewOptOutCookies()
+                    val retryClassicUrl = resolveTargetGameClassicUrl()
+                    isAwaitingOrOnClassicSurface = true
+                    lastClassicSwitchElapsedMs = nowElapsed
+                    pendingAppNavReason = "thử lại lần 2 sau khi Xbox đẩy ngược về play.xbox.com (game=$gameKey)"
+                    lastXboxUrl = retryClassicUrl
+                    currentMainFrameUrl = retryClassicUrl
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Xbox đẩy ngược về play.xbox.com lần 1 (game=$gameKey) -> thử chuyển lại Giao diện cũ thêm 1 lần: ${com.example.data.AppLogger.safeUrlHostPath(retryClassicUrl)}"
+                    )
+                    webViewInstance?.post {
+                        if (!classicBounceLoopStopped) {
+                            webViewInstance?.loadUrl(retryClassicUrl)
+                        }
+                    }
+                    return@nav
+                }
+            }
+        }
+
+        if (isTrusted || isTrustedDomainHost) {
+            showReturnButton = false
+            VpnManager.restoreProxyForGaming()
+            // Khi người dùng thoát về trang danh mục Xbox (ngoài /launch/), nối lại bộ dịch nếu đang bật tiếng Việt và không bật Chế độ máy yếu
+            if (XboxBridge.isXboxHost(targetUrl) && !targetUrl.contains("/launch/") && !config.lowEndDeviceMode && config.isEffectiveTranslateEnabled()) {
+                webViewInstance?.evaluateJavascript(
+                    "if (window.__resumeTranslator) window.__resumeTranslator();",
+                    null
+                )
+            }
+        } else if (!isHttpToHttpsSameDomain) {
+            showReturnButton = true
+            VpnManager.pauseProxyForExternalNavigation()
+        }
+
+        currentMainFrameUrl = targetUrl
+    }
+
     val switchWebViewToClassicUi: (String) -> Unit = { reason ->
         if (config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
             lastAppliedUiMode = com.example.data.XboxWebUiMode.CLASSIC
@@ -485,6 +619,19 @@ fun CloudBrowserScreen(
         }
         applyClassicPreviewOptOutCookies()
         val targetClassicUrl = resolveTargetGameClassicUrl()
+        val gameKey = resolveBounceGameIdentity(
+            listOf(targetClassicUrl, exitPreviewSavedGameUrl, lastVisitedGameUrl, currentMainFrameUrl, initialUrl)
+        )
+        if (gameKey != bounceTrackedGameKey) {
+            bounceTrackedGameKey = gameKey
+            consecutiveClassicBounceCount = 0
+            classicBounceLoopStopped = false
+            isClassicBounceBannerDismissed = false
+        }
+        isAwaitingOrOnClassicSurface = true
+        lastClassicSwitchElapsedMs = android.os.SystemClock.elapsedRealtime()
+        exitPreviewArmedAtMs = 0L
+        exitPreviewOptOutStartedAtMs = 0L
         exitPreviewSavedGameUrl = ""
         exitPreviewSavedGameTitle = ""
         pendingAppNavReason = reason
@@ -508,7 +655,10 @@ fun CloudBrowserScreen(
     }
 
     val commitExitPreviewToClassicUi: (String) -> Unit = commit@{ triggerReason ->
-        if (!config.autoExitPreviewHandlerEnabled || config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+        if (!config.autoExitPreviewHandlerEnabled ||
+            config.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC ||
+            classicBounceLoopStopped
+        ) {
             exitPreviewArmedAtMs = 0L
             exitPreviewOptOutStartedAtMs = 0L
             return@commit
@@ -521,6 +671,17 @@ fun CloudBrowserScreen(
 
         // Mở thẳng đúng trang chi tiết của tựa game người dùng đang xem ở Giao diện cũ sau khi opt-out
         val targetClassicUrl = resolveTargetGameClassicUrl()
+        val gameKey = resolveBounceGameIdentity(
+            listOf(targetClassicUrl, exitPreviewSavedGameUrl, lastVisitedGameUrl, currentMainFrameUrl, initialUrl)
+        )
+        if (gameKey != bounceTrackedGameKey) {
+            bounceTrackedGameKey = gameKey
+            consecutiveClassicBounceCount = 0
+            classicBounceLoopStopped = false
+            isClassicBounceBannerDismissed = false
+        }
+        isAwaitingOrOnClassicSurface = true
+        lastClassicSwitchElapsedMs = android.os.SystemClock.elapsedRealtime()
         exitPreviewSavedGameUrl = ""
         exitPreviewSavedGameTitle = ""
 
@@ -852,9 +1013,10 @@ fun CloudBrowserScreen(
     }
 
     // Đồng bộ tức thì trạng thái Bộ xử lý tự động thoát Giao diện mới (Exit preview) với WebView đang chạy
-    LaunchedEffect(config.autoExitPreviewHandlerEnabled, config.xboxWebUiMode, webViewInstance) {
+    LaunchedEffect(config.autoExitPreviewHandlerEnabled, config.xboxWebUiMode, classicBounceLoopStopped, webViewInstance) {
         val effectiveAutoExit = config.autoExitPreviewHandlerEnabled &&
-            config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+            config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+            !classicBounceLoopStopped
         if (!effectiveAutoExit) {
             exitPreviewArmedAtMs = 0L
             exitPreviewOptOutStartedAtMs = 0L
@@ -1074,7 +1236,10 @@ fun CloudBrowserScreen(
                         }
 
                         val curCfg = SettingsRepository.config.value
-                        if (!curCfg.autoExitPreviewHandlerEnabled || curCfg.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC) {
+                        if (!curCfg.autoExitPreviewHandlerEnabled ||
+                            curCfg.xboxWebUiMode != com.example.data.XboxWebUiMode.CLASSIC ||
+                            classicBounceLoopStopped
+                        ) {
                             exitPreviewArmedAtMs = 0L
                             exitPreviewOptOutStartedAtMs = 0L
                             return@setExitPreviewSignalListener
@@ -1148,7 +1313,8 @@ fun CloudBrowserScreen(
                             if (url != null &&
                                 exitPreviewOptOutStartedAtMs > 0L &&
                                 config.autoExitPreviewHandlerEnabled &&
-                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                                !classicBounceLoopStopped
                             ) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
@@ -1216,7 +1382,8 @@ fun CloudBrowserScreen(
                             val targetUrl = request?.url?.toString()
                             if (isMainFrame && targetUrl != null) {
                                 val isClassicAutoExitActive = config.autoExitPreviewHandlerEnabled &&
-                                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                                    config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                                    !classicBounceLoopStopped
                                 if (exitPreviewOptOutStartedAtMs > 0L && isClassicAutoExitActive) {
                                     val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                     val isMigrateStep = targetUrl.contains("/migrate", ignoreCase = true)
@@ -1232,15 +1399,25 @@ fun CloudBrowserScreen(
                                     val nextPath = nextUri?.path?.trimEnd('/') ?: ""
                                     val isBareClassicRoot = (nextHost == "www.xbox.com" || nextHost == "xbox.com") &&
                                         (nextPath.equals("/play", ignoreCase = true) || Regex("^/[a-zA-Z]{2}-[a-zA-Z]{2}/play$", RegexOption.IGNORE_CASE).matches(nextPath))
-                                    val isBounceToNewUiMigrate = nextHost == "play.xbox.com" &&
-                                        nextPath.contains("/migrate", ignoreCase = true) &&
-                                        (prevHost == "www.xbox.com" || prevHost == "xbox.com")
-                                    if ((prevHost == "play.xbox.com" && isBareClassicRoot) || isBounceToNewUiMigrate) {
+                                    if (prevHost == "play.xbox.com" && isBareClassicRoot) {
                                         applyClassicPreviewOptOutCookies()
                                         val directClassicGameUrl = resolveTargetGameClassicUrl()
+                                        val gameKey = resolveBounceGameIdentity(
+                                            listOf(directClassicGameUrl, exitPreviewSavedGameUrl, lastVisitedGameUrl, currentMainFrameUrl, initialUrl)
+                                        )
+                                        if (gameKey != bounceTrackedGameKey) {
+                                            bounceTrackedGameKey = gameKey
+                                            consecutiveClassicBounceCount = 0
+                                            classicBounceLoopStopped = false
+                                            isClassicBounceBannerDismissed = false
+                                        }
+                                        isAwaitingOrOnClassicSurface = true
+                                        lastClassicSwitchElapsedMs = android.os.SystemClock.elapsedRealtime()
+                                        exitPreviewArmedAtMs = 0L
+                                        exitPreviewOptOutStartedAtMs = 0L
                                         exitPreviewSavedGameUrl = ""
                                         exitPreviewSavedGameTitle = ""
-                                        pendingAppNavReason = "chuyển thẳng vào trang game Giao diện cũ khi rời play.xbox.com hoặc chặn /migrate"
+                                        pendingAppNavReason = "chuyển thẳng vào trang game Giao diện cũ khi rời play.xbox.com"
                                         lastXboxUrl = directClassicGameUrl
                                         currentMainFrameUrl = directClassicGameUrl
                                         view?.loadUrl(directClassicGameUrl)
@@ -1264,7 +1441,8 @@ fun CloudBrowserScreen(
                             if (url != null &&
                                 exitPreviewOptOutStartedAtMs > 0L &&
                                 config.autoExitPreviewHandlerEnabled &&
-                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC
+                                config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+                                !classicBounceLoopStopped
                             ) {
                                 val optElapsed = android.os.SystemClock.elapsedRealtime() - exitPreviewOptOutStartedAtMs
                                 val isMigrateStep = url.contains("/migrate", ignoreCase = true)
@@ -1330,7 +1508,13 @@ fun CloudBrowserScreen(
                         private var lastConsoleErrLogMs = 0L
 
                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                            pageLoadingProgress = newProgress / 100f
+                            val nextProgress = newProgress / 100f
+                            val curProgress = pageLoadingProgress
+                            val crossedThreshold = (curProgress < 0.80f && nextProgress >= 0.80f) ||
+                                (curProgress < 0.05f && nextProgress >= 0.05f)
+                            if (newProgress >= 100 || newProgress <= 5 || crossedThreshold || kotlin.math.abs(nextProgress - curProgress) >= 0.05f) {
+                                pageLoadingProgress = nextProgress
+                            }
                             if (!injectedForCurrentPage && newProgress >= 30 && XboxBridge.isTrustedHost(view?.url)) {
                                 injectedForCurrentPage = true
                                 view?.evaluateJavascript(currentInjectionScript, null)
@@ -1537,6 +1721,54 @@ fun CloudBrowserScreen(
                     }
                 }
             }
+        }
+
+        // A2: Nhắc nhở nhỏ không chặn khi máy chủ lặp lại lỗi không mở khóa được vùng (kèm gợi ý máy chủ đã đo thật / báo đã tự đổi ở chế độ tự chọn)
+        if (!streamUiState.isStreamConnected) {
+            IsolatedServerUnlockFailReminderChip(
+                config = config,
+                effectiveLocale = effectiveLocale,
+                webViewInstance = webViewInstance,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+
+        // A1: Nhắc nhở nhỏ không chặn khi Xbox liên tục đẩy ngược từ Giao diện cũ về play.xbox.com (>= 2 lần trong cùng một game)
+        if (classicBounceLoopStopped &&
+            !isClassicBounceBannerDismissed &&
+            config.xboxWebUiMode == com.example.data.XboxWebUiMode.CLASSIC &&
+            !streamUiState.isStreamConnected
+        ) {
+            ClassicUiBounceReminderChip(
+                config = config,
+                onRetryClassic = {
+                    isClassicBounceBannerDismissed = true
+                    classicBounceLoopStopped = false
+                    consecutiveClassicBounceCount = 1
+                    switchWebViewToClassicUi("người dùng bấm Thử lại trên thanh nhắc giao diện cũ")
+                },
+                onContinueNewUi = {
+                    isClassicBounceBannerDismissed = true
+                    classicBounceLoopStopped = false
+                    consecutiveClassicBounceCount = 0
+                    lastAppliedUiMode = com.example.data.XboxWebUiMode.NEW_UI
+                    SettingsRepository.updateXboxWebUiMode(com.example.data.XboxWebUiMode.NEW_UI)
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Người dùng chọn tiếp tục dùng Giao diện mới (play.xbox.com) từ thanh nhắc"
+                    )
+                },
+                onDismiss = {
+                    isClassicBounceBannerDismissed = true
+                    dismissedAtWebMarket = lastSeenWebMarketLocale
+                    com.example.data.AppLogger.info(
+                        "WEB-UI",
+                        "Người dùng tắt thanh nhắc giao diện mới cho lần chuyển hướng hiện tại (thị trường=${lastSeenWebMarketLocale.ifBlank { "default" }})"
+                    )
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+            )
         }
 
         // Floating "Return to Game" Pill when navigating away to external untrusted websites (e.g. 3D Secure / Payment / External Links)
@@ -1856,14 +2088,19 @@ private fun IsolatedInGameLoadingOverlay(
     onSkip: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val vpnState by VpnManager.state.collectAsState()
+    val vpnSnapshot = if (isLoading) {
+        val liveVpn by VpnManager.state.collectAsState()
+        liveVpn
+    } else {
+        remember { VpnManager.state.value }
+    }
     com.example.ui.components.InGameLoadingOverlay(
         isLoading = isLoading,
         progress = progress,
-        targetServerName = "${vpnState.currentServer.flag} ${vpnState.currentServer.name}",
+        targetServerName = "${vpnSnapshot.currentServer.flag} ${vpnSnapshot.currentServer.name}",
         hasGamepad = hasGamepad,
         gameProfile = gameProfile,
-        realLatencyMs = if (vpnState.mode == NetworkMode.DIRECT_NETWORK) vpnState.directLatencyMs else vpnState.latencyMs,
+        realLatencyMs = if (vpnSnapshot.mode == NetworkMode.DIRECT_NETWORK) vpnSnapshot.directLatencyMs else vpnSnapshot.latencyMs,
         lowEndDeviceMode = lowEndDeviceMode,
         onNavigateHome = onNavigateHome,
         onSkip = onSkip,
@@ -1989,15 +2226,68 @@ private fun IsolatedFloatingHud(
 ) {
     val context = LocalContext.current
     val config by SettingsRepository.config.collectAsState()
-    val vpnState by VpnManager.state.collectAsState()
-    val translationInfo by XboxBridge.translationInfo.collectAsState()
-    val networkStatus by com.example.cloudplay.NetworkOptimizer.status.collectAsState()
-    val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
-    val telemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
-    val adaptiveQualityState by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
-
     val isTvMode = remember(config.appUiMode, context) {
         config.isEffectiveTvMode(context)
+    }
+
+    var isHudOpenInternal by remember { mutableStateOf(false) }
+    val needFullLiveHudState = isHudOpenInternal || (isTvMode && !hideStreamStats)
+
+    val networkStatus by remember {
+        com.example.cloudplay.NetworkOptimizer.status.distinctUntilChanged { old, new ->
+            old.isWifi == new.isWifi &&
+                old.isCellular == new.isCellular &&
+                old.hasVpnTransport == new.hasVpnTransport &&
+                old.wifiRssiDbm == new.wifiRssiDbm &&
+                old.wifiFrequencyMhz == new.wifiFrequencyMhz
+        }
+    }.collectAsState(initial = com.example.cloudplay.NetworkOptimizer.status.value)
+
+    val recorderState by com.example.cloudplay.ZeroLagScreenRecorder.state.collectAsState()
+
+    val vpnState = if (needFullLiveHudState) {
+        val liveVpn by VpnManager.state.collectAsState()
+        liveVpn
+    } else {
+        remember { VpnManager.state.value }
+    }
+
+    val translatedCount = if (needFullLiveHudState) {
+        val liveTrans by XboxBridge.translationInfo.collectAsState()
+        liveTrans.translatedCount
+    } else {
+        0
+    }
+
+    val adaptiveQualityState = if (needFullLiveHudState) {
+        val liveAdaptive by com.example.cloudplay.AdaptiveQualityManager.state.collectAsState()
+        liveAdaptive
+    } else {
+        remember { com.example.cloudplay.AdaptiveQualityManager.state.value }
+    }
+
+    val telemetry = if (needFullLiveHudState) {
+        val liveTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
+        liveTelemetry
+    } else {
+        val minimalPingPair by remember {
+            com.example.cloudplay.NetworkOptimizer.telemetry
+                .map { it.rttMs to it.hasStatsSample }
+                .distinctUntilChanged()
+        }.collectAsState(
+            initial = com.example.cloudplay.NetworkOptimizer.telemetry.value.let { it.rttMs to it.hasStatsSample }
+        )
+        remember(minimalPingPair.first, minimalPingPair.second) {
+            com.example.cloudplay.StreamTelemetry(
+                rttMs = minimalPingPair.first,
+                hasStatsSample = minimalPingPair.second
+            )
+        }
+    }
+
+    val handleHudOpenChanged: (Boolean) -> Unit = { open ->
+        isHudOpenInternal = open
+        onHudOpenStateChanged(open)
     }
 
     if (isTvMode) {
@@ -2019,7 +2309,7 @@ private fun IsolatedFloatingHud(
             onReloadPage = onReloadPage,
             onOpenQuickSettings = onOpenSettings,
             onNavigateHome = onNavigateHome,
-            onHudOpenStateChanged = onHudOpenStateChanged
+            onHudOpenStateChanged = handleHudOpenChanged
         )
     } else {
         FloatingHud(
@@ -2036,7 +2326,7 @@ private fun IsolatedFloatingHud(
             onToggleClarityBoost = onToggleClarityBoost,
             clarityBoostActive = clarityBoostActive,
             translationActive = translationActive,
-            translatedCount = translationInfo.translatedCount,
+            translatedCount = translatedCount,
             onToggleTranslation = onToggleTranslation,
             hideStreamStats = hideStreamStats,
             onToggleHideStreamStats = onToggleHideStreamStats,
@@ -2057,10 +2347,318 @@ private fun IsolatedFloatingHud(
             onToggleRecording = onToggleRecording,
             xboxWebUiMode = xboxWebUiMode,
             onSelectXboxWebUiMode = onSelectXboxWebUiMode,
-            onHudOpenStateChanged = onHudOpenStateChanged
+            onHudOpenStateChanged = handleHudOpenChanged
         )
     }
 }
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ClassicUiBounceReminderChip(
+    config: com.example.data.AppConfig,
+    onRetryClassic: () -> Unit,
+    onContinueNewUi: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val minSide = minOf(maxWidth, maxHeight)
+        val unit = minSide * 0.01f
+        val outerMarginH = unit * 3.5f
+        val outerMarginBottom = unit * 11.0f
+        val padH = unit * 3.2f
+        val padV = unit * 2.2f
+        val gap = unit * 2.0f
+        val cornerRadius = unit * 3.0f
+        val btnRadius = unit * 2.2f
+        val borderStroke = unit * 0.28f
+        val chipPadH = unit * 2.6f
+        val chipPadV = unit * 1.4f
+        val textFontSp = with(density) { (unit * 3.1f).toSp() }
+        val actionFontSp = with(density) { (unit * 2.9f).toSp() }
+
+        val messageText = config.tr(
+            "Xbox đang tự chuyển về giao diện mới (play.xbox.com). Đã dừng tự thử lại.",
+            "Xbox is redirecting to the new UI (play.xbox.com). Auto-retry paused."
+        )
+        val retryLabel = config.tr("Thử lại", "Retry")
+        val continueNewUiLabel = config.tr("Dùng giao diện mới", "Use New UI")
+        val dismissLabel = config.tr("Đóng", "Dismiss")
+
+        Box(
+            modifier = Modifier
+                .padding(start = outerMarginH, end = outerMarginH, bottom = outerMarginBottom)
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(XboxSurface)
+                .border(borderStroke, XboxCardBorder, RoundedCornerShape(cornerRadius))
+                .padding(horizontal = padH, vertical = padV)
+                .testTag("classic_bounce_reminder_banner")
+        ) {
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = messageText,
+                    color = TextPrimary,
+                    fontSize = textFontSp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .align(Alignment.CenterVertically)
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(btnRadius))
+                            .background(XboxNeonGreen)
+                            .clickable(onClick = onRetryClassic)
+                            .padding(horizontal = chipPadH, vertical = chipPadV)
+                            .testTag("classic_bounce_retry_btn"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = retryLabel,
+                            color = Color.Black,
+                            fontSize = actionFontSp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(btnRadius))
+                            .background(XboxCardBorder)
+                            .clickable(onClick = onContinueNewUi)
+                            .padding(horizontal = chipPadH, vertical = chipPadV)
+                            .testTag("classic_bounce_continue_new_ui_btn"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = continueNewUiLabel,
+                            color = TextPrimary,
+                            fontSize = actionFontSp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(btnRadius))
+                            .border(borderStroke, XboxCardBorder, RoundedCornerShape(btnRadius))
+                            .clickable(onClick = onDismiss)
+                            .padding(horizontal = chipPadH, vertical = chipPadV)
+                            .testTag("classic_bounce_dismiss_btn"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dismissLabel,
+                            color = TextSecondary,
+                            fontSize = actionFontSp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class UnlockFailBannerSlice(
+    val promptServer: com.example.vpn.ServerLocation?,
+    val suggestedServer: com.example.vpn.ServerLocation?,
+    val suggestedPingMs: Int?,
+    val consecutiveCount: Int,
+    val autoSwitchedFromServer: com.example.vpn.ServerLocation?,
+    val currentServer: com.example.vpn.ServerLocation
+)
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun IsolatedServerUnlockFailReminderChip(
+    config: com.example.data.AppConfig,
+    effectiveLocale: String,
+    webViewInstance: WebView?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val slice by remember {
+        VpnManager.state.map { s ->
+            UnlockFailBannerSlice(
+                promptServer = s.unlockFailPromptServer,
+                suggestedServer = s.unlockFailSuggestedServer,
+                suggestedPingMs = s.unlockFailSuggestedPingMs,
+                consecutiveCount = s.unlockFailConsecutiveCount,
+                autoSwitchedFromServer = s.unlockFailAutoSwitchedFromServer,
+                currentServer = s.currentServer
+            )
+        }.distinctUntilChanged()
+    }.collectAsState(
+        initial = VpnManager.state.value.let { s ->
+            UnlockFailBannerSlice(
+                promptServer = s.unlockFailPromptServer,
+                suggestedServer = s.unlockFailSuggestedServer,
+                suggestedPingMs = s.unlockFailSuggestedPingMs,
+                consecutiveCount = s.unlockFailConsecutiveCount,
+                autoSwitchedFromServer = s.unlockFailAutoSwitchedFromServer,
+                currentServer = s.currentServer
+            )
+        }
+    )
+
+    val autoSwitchedFrom = slice.autoSwitchedFromServer
+    val promptServer = slice.promptServer
+
+    // Khi đang ở chế độ tự chọn và VpnManager đã tự đổi sang máy chủ khác có số đo thật,
+    // cập nhật vùng cho WebView và tải lại trang danh mục để mở khóa ngay.
+    LaunchedEffect(autoSwitchedFrom?.id, slice.currentServer.id, webViewInstance) {
+        if (autoSwitchedFrom != null && webViewInstance != null && autoSwitchedFrom.id != slice.currentServer.id) {
+            val safeCountry = org.json.JSONObject.quote(slice.currentServer.countryCode)
+            val safeIp = org.json.JSONObject.quote(slice.currentServer.ip)
+            val safeLocale = org.json.JSONObject.quote(effectiveLocale)
+            webViewInstance.evaluateJavascript(
+                "window.__lastUnlockSignal = null; if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale }); location.reload();",
+                null
+            )
+        }
+    }
+
+    if (promptServer == null && autoSwitchedFrom == null) return
+
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val minSide = minOf(maxWidth, maxHeight)
+        val unit = minSide * 0.01f
+        val outerMarginH = unit * 3.5f
+        val outerMarginBottom = unit * 11.0f
+        val padH = unit * 3.2f
+        val padV = unit * 2.2f
+        val gap = unit * 2.0f
+        val cornerRadius = unit * 3.0f
+        val btnRadius = unit * 2.2f
+        val borderStroke = unit * 0.28f
+        val chipPadH = unit * 2.6f
+        val chipPadV = unit * 1.4f
+        val textFontSp = with(density) { (unit * 3.1f).toSp() }
+        val actionFontSp = with(density) { (unit * 2.9f).toSp() }
+
+        val pingSuffix = slice.suggestedPingMs?.takeIf { it > 0 }?.let { " · $it ms" } ?: ""
+        val messageText = if (autoSwitchedFrom != null) {
+            val failedLabel = "${autoSwitchedFrom.flag} ${autoSwitchedFrom.name}".trim()
+            val targetSrv = slice.suggestedServer ?: slice.currentServer
+            val targetLabel = "${targetSrv.flag} ${targetSrv.name}".trim()
+            "${config.tr("Máy chủ không mở khóa được vùng:", "Server cannot unlock region:")} $failedLabel. " +
+                "${config.tr("Đã tự chuyển sang máy chủ đo thật:", "Auto-switched to measured server:")} $targetLabel$pingSuffix"
+        } else {
+            val failed = promptServer ?: return@BoxWithConstraints
+            val failedLabel = "${failed.flag} ${failed.name}".trim()
+            val suggested = slice.suggestedServer
+            val baseMsg = "${config.tr("Máy chủ không mở khóa được vùng:", "Server cannot unlock region:")} $failedLabel."
+            if (suggested != null) {
+                val suggestedLabel = "${suggested.flag} ${suggested.name}".trim()
+                "$baseMsg ${config.tr("Gợi ý máy chủ đã đo thật:", "Suggested measured server:")} $suggestedLabel$pingSuffix"
+            } else {
+                "$baseMsg ${config.tr("Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?", "This server cannot unlock the region, switch to another server?")}"
+            }
+        }
+
+        val switchLabel = config.tr("Chuyển máy chủ", "Switch server")
+        val dismissLabel = config.tr("Đóng", "Dismiss")
+
+        Box(
+            modifier = Modifier
+                .padding(start = outerMarginH, end = outerMarginH, bottom = outerMarginBottom)
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(XboxSurface)
+                .border(borderStroke, XboxCardBorder, RoundedCornerShape(cornerRadius))
+                .padding(horizontal = padH, vertical = padV)
+                .testTag("webview_unlock_fail_reminder_banner")
+        ) {
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = messageText,
+                    color = TextPrimary,
+                    fontSize = textFontSp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .weight(1f, fill = true)
+                        .align(Alignment.CenterVertically)
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                ) {
+                    if (autoSwitchedFrom == null && promptServer != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(btnRadius))
+                                .background(XboxNeonGreen)
+                                .clickable {
+                                    val nextServer = VpnManager.confirmSwitchToNextBestServer(context)
+                                    if (nextServer != null && webViewInstance != null) {
+                                        val safeCountry = org.json.JSONObject.quote(nextServer.countryCode)
+                                        val safeIp = org.json.JSONObject.quote(nextServer.ip)
+                                        val safeLocale = org.json.JSONObject.quote(effectiveLocale)
+                                        webViewInstance.evaluateJavascript(
+                                            "window.__lastUnlockSignal = null; if (window.__updateRegionAndLocale) window.__updateRegionAndLocale({ country: $safeCountry, ip: $safeIp, locale: $safeLocale }); location.reload();",
+                                            null
+                                        )
+                                    }
+                                }
+                                .padding(horizontal = chipPadH, vertical = chipPadV)
+                                .testTag("webview_unlock_fail_switch_btn"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = switchLabel,
+                                color = Color.Black,
+                                fontSize = actionFontSp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(btnRadius))
+                            .border(borderStroke, XboxCardBorder, RoundedCornerShape(btnRadius))
+                            .clickable { VpnManager.dismissUnlockFailPrompt() }
+                            .padding(horizontal = chipPadH, vertical = chipPadV)
+                            .testTag("webview_unlock_fail_dismiss_btn"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = dismissLabel,
+                            color = TextSecondary,
+                            fontSize = actionFontSp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 
 

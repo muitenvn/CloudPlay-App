@@ -764,6 +764,8 @@ object RegionalProbeTester {
                 }
             }
             null
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
         } catch (_: Exception) {
             remoteApiCooldownUntilMs.set(System.currentTimeMillis() + 30_000L)
             null

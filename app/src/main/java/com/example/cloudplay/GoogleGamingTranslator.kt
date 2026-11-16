@@ -292,8 +292,10 @@ object GoogleGamingTranslator {
             } else {
                 finalizedText
             }
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
         } catch (e: Exception) {
-            Log.w(TAG, "Google Translate error for text: '$trimmed'", e)
+            Log.w(TAG, "Google Translate error", e)
             rawText
         }
     }

@@ -136,70 +136,71 @@ fun HomeScreen(
         onLaunchGame(game.playUrl)
     }
 
-    val initialHomeGames = remember {
-        Triple(
-            featuredGames.take(18),
-            null as GameBookmark?,
-            emptyList<GameBookmark>()
-        )
+    val gamesByIdLower = remember(featuredGames) {
+        val map = HashMap<String, GameBookmark>(featuredGames.size * 2)
+        for (g in featuredGames) {
+            map.putIfAbsent(g.id.lowercase(java.util.Locale.ROOT), g)
+        }
+        map
     }
-    val computedHomeGames by androidx.compose.runtime.produceState(
-        initialValue = initialHomeGames,
+
+    val computedHomeGames = remember(
         featuredGames,
+        gamesByIdLower,
         favoriteIds,
         repoLastPlayedId,
         playedGameIds,
         recentSessions
     ) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            val topFeatured = if (favoriteIds.isEmpty()) {
-                featuredGames.take(18)
-            } else {
-                val favs = ArrayList<GameBookmark>(18)
-                val nonFavs = ArrayList<GameBookmark>(18)
-                for (g in featuredGames) {
-                    if (g.id in favoriteIds) {
-                        favs.add(g)
-                        if (favs.size >= 18) break
-                    } else if (nonFavs.size < 18) {
-                        nonFavs.add(g)
-                    }
-                }
-                if (favs.size >= 18) favs else (favs + nonFavs).take(18)
-            }
-
-            val playedList = ArrayList<GameBookmark>()
-            val addedIds = HashSet<String>()
-            for (playedId in playedGameIds) {
-                val found = featuredGames.firstOrNull { it.id.equals(playedId, ignoreCase = true) }
-                if (found != null && addedIds.add(found.id.lowercase())) {
-                    playedList.add(found)
+        val topFeatured = if (favoriteIds.isEmpty()) {
+            featuredGames.take(18)
+        } else {
+            val favs = ArrayList<GameBookmark>(18)
+            val nonFavs = ArrayList<GameBookmark>(18)
+            for (g in featuredGames) {
+                if (g.id in favoriteIds) {
+                    favs.add(g)
+                    if (favs.size >= 18) break
+                } else if (nonFavs.size < 18) {
+                    nonFavs.add(g)
                 }
             }
-            val currentLastId = repoLastPlayedId
-            if (currentLastId != null) {
-                val byLast = featuredGames.firstOrNull { it.id.equals(currentLastId, ignoreCase = true) }
-                if (byLast != null && addedIds.add(byLast.id.lowercase())) {
-                    playedList.add(0, byLast)
-                }
-            }
-            for (session in recentSessions) {
-                if (playedList.size >= 16) break
-                val title = session.gameTitle.trim()
-                if (title.isNotBlank()) {
-                    val matched = featuredGames.firstOrNull {
-                        it.title.equals(title, ignoreCase = true) ||
-                            it.title.contains(title, ignoreCase = true) ||
-                            title.contains(it.title, ignoreCase = true)
-                    }
-                    if (matched != null && addedIds.add(matched.id.lowercase())) {
-                        playedList.add(matched)
-                    }
-                }
-            }
-            val lastGame = playedList.firstOrNull()
-            Triple(topFeatured, lastGame, playedList.toList())
+            if (favs.size >= 18) favs else (favs + nonFavs).take(18)
         }
+
+        val playedList = ArrayList<GameBookmark>(16)
+        val addedIds = HashSet<String>(32)
+        for (playedId in playedGameIds) {
+            val key = playedId.lowercase(java.util.Locale.ROOT)
+            val found = gamesByIdLower[key]
+            if (found != null && addedIds.add(key)) {
+                playedList.add(found)
+            }
+        }
+        val currentLastId = repoLastPlayedId
+        if (currentLastId != null) {
+            val key = currentLastId.lowercase(java.util.Locale.ROOT)
+            val byLast = gamesByIdLower[key]
+            if (byLast != null && addedIds.add(key)) {
+                playedList.add(0, byLast)
+            }
+        }
+        for (session in recentSessions) {
+            if (playedList.size >= 16) break
+            val title = session.gameTitle.trim()
+            if (title.isNotBlank()) {
+                val matched = featuredGames.firstOrNull {
+                    it.title.equals(title, ignoreCase = true) ||
+                        it.title.contains(title, ignoreCase = true) ||
+                        title.contains(it.title, ignoreCase = true)
+                }
+                if (matched != null && addedIds.add(matched.id.lowercase(java.util.Locale.ROOT))) {
+                    playedList.add(matched)
+                }
+            }
+        }
+        val lastGame = playedList.firstOrNull()
+        Triple(topFeatured, lastGame, playedList.toList())
     }
     val sortedFeaturedGames = computedHomeGames.first
     val lastPlayedGame = computedHomeGames.second

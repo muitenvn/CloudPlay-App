@@ -63,6 +63,8 @@ import com.example.ui.components.HowToUseGuideDialog
 import com.example.ui.components.SmartTranslatorDialog
 import com.example.ui.components.WebDownloadPortalDialog
 import com.example.ui.components.gamepadClickable
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.vpn.ServerLocation
 import com.example.vpn.VpnManager
@@ -84,7 +86,9 @@ fun TvDashboardScreen(
     val config by SettingsRepository.config.collectAsState()
     val allGames by GameLibraryRepository.games.collectAsState()
     val recentSessions by SessionHistoryRepository.sessions.collectAsState()
-    val streamTelemetry by NetworkOptimizer.telemetry.collectAsState()
+    val streamRttMs by remember {
+        NetworkOptimizer.telemetry.map { it.rttMs }.distinctUntilChanged()
+    }.collectAsState(initial = NetworkOptimizer.telemetry.value.rttMs)
 
     androidx.compose.runtime.DisposableEffect(context) {
         com.example.cloudplay.RemotePadTvServer.startServerIfNeeded(context)
@@ -127,7 +131,7 @@ fun TvDashboardScreen(
             sessions = recentSessions
         ).takeIf { it > 0 }
     }
-    val measuredPingMs: Int? = streamTelemetry.rttMs.takeIf { it > 0 }
+    val measuredPingMs: Int? = streamRttMs.takeIf { it > 0 }
         ?: vpnState.directLatencyMs?.takeIf { it > 0 }
         ?: lastSessionPing
 

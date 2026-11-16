@@ -212,11 +212,6 @@ object VpnManager {
         }
     }
 
-    init {
-        // Initial location check at launch
-        checkCurrentIp(reason = "khởi động", force = true)
-    }
-
     fun init(context: Context) {
         val appCtx = context.applicationContext
         appContext = appCtx
@@ -226,12 +221,21 @@ object VpnManager {
         lastObservedHasVpnTransport = initialNetStatus.hasVpnTransport
         lastStartupMaintenanceAtMs = System.currentTimeMillis()
 
-        // Nạp JSON danh sách máy chủ & lịch sử mở khóa trên Dispatchers.IO, sau đó đo chọn máy chủ và hoãn đồng bộ công cộng 3.5 giây
+        // Nạp JSON danh sách máy chủ & lịch sử mở khóa trên Dispatchers.IO.
+        // Nếu VPN đang bật thì giữ luồng kiểm tra tức thì; nếu VPN đang tắt thì nhường 750ms đầu cho UI & Snapshot Thư viện.
         scope.launch(Dispatchers.IO) {
             loadPersistedServers(appCtx)
             loadPersistedUnlockRecords(appCtx)
+            val isVpnAlreadyActive = _state.value.mode != NetworkMode.DISCONNECTED || initialNetStatus.hasVpnTransport
+            if (!isVpnAlreadyActive) {
+                delay(750L)
+            }
+            checkCurrentIp(reason = "khởi động", force = true)
             ensureInitialOrGeoUpdatedOptimalServer(context = appCtx, force = false)
             if (_state.value.serverPings.isEmpty() && _state.value.serverMeasurements.isEmpty()) {
+                if (!isVpnAlreadyActive) {
+                    delay(600L)
+                }
                 testAllServers(
                     autoPickBest = false,
                     context = appCtx,
@@ -243,7 +247,7 @@ object VpnManager {
             if (!isInGameStreamActive) {
                 autoSyncPublicProxiesIfNeeded(context = appCtx, force = false)
             }
-            delay(1_500L)
+            delay(2_000L)
             if (!isInGameStreamActive) {
                 GeoIpDetector.downloadDbIpLiteIfPermitted(appCtx, isCellularConfirmedByUser = false)
             }
@@ -423,12 +427,15 @@ object VpnManager {
                         "Đã lưu ${mergedLive.size} máy chủ công cộng đã kiểm tra kết nối (mới: +${syncResult.verifiedServers.size}, không phản hồi: ${syncResult.filteredOutErrorCount})"
                     )
                 }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w(TAG, "autoSyncPublicProxiesIfNeeded failed", e)
                 com.example.data.AppLogger.error(
                     "VPN_AUTO",
                     "Đồng bộ máy chủ công cộng thất bại — ${com.example.data.AppLogger.shortThrowable(e)}"
                 )
+            } finally {
                 _state.value = _state.value.copy(
                     isAutoSyncingLiveProxies = false,
                     lastAutoSyncTimestampMs = System.currentTimeMillis()
@@ -589,6 +596,8 @@ object VpnManager {
                         }
                     }
                 }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (_: Exception) {
             }
         }
@@ -662,6 +671,68 @@ object VpnManager {
         }
     }
 
+    @Volatile
+    private var lastUnlockFailServerKey: String = ""
+
+    @Volatile
+    private var consecutiveUnlockFailCount: Int = 0
+
+    private suspend fun findBestMeasuredAlternativeServer(
+        failedServer: ServerLocation
+    ): Pair<ServerLocation, Int>? = withContext(Dispatchers.IO) {
+        val records = _state.value.unlockRecords
+        val all = getAllServers()
+        val eligible = all.filter {
+            !it.addressPortKey.equals(failedServer.addressPortKey, ignoreCase = true) &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+        }
+        val distanceLimited = filterServersWithinDistanceLimit(
+            servers = eligible,
+            geo = _state.value.detectedGeoIp,
+            allowTimezoneFallback = true
+        )
+        val currentPings = _state.value.serverPings
+        val currentMeas = _state.value.serverMeasurements
+
+        val alreadyMeasured = distanceLimited.filter { srv ->
+            val p = currentPings[srv.id]
+            val m = currentMeas[srv.id]
+            p != null && p > 0 && (m == null || m.isReachableAnyPort)
+        }
+        if (alreadyMeasured.isNotEmpty()) {
+            val best = sortServersByUnlockAndPing(alreadyMeasured, currentPings, records).firstOrNull()
+            if (best != null) {
+                val pingVal = currentPings[best.id]
+                if (pingVal != null) return@withContext best to pingVal
+            }
+        }
+
+        // Nếu chưa có máy chủ nào trong danh sách đã đo thật, đo nhanh thực tế 4 ứng viên đầu
+        val probeTargets = sortServersByUnlockAndPing(distanceLimited, currentPings, records).take(4)
+        if (probeTargets.isEmpty()) return@withContext null
+        val gen = measurementGeneration.get()
+        val batchMap = HashMap<String, EndpointPingMeasurement>()
+        probeTargets.map { srv ->
+            async {
+                val m = PingTester.measureServerEndpoint(srv, timeoutMs = 800, useCache = true)
+                synchronized(batchMap) {
+                    batchMap[srv.id] = m
+                }
+            }
+        }.awaitAll()
+        recordBatchMeasurementsIfCurrentGeneration(gen, batchMap)
+        val updatedPings = _state.value.serverPings
+        val newlyMeasured = probeTargets.filter { srv ->
+            val m = batchMap[srv.id]
+            m != null && m.isReachableAnyPort && updatedPings[srv.id] != null
+        }
+        val bestProbed = sortServersByUnlockAndPing(newlyMeasured, updatedPings, _state.value.unlockRecords).firstOrNull()
+            ?: return@withContext null
+        val bestPing = updatedPings[bestProbed.id] ?: return@withContext null
+        bestProbed to bestPing
+    }
+
     /**
      * 2. HỌC TỪ THỰC TẾ: nhận tín hiệu UNLOCK_OK hoặc UNLOCK_FAIL từ XboxBridge
      * Lưu kết quả theo từng máy chủ (khóa theo địa chỉ + cổng), kèm thời điểm.
@@ -671,10 +742,16 @@ object VpnManager {
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
         when (signal.trim().uppercase()) {
             "UNLOCK_OK" -> {
+                lastUnlockFailServerKey = ""
+                consecutiveUnlockFailCount = 0
                 com.example.data.AppLogger.success("UNLOCK", "Mở khóa vùng thành công: ${currentServer.name} (${currentServer.countryCode})")
                 saveServerUnlockRecord(currentServer, RegionUnlockStatus.UNLOCKED, currentServer.countryCode)
                 _state.value = _state.value.copy(
                     unlockFailPromptServer = null,
+                    unlockFailSuggestedServer = null,
+                    unlockFailSuggestedPingMs = null,
+                    unlockFailConsecutiveCount = 0,
+                    unlockFailAutoSwitchedFromServer = null,
                     isBypassActiveInBrowser = true,
                     statusMessage = if (isEn) {
                         "✅ Region unlocked successfully: ${currentServer.name} ${currentServer.flag}"
@@ -684,7 +761,19 @@ object VpnManager {
                 )
             }
             "UNLOCK_FAIL" -> {
-                com.example.data.AppLogger.warn("UNLOCK", "Máy chủ không mở khóa được vùng: ${currentServer.name} (${currentServer.ip}:${currentServer.port})")
+                val srvKey = currentServer.addressPortKey.lowercase()
+                val count = if (srvKey == lastUnlockFailServerKey) {
+                    consecutiveUnlockFailCount + 1
+                } else {
+                    lastUnlockFailServerKey = srvKey
+                    1
+                }
+                consecutiveUnlockFailCount = count
+
+                com.example.data.AppLogger.warn(
+                    "UNLOCK",
+                    "Máy chủ không mở khóa được vùng (lần $count liên tiếp): ${currentServer.name} (${currentServer.ip}:${currentServer.port})"
+                )
                 saveServerUnlockRecord(currentServer, RegionUnlockStatus.FAILED, currentServer.countryCode)
                 val prunedLive = _state.value.liveVerifiedServers.filterNot {
                     it.addressPortKey.equals(currentServer.addressPortKey, ignoreCase = true)
@@ -692,21 +781,94 @@ object VpnManager {
                 if (prunedLive.size != _state.value.liveVerifiedServers.size) {
                     persistLiveVerifiedServers(appContext, prunedLive)
                 }
+
+                // Cập nhật tức thì với máy chủ đã đo thật sẵn có (nếu có) trước khi tìm/đo bổ sung trên IO
+                val existingPings = _state.value.serverPings
+                val existingMeas = _state.value.serverMeasurements
+                val immediateSuggested = sortServersByUnlockAndPing(
+                    filterServersWithinDistanceLimit(
+                        servers = getAllServers().filter {
+                            !it.addressPortKey.equals(currentServer.addressPortKey, ignoreCase = true) &&
+                                getServerUnlockStatus(it, _state.value.unlockRecords) != RegionUnlockStatus.FAILED &&
+                                getServerUnlockStatus(it, _state.value.unlockRecords) != RegionUnlockStatus.WRONG_REGION &&
+                                existingPings[it.id] != null &&
+                                (existingMeas[it.id]?.isReachableAnyPort != false)
+                        },
+                        geo = _state.value.detectedGeoIp,
+                        allowTimezoneFallback = true
+                    ),
+                    existingPings,
+                    _state.value.unlockRecords
+                ).firstOrNull()
+                val immediatePing = immediateSuggested?.let { existingPings[it.id] }
+
                 _state.value = _state.value.copy(
                     liveVerifiedServers = prunedLive,
                     unlockFailPromptServer = currentServer,
+                    unlockFailSuggestedServer = immediateSuggested,
+                    unlockFailSuggestedPingMs = immediatePing,
+                    unlockFailConsecutiveCount = count,
+                    unlockFailAutoSwitchedFromServer = null,
                     statusMessage = if (isEn) {
                         "⚠️ This server cannot unlock the region, switch to another server?"
                     } else {
                         "⚠️ Máy chủ này không mở khóa được, đổi sang máy chủ khác?"
                     }
                 )
+
+                scope.launch {
+                    val measuredPair = findBestMeasuredAlternativeServer(currentServer)
+                    val suggestedSrv = measuredPair?.first
+                    val suggestedPing = measuredPair?.second
+                    val isManual = _state.value.userManuallySelectedServer || currentServer.isCustom
+
+                    if (count >= 2 && !isManual && suggestedSrv != null && suggestedPing != null) {
+                        com.example.data.AppLogger.info(
+                            "UNLOCK",
+                            "Tự động đổi máy chủ (chế độ tự chọn) do ${currentServer.name} không mở khóa được vùng ($count lần liên tiếp) -> chuyển sang máy chủ đã đo thật: ${suggestedSrv.name} (${suggestedSrv.ip}:${suggestedSrv.port}, ${suggestedPing}ms)"
+                        )
+                        lastUnlockFailServerKey = ""
+                        consecutiveUnlockFailCount = 0
+                        selectServer(suggestedSrv, appContext, isManualSelection = false)
+                        _state.value = _state.value.copy(
+                            unlockFailPromptServer = currentServer,
+                            unlockFailSuggestedServer = suggestedSrv,
+                            unlockFailSuggestedPingMs = suggestedPing,
+                            unlockFailConsecutiveCount = count,
+                            unlockFailAutoSwitchedFromServer = currentServer
+                        )
+                    } else {
+                        if (count >= 2 && isManual) {
+                            val suggestLabel = if (suggestedSrv != null && suggestedPing != null) {
+                                "${suggestedSrv.name} (${suggestedPing}ms)"
+                            } else {
+                                "chưa có máy chủ đo được"
+                            }
+                            com.example.data.AppLogger.info(
+                                "UNLOCK",
+                                "Giữ nguyên máy chủ ${currentServer.name} vì người dùng đang chọn thủ công (không mở khóa được vùng $count lần liên tiếp); gợi ý máy chủ đã đo thật: $suggestLabel"
+                            )
+                        }
+                        if (_state.value.unlockFailPromptServer?.addressPortKey == currentServer.addressPortKey) {
+                            _state.value = _state.value.copy(
+                                unlockFailSuggestedServer = suggestedSrv ?: _state.value.unlockFailSuggestedServer,
+                                unlockFailSuggestedPingMs = suggestedPing ?: _state.value.unlockFailSuggestedPingMs,
+                                unlockFailConsecutiveCount = count
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
     fun dismissUnlockFailPrompt() {
-        _state.value = _state.value.copy(unlockFailPromptServer = null)
+        _state.value = _state.value.copy(
+            unlockFailPromptServer = null,
+            unlockFailSuggestedServer = null,
+            unlockFailSuggestedPingMs = null,
+            unlockFailAutoSwitchedFromServer = null
+        )
     }
 
     // ==================== HẰNG SỐ CHẤM ĐIỂM & CHỌN MÁY CHỦ (MỤC 4, 5, 6) ====================
@@ -1588,16 +1750,15 @@ object VpnManager {
                         onPickedBest?.invoke(_state.value.currentServer, currentSrvPing)
                     }
                 }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) {
-                    com.example.data.AppLogger.warn("PING", "Đợt đo #$myGeneration đã dừng sớm (chuyển đợt mới hoặc vào game)")
-                } else {
-                    Log.w(TAG, "testAllServers interrupted", e)
-                    com.example.data.AppLogger.error(
-                        "PING",
-                        "Lỗi trong đợt đo #$myGeneration — ${com.example.data.AppLogger.shortThrowable(e)}"
-                    )
-                }
+                Log.w(TAG, "testAllServers interrupted", e)
+                com.example.data.AppLogger.error(
+                    "PING",
+                    "Lỗi trong đợt đo #$myGeneration — ${com.example.data.AppLogger.shortThrowable(e)}"
+                )
+            } finally {
                 if (myGeneration == measurementGeneration.get()) {
                     _state.value = _state.value.copy(isTestingPings = false)
                 }
@@ -1720,11 +1881,16 @@ object VpnManager {
 
     /**
      * 5. TỰ CHUYỂN: khi người dùng xác nhận thông báo "Máy chủ này không mở khóa được, đổi sang máy chủ khác?",
-     * chuyển sang máy chủ tốt nhất kế tiếp (không chọn máy chủ "Không mở khóa" hoặc "Sai vùng").
+     * ưu tiên chuyển sang máy chủ đã đo thật (`unlockFailSuggestedServer`), không chọn máy chủ "Không mở khóa" hoặc "Sai vùng".
      */
     fun confirmSwitchToNextBestServer(context: Context? = null): ServerLocation? {
         val current = _state.value.currentServer
         val records = _state.value.unlockRecords
+        val preSuggested = _state.value.unlockFailSuggestedServer?.takeIf {
+            !it.addressPortKey.equals(current.addressPortKey, ignoreCase = true) &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.FAILED &&
+                getServerUnlockStatus(it, records) != RegionUnlockStatus.WRONG_REGION
+        }
         val all = getAllServers()
 
         // Lọc bỏ máy chủ đang lỗi, các máy chủ "Không mở khóa" / "Sai vùng", và giới hạn khoảng cách (<= 5.500 km)
@@ -1739,24 +1905,34 @@ object VpnManager {
             allowTimezoneFallback = true
         )
 
+        val currentPings = _state.value.serverPings
+        val measuredEligible = distanceLimitedEligible.filter { currentPings[it.id] != null }
         val sortedPool = sortServersByUnlockAndPing(
-            distanceLimitedEligible,
-            _state.value.serverPings,
+            if (measuredEligible.isNotEmpty()) measuredEligible else distanceLimitedEligible,
+            currentPings,
             records
         )
-        val bestNext = sortedPool.firstOrNull() ?: return null
+        val bestNext = preSuggested ?: sortedPool.firstOrNull() ?: return null
+        val wasManual = _state.value.userManuallySelectedServer
+
+        lastUnlockFailServerKey = ""
+        consecutiveUnlockFailCount = 0
 
         val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
         _state.value = _state.value.copy(
             currentServer = bestNext,
             unlockFailPromptServer = null,
+            unlockFailSuggestedServer = null,
+            unlockFailSuggestedPingMs = null,
+            unlockFailConsecutiveCount = 0,
+            unlockFailAutoSwitchedFromServer = null,
             statusMessage = if (isEn) {
                 "🔄 Switched to next best server: ${bestNext.name} ${bestNext.flag}"
             } else {
                 "🔄 Đã chuyển sang máy chủ tốt nhất kế tiếp: ${bestNext.name} ${bestNext.flag}"
             }
         )
-        selectServer(bestNext, context ?: appContext, isManualSelection = false)
+        selectServer(bestNext, context ?: appContext, isManualSelection = wasManual)
         return bestNext
     }
 
@@ -2304,7 +2480,7 @@ object VpnManager {
                 updateSmartDecision(result)
             } else {
                 isIpInvalidatedByNetworkChange = false
-                com.example.data.AppLogger.error(
+                com.example.data.AppLogger.warn(
                     "VPN",
                     "Kiểm tra IP thất bại (ngoại tuyến hoặc tất cả nguồn GeoIP không phản hồi)"
                 )
@@ -2605,9 +2781,15 @@ object VpnManager {
             isXboxSupported = true,
             isFromWebView = true
         )
+        lastUnlockFailServerKey = ""
+        consecutiveUnlockFailCount = 0
         _state.value = _state.value.copy(
             isBypassActiveInBrowser = true,
             unlockFailPromptServer = null,
+            unlockFailSuggestedServer = null,
+            unlockFailSuggestedPingMs = null,
+            unlockFailConsecutiveCount = 0,
+            unlockFailAutoSwitchedFromServer = null,
             detectedGeoIp = spoofGeo,
             smartVpnPhase = SmartVpnPhase.BYPASS_ACTIVE,
             statusMessage = if (isEn) {
@@ -2629,6 +2811,9 @@ object VpnManager {
             isConnecting = true,
             currentServer = server,
             unlockFailPromptServer = null,
+            unlockFailSuggestedServer = null,
+            unlockFailSuggestedPingMs = null,
+            unlockFailAutoSwitchedFromServer = null,
             lastError = null,
             statusMessage = if (isEn) "Connecting to ${server.name} ${server.flag}..." else "Đang kết nối tới ${server.name} ${server.flag}..."
         )

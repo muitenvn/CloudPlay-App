@@ -160,6 +160,8 @@ object LiveProxyFetcher {
                             }
                         }
                         conn.disconnect()
+                    } catch (ce: kotlinx.coroutines.CancellationException) {
+                        throw ce
                     } catch (_: Exception) {
                     }
                 }
@@ -225,6 +227,8 @@ object LiveProxyFetcher {
                                     }
                                 }
                                 conn.disconnect()
+                            } catch (ce: kotlinx.coroutines.CancellationException) {
+                                throw ce
                             } catch (_: Exception) {
                             }
                         }

@@ -888,83 +888,76 @@ object SettingsRepository {
     private val _config = MutableStateFlow(AppConfig())
     val config: StateFlow<AppConfig> = _config.asStateFlow()
 
+    private const val CURRENT_SETTINGS_MIGRATION_VERSION = 1
+
     fun init(context: Context) {
         val sp = context.getSharedPreferences("cloudplay_settings_store", Context.MODE_PRIVATE)
         prefs = sp
 
-        val hasMigratedUnifiedSwitches = sp.getBoolean("migrated_unified_switches_v1", false)
-        val rawSmartVpn = sp.getBoolean("smart_vpn_enabled", true)
-        val rawAutoBypass = sp.getBoolean("auto_bypass_enabled", true)
-        val rawLowEnd = sp.getBoolean("low_end_device_mode", false)
-        val rawGpuReduction = sp.getBoolean("gpu_load_reduction_enabled", true)
-
-        val effectiveSmartVpn = if (!hasMigratedUnifiedSwitches) (rawSmartVpn || rawAutoBypass) else rawSmartVpn
-        val effectiveAutoBypass = rawAutoBypass
-        // Phản biện mục 1: gpu_load_reduction_enabled mặc định là true cho mọi máy, nếu dùng phép HOẶC sẽ ép mọi thiết bị bật lowEndDeviceMode (khóa 5 Mbps, 720p, tắt dịch). Do đó lấy theo rawLowEnd.
-        val effectiveLowEnd = rawLowEnd
-        val effectiveGpuReduction = if (!hasMigratedUnifiedSwitches) rawLowEnd else rawGpuReduction
-
-        if (!hasMigratedUnifiedSwitches) {
-            sp.edit()
-                .putBoolean("smart_vpn_enabled", effectiveSmartVpn)
-                .putBoolean("auto_bypass_enabled", effectiveAutoBypass)
-                .putBoolean("low_end_device_mode", effectiveLowEnd)
-                .putBoolean("gpu_load_reduction_enabled", effectiveGpuReduction)
-                .putBoolean("migrated_unified_switches_v1", true)
-                .apply()
-        }
-
-        // Mục 7d: Migration 1 lần đưa thị trường đã lưu khác en-US từ bản cũ về en-US
-        val hasMigratedXboxMarket = sp.getBoolean("migrated_xbox_market_en_us_v1", false)
-        if (!hasMigratedXboxMarket) {
-            val savedLocale = sp.getString("custom_locale", "en-US") ?: "en-US"
-            val savedUseSystem = sp.getBoolean("use_system_language", true)
-            if (!savedUseSystem || !savedLocale.equals("en-US", ignoreCase = true)) {
-                sp.edit()
-                    .putBoolean("use_system_language", true)
-                    .putString("custom_locale", "en-US")
-                    .putBoolean("migrated_xbox_market_en_us_v1", true)
-                    .apply()
-            } else {
-                sp.edit().putBoolean("migrated_xbox_market_en_us_v1", true).apply()
-            }
-        }
+        var effectiveSmartVpn = sp.getBoolean("smart_vpn_enabled", true)
+        val effectiveAutoBypass = sp.getBoolean("auto_bypass_enabled", true)
+        val effectiveLowEnd = sp.getBoolean("low_end_device_mode", false)
+        var effectiveGpuReduction = sp.getBoolean("gpu_load_reduction_enabled", true)
 
         val resolvedAppLanguage = try {
             AppLanguage.valueOf(sp.getString("app_language", AppLanguage.SYSTEM.name) ?: AppLanguage.SYSTEM.name)
         } catch (_: Exception) { AppLanguage.SYSTEM }
 
-        // Mục 8: Migration ngôn ngữ dịch giao diện Xbox:
-        // Người dùng cũ giữ "vi" (nếu xcloudTranslateEnabled đang tắt thì giữ tắt);
-        // Người dùng mới mặc định theo ngôn ngữ app, nếu app tiếng Anh thì tắt.
-        val hasMigratedTranslateLang = sp.getBoolean("migrated_translate_lang_v1", false)
-        if (!hasMigratedTranslateLang) {
-            val isExistingUser = sp.contains("xcloud_translate") || sp.contains("app_language") || sp.contains("smart_vpn_enabled") && hasMigratedUnifiedSwitches
-            if (isExistingUser && (sp.contains("xcloud_translate") || sp.contains("app_language"))) {
-                val oldEnabled = sp.getBoolean("xcloud_translate", true)
-                val targetLang = sp.getString("translate_language", null)?.ifBlank { "vi" } ?: "vi"
-                sp.edit()
-                    .putBoolean("xcloud_translate", oldEnabled)
-                    .putString("translate_language", targetLang)
-                    .putBoolean("migrated_translate_lang_v1", true)
-                    .apply()
-            } else {
-                val effAppCode = resolvedAppLanguage.effectiveLanguageCode()
-                if (effAppCode == "en") {
-                    sp.edit()
-                        .putBoolean("xcloud_translate", false)
-                        .putString("translate_language", "OFF")
-                        .putBoolean("migrated_translate_lang_v1", true)
-                        .apply()
-                } else {
-                    val defaultTarget = resolvedAppLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
-                    sp.edit()
-                        .putBoolean("xcloud_translate", true)
-                        .putString("translate_language", defaultTarget)
-                        .putBoolean("migrated_translate_lang_v1", true)
-                        .apply()
-                }
+        val savedMigrationVersion = sp.getInt("settings_migration_version", 0)
+        if (savedMigrationVersion < CURRENT_SETTINGS_MIGRATION_VERSION) {
+            val hasMigratedUnifiedSwitches = sp.getBoolean("migrated_unified_switches_v1", false)
+            val hasMigratedXboxMarket = sp.getBoolean("migrated_xbox_market_en_us_v1", false)
+            val hasMigratedTranslateLang = sp.getBoolean("migrated_translate_lang_v1", false)
+
+            val editor = sp.edit()
+            if (!hasMigratedUnifiedSwitches) {
+                effectiveSmartVpn = effectiveSmartVpn || effectiveAutoBypass
+                // Phản biện mục 1: gpu_load_reduction_enabled mặc định là true cho mọi máy, nếu dùng phép HOẶC sẽ ép mọi thiết bị bật lowEndDeviceMode (khóa 5 Mbps, 720p, tắt dịch). Do đó lấy theo rawLowEnd.
+                effectiveGpuReduction = effectiveLowEnd
+                editor
+                    .putBoolean("smart_vpn_enabled", effectiveSmartVpn)
+                    .putBoolean("auto_bypass_enabled", effectiveAutoBypass)
+                    .putBoolean("low_end_device_mode", effectiveLowEnd)
+                    .putBoolean("gpu_load_reduction_enabled", effectiveGpuReduction)
+                    .putBoolean("migrated_unified_switches_v1", true)
             }
+
+            if (!hasMigratedXboxMarket) {
+                val savedLocale = sp.getString("custom_locale", "en-US") ?: "en-US"
+                val savedUseSystem = sp.getBoolean("use_system_language", true)
+                if (!savedUseSystem || !savedLocale.equals("en-US", ignoreCase = true)) {
+                    editor
+                        .putBoolean("use_system_language", true)
+                        .putString("custom_locale", "en-US")
+                }
+                editor.putBoolean("migrated_xbox_market_en_us_v1", true)
+            }
+
+            if (!hasMigratedTranslateLang) {
+                val isExistingUser = sp.contains("xcloud_translate") || sp.contains("app_language") || (sp.contains("smart_vpn_enabled") && hasMigratedUnifiedSwitches)
+                if (isExistingUser && (sp.contains("xcloud_translate") || sp.contains("app_language"))) {
+                    val oldEnabled = sp.getBoolean("xcloud_translate", true)
+                    val targetLang = sp.getString("translate_language", null)?.ifBlank { "vi" } ?: "vi"
+                    editor
+                        .putBoolean("xcloud_translate", oldEnabled)
+                        .putString("translate_language", targetLang)
+                } else {
+                    val effAppCode = resolvedAppLanguage.effectiveLanguageCode()
+                    if (effAppCode == "en") {
+                        editor
+                            .putBoolean("xcloud_translate", false)
+                            .putString("translate_language", "OFF")
+                    } else {
+                        val defaultTarget = resolvedAppLanguage.resolveTranslateTargetCode().ifBlank { "vi" }
+                        editor
+                            .putBoolean("xcloud_translate", true)
+                            .putString("translate_language", defaultTarget)
+                    }
+                }
+                editor.putBoolean("migrated_translate_lang_v1", true)
+            }
+
+            editor.putInt("settings_migration_version", CURRENT_SETTINGS_MIGRATION_VERSION).apply()
         }
 
         val loaded = AppConfig(

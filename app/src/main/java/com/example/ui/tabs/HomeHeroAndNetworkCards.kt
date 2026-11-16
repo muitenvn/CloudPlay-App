@@ -58,6 +58,8 @@ import com.example.ui.theme.GoldStar
 import com.example.ui.theme.JapanRed
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.WarningAmber
@@ -91,8 +93,6 @@ internal fun HeroConsolePlayDeck(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val config by SettingsRepository.config.collectAsState()
-    val recentSessions by SessionHistoryRepository.sessions.collectAsState()
-    val streamTelemetry by com.example.cloudplay.NetworkOptimizer.telemetry.collectAsState()
 
     val heroBannerRequest = remember(context) {
         coil.request.ImageRequest.Builder(context)
@@ -102,16 +102,6 @@ internal fun HeroConsolePlayDeck(
             .crossfade(false)
             .build()
     }
-
-    val lastSessionPing = com.example.vpn.VpnManager.getLastSessionPingForServer(
-        server = vpnState.currentServer,
-        sessions = recentSessions
-    ).takeIf { it > 0 }
-    val pingMs = streamTelemetry.rttMs.takeIf { it > 0 }
-        ?: vpnState.directLatencyMs?.takeIf { it > 0 }
-        ?: lastSessionPing
-    val pingSuffix = if (pingMs != null && pingMs > 0) " · $pingMs ms" else ""
-    val statusText = "${config.tr("Sẵn sàng", "Ready")} · ${vpnState.currentServer.name}$pingSuffix"
 
     BoxWithConstraints(
         modifier = Modifier
@@ -164,14 +154,9 @@ internal fun HeroConsolePlayDeck(
                             .clip(CircleShape)
                             .background(XboxNeonGreen)
                     )
-                    Text(
-                        text = statusText,
-                        color = TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    HeroStatusPillText(
+                        vpnState = vpnState,
+                        readyLabel = config.tr("Sẵn sàng", "Ready")
                     )
                 }
 
@@ -359,6 +344,39 @@ internal fun HeroConsolePlayDeck(
             }
         }
     }
+}
+
+@Composable
+private fun HeroStatusPillText(
+    vpnState: VpnConnectionState,
+    readyLabel: String
+) {
+    val recentSessions by SessionHistoryRepository.sessions.collectAsState()
+    val streamRttMs by remember {
+        com.example.cloudplay.NetworkOptimizer.telemetry.map { it.rttMs }.distinctUntilChanged()
+    }.collectAsState(initial = com.example.cloudplay.NetworkOptimizer.telemetry.value.rttMs)
+
+    val lastSessionPing = remember(vpnState.currentServer, recentSessions) {
+        com.example.vpn.VpnManager.getLastSessionPingForServer(
+            server = vpnState.currentServer,
+            sessions = recentSessions
+        ).takeIf { it > 0 }
+    }
+    val pingMs = streamRttMs.takeIf { it > 0 }
+        ?: vpnState.directLatencyMs?.takeIf { it > 0 }
+        ?: lastSessionPing
+    val pingSuffix = if (pingMs != null && pingMs > 0) " · $pingMs ms" else ""
+    val statusText = "$readyLabel · ${vpnState.currentServer.name}$pingSuffix"
+
+    Text(
+        text = statusText,
+        color = TextPrimary,
+        fontFamily = SpaceGroteskFontFamily,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable

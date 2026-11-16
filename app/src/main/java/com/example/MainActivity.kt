@@ -349,6 +349,7 @@ fun MainContent(
 
     LaunchedEffect(config.userAcceptedTerms, config.autoCheckUpdatesOnLaunch) {
         if (config.userAcceptedTerms && config.autoCheckUpdatesOnLaunch) {
+            kotlinx.coroutines.delay(4_000L)
             com.example.data.UpdateChecker.checkOnAppLaunchIfNeeded(context)
         }
     }

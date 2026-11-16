@@ -350,6 +350,10 @@ object GameLibraryRepository {
     private var recentPrefs: SharedPreferences? = null
     @Volatile
     private var syncedGamesCacheFile: java.io.File? = null
+    @Volatile
+    private var mergedGamesSnapshotFile: java.io.File? = null
+    private const val MERGED_GAMES_SNAPSHOT_FILE_NAME = "merged_games_snapshot_v1.json"
+    private const val MERGED_SNAPSHOT_SCHEMA_VERSION = 1
     private val cacheFileLock = Any()
     @Volatile
     private var userModifiedFavoritesEarly = false
@@ -420,6 +424,7 @@ object GameLibraryRepository {
             initStarted = true
             val appCtx = context.applicationContext
             syncedGamesCacheFile = java.io.File(appCtx.filesDir, SYNCED_GAMES_CACHE_FILE_NAME)
+            mergedGamesSnapshotFile = java.io.File(appCtx.filesDir, MERGED_GAMES_SNAPSHOT_FILE_NAME)
             // Gán tham chiếu SharedPreferences ngay lập tức (<0.2ms, không chờ nạp XML) để các hàm gọi sớm
             // như toggleFavorite / recordLastPlayed luôn có đối tượng prefs hợp lệ.
             val sharedPrefs = appCtx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -428,12 +433,6 @@ object GameLibraryRepository {
             recentPrefs = legacyRecentPrefs
             _isLoadingInitialCatalog.value = true
             ioScope.launch {
-                // Khởi tạo sẵn Coil ImageLoader trên luồng IO để lần gọi AsyncImage đầu tiên trên UI không bị chặn
-                try {
-                    coil.Coil.imageLoader(appCtx)
-                } catch (_: Throwable) {
-                }
-
                 val t0 = android.os.SystemClock.elapsedRealtime()
                 // Chờ SharedPreferencesImpl nạp xong file XML trên luồng IO thay vì chặn luồng chính
                 val savedFavs = sharedPrefs.getStringSet(KEY_FAVORITE_IDS, emptySet()) ?: emptySet()
@@ -484,38 +483,88 @@ object GameLibraryRepository {
                     lastSyncTimeMs = lastSyncMs
                 )
 
-                val customList: List<GameBookmark>
-                val syncedList: List<GameBookmark>
+                var activeCatalogList: List<GameBookmark> = emptyList()
                 try {
                     val tParseStart = android.os.SystemClock.elapsedRealtime()
-                    val earlyDiscovered = _games.value.filter { !it.id.startsWith("custom_") }
-                    customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
-                    val diskSynced = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
-                    syncedList = (diskSynced + earlyDiscovered)
-                        .distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
-                    val tParseEnd = android.os.SystemClock.elapsedRealtime()
-                    rebuildMergedGames(customList, syncedList)
-                    initialDiskLoadCompleted = true
-                    val tMergeEnd = android.os.SystemClock.elapsedRealtime()
-                    PerformanceMonitor.recordInitMilestone(
-                        "GameLibraryRepository (IO): xmlLoad=${tAfterPrefsAwait - t0}ms, jsonParse=${tParseEnd - tParseStart}ms, merge=${tMergeEnd - tParseEnd}ms (tổng=${_games.value.size} game)"
-                    )
+                    val earlyDiscovered = _games.value.filter {
+                        !it.id.startsWith("custom_") && INITIAL_XBOX_GAMES.none { initG -> initG.id == it.id }
+                    }
+                    val expectedFingerprint = computeCatalogSourcesFingerprint(sharedPrefs)
+                    val snapshot = loadMergedSnapshotFromDisk()
+
+                    if (snapshot != null && snapshot.games.isNotEmpty()) {
+                        // Hiển thị ngay danh sách đã gộp từ snapshot (bỏ qua chuẩn hóa & phân loại lại)
+                        _games.value = snapshot.games
+                        _xboxStatus.value = _xboxStatus.value.copy(
+                            syncedCatalogCount = snapshot.games.size,
+                            totalCloudCatalogCount = _xboxStatus.value.totalCloudCatalogCount.coerceAtLeast(snapshot.games.size)
+                        )
+                        activeCatalogList = snapshot.games
+                        initialDiskLoadCompleted = true
+                        _isLoadingInitialCatalog.value = false
+                        val tSnapEnd = android.os.SystemClock.elapsedRealtime()
+                        PerformanceMonitor.recordInitMilestone(
+                            "GameLibraryRepository (Snapshot): xmlLoad=${tAfterPrefsAwait - t0}ms, snapshotLoad=${tSnapEnd - tParseStart}ms (tổng=${snapshot.games.size} game, khớpVânTay=${snapshot.fingerprint == expectedFingerprint})"
+                        )
+
+                        // Nếu dấu vân tay thay đổi hoặc có game phát hiện sớm thì cập nhật ngầm
+                        if (snapshot.fingerprint != expectedFingerprint || earlyDiscovered.isNotEmpty()) {
+                            val customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
+                            val diskSynced = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
+                            val syncedList = if (earlyDiscovered.isEmpty()) {
+                                diskSynced
+                            } else {
+                                (diskSynced + earlyDiscovered).distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                            }
+                            if (customList.isNotEmpty() || syncedList.isNotEmpty()) {
+                                rebuildMergedGames(customList, syncedList, itemsAlreadyClassified = true)
+                                saveMergedSnapshotToDisk(_games.value, computeCatalogSourcesFingerprint(sharedPrefs))
+                                activeCatalogList = _games.value
+                            }
+                        }
+                    } else {
+                        // Snapshot chưa có hoặc bị hỏng -> tự dựng lại từ nguồn gốc, đảm bảo thư viện không bao giờ trống
+                        val customList = loadGamesArrayFromPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON)
+                        val diskSynced = loadSyncedGamesFromFileOrMigratePrefs(sharedPrefs)
+                        val syncedList = if (earlyDiscovered.isEmpty()) {
+                            diskSynced
+                        } else {
+                            (diskSynced + earlyDiscovered).distinctBy { extractProductId(it.playUrl).ifBlank { it.id } }
+                        }
+                        val tParseEnd = android.os.SystemClock.elapsedRealtime()
+                        rebuildMergedGames(customList, syncedList, itemsAlreadyClassified = true)
+                        initialDiskLoadCompleted = true
+                        val freshFingerprint = computeCatalogSourcesFingerprint(sharedPrefs)
+                        saveMergedSnapshotToDisk(_games.value, freshFingerprint)
+                        activeCatalogList = _games.value
+                        val tMergeEnd = android.os.SystemClock.elapsedRealtime()
+                        PerformanceMonitor.recordInitMilestone(
+                            "GameLibraryRepository (Rebuild): xmlLoad=${tAfterPrefsAwait - t0}ms, jsonParse=${tParseEnd - tParseStart}ms, merge=${tMergeEnd - tParseEnd}ms (tổng=${_games.value.size} game)"
+                        )
+                    }
                 } finally {
                     initialDiskLoadCompleted = true
                     _isLoadingInitialCatalog.value = false
                 }
 
+                // Khởi tạo Coil ImageLoader sau khi đã nạp xong danh mục để không tranh chấp IO/CPU lúc khởi động
+                try {
+                    coil.Coil.imageLoader(appCtx)
+                } catch (_: Throwable) {
+                }
+
+                val syncedNonCustom = activeCatalogList.filter { !it.id.startsWith("custom_") }
                 val now = System.currentTimeMillis()
-                val missingCoverArt = syncedList.any { it.imageUrl.isNullOrBlank() }
+                val missingCoverArt = syncedNonCustom.any { it.imageUrl.isNullOrBlank() }
                 val targetMinSynced = (savedTotalCloud.coerceAtMost(550) - 20).coerceAtLeast(0)
-                val isCatalogTooSmall = syncedList.size < 120
-                val needsAutoFullScan = syncedList.isEmpty() ||
+                val isCatalogTooSmall = syncedNonCustom.size < 120
+                val needsAutoFullScan = syncedNonCustom.isEmpty() ||
                     missingCoverArt ||
                     isCatalogTooSmall ||
-                    (targetMinSynced > 0 && syncedList.size < targetMinSynced) ||
+                    (targetMinSynced > 0 && syncedNonCustom.size < targetMinSynced) ||
                     (now - lastSyncMs) > 6 * 3600 * 1000L
                 if (needsAutoFullScan) {
-                    kotlinx.coroutines.delay(if (isCatalogTooSmall) 300L else 3_500L)
+                    kotlinx.coroutines.delay(if (isCatalogTooSmall) 2_500L else 5_500L)
                     if (!isStreamActive && !com.example.vpn.VpnManager.isStreamActive()) {
                         syncLiveXboxCatalog(
                             force = missingCoverArt || isCatalogTooSmall,
@@ -529,7 +578,8 @@ object GameLibraryRepository {
 
     private fun rebuildMergedGames(
         customList: List<GameBookmark>,
-        syncedList: List<GameBookmark>
+        syncedList: List<GameBookmark>,
+        itemsAlreadyClassified: Boolean = false
     ) {
         val existingIds = HashSet<String>((customList.size + syncedList.size) * 2)
         val existingProductIds = HashSet<String>((customList.size + syncedList.size) * 2)
@@ -543,12 +593,18 @@ object GameLibraryRepository {
             if (!isCustom && pid.isBlank() && item.playUrl.contains("play.xbox.com", ignoreCase = true)) {
                 return
             }
-            val normalizedPlayUrl = normalizeToClassicGameUrl(item.playUrl, item.title)
-            val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
             if (existingIds.contains(idKey)) return
             if (pid.isNotBlank() && existingProductIds.contains(pid)) return
             existingIds.add(idKey)
             if (pid.isNotBlank()) existingProductIds.add(pid)
+
+            if (itemsAlreadyClassified && item.drawableResId == null) {
+                merged.add(item)
+                return
+            }
+
+            val normalizedPlayUrl = normalizeToClassicGameUrl(item.playUrl, item.title)
+            val isFortnite = idKey == "fortnite" || pid.equals(FORTNITE_PRODUCT_ID, ignoreCase = true)
 
             val trulyFree = isFreeToPlayTitle(item.title, pid, normalizedPlayUrl) || (isCustom && item.freeToPlay)
             val trulyTouch = if (isCustom) item.supportsTouch else isTouchSupportedTitle(pid, normalizedPlayUrl)
@@ -2134,10 +2190,112 @@ object GameLibraryRepository {
         }
     }
 
+    private data class MergedCatalogSnapshot(
+        val version: Int,
+        val fingerprint: String,
+        val games: List<GameBookmark>
+    )
+
+    private fun computeCatalogSourcesFingerprint(sharedPrefs: SharedPreferences): String {
+        val customJson = try {
+            sharedPrefs.getString(KEY_CUSTOM_GAMES_JSON, "") ?: ""
+        } catch (_: Exception) {
+            ""
+        }
+        val cacheFile = syncedGamesCacheFile
+        val fileLen = if (cacheFile != null && cacheFile.exists()) cacheFile.length() else -1L
+        val fileMod = if (cacheFile != null && cacheFile.exists()) cacheFile.lastModified() else -1L
+        val legacyLen = try {
+            (sharedPrefs.getString(KEY_SYNCED_GAMES_JSON, "") ?: "").length
+        } catch (_: Exception) {
+            0
+        }
+        val genreRuleHash = cachedFreeToPlayIds.size * 31 +
+            cachedTouchIds.size * 97 +
+            cachedPopularIds.size * 193 +
+            cachedRecentIds.size * 389 +
+            cachedShooterIds.size * 769 +
+            cachedRpgIds.size * 1543
+        return "v${MERGED_SNAPSHOT_SCHEMA_VERSION}_c${customJson.hashCode()}_l${fileLen}_m${fileMod}_p${legacyLen}_g${genreRuleHash}"
+    }
+
+    private fun loadMergedSnapshotFromDisk(): MergedCatalogSnapshot? {
+        val snapshotFile = mergedGamesSnapshotFile ?: return null
+        if (!snapshotFile.exists() || snapshotFile.length() <= 16L) return null
+        return try {
+            val rawText = synchronized(cacheFileLock) {
+                snapshotFile.readText(Charsets.UTF_8)
+            }
+            if (rawText.isBlank()) return null
+            val root = JSONObject(rawText)
+            val version = root.optInt("version", -1)
+            if (version != MERGED_SNAPSHOT_SCHEMA_VERSION) return null
+            val fingerprint = root.optString("fingerprint", "")
+            val gamesArr = root.optJSONArray("games") ?: return null
+            val list = ArrayList<GameBookmark>(gamesArr.length())
+            for (i in 0 until gamesArr.length()) {
+                val obj = gamesArr.optJSONObject(i) ?: continue
+                val id = obj.optString("id", "").trim()
+                val title = obj.optString("title", "").trim()
+                val playUrl = obj.optString("playUrl", "").trim()
+                if (id.isBlank() || title.isBlank() || playUrl.isBlank()) continue
+                val catVi = obj.optString("category", "Hành động & Phiêu lưu")
+                val catEn = obj.optString("categoryEn", catVi)
+                list.add(
+                    GameBookmark(
+                        id = id,
+                        title = title,
+                        category = catVi,
+                        categoryEn = catEn,
+                        playUrl = playUrl,
+                        freeToPlay = obj.optBoolean("freeToPlay", false),
+                        supportsTouch = obj.optBoolean("supportsTouch", false),
+                        accentColorHex = obj.optLong("accentColorHex", 0xFF107C10L),
+                        badge = obj.optString("badge", "").takeIf { it.isNotBlank() },
+                        badgeEn = obj.optString("badgeEn", "").takeIf { it.isNotBlank() },
+                        drawableResId = null,
+                        rating = obj.optString("rating", "4.8"),
+                        imageUrl = obj.optString("imageUrl", "").takeIf { it.isNotBlank() },
+                        heroImageUrl = obj.optString("heroImageUrl", "").takeIf { it.isNotBlank() },
+                        description = obj.optString("description", "").takeIf { it.isNotBlank() },
+                        publisher = obj.optString("publisher", "").takeIf { it.isNotBlank() },
+                        isPopular = obj.optBoolean("isPopular", false),
+                        isRecentlyAdded = obj.optBoolean("isRecentlyAdded", false)
+                    )
+                )
+            }
+            if (list.isEmpty()) null else MergedCatalogSnapshot(version, fingerprint, list)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun saveMergedSnapshotToDisk(gamesList: List<GameBookmark>, explicitFingerprint: String? = null) {
+        val snapshotFile = mergedGamesSnapshotFile ?: return
+        val sharedPrefs = prefs ?: return
+        if (gamesList.isEmpty()) return
+        try {
+            val fp = explicitFingerprint ?: computeCatalogSourcesFingerprint(sharedPrefs)
+            val arr = serializeGamesListToJsonArray(gamesList) ?: return
+            val root = JSONObject().apply {
+                put("version", MERGED_SNAPSHOT_SCHEMA_VERSION)
+                put("fingerprint", fp)
+                put("games", arr)
+            }
+            writeTextAtomically(snapshotFile, root.toString())
+        } catch (_: Exception) {
+        }
+    }
+
     private fun saveCustomGames(allGames: List<GameBookmark>) {
         val sharedPrefs = prefs ?: return
         val customGames = allGames.filter { it.id.startsWith("custom_") }
         saveGamesListToPrefs(sharedPrefs, KEY_CUSTOM_GAMES_JSON, customGames)
+        if (initialDiskLoadCompleted) {
+            ioScope.launch {
+                saveMergedSnapshotToDisk(allGames)
+            }
+        }
     }
 
     private fun saveSyncedGames(allGames: List<GameBookmark>) {
@@ -2173,11 +2331,13 @@ object GameLibraryRepository {
                             sp.edit().remove(KEY_SYNCED_GAMES_JSON).apply()
                         }
                     }
+                    saveMergedSnapshotToDisk(_games.value)
                     return@launch
                 } catch (_: Exception) {
                 }
             }
             prefs?.edit()?.putString(KEY_SYNCED_GAMES_JSON, jsonStr)?.apply()
+            saveMergedSnapshotToDisk(_games.value)
         }
     }
 
@@ -2186,7 +2346,7 @@ object GameLibraryRepository {
         sharedPrefs.edit().putString(key, jsonStr).apply()
     }
 
-    private fun serializeGamesListToJson(gamesList: List<GameBookmark>): String? {
+    private fun serializeGamesListToJsonArray(gamesList: List<GameBookmark>): JSONArray? {
         return try {
             val arr = JSONArray()
             for (game in gamesList) {
@@ -2211,10 +2371,14 @@ object GameLibraryRepository {
                 }
                 arr.put(obj)
             }
-            arr.toString()
+            arr
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun serializeGamesListToJson(gamesList: List<GameBookmark>): String? {
+        return serializeGamesListToJsonArray(gamesList)?.toString()
     }
 
     fun addCustomGame(title: String, url: String) {

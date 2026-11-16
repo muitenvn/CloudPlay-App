@@ -605,87 +605,134 @@ fun ServersScreen(
                 }
             }
         }
-        if (vpnState.unlockFailPromptServer != null) {
+        if (vpnState.unlockFailPromptServer != null || vpnState.unlockFailAutoSwitchedFromServer != null) {
             item(key = "unlock_fail_prompt_banner") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(bannerShape)
-                        .background(Color(0xFF1A0D10), bannerShape)
-                        .border(1.dp, JapanRed.copy(alpha = 0.65f), bannerShape)
-                        .padding(horizontal = 11.dp, vertical = 8.dp)
-                        .testTag("unlock_fail_prompt_card"),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val unit = maxWidth * 0.01f
+                    val padH = unit * 3.0f
+                    val padV = unit * 2.2f
+                    val gap = unit * 2.0f
+                    val btnRadius = unit * 2.0f
+                    val borderStroke = unit * 0.25f
+                    val chipPadH = unit * 2.6f
+                    val chipPadV = unit * 1.4f
+                    val titleFontSp = with(density) { (unit * 3.1f).toSp() }
+                    val subFontSp = with(density) { (unit * 2.85f).toSp() }
+                    val actionFontSp = with(density) { (unit * 2.9f).toSp() }
+
+                    val autoSwitchedFrom = vpnState.unlockFailAutoSwitchedFromServer
+                    val promptSrv = vpnState.unlockFailPromptServer
+                    val suggestedSrv = vpnState.unlockFailSuggestedServer
+                    val pingSuffix = vpnState.unlockFailSuggestedPingMs?.takeIf { it > 0 }?.let { " · $it ms" } ?: ""
+
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                            .fillMaxWidth()
+                            .clip(bannerShape)
+                            .background(XboxSurface, bannerShape)
+                            .border(borderStroke, XboxCardBorder, bannerShape)
+                            .padding(horizontal = padH, vertical = padV)
+                            .testTag("unlock_fail_prompt_card")
                     ) {
-                        Text(
-                            text = if (isEn) "This server cannot unlock the region, switch to another server?" else "Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?",
-                            color = TextPrimary,
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${vpnState.unlockFailPromptServer?.flag ?: ""} ${vpnState.unlockFailPromptServer?.name ?: ""}",
-                            color = JapanRed,
-                            fontSize = 11.5.sp
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val switched = VpnManager.confirmSwitchToNextBestServer(context)
-                                if (switched != null) {
-                                    onSelectServer(switched)
+                        androidx.compose.foundation.layout.FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(gap),
+                            verticalArrangement = Arrangement.spacedBy(gap),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f, fill = true)
+                                    .align(Alignment.CenterVertically),
+                                verticalArrangement = Arrangement.spacedBy(unit * 0.6f)
+                            ) {
+                                if (autoSwitchedFrom != null) {
+                                    Text(
+                                        text = "${config.tr("Máy chủ không mở khóa được vùng:", "Server cannot unlock region:")} ${autoSwitchedFrom.flag} ${autoSwitchedFrom.name}",
+                                        color = JapanRed,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = titleFontSp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    val targetSrv = suggestedSrv ?: currentServer
+                                    Text(
+                                        text = "${config.tr("Đã tự chuyển sang máy chủ đo thật:", "Auto-switched to measured server:")} ${targetSrv.flag} ${targetSrv.name}$pingSuffix",
+                                        color = TextPrimary,
+                                        fontSize = subFontSp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                } else if (promptSrv != null) {
+                                    Text(
+                                        text = "${config.tr("Máy chủ không mở khóa được vùng:", "Server cannot unlock region:")} ${promptSrv.flag} ${promptSrv.name}",
+                                        color = JapanRed,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = titleFontSp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = if (suggestedSrv != null) {
+                                            "${config.tr("Gợi ý máy chủ đã đo thật:", "Suggested measured server:")} ${suggestedSrv.flag} ${suggestedSrv.name}$pingSuffix"
+                                        } else {
+                                            config.tr(
+                                                "Máy chủ này không mở khóa được vùng, đổi sang máy chủ khác?",
+                                                "This server cannot unlock the region, switch to another server?"
+                                            )
+                                        },
+                                        color = TextPrimary,
+                                        fontSize = subFontSp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = XboxGreen),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = 36.dp)
-                                .gamepadActionButton(cornerRadius = 8.dp) {
-                                    val switched = VpnManager.confirmSwitchToNextBestServer(context)
-                                    if (switched != null) {
-                                        onSelectServer(switched)
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(gap),
+                                modifier = Modifier.align(Alignment.CenterVertically)
+                            ) {
+                                if (autoSwitchedFrom == null && promptSrv != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(btnRadius))
+                                            .background(XboxGreen)
+                                            .gamepadActionButton(cornerRadius = btnRadius) {
+                                                val switched = VpnManager.confirmSwitchToNextBestServer(context)
+                                                if (switched != null) {
+                                                    onSelectServer(switched)
+                                                }
+                                            }
+                                            .padding(horizontal = chipPadH, vertical = chipPadV)
+                                            .testTag("confirm_switch_best_server_button"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = config.tr("Chuyển máy chủ", "Switch server"),
+                                            color = Color.White,
+                                            fontSize = actionFontSp,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
                                     }
                                 }
-                                .testTag("confirm_switch_best_server_button")
-                        ) {
-                            Text(
-                                text = if (isEn) "Switch" else "Đổi",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                        TextButton(
-                            onClick = { VpnManager.dismissUnlockFailPrompt() },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = 36.dp)
-                                .gamepadActionButton(cornerRadius = 8.dp) {
-                                    VpnManager.dismissUnlockFailPrompt()
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(btnRadius))
+                                        .border(borderStroke, XboxCardBorder, RoundedCornerShape(btnRadius))
+                                        .gamepadActionButton(cornerRadius = btnRadius) {
+                                            VpnManager.dismissUnlockFailPrompt()
+                                        }
+                                        .padding(horizontal = chipPadH, vertical = chipPadV),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = config.tr("Đóng", "Dismiss"),
+                                        color = TextSecondary,
+                                        fontSize = actionFontSp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
-                        ) {
-                            Text(
-                                text = if (isEn) "Dismiss" else "Đóng",
-                                color = TextSecondary,
-                                fontSize = 11.5.sp,
-                                maxLines = 1,
-                                softWrap = false
-                            )
+                            }
                         }
                     }
                 }

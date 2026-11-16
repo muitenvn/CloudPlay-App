@@ -395,6 +395,8 @@ object UpdateChecker {
             } else {
                 ""
             }
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (_: Throwable) {
             ""
         } finally {
@@ -415,6 +417,8 @@ object UpdateChecker {
             }
             val hex = Regex("\\b([0-9a-fA-F]{64})\\b").find(content)?.groupValues?.getOrNull(1)?.lowercase().orEmpty()
             if (isValidSha256Hex(hex)) hex else ""
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (_: Throwable) {
             ""
         } finally {
@@ -671,6 +675,8 @@ object UpdateChecker {
                 AppLogger.success("UPDATE", "Ứng dụng đang ở phiên bản mới nhất (v$currentVersion)")
                 _state.value = UpdateCheckState.UpToDate(currentVersion = currentVersion)
             }
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (e: Throwable) {
             val redirectVer = fetchLatestVersionViaWebRedirect().ifBlank { cachedLatest }
             if (!applyCachedOrResolvedVersionState(context, currentVersion, redirectVer, openDialogIfNewer = true)) {
@@ -723,6 +729,8 @@ object UpdateChecker {
                     if (isValidSha256Hex(fromAsset)) return fromAsset
                 }
             }
+        } catch (ce: CancellationException) {
+            throw ce
         } catch (_: Throwable) {
         } finally {
             try { conn?.disconnect() } catch (_: Throwable) {}
@@ -876,9 +884,10 @@ object UpdateChecker {
 
                 _downloadState.value = ApkDownloadState.VerifiedReadyToInstall(targetApkFile)
                 launchApkInstaller(appContext, targetApkFile)
-            } catch (_: CancellationException) {
+            } catch (ce: CancellationException) {
                 targetApkFile.delete()
                 _downloadState.value = ApkDownloadState.Idle
+                throw ce
             } catch (e: Throwable) {
                 targetApkFile.delete()
                 AppLogger.error("UPDATE", "Không thể tải bản cập nhật qua tất cả các cổng (${AppLogger.shortThrowable(e)})")

@@ -1510,6 +1510,36 @@ object AppUiTranslator {
                 "fr" -> "Erreur de connexion ou chargement lent ?"; "de" -> "Verbindungsfehler oder langsames Laden?"; "ru" -> "Ошибка подключения или долгая загрузка?"; "th" -> "เชื่อมต่อไม่ได้หรือโหลดหน้าเว็บช้า?"; "id" -> "Gagal terhubung atau pemuatan lambat?"
                 else -> en
             }
+            "Xbox is redirecting to the new UI (play.xbox.com). Auto-retry paused." -> return when (lang) {
+                "zh" -> "Xbox 正在跳转回新版界面 (play.xbox.com)，已暂停自动重试。"; "ja" -> "Xbox が新しい画面 (play.xbox.com) に戻しています。自動再試行を停止しました。"; "ko" -> "Xbox가 새 UI(play.xbox.com)로 이동시키고 있어 자동 재시도를 멈췄습니다."; "es" -> "Xbox está redirigiendo a la nueva interfaz (play.xbox.com). Reintento pausado."; "pt" -> "O Xbox está redirecionando para a nova interface (play.xbox.com). Tentativa pausada."
+                "fr" -> "Xbox redirige vers la nouvelle interface (play.xbox.com). Nouvel essai mis en pause."; "de" -> "Xbox leitet zur neuen Oberfläche (play.xbox.com) weiter. Automatischer Versuch pausiert."; "ru" -> "Xbox перенаправляет на новый интерфейс (play.xbox.com). Автоповтор остановлен."; "th" -> "Xbox กำลังสลับกลับไปหน้าเว็บแบบใหม่ (play.xbox.com) หยุดลองใหม่อัตโนมัติแล้ว"; "id" -> "Xbox mengalihkan ke antarmuka baru (play.xbox.com). Coba ulang otomatis dijeda."
+                else -> en
+            }
+            "Retry" -> return when (lang) {
+                "zh" -> "重试"; "ja" -> "再試行"; "ko" -> "다시 시도"; "es" -> "Reintentar"; "pt" -> "Tentar novamente"
+                "fr" -> "Réessayer"; "de" -> "Erneut versuchen"; "ru" -> "Повторить"; "th" -> "ลองใหม่"; "id" -> "Coba lagi"
+                else -> en
+            }
+            "Use New UI" -> return when (lang) {
+                "zh" -> "使用新版"; "ja" -> "新画面を使う"; "ko" -> "새 UI 사용"; "es" -> "Usar nueva UI"; "pt" -> "Usar nova UI"
+                "fr" -> "Nouvelle UI"; "de" -> "Neue UI nutzen"; "ru" -> "Новый интерфейс"; "th" -> "ใช้หน้าเว็บใหม่"; "id" -> "Pakai UI Baru"
+                else -> en
+            }
+            "Server cannot unlock region:" -> return when (lang) {
+                "zh" -> "当前节点无法解锁该地区:"; "ja" -> "このサーバーでは地域ロックを解除できません:"; "ko" -> "이 서버는 지역 잠금을 해제할 수 없습니다:"; "es" -> "El servidor no puede desbloquear la región:"; "pt" -> "O servidor não pode desbloquear a região:"
+                "fr" -> "Le serveur ne peut pas débloquer la région :"; "de" -> "Server kann Region nicht entsperren:"; "ru" -> "Сервер не может разблокировать регион:"; "th" -> "เซิร์ฟเวอร์ปลดล็อกภูมิภาคไม่ได้:"; "id" -> "Server tidak dapat membuka kunci wilayah:"
+                else -> en
+            }
+            "Suggested measured server:" -> return when (lang) {
+                "zh" -> "推荐已实测节点:"; "ja" -> "測定済みおすすめサーバー:"; "ko" -> "실측 추천 서버:"; "es" -> "Servidor medido sugerido:"; "pt" -> "Servidor medido sugerido:"
+                "fr" -> "Serveur mesuré suggéré :"; "de" -> "Empfohlener gemessener Server:"; "ru" -> "Рекомендуемый проверенный сервер:"; "th" -> "เซิร์ฟเวอร์ที่วัดจริงแนะนำ:"; "id" -> "Saran server terukur:"
+                else -> en
+            }
+            "Auto-switched to measured server:" -> return when (lang) {
+                "zh" -> "已自动切换到实测节点:"; "ja" -> "測定済みサーバーに自動切替しました:"; "ko" -> "실측 서버로 자동 전환됨:"; "es" -> "Cambiado automáticamente al servidor medido:"; "pt" -> "Alternado automaticamente para servidor medido:"
+                "fr" -> "Bascule auto vers le serveur mesuré :"; "de" -> "Automatisch zu gemessenem Server gewechselt:"; "ru" -> "Автопереключение на проверенный сервер:"; "th" -> "สลับไปเซิร์ฟเวอร์ที่วัดจริงอัตโนมัติ:"; "id" -> "Beralih otomatis ke server terukur:"
+                else -> en
+            }
         }
         return en
     }

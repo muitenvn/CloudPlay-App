@@ -35,17 +35,24 @@ data class GamepadStatus(
 
 class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
 
+    companion object {
+        @Volatile
+        private var cachedStatus: GamepadStatus? = null
+    }
+
     private val appContext = context.applicationContext ?: context
     private val inputManager = appContext.getSystemService(Context.INPUT_SERVICE) as? InputManager
     private val _status = MutableStateFlow(
-        GamepadStatus(controllerName = appContext.getString(R.string.gamepad_none))
+        cachedStatus ?: GamepadStatus(controllerName = appContext.getString(R.string.gamepad_none))
     )
     val status: StateFlow<GamepadStatus> = _status.asStateFlow()
 
     init {
         try {
             inputManager?.registerInputDeviceListener(this, null)
-            checkControllers()
+            if (cachedStatus == null) {
+                checkControllers()
+            }
         } catch (ignored: Exception) {
         }
     }
@@ -106,7 +113,7 @@ class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
             }
         }
 
-        _status.value = GamepadStatus(
+        val resolved = GamepadStatus(
             hasPhysicalController = foundGamepad,
             controllerName = name,
             deviceCount = count,
@@ -115,6 +122,8 @@ class GamepadDetector(context: Context) : InputManager.InputDeviceListener {
             vendorProductHex = vidPid,
             supportsRumble = hasRumble
         )
+        cachedStatus = resolved
+        _status.value = resolved
     }
 
     override fun onInputDeviceAdded(deviceId: Int) {

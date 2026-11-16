@@ -1571,7 +1571,6 @@ class XboxBridge(
                             if (window.__lastUnlockSignal !== 'UNLOCK_FAIL') {
                                 window.__lastUnlockSignal = 'UNLOCK_FAIL';
                                 notify('onRegionUnlockSignal', 'UNLOCK_FAIL');
-                                showUnlockFailBannerDom();
                             }
                         }
                     }
@@ -3546,6 +3545,8 @@ class XboxBridge(
                         null
                     )
                 }
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w(TAG, "Error in requestBatchTranslate", e)
                 com.example.data.AppLogger.error(

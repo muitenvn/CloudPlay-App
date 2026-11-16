@@ -1,8 +1,8 @@
 # Chính sách An toàn & Quyền riêng tư / Security & Privacy Policy
 
-Tài liệu này giải thích ngắn gọn, dễ hiểu cách **CloudPlay** bảo vệ tài khoản, dữ liệu cá nhân của bạn và cách liên hệ khi bạn phát hiện vấn đề về an toàn bảo mật.
+Tài liệu này giải thích ngắn gọn, dễ hiểu cách **Ravno** (**Ravno App** & **Ravno Pad**) bảo vệ tài khoản, dữ liệu cá nhân của bạn và cách liên hệ khi bạn phát hiện vấn đề về an toàn bảo mật.
 
-This document explains in simple terms how **CloudPlay** protects your account and personal data, and how to contact us if you find a security issue.
+This document explains in simple terms how **Ravno** (**Ravno App** & **Ravno Pad**) protects your account and personal data, and how to contact us if you find a security issue.
 
 ---
 

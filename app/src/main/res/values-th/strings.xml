@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- App & General -->
-    <string name="app_name">CloudPlay</string>
+    <string name="app_name">Ravno</string>
     <string name="app_subtitle">Xbox Cloud Gaming</string>
     <string name="xbox_cloud_url">https://www.xbox.com/en-US/play</string>
 

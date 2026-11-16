@@ -263,7 +263,7 @@ fun DashboardScreen(
                             ) {
                                 coil.compose.AsyncImage(
                                     model = topBarLogoRequest,
-                                    contentDescription = "CloudPlay Logo",
+                                    contentDescription = "Ravno Logo",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
@@ -274,7 +274,7 @@ fun DashboardScreen(
                                 verticalArrangement = Arrangement.spacedBy(1.dp)
                             ) {
                                 Text(
-                                    text = "CloudPlay",
+                                    text = "Ravno",
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontWeight = FontWeight.Bold,

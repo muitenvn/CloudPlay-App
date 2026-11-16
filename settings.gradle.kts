@@ -22,7 +22,7 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "CloudPlay"
+rootProject.name = "Ravno"
 
 include(":app")
 include(":remote-protocol")

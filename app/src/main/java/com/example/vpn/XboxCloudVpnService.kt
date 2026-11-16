@@ -76,12 +76,12 @@ class XboxCloudVpnService : Service() {
         val action = intent?.action
         when (action) {
             ACTION_CONNECT -> {
-                val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "CloudPlay"
+                val serverName = intent.getStringExtra(EXTRA_SERVER_NAME) ?: "Ravno"
                 startOptimizer(serverName)
             }
             ACTION_DISCONNECT, null -> {
                 if (!isRunning.get()) {
-                    startOptimizer("CloudPlay")
+                    startOptimizer("Ravno")
                 }
                 stopOptimizer()
                 stopForegroundCompat()
@@ -147,7 +147,7 @@ class XboxCloudVpnService : Service() {
             val isEn = com.example.data.SettingsRepository.config.value.isEnglishUI()
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "CloudPlay Stream Status",
+                "Ravno Stream Status",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = if (isEn) "Keeps connection stable while gaming" else "Đang giữ kết nối ổn định khi chơi game"
@@ -170,7 +170,7 @@ class XboxCloudVpnService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("CloudPlay Stream Optimizer")
+            .setContentTitle("Ravno Stream Optimizer")
             .setContentText(text)
             .setSmallIcon(com.example.R.drawable.cloudplay_launcher_icon_1791392788421)
             .setContentIntent(pendingIntent)

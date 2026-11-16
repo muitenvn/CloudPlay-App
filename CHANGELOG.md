@@ -1,4 +1,4 @@
-# Nhật ký cập nhật / Changelog (CloudPlay)
+# Nhật ký cập nhật / Changelog (Ravno App & Ravno Pad)
 
 Tài liệu này ghi nhận các thay đổi và sửa lỗi theo từng phiên bản của ứng dụng.
 

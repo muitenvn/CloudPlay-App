@@ -1,8 +1,8 @@
-# CloudPlay — Ứng dụng hỗ trợ chơi Xbox Cloud Gaming trên Android
+# Ravno App — Ứng dụng hỗ trợ chơi Xbox Cloud Gaming trên Android
 
-**CloudPlay** là ứng dụng độc lập, gọn nhẹ dành cho điện thoại Android giúp mở và trải nghiệm **Xbox Cloud Gaming** (`xbox.com/play`) thuận tiện hơn, tích hợp sẵn tay cầm cảm ứng tùy chỉnh, thông số kỹ thuật thực tế, dịch giao diện và bộ công cụ mạng tùy chọn (lấy cảm hứng từ dự án mã nguồn mở [better-xcloud](https://github.com/redphx/better-xcloud)).
+**Ravno** (**Ravno App**) là ứng dụng độc lập, gọn nhẹ dành cho điện thoại Android và Android TV giúp mở và trải nghiệm **Xbox Cloud Gaming** (`xbox.com/play`) thuận tiện hơn, tích hợp sẵn tay cầm cảm ứng tùy chỉnh, ứng dụng tay cầm từ xa **Ravno Pad**, thông số kỹ thuật thực tế, dịch giao diện và bộ công cụ mạng tùy chọn (lấy cảm hứng từ dự án mã nguồn mở [better-xcloud](https://github.com/redphx/better-xcloud)).
 
-**CloudPlay** is a lightweight, independent Android application built for playing **Xbox Cloud Gaming** (`xbox.com/play`) on mobile phones, featuring customizable touch controls, real-time stream telemetry, menu localization, and optional network routing tools (inspired by the open-source [better-xcloud](https://github.com/redphx/better-xcloud) project).
+**Ravno** (**Ravno App**) is a lightweight, independent Android application built for playing **Xbox Cloud Gaming** (`xbox.com/play`) on mobile phones and Android TV, featuring customizable touch controls, the **Ravno Pad** companion controller app, real-time stream telemetry, menu localization, and optional network routing tools (inspired by the open-source [better-xcloud](https://github.com/redphx/better-xcloud) project).
 
 - **Trang chủ & Tải APK / Website & Download:** [https://muitenvn.github.io/CloudPlay-App/](https://muitenvn.github.io/CloudPlay-App/)
 - **Điều khoản & Quyền riêng tư (15 mục) / Terms & Privacy:** [https://muitenvn.github.io/CloudPlay-App/terms.html](https://muitenvn.github.io/CloudPlay-App/terms.html)
@@ -33,6 +33,6 @@ Chi tiết đầy đủ được công bố tại [Chính sách Bảo mật (SEC
 
 ## Lưu ý pháp lý & Liên hệ / Legal Notice & Contact
 
-- **Dự án độc lập:** CloudPlay là dự án cá nhân độc lập, **không** liên kết, không thuộc sở hữu và không được Microsoft Corporation, Xbox hay Epic Games bảo trợ hoặc cấp phép. Mọi tên gọi và nhãn hiệu thuộc về chủ sở hữu tương ứng.
+- **Dự án độc lập:** Ravno (Ravno App & Ravno Pad) là dự án cá nhân độc lập, **không** liên kết, không thuộc sở hữu và không được Microsoft Corporation, Xbox hay Epic Games bảo trợ hoặc cấp phép. Mọi tên gọi và nhãn hiệu thuộc về chủ sở hữu tương ứng.
 - **Ghi công dữ liệu:** Định vị vị trí IP sử dụng cơ sở dữ liệu miễn phí từ [DB-IP.com](https://db-ip.com) theo giấy phép **CC BY 4.0**.
 - **Nhà phát triển / Developer:** Nguyễn Thế Ngọc (`muitenvn`) — Email: [cloudplayxbox@gmail.com](mailto:cloudplayxbox@gmail.com)

@@ -229,14 +229,14 @@ private fun PadFindTvScreen(
             .testTag("pad_find_tv_screen"),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // 1. Thanh trên cùng: CloudPlay Pad + mạng Wi-Fi + nút đổi ngôn ngữ (12 ngôn ngữ)
+        // 1. Thanh trên cùng: Ravno Pad + mạng Wi-Fi + nút đổi ngôn ngữ (12 ngôn ngữ)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "CloudPlay Pad",
+                text = "Ravno Pad",
                 color = PadInk,
                 fontSize = m.titleFont,
                 fontWeight = FontWeight.ExtraBold
@@ -353,8 +353,8 @@ private fun PadFindTvScreen(
                         Text(
                             text = PadStrings.tr(
                                 lang = lang,
-                                vi = "Hãy mở mục Dùng điện thoại làm tay cầm trong Cài đặt của CloudPlay trên TV.",
-                                en = "Open 'Use Phone as Controller' in CloudPlay Settings on your TV."
+                                vi = "Hãy mở mục Dùng điện thoại làm tay cầm trong Cài đặt của Ravno trên TV.",
+                                en = "Open 'Use Phone as Controller' in Ravno Settings on your TV."
                             ),
                             color = PadMuted,
                             fontSize = m.captionFont
@@ -550,7 +550,7 @@ private fun PadEnterPinScreen(
     onSubmit: () -> Unit
 ) {
     val lang = state.language
-    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
 
     Column(
         modifier = Modifier
@@ -800,7 +800,7 @@ private fun PadConnectedReadyScreen(
     onDisconnect: () -> Unit
 ) {
     val lang = state.language
-    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
     val pingText = state.measuredPingMs?.let { "${it} ms" } ?: PadStrings.tr(lang, "Đang đo...", "Measuring...")
 
     Column(
@@ -892,7 +892,7 @@ private fun PadDisconnectedSummaryScreen(
     onBackToList: () -> Unit
 ) {
     val lang = state.language
-    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
 
     val subtitleText = when (state.disconnectReasonCode) {
         "FORGOTTEN" -> PadStrings.tr(

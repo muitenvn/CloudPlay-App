@@ -304,8 +304,8 @@ internal fun TvSettingsScreen(
                                     )
                                 } else {
                                     config.tr(
-                                        "Bấm vào đây để hiện mã 4 chữ số ghép đôi với ứng dụng CloudPlay Pad.",
-                                        "Tap here to show the 4-digit pairing code for CloudPlay Pad."
+                                        "Bấm vào đây để hiện mã 4 chữ số ghép đôi với ứng dụng Ravno Pad.",
+                                        "Tap here to show the 4-digit pairing code for Ravno Pad."
                                     )
                                 },
                                 actionLabel = if (isPhoneConnected) {
@@ -544,8 +544,8 @@ internal fun TvSettingsScreen(
                                 )
                             } else {
                                 config.tr(
-                                    "Kết nối ứng dụng CloudPlay Pad qua mạng Wi-Fi / LAN bằng mã 4 chữ số.",
-                                    "Connect CloudPlay Pad over Wi-Fi / LAN with a 4-digit pairing code."
+                                    "Kết nối ứng dụng Ravno Pad qua mạng Wi-Fi / LAN bằng mã 4 chữ số.",
+                                    "Connect Ravno Pad over Wi-Fi / LAN with a 4-digit pairing code."
                                 )
                             }
                             TvSettingActionRow(
@@ -732,7 +732,7 @@ internal fun TvSettingsScreen(
                             val appLangs = AppLanguage.entries
                             val curIdx = appLangs.indexOf(config.appLanguage).coerceAtLeast(0)
                             TvSettingSliderRow(
-                                title = config.tr("Ngôn ngữ ứng dụng CloudPlay", "CloudPlay App Language"),
+                                title = config.tr("Ngôn ngữ ứng dụng Ravno", "Ravno App Language"),
                                 subtitle = config.tr("Dùng ◀ ▶ hoặc bấm A để đổi ngôn ngữ hiển thị của ứng dụng.", "Use ◀ ▶ or press A to switch app language."),
                                 valueText = "${config.appLanguage.effectiveFlag()} ${config.appLanguage.localizedTitle(isEn)}",
                                 fraction = curIdx.toFloat() / appLangs.lastIndex.coerceAtLeast(1).toFloat(),
@@ -1086,7 +1086,7 @@ internal fun TvSettingsScreen(
                                     )
                                     try {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                        clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Diagnostic Report", reportText))
+                                        clipboard?.setPrimaryClip(ClipData.newPlainText("Ravno Diagnostic Report", reportText))
                                         Toast.makeText(
                                             context,
                                             config.tr("Đã sao chép báo cáo chẩn đoán", "Copied diagnostic report"),

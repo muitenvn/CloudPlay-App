@@ -729,7 +729,7 @@ internal fun PadLandscapeControllerScreen(
                         .clip(CircleShape)
                         .background(OfficialHudAccent)
                 )
-                val tvTitle = state.selectedTv?.tvName.orEmpty().ifBlank { "CloudPlay TV" }
+                val tvTitle = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
                 val gameBadge = state.activeGameTitle.trim().takeIf {
                     it.isNotEmpty() && !it.equals("generic", ignoreCase = true)
                 }

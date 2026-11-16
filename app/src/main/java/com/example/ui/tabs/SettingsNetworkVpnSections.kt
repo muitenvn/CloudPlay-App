@@ -835,7 +835,7 @@ internal fun SettingsAdvancedSection(
                 try {
                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                     clipboard?.setPrimaryClip(
-                        android.content.ClipData.newPlainText("CloudPlay Diagnostic Report", reportText)
+                        android.content.ClipData.newPlainText("Ravno Diagnostic Report", reportText)
                     )
                     Toast.makeText(
                         context,
@@ -848,7 +848,7 @@ internal fun SettingsAdvancedSection(
                         type = "text/plain"
                         putExtra(
                             android.content.Intent.EXTRA_SUBJECT,
-                            if (isEn) "CloudPlay Diagnostic Report" else "Báo cáo chẩn đoán CloudPlay"
+                            if (isEn) "Ravno Diagnostic Report" else "Báo cáo chẩn đoán Ravno"
                         )
                         putExtra(android.content.Intent.EXTRA_TEXT, reportText)
                     }

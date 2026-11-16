@@ -602,11 +602,12 @@ object UpdateChecker {
                     val name = assetObj.optString("name", "").trim()
                     val dlUrl = assetObj.optString("browser_download_url", "").trim()
                     val digest = assetObj.optString("digest", "").trim()
-                    val isPadAsset = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                    val isPadAsset = name.contains("Ravno-Pad", ignoreCase = true) ||
+                        name.contains("CloudPlay-Pad", ignoreCase = true) ||
                         name.contains("-pad-", ignoreCase = true) ||
                         name.startsWith("pad-", ignoreCase = true)
                     if (!isPadAsset && name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
-                        if (name.contains("CloudPlay-Xbox", ignoreCase = true) || apkDirectUrl.isBlank()) {
+                        if (name.contains("Ravno-Xbox", ignoreCase = true) || name.contains("CloudPlay-Xbox", ignoreCase = true) || apkDirectUrl.isBlank()) {
                             apkDirectUrl = dlUrl
                             apkAssetName = name
                             val extracted = extractDigestSha256(digest)
@@ -618,7 +619,8 @@ object UpdateChecker {
                     val assetObj = assetsArr.optJSONObject(i) ?: continue
                     val name = assetObj.optString("name", "").trim()
                     val dlUrl = assetObj.optString("browser_download_url", "").trim()
-                    val isPadSha = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                    val isPadSha = name.contains("Ravno-Pad", ignoreCase = true) ||
+                        name.contains("CloudPlay-Pad", ignoreCase = true) ||
                         name.contains("-pad-", ignoreCase = true) ||
                         name.startsWith("pad-", ignoreCase = true)
                     if (!isPadSha && name.endsWith(".sha256", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
@@ -708,17 +710,18 @@ object UpdateChecker {
                         val name = assetObj.optString("name", "").trim()
                         val dlUrl = assetObj.optString("browser_download_url", "").trim()
                         val digest = assetObj.optString("digest", "").trim()
-                        val isPadAsset = name.contains("CloudPlay-Pad", ignoreCase = true) ||
+                        val isPadAsset = name.contains("Ravno-Pad", ignoreCase = true) ||
+                            name.contains("CloudPlay-Pad", ignoreCase = true) ||
                             name.contains("-pad-", ignoreCase = true) ||
                             name.startsWith("pad-", ignoreCase = true)
                         if (isPadAsset) continue
                         if (name.endsWith(".apk", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
-                            if (name.contains("CloudPlay-Xbox", ignoreCase = true)) {
+                            if (name.contains("Ravno-Xbox", ignoreCase = true) || name.contains("CloudPlay-Xbox", ignoreCase = true)) {
                                 val extracted = extractDigestSha256(digest)
                                 if (isValidSha256Hex(extracted)) return extracted
                             }
                         } else if (name.endsWith(".sha256", ignoreCase = true) && dlUrl.startsWith("https://github.com/")) {
-                            if (name.contains("CloudPlay-Xbox", ignoreCase = true) || fallbackShaUrl.isBlank()) {
+                            if (name.contains("Ravno-Xbox", ignoreCase = true) || name.contains("CloudPlay-Xbox", ignoreCase = true) || fallbackShaUrl.isBlank()) {
                                 fallbackShaUrl = dlUrl
                             }
                         }
@@ -838,7 +841,7 @@ object UpdateChecker {
                         // Kiểm tra cấu trúc gói APK và chữ ký SHA-256 ngay trong vòng lặp để nếu máy chủ phụ trả file hỏng thì tự chuyển sang máy chủ kế tiếp
                         _downloadState.value = ApkDownloadState.Verifying
                         if (!isValidDownloadedApkArchive(appContext, targetApkFile)) {
-                            throw IllegalStateException("File tải từ ${node.name} không phải gói APK CloudPlay hợp lệ")
+                            throw IllegalStateException("File tải từ ${node.name} không phải gói APK Ravno hợp lệ")
                         }
 
                         val resolvedSha = officialSha256 ?: ensureOfficialSha256FromGitHub(updateInfo).also {

@@ -361,7 +361,7 @@ internal fun TvLeftNavigationRail(
                 )
             }
             Text(
-                text = "CloudPlay",
+                text = "Ravno",
                 color = TvInk,
                 fontFamily = SpaceGroteskFontFamily,
                 fontSize = (16.5f * scale).coerceAtLeast(13f).sp,

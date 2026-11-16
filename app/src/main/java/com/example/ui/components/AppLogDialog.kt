@@ -382,7 +382,7 @@ fun AppLogDialog(
                     } else {
                         AppLogger.exportAsText() + "\n\n" + com.example.data.PerformanceMonitor.buildShortPerfReport(isEn)
                     }
-                    clipboard?.setPrimaryClip(ClipData.newPlainText("CloudPlay Log", exportedText))
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Ravno Log", exportedText))
                     Toast.makeText(
                         context,
                         if (isEn) "Copied logs to clipboard" else "Đã sao chép nhật ký vào bộ nhớ tạm",

@@ -377,7 +377,7 @@ def generate_ai_description(
     full_context = "\n\n".join(context_parts)[:3800]
 
     system_instruction = (
-        "Bạn là người viết ghi chú phát hành (release notes) cho ứng dụng Android CloudPlay. "
+        "Bạn là người viết ghi chú phát hành (release notes) cho ứng dụng Android Ravno (Ravno App & Ravno Pad). "
         "Hãy viết 3 đến 5 gạch đầu dòng bằng Tiếng Việt (dạng `- **Tiêu đề ngắn:** Nội dung.`) "
         "liệt kê các thay đổi và sửa lỗi có trong Git Diff được cung cấp.\n"
         "QUY TẮC:\n"
@@ -388,7 +388,7 @@ def generate_ai_description(
 
     user_prompt = (
         f"Hãy tóm tắt ngắn gọn (3-5 gạch đầu dòng Tiếng Việt) các thay đổi trong bản "
-        f"CloudPlay v{app_ver} (so với {prev_tag or 'bản trước'}) dựa trên dữ liệu sau:\n\n"
+        f"Ravno v{app_ver} (so với {prev_tag or 'bản trước'}) dựa trên dữ liệu sau:\n\n"
         f"{full_context}"
     )
 
@@ -535,10 +535,10 @@ def main() -> None:
     github_ref_name = os.environ.get("GITHUB_REF_NAME", "")
     if github_ref.startswith("refs/tags/") and github_ref_name and "${" not in github_ref_name:
         tag_name = github_ref_name
-        release_name = f"CloudPlay Xbox {tag_name} (Build #{run_number})"
+        release_name = f"Ravno App {tag_name} (Build #{run_number})"
     else:
         tag_name = f"v{app_ver}"
-        release_name = f"CloudPlay Xbox v{app_ver} (Build #{run_number})"
+        release_name = f"Ravno App v{app_ver} (Build #{run_number})"
 
     github_output = os.environ.get("GITHUB_OUTPUT", "")
     if github_output:
@@ -614,7 +614,7 @@ def main() -> None:
     )
 
     lines = [
-        f"## Bản phát hành CloudPlay **v{app_ver}** (`{tag_name}`)",
+        f"## Bản phát hành Ravno App **v{app_ver}** (`{tag_name}`)",
         f"> **Ngày tạo:** {build_date}  |  **Dung lượng APK:** `{apk_size_str}`  |  **Version Code:** `#{app_code}`  |  **Commit:** `{latest_hash}`",
         "",
         "### 🤖 Mô tả bản cập nhật bằng AI (AI Release Summary)",

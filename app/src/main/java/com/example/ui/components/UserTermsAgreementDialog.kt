@@ -370,9 +370,9 @@ fun UserTermsAgreementDialog(
                             icon = Icons.Default.Gavel,
                             title = if (isEn) "1. Independent Application" else "1. Ứng dụng độc lập",
                             content = if (isEn) {
-                                "CloudPlay is an independent Android browser for xbox.com/play and is NOT affiliated with, owned by, or endorsed by Microsoft, Xbox, or Epic Games."
+                                "Ravno App is an independent Android browser for xbox.com/play and is NOT affiliated with, owned by, or endorsed by Microsoft, Xbox, or Epic Games."
                             } else {
-                                "CloudPlay là trình duyệt chuyên biệt mở xbox.com/play trên Android; KHÔNG liên kết, không thuộc sở hữu và không được bảo trợ bởi Microsoft, Xbox hay Epic Games."
+                                "Ravno App là trình duyệt chuyên biệt mở xbox.com/play trên Android; KHÔNG liên kết, không thuộc sở hữu và không được bảo trợ bởi Microsoft, Xbox hay Epic Games."
                             }
                         )
 
@@ -400,9 +400,9 @@ fun UserTermsAgreementDialog(
                             icon = Icons.Default.SportsEsports,
                             title = if (isEn) "4. Fair Play & Acceptable Use" else "4. Chơi công bằng & Sử dụng đúng mục đích",
                             content = if (isEn) {
-                                "CloudPlay only provides touch controls, controller support, and stream stats — NO cheats, NO auto-fire macros, and NO game modification."
+                                "Ravno only provides touch controls, controller support, and stream stats — NO cheats, NO auto-fire macros, and NO game modification."
                             } else {
-                                "CloudPlay chỉ cung cấp tay cầm cảm ứng, hỗ trợ tay cầm rời và thông số truyền phát thực tế — KHÔNG gian lận, KHÔNG macro tự bắn và KHÔNG can thiệp trò chơi."
+                                "Ravno chỉ cung cấp tay cầm cảm ứng, hỗ trợ tay cầm rời và thông số truyền phát thực tế — KHÔNG gian lận, KHÔNG macro tự bắn và KHÔNG can thiệp trò chơi."
                             }
                         )
 

@@ -515,7 +515,7 @@ object RemoteControlCodec {
             "HELLO" -> RemoteControlFrame.Hello(
                 protocolVersion = map["v"]?.toIntOrNull() ?: RemotePadProtocol.PROTOCOL_VERSION,
                 tvId = map["id"].orEmpty(),
-                tvName = map["name"].orEmpty().ifBlank { "CloudPlay TV" },
+                tvName = map["name"].orEmpty().ifBlank { "Ravno TV" },
                 nonceHex = map["nonce"].orEmpty(),
                 udpPort = map["up"]?.toIntOrNull() ?: RemotePadProtocol.DEFAULT_UDP_INPUT_PORT,
                 status = TvServiceStatus.fromWireCode(map["st"]),
@@ -524,13 +524,13 @@ object RemoteControlCodec {
             "PAIR_PIN" -> RemoteControlFrame.PairWithPin(
                 protocolVersion = map["v"]?.toIntOrNull() ?: RemotePadProtocol.PROTOCOL_VERSION,
                 deviceId = map["id"].orEmpty(),
-                deviceName = map["name"].orEmpty().ifBlank { "CloudPlay Pad" },
+                deviceName = map["name"].orEmpty().ifBlank { "Ravno Pad" },
                 pinHmacHex = map["hmac"].orEmpty()
             )
             "AUTH_TOKEN" -> RemoteControlFrame.AuthWithToken(
                 protocolVersion = map["v"]?.toIntOrNull() ?: RemotePadProtocol.PROTOCOL_VERSION,
                 deviceId = map["id"].orEmpty(),
-                deviceName = map["name"].orEmpty().ifBlank { "CloudPlay Pad" },
+                deviceName = map["name"].orEmpty().ifBlank { "Ravno Pad" },
                 tokenHmacHex = map["hmac"].orEmpty()
             )
             "AUTH_OK" -> RemoteControlFrame.AuthOk(

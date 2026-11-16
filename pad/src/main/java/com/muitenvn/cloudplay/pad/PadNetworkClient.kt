@@ -449,7 +449,7 @@ object PadNetworkClient {
                         val udpPort = upStr?.trim()?.toIntOrNull() ?: RemotePadProtocol.DEFAULT_UDP_INPUT_PORT
                         val status = TvServiceStatus.fromWireCode(stStr)
                         val tvId = idStr?.trim()?.ifBlank { "$host:$tcpPort" } ?: "$host:$tcpPort"
-                        val tvName = resolved.serviceName?.trim()?.ifBlank { "CloudPlay TV ($host)" } ?: "CloudPlay TV ($host)"
+                        val tvName = resolved.serviceName?.trim()?.ifBlank { "Ravno TV ($host)" } ?: "Ravno TV ($host)"
                         val hasToken = getRememberToken(tvId).isNotBlank()
 
                         discoveredMap[tvId] = DiscoveredTvDevice(
@@ -513,7 +513,7 @@ object PadNetworkClient {
             val hasToken = getRememberToken(tvId).isNotBlank()
             discoveredMap[tvId] = DiscoveredTvDevice(
                 tvId = tvId,
-                tvName = hello.tvName.ifBlank { "CloudPlay TV ($host)" },
+                tvName = hello.tvName.ifBlank { "Ravno TV ($host)" },
                 hostAddress = host,
                 tcpPort = tcpPort,
                 udpPort = hello.udpPort,

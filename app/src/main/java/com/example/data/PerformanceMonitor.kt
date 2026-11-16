@@ -353,10 +353,10 @@ object PerformanceMonitor {
         val (usedMb, maxMb) = readHeapMb()
         val sb = StringBuilder()
         if (isEn) {
-            sb.appendLine("=== CLOUDPLAY [PERF] SUMMARY REPORT ===")
+            sb.appendLine("=== RAVNO [PERF] SUMMARY REPORT ===")
             sb.appendLine("Active Scenario: ${currentScenario.code} | Heap RAM: $usedMb / $maxMb MB")
         } else {
-            sb.appendLine("=== BÁO CÁO HIỆU NĂNG CLOUDPLAY [PERF] ===")
+            sb.appendLine("=== BÁO CÁO HIỆU NĂNG RAVNO [PERF] ===")
             sb.appendLine("Màn hình hiện tại: ${currentScenario.code} (${currentScenario.labelVi}) | RAM: $usedMb / $maxMb MB")
         }
 

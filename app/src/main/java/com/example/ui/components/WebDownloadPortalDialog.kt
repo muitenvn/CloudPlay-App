@@ -110,16 +110,16 @@ fun WebDownloadPortalDialog(
 
     fun sharePortalLink() {
         val shareText = if (isEn) {
-            "Download CloudPlay for Xbox Cloud Gaming:\nWeb: ${config.publicWebPortalUrl}\nAPK: ${config.customApkDownloadUrl}"
+            "Download Ravno App for Xbox Cloud Gaming:\nWeb: ${config.publicWebPortalUrl}\nAPK: ${config.customApkDownloadUrl}"
         } else {
-            "Link tải ứng dụng CloudPlay (hỗ trợ Xbox Cloud Gaming):\nTrang web: ${config.publicWebPortalUrl}\nFile APK: ${config.customApkDownloadUrl}"
+            "Link tải ứng dụng Ravno App (hỗ trợ Xbox Cloud Gaming):\nTrang web: ${config.publicWebPortalUrl}\nFile APK: ${config.customApkDownloadUrl}"
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "CloudPlay Xbox APK")
+            putExtra(Intent.EXTRA_SUBJECT, "Ravno Xbox APK")
             putExtra(Intent.EXTRA_TEXT, shareText)
         }
-        context.startActivity(Intent.createChooser(intent, if (isEn) "Share CloudPlay APK" else "Chia sẻ link tải CloudPlay"))
+        context.startActivity(Intent.createChooser(intent, if (isEn) "Share Ravno APK" else "Chia sẻ link tải Ravno"))
     }
 
     val shareBtnFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -180,7 +180,7 @@ fun WebDownloadPortalDialog(
                             }
                             Column {
                                 Text(
-                                    text = config.tr("Chia sẻ ứng dụng CloudPlay", "Share CloudPlay App"),
+                                    text = config.tr("Chia sẻ ứng dụng Ravno", "Share Ravno App"),
                                     color = TextPrimary,
                                     fontFamily = SpaceGroteskFontFamily,
                                     fontSize = 15.sp,

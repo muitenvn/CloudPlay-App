@@ -296,7 +296,7 @@ private fun TvRemotePadPairingBody(
 
             TvPairingStepCard(
                 stepLabel = config.tr("Bước 1", "Step 1"),
-                title = config.tr("Mở ứng dụng CloudPlay Pad trên điện thoại", "Open CloudPlay Pad on your phone"),
+                title = config.tr("Mở ứng dụng Ravno Pad trên điện thoại", "Open Ravno Pad on your phone"),
                 subtitle = config.tr(
                     "Đảm bảo điện thoại và TV đang bắt cùng một mạng Wi-Fi hoặc mạng nội bộ.",
                     "Make sure your phone and TV are connected to the same Wi-Fi / LAN."

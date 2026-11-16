@@ -879,7 +879,7 @@ object AppLogger {
         }
 
         return buildString {
-            appendLine("=== CLOUDPLAY DIAGNOSTIC REPORT ===")
+            appendLine("=== RAVNO DIAGNOSTIC REPORT ===")
             appendLine(if (isEn) "App Version: v$appVersion" else "Phiên bản ứng dụng: v$appVersion")
             appendLine(if (isEn) "Android Version: $androidVer" else "Phiên bản Android: $androidVer")
             appendLine(if (isEn) "Device Model: $deviceModel" else "Tên máy: $deviceModel")

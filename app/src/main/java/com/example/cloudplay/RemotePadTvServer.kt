@@ -551,7 +551,7 @@ object RemotePadTvServer {
 
                     // Ghép đôi thành công: cấp mã nhớ riêng cho điện thoại này và lưu lại
                     val rememberTokenHex = RemotePadCrypto.generateRememberTokenHex()
-                    val cleanName = authFrame.deviceName.trim().ifBlank { "CloudPlay Pad" }
+                    val cleanName = authFrame.deviceName.trim().ifBlank { "Ravno Pad" }
                     val cleanId = authFrame.deviceId.trim().ifBlank { UUID.randomUUID().toString() }
                     savePairedDevice(
                         PairedPhoneDevice(
@@ -634,8 +634,8 @@ object RemotePadTvServer {
             VersionCheckResult.NEED_UPDATE_CLOUDPLAY -> {
                 _state.update {
                     it.copy(
-                        versionMismatchNoticeVi = "Cần cập nhật CloudPlay (TV đang dùng giao thức v${RemotePadProtocol.PROTOCOL_VERSION}, điện thoại dùng v$clientVersion).",
-                        versionMismatchNoticeEn = "Need to update CloudPlay (TV uses protocol v${RemotePadProtocol.PROTOCOL_VERSION}, phone uses v$clientVersion)."
+                        versionMismatchNoticeVi = "Cần cập nhật Ravno (TV đang dùng giao thức v${RemotePadProtocol.PROTOCOL_VERSION}, điện thoại dùng v$clientVersion).",
+                        versionMismatchNoticeEn = "Need to update Ravno (TV uses protocol v${RemotePadProtocol.PROTOCOL_VERSION}, phone uses v$clientVersion)."
                     )
                 }
                 sendFrame(
@@ -650,8 +650,8 @@ object RemotePadTvServer {
             VersionCheckResult.NEED_UPDATE_PAD -> {
                 _state.update {
                     it.copy(
-                        versionMismatchNoticeVi = "Cần cập nhật CloudPlay Pad trên điện thoại (TV dùng v${RemotePadProtocol.PROTOCOL_VERSION}, điện thoại dùng v$clientVersion).",
-                        versionMismatchNoticeEn = "Need to update CloudPlay Pad on phone (TV uses v${RemotePadProtocol.PROTOCOL_VERSION}, phone uses v$clientVersion)."
+                        versionMismatchNoticeVi = "Cần cập nhật Ravno Pad trên điện thoại (TV dùng v${RemotePadProtocol.PROTOCOL_VERSION}, điện thoại dùng v$clientVersion).",
+                        versionMismatchNoticeEn = "Need to update Ravno Pad on phone (TV uses v${RemotePadProtocol.PROTOCOL_VERSION}, phone uses v$clientVersion)."
                     )
                 }
                 sendFrame(
@@ -934,7 +934,7 @@ object RemotePadTvServer {
             nsdManager = manager
             val cur = _state.value
             val serviceInfo = NsdServiceInfo().apply {
-                serviceName = cur.tvDisplayName.ifBlank { "CloudPlay TV" }
+                serviceName = cur.tvDisplayName.ifBlank { "Ravno TV" }
                 serviceType = RemotePadProtocol.NSD_SERVICE_TYPE
                 port = tcpPort
                 setAttribute(RemotePadProtocol.TXT_KEY_VERSION, RemotePadProtocol.PROTOCOL_VERSION.toString())
@@ -1016,7 +1016,7 @@ object RemotePadTvServer {
                 val tok = obj.optString("token")
                 val at = obj.optLong("at", 0L)
                 if (id.isNotBlank() && tok.isNotBlank()) {
-                    list.add(PairedPhoneDevice(id, name.ifBlank { "CloudPlay Pad" }, tok, at))
+                    list.add(PairedPhoneDevice(id, name.ifBlank { "Ravno Pad" }, tok, at))
                 }
             }
             list

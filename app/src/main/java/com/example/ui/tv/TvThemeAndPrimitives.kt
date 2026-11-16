@@ -30,12 +30,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.AppConfig
 import com.example.ui.DashboardTab
 import com.example.ui.components.gamepadClickable
@@ -346,20 +350,15 @@ internal fun TvLeftNavigationRail(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(5.dp))
         ) {
-            Box(
+            Image(
+                painter = painterResource(id = R.drawable.cloudplay_launcher_icon_1791392788421),
+                contentDescription = "Ravno Logo",
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size((26.dp * scale).coerceAtLeast(22.dp))
+                    .size((28.dp * scale).coerceAtLeast(22.dp))
                     .clip(RoundedCornerShape((8.dp * scale).coerceAtLeast(6.dp)))
-                    .background(TvAccent),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "▶",
-                    color = TvOnAccent,
-                    fontSize = (13f * scale).coerceAtLeast(10.5f).sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-            }
+                    .border((1.dp * scale).coerceAtLeast(0.7.dp), TvLine, RoundedCornerShape((8.dp * scale).coerceAtLeast(6.dp)))
+            )
             Text(
                 text = "Ravno",
                 color = TvInk,

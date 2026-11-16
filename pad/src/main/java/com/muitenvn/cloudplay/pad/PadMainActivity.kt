@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,9 +43,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -235,12 +238,26 @@ private fun PadFindTvScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Ravno Pad",
-                color = PadInk,
-                fontSize = m.titleFont,
-                fontWeight = FontWeight.ExtraBold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.85f)
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ravno_pad_launcher_icon),
+                    contentDescription = "Ravno Pad Logo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(m.cardPad * 1.9f)
+                        .clip(RoundedCornerShape(m.buttonRadius * 0.8f))
+                        .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius * 0.8f))
+                )
+                Text(
+                    text = "Ravno Pad",
+                    color = PadInk,
+                    fontSize = m.titleFont,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,

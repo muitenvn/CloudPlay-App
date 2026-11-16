@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://muitenvn.github.io/CloudPlay-App/sitemap.xml
+Sitemap: https://muitenvn.github.io/Ravno-App/sitemap.xml

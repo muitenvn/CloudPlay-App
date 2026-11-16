@@ -85,7 +85,7 @@ fun SettingsScreen(
 
     val context = LocalContext.current
     val isEn = config.isSettingsEnglishUI()
-    val termsWebUrl = "https://muitenvn.github.io/CloudPlay-App/terms.html"
+    val termsWebUrl = "https://muitenvn.github.io/Ravno-App/terms.html"
 
     fun openExternalTermsPage() {
         showFullTermsDialog = true

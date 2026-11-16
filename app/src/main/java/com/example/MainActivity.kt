@@ -188,7 +188,13 @@ class MainActivity : ComponentActivity() {
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
         com.example.ui.components.GamepadUiNavigation.observeKeyEventPassively(event)
-        return super.dispatchKeyEvent(event)
+        val handled = super.dispatchKeyEvent(event)
+        if (!handled && (!isBrowserScreenActive || com.example.ui.components.GamepadUiNavigation.shouldRouteToAppUi)) {
+            if (com.example.ui.components.GamepadUiNavigation.handleActivityKeyEvent(event)) {
+                return true
+            }
+        }
+        return handled
     }
 
     override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
@@ -389,6 +395,22 @@ fun MainContent(
         } else if (!isBrowser) {
             activity.resetOrientation()
         }
+    }
+
+    // Gắn điều khiển giao diện cho Ravno Pad (UDP) trên cả màn hình Điện thoại và TV khi ở Trang chủ
+    androidx.compose.runtime.DisposableEffect(currentScreen, context) {
+        if (currentScreen is AppScreen.Dashboard) {
+            com.example.cloudplay.RemotePadTvServer.startServerIfNeeded(context)
+            com.example.cloudplay.RemotePadTvServer.onRemotePadButton = { buttonIndex, pressed, _ ->
+                com.example.ui.components.GamepadUiNavigation.dispatchRemotePadButton(buttonIndex, pressed)
+            }
+            com.example.cloudplay.RemotePadTvServer.onRemotePadStick = { xAxisIndex, xVal, yAxisIndex, yVal ->
+                if (xAxisIndex == 0 && yAxisIndex == 1) {
+                    com.example.ui.components.GamepadUiNavigation.dispatchRemotePadStick(xVal, yVal)
+                }
+            }
+        }
+        onDispose { }
     }
 
     val launchXboxUrl: (String) -> Unit = { url ->

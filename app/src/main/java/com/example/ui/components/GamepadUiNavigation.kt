@@ -204,6 +204,45 @@ object GamepadUiNavigation {
     }
 
     /**
+     * Dự phòng cấp Activity: khi không có node Compose nào đang giữ focus (ví dụ vừa mở app trên máy cảm ứng,
+     * vừa cuộn mất phần tử đang chọn hoặc vừa đóng hộp thoại), chuyển sự kiện phím tay cầm trực tiếp vào
+     * scope trên cùng để khôi phục focus ngay lập tức thay vì làm đơ tay cầm.
+     */
+    fun handleActivityKeyEvent(event: KeyEvent): Boolean {
+        if (!shouldRouteToAppUi) return false
+        if (!isFromGamepadOrKeyboard(event)) return false
+        val pressed = event.action == KeyEvent.ACTION_DOWN
+        if (!pressed && event.action != KeyEvent.ACTION_UP) return false
+        if (pressed && event.repeatCount > 0) {
+            return when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT -> true
+                else -> false
+            }
+        }
+        val mappedButton = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> 12
+            KeyEvent.KEYCODE_DPAD_DOWN -> 13
+            KeyEvent.KEYCODE_DPAD_LEFT -> 14
+            KeyEvent.KEYCODE_DPAD_RIGHT -> 15
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER -> 0
+            KeyEvent.KEYCODE_BUTTON_B -> 1
+            KeyEvent.KEYCODE_BUTTON_X -> 2
+            KeyEvent.KEYCODE_BUTTON_Y -> 3
+            KeyEvent.KEYCODE_BUTTON_L1 -> 4
+            KeyEvent.KEYCODE_BUTTON_R1 -> 5
+            KeyEvent.KEYCODE_BUTTON_START -> 9
+            else -> return false
+        }
+        return dispatchRemotePadButton(mappedButton, pressed)
+    }
+
+    /**
      * Tăng lên mỗi khi người dùng giữ đồng thời View (SELECT) + Menu (START) khoảng 0,6 giây.
      * Nhận tổ hợp phím theo kiểu nghe lén (passive): không chặn hay tiêu thụ phím của game.
      */
@@ -451,7 +490,7 @@ fun Modifier.gamepadControllerScope(
             }
         }
         val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
-        if (!moved && !hasFocusInsideScope && GamepadUiNavigation.activeFocusedClickHandler == null) {
+        if (!moved && GamepadUiNavigation.activeFocusedClickHandler == null) {
             runCatching { currentDefaultRequester?.requestFocus() }
         }
     }
@@ -814,6 +853,17 @@ fun Modifier.gamepadActionButton(
     var isFocused by remember { mutableStateOf(false) }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnFocused by rememberUpdatedState(onFocused)
+    val selfClickDispatcher = remember { { currentOnClick() } }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isFocused) {
+                if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                    GamepadUiNavigation.activeFocusedClickHandler = null
+                }
+            }
+        }
+    }
 
     this
         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
@@ -822,7 +872,15 @@ fun Modifier.gamepadActionButton(
             if (isFocused != next) {
                 isFocused = next
                 if (next) {
+                    GamepadUiNavigation.activeFocusedClickHandler = selfClickDispatcher
+                    GamepadUiNavigation.activeFocusedKeyYHandler = null
+                    GamepadUiNavigation.activeFocusedLongClickHandler = null
+                    GamepadUiNavigation.activeHorizontalStepper = null
                     currentOnFocused?.invoke()
+                } else {
+                    if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                        GamepadUiNavigation.activeFocusedClickHandler = null
+                    }
                 }
             }
         }
@@ -930,6 +988,25 @@ fun Modifier.gamepadCombinedClickable(
     val currentOnKeyY by rememberUpdatedState(onKeyY)
     val currentOnFocused by rememberUpdatedState(onFocused)
     val interactionSource = remember { MutableInteractionSource() }
+    val selfClickDispatcher = remember { { currentOnClick() } }
+    val selfKeyYDispatcher = remember { { currentOnKeyY?.invoke() ?: Unit } }
+    val selfLongClickDispatcher = remember { { currentOnLongClick?.invoke() ?: Unit } }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isFocused) {
+                if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                    GamepadUiNavigation.activeFocusedClickHandler = null
+                }
+                if (GamepadUiNavigation.activeFocusedKeyYHandler === selfKeyYDispatcher) {
+                    GamepadUiNavigation.activeFocusedKeyYHandler = null
+                }
+                if (GamepadUiNavigation.activeFocusedLongClickHandler === selfLongClickDispatcher) {
+                    GamepadUiNavigation.activeFocusedLongClickHandler = null
+                }
+            }
+        }
+    }
 
     this
         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
@@ -938,7 +1015,21 @@ fun Modifier.gamepadCombinedClickable(
             if (isFocused != next) {
                 isFocused = next
                 if (next) {
+                    GamepadUiNavigation.activeFocusedClickHandler = selfClickDispatcher
+                    GamepadUiNavigation.activeFocusedKeyYHandler = if (currentOnKeyY != null) selfKeyYDispatcher else null
+                    GamepadUiNavigation.activeFocusedLongClickHandler = if (currentOnLongClick != null) selfLongClickDispatcher else null
+                    GamepadUiNavigation.activeHorizontalStepper = null
                     currentOnFocused?.invoke()
+                } else {
+                    if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
+                        GamepadUiNavigation.activeFocusedClickHandler = null
+                    }
+                    if (GamepadUiNavigation.activeFocusedKeyYHandler === selfKeyYDispatcher) {
+                        GamepadUiNavigation.activeFocusedKeyYHandler = null
+                    }
+                    if (GamepadUiNavigation.activeFocusedLongClickHandler === selfLongClickDispatcher) {
+                        GamepadUiNavigation.activeFocusedLongClickHandler = null
+                    }
                 }
             }
         }

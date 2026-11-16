@@ -301,9 +301,9 @@ fun WebDownloadPortalDialog(
                                     ) {
                                         var qrUseDirectApk by rememberSaveable { mutableStateOf(false) }
                                         val activeQrUrl = if (qrUseDirectApk) {
-                                            config.customApkDownloadUrl.ifBlank { "https://muitenvn.github.io/CloudPlay-App/" }
+                                            config.customApkDownloadUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
                                         } else {
-                                            config.publicWebPortalUrl.ifBlank { "https://muitenvn.github.io/CloudPlay-App/" }
+                                            config.publicWebPortalUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
                                         }
 
                                         Text(

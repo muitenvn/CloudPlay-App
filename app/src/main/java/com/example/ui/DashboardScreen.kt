@@ -236,6 +236,7 @@ fun DashboardScreen(
                 val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
                 val effectiveWidthDp = maxWidth.value / fontScale
                 val isCompactTopBar = maxWidth < 360.dp || effectiveWidthDp < 340f
+                val isLandscapeOrWide = maxWidth > maxHeight || maxWidth >= 480.dp
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -320,6 +321,35 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
+                            // Nút chuyển nhanh sang Giao diện TV trên thanh công cụ (luôn hiện nổi bật khi nằm ngang / tỷ lệ rộng như TV/Laptop, hoặc khi cắm tay cầm)
+                            if (isLandscapeOrWide || gamepadStatus.hasPhysicalController) {
+                                Row(
+                                    modifier = Modifier
+                                        .defaultMinSize(minHeight = 38.dp)
+                                        .clip(TOP_PILL_SHAPE)
+                                        .background(Color(0xFF16352A), TOP_PILL_SHAPE)
+                                        .border(1.dp, XboxNeonGreen.copy(alpha = 0.55f), TOP_PILL_SHAPE)
+                                        .gamepadClickable(cornerRadius = 8.dp) {
+                                            com.example.data.AppLogger.info("UI", "Bấm nút chuyển nhanh sang Giao diện TV từ thanh công cụ")
+                                            SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.TV)
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                                        .testTag("topbar_quick_switch_tv_button"),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Text(
+                                        text = config.tr("📺 Giao diện TV", "📺 TV Mode"),
+                                        color = XboxNeonGreen,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+
                             // Language Switcher
                             val currentLangLabel = config.appLanguage.effectiveShortBadge()
                             Box(contentAlignment = Alignment.Center) {
@@ -436,6 +466,31 @@ fun DashboardScreen(
                                         .background(XboxSurfaceVariant)
                                         .border(1.dp, XboxCardBorder, RoundedCornerShape(10.dp))
                                 ) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = config.tr("Chuyển sang Giao diện TV", "Switch to TV Mode"),
+                                                color = XboxNeonGreen,
+                                                fontFamily = SpaceGroteskFontFamily,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.SportsEsports,
+                                                contentDescription = null,
+                                                tint = XboxNeonGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        },
+                                        onClick = {
+                                            showOverflowMenu = false
+                                            com.example.data.AppLogger.info("UI", "Chuyển sang Giao diện TV từ menu 3 chấm")
+                                            SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.TV)
+                                        },
+                                        modifier = Modifier.testTag("topbar_overflow_switch_tv_button")
+                                    )
                                     DropdownMenuItem(
                                         text = {
                                             Text(

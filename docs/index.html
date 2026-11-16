@@ -6,7 +6,7 @@
   <title>Ravno — Xbox Cloud Gaming gọn nhẹ trên Android</title>
   <meta name="description" content="Ravno là ứng dụng Android độc lập để chơi Xbox Cloud Gaming trên điện thoại: tay cầm cảm ứng tùy chỉnh, thông số thật, dịch giao diện." />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://muitenvn.github.io/CloudPlay-App/" />
+  <link rel="canonical" href="https://muitenvn.github.io/Ravno-App/" />
   <link rel="icon" href="img/icon.png" type="image/png" />
   <meta name="theme-color" content="#f5f8f7" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#0b1412" media="(prefers-color-scheme: dark)" />
@@ -14,8 +14,8 @@
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Ravno — Xbox Cloud Gaming gọn nhẹ trên Android" />
   <meta property="og:description" content="Ứng dụng Android độc lập: tay cầm cảm ứng tùy chỉnh, thông số thật, dịch giao diện." />
-  <meta property="og:url" content="https://muitenvn.github.io/CloudPlay-App/" />
-  <meta property="og:image" content="https://muitenvn.github.io/CloudPlay-App/img/og.jpg" />
+  <meta property="og:url" content="https://muitenvn.github.io/Ravno-App/" />
+  <meta property="og:image" content="https://muitenvn.github.io/Ravno-App/img/og.jpg" />
   <meta name="twitter:card" content="summary_large_image" />
 
   <style>
@@ -193,13 +193,13 @@
           <span class="rel-sub" id="relSub" data-i18n="relSubDefault">Android 8.0 trở lên</span>
         </div>
         <div class="btns">
-          <a id="dlMain" class="btn btn-main" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener">
+          <a id="dlMain" class="btn btn-main" href="https://github.com/muitenvn/Ravno-App/releases/latest" rel="noopener">
             <span data-i18n="dlMain">Tải APK</span><small id="relSize"></small>
           </a>
-          <a id="dlMirror" class="btn btn-alt" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener noreferrer">
+          <a id="dlMirror" class="btn btn-alt" href="https://github.com/muitenvn/Ravno-App/releases/latest" rel="noopener noreferrer">
             <span data-i18n="dlMirror">Tải nhanh (mirror)</span>
           </a>
-          <a id="dlPad" class="btn btn-alt" href="https://github.com/muitenvn/CloudPlay-App/releases/latest" rel="noopener" hidden>
+          <a id="dlPad" class="btn btn-alt" href="https://github.com/muitenvn/Ravno-App/releases/latest" rel="noopener" hidden>
             <span data-i18n="dlPad">Tải Ravno Pad (Tay cầm TV)</span>
           </a>
         </div>
@@ -248,9 +248,9 @@
   <footer class="foot">
     <nav aria-label="Liên kết">
       <a href="terms.html" id="termsFoot" data-i18n="navTerms">Điều khoản</a>
-      <a href="https://github.com/muitenvn/CloudPlay-App" rel="noopener noreferrer" data-i18n="fRepo">Mã nguồn</a>
-      <a href="https://github.com/muitenvn/CloudPlay-App/releases" rel="noopener noreferrer" data-i18n="fReleases">Các phiên bản</a>
-      <a href="https://github.com/muitenvn/CloudPlay-App/issues" rel="noopener noreferrer" data-i18n="fIssues">Báo lỗi và góp ý</a>
+      <a href="https://github.com/muitenvn/Ravno-App" rel="noopener noreferrer" data-i18n="fRepo">Mã nguồn</a>
+      <a href="https://github.com/muitenvn/Ravno-App/releases" rel="noopener noreferrer" data-i18n="fReleases">Các phiên bản</a>
+      <a href="https://github.com/muitenvn/Ravno-App/issues" rel="noopener noreferrer" data-i18n="fIssues">Báo lỗi và góp ý</a>
     </nav>
     <p data-i18n="fCopy">Ravno, dự án độc lập không liên kết với Microsoft hay Xbox. Định vị IP bởi DB-IP.com (CC BY 4.0).</p>
   </footer>
@@ -408,7 +408,7 @@
   try { saved = localStorage.getItem("cp_lang"); } catch (e) {}
   setLang(q || saved || "vi");
 
-  fetch("https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest", { headers: { "Accept": "application/vnd.github+json" } })
+  fetch("https://api.github.com/repos/muitenvn/Ravno-App/releases/latest", { headers: { "Accept": "application/vnd.github+json" } })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
       if (!d) return;
@@ -418,15 +418,15 @@
         if (!a || typeof a.name !== "string") continue;
         var nm = a.name.toLowerCase();
         if (!nm.endsWith(".apk")) continue;
-        var isPad = nm.indexOf("cloudplay-pad") !== -1 || nm.indexOf("-pad-") !== -1 || nm.indexOf("pad-") === 0;
+        var isPad = nm.indexOf("ravno-pad") !== -1 || nm.indexOf("cloudplay-pad") !== -1 || nm.indexOf("-pad-") !== -1 || nm.indexOf("pad-") === 0;
         if (isPad) {
           if (!padApk) padApk = a;
-        } else if (nm.indexOf("cloudplay-xbox") !== -1 || !apk) {
+        } else if (nm.indexOf("ravno-xbox") !== -1 || nm.indexOf("ravno-app") !== -1 || nm.indexOf("cloudplay-xbox") !== -1 || !apk) {
           apk = a;
         }
       }
       var m = (d.body || "").match(/\b([a-fA-F0-9]{64})\b/);
-      var url = apk ? apk.browser_download_url : (d.html_url || "https://github.com/muitenvn/CloudPlay-App/releases/latest");
+      var url = apk ? apk.browser_download_url : (d.html_url || "https://github.com/muitenvn/Ravno-App/releases/latest");
       info = {
         tag: d.tag_name || "",
         date: d.published_at ? d.published_at.slice(0, 10) : "",

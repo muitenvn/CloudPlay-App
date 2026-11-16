@@ -559,7 +559,8 @@ fun UpdateAvailableDialog(
                     val openBrowserAction: () -> Unit = {
                         try {
                             val targetUrl = updateInfo.releaseUrl.takeIf {
-                                it.startsWith("https://github.com/muitenvn/CloudPlay-App/releases")
+                                it.startsWith("https://github.com/muitenvn/Ravno-App/releases") ||
+                                    it.startsWith("https://github.com/muitenvn/CloudPlay-App/releases")
                             } ?: githubReleasesUrl
                             com.example.data.AppLogger.info("UI", "Mở trang bản phát hành GitHub trên trình duyệt ngoài")
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {

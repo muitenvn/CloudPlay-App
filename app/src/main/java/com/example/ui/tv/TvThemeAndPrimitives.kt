@@ -410,6 +410,36 @@ internal fun TvLeftNavigationRail(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // Nút chuyển nhanh sang Giao diện Điện thoại ngay trên thanh điều hướng trái (hiển thị ở mọi tab TV)
+        val switchCorner = (10.dp * scale).coerceAtLeast(8.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(switchCorner))
+                .background(TvSurface2)
+                .gamepadClickable(
+                    cornerRadius = switchCorner,
+                    onClick = {
+                        com.example.data.AppLogger.info("UI", "Chuyển nhanh về Giao diện Điện thoại từ thanh điều hướng TV")
+                        com.example.data.SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.PHONE)
+                    }
+                )
+                .padding(horizontal = (10.dp * scale).coerceAtLeast(7.dp), vertical = (6.dp * scale).coerceAtLeast(4.dp))
+                .testTag("tv_rail_switch_phone_ui_button"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy((6.dp * scale).coerceAtLeast(4.dp))
+        ) {
+            Text(
+                text = config.tr("📲 Giao diện ĐT", "📲 Phone UI"),
+                color = TvCyan,
+                fontFamily = SpaceGroteskFontFamily,
+                fontSize = (11.5f * scale).coerceAtLeast(9.5f).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
         // Bottom VPN Status Chip (.vpnchip)
         val isVpnActive = vpnState.mode != NetworkMode.DISCONNECTED
         val dotColor = when (vpnState.mode) {

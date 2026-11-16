@@ -795,9 +795,9 @@ data class AppConfig(
     val videoContrast: Int = 100, // 80 .. 140 (%)
     val videoSaturation: Int = 100, // 80 .. 150 (%)
     val videoBrightness: Int = 100, // 80 .. 130 (%)
-    val customApkDownloadUrl: String = "https://github.com/muitenvn/CloudPlay-App/releases/latest",
-    val publicWebPortalUrl: String = "https://muitenvn.github.io/CloudPlay-App/",
-    val githubRepoSlug: String = "muitenvn/CloudPlay-App",
+    val customApkDownloadUrl: String = "https://github.com/muitenvn/Ravno-App/releases/latest",
+    val publicWebPortalUrl: String = "https://muitenvn.github.io/Ravno-App/",
+    val githubRepoSlug: String = "muitenvn/Ravno-App",
     val userAcceptedTerms: Boolean = false,
     val autoCheckUpdatesOnLaunch: Boolean = true,
     val enableGlobalpingProbe: Boolean = false, // A4: Mặc định TẮT đo qua trạm Globalping bên thứ ba
@@ -1076,18 +1076,21 @@ object SettingsRepository {
             videoContrast = sp.getInt("video_contrast_v2", 100).coerceIn(80, 140),
             videoSaturation = sp.getInt("video_saturation_v2", 100).coerceIn(80, 150),
             videoBrightness = sp.getInt("video_brightness", 100).coerceIn(80, 130),
-            customApkDownloadUrl = sp.getString(
+            customApkDownloadUrl = (sp.getString(
                 "custom_apk_download_url_v2",
-                "https://github.com/muitenvn/CloudPlay-App/releases/latest"
-            ) ?: "https://github.com/muitenvn/CloudPlay-App/releases/latest",
-            publicWebPortalUrl = sp.getString(
+                "https://github.com/muitenvn/Ravno-App/releases/latest"
+            ) ?: "https://github.com/muitenvn/Ravno-App/releases/latest")
+                .replace("CloudPlay-App", "Ravno-App"),
+            publicWebPortalUrl = (sp.getString(
                 "public_web_portal_url_v2",
-                "https://muitenvn.github.io/CloudPlay-App/"
-            ) ?: "https://muitenvn.github.io/CloudPlay-App/",
-            githubRepoSlug = sp.getString(
+                "https://muitenvn.github.io/Ravno-App/"
+            ) ?: "https://muitenvn.github.io/Ravno-App/")
+                .replace("CloudPlay-App", "Ravno-App"),
+            githubRepoSlug = (sp.getString(
                 "github_repo_slug_v2",
-                "muitenvn/CloudPlay-App"
-            ) ?: "muitenvn/CloudPlay-App",
+                "muitenvn/Ravno-App"
+            ) ?: "muitenvn/Ravno-App")
+                .replace("CloudPlay-App", "Ravno-App"),
             userAcceptedTerms = sp.getBoolean("user_accepted_terms_v2", false),
             autoCheckUpdatesOnLaunch = sp.getBoolean("auto_check_updates_on_launch", true),
             enableGlobalpingProbe = sp.getBoolean("enable_globalping_probe", false),
@@ -1731,13 +1734,13 @@ object SettingsRepository {
         _config.update {
             it.copy(
                 customApkDownloadUrl = apkDownloadUrl.trim().ifBlank {
-                    "https://github.com/muitenvn/CloudPlay-App/releases/latest"
+                    "https://github.com/muitenvn/Ravno-App/releases/latest"
                 },
                 publicWebPortalUrl = webPortalUrl.trim().ifBlank {
-                    "https://muitenvn.github.io/CloudPlay-App/"
+                    "https://muitenvn.github.io/Ravno-App/"
                 },
                 githubRepoSlug = githubRepo.trim().ifBlank {
-                    "muitenvn/CloudPlay-App"
+                    "muitenvn/Ravno-App"
                 }
             )
         }

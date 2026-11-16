@@ -1223,7 +1223,7 @@ internal fun TvSettingsScreen(
             isEn = config.isEnglishUI(),
             onOpenExternalBrowser = {
                 try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://muitenvn.github.io/CloudPlay-App/terms.html")).apply {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://muitenvn.github.io/Ravno-App/terms.html")).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     context.startActivity(intent)

@@ -92,34 +92,12 @@ fun TvDashboardScreen(
 
     androidx.compose.runtime.DisposableEffect(context) {
         com.example.cloudplay.RemotePadTvServer.startServerIfNeeded(context)
-        val act = (context as? android.app.Activity)
-            ?: ((context as? android.content.ContextWrapper)?.baseContext as? android.app.Activity)
         com.example.cloudplay.RemotePadTvServer.onRemotePadButton = { buttonIndex, pressed, _ ->
-            val keyCode = when (buttonIndex) {
-                0 -> android.view.KeyEvent.KEYCODE_BUTTON_A
-                1 -> android.view.KeyEvent.KEYCODE_BUTTON_B
-                12 -> android.view.KeyEvent.KEYCODE_DPAD_UP
-                13 -> android.view.KeyEvent.KEYCODE_DPAD_DOWN
-                14 -> android.view.KeyEvent.KEYCODE_DPAD_LEFT
-                15 -> android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                else -> null
-            }
-            if (keyCode != null) {
-                val action = if (pressed) android.view.KeyEvent.ACTION_DOWN else android.view.KeyEvent.ACTION_UP
-                val now = android.os.SystemClock.uptimeMillis()
-                val ev = android.view.KeyEvent(
-                    now,
-                    now,
-                    action,
-                    keyCode,
-                    0,
-                    0,
-                    android.view.KeyCharacterMap.VIRTUAL_KEYBOARD,
-                    0,
-                    0,
-                    android.view.InputDevice.SOURCE_GAMEPAD or android.view.InputDevice.SOURCE_DPAD
-                )
-                act?.window?.decorView?.dispatchKeyEvent(ev)
+            com.example.ui.components.GamepadUiNavigation.dispatchRemotePadButton(buttonIndex, pressed)
+        }
+        com.example.cloudplay.RemotePadTvServer.onRemotePadStick = { xAxisIndex, xVal, yAxisIndex, yVal ->
+            if (xAxisIndex == 0 && yAxisIndex == 1) {
+                com.example.ui.components.GamepadUiNavigation.dispatchRemotePadStick(xVal, yVal)
             }
         }
         onDispose { }

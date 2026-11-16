@@ -256,6 +256,17 @@ internal fun TvHomeScreen(
                     )
 
                     TvPill(
+                        text = config.tr("📲 Điện thoại", "📲 Phone UI"),
+                        scale = scale,
+                        tone = TvPillTone.CYAN,
+                        onClick = {
+                            com.example.data.AppLogger.info("UI", "Bấm nút chuyển nhanh về Giao diện Điện thoại từ thanh đầu TV")
+                            SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.PHONE)
+                        },
+                        modifier = Modifier.testTag("tv_home_switch_phone_ui_pill")
+                    )
+
+                    TvPill(
                         text = "QR",
                         scale = scale,
                         tone = TvPillTone.NEUTRAL,

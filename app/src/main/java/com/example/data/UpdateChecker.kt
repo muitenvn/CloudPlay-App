@@ -114,9 +114,9 @@ object UpdateChecker {
     private const val BROWSER_COMPAT_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
 
-    private const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/muitenvn/CloudPlay-App/releases/latest"
-    private const val LATEST_RELEASE_WEB_URL = "https://github.com/muitenvn/CloudPlay-App/releases/latest"
-    const val FALLBACK_RELEASES_URL = "https://github.com/muitenvn/CloudPlay-App/releases"
+    private const val LATEST_RELEASE_API_URL = "https://api.github.com/repos/muitenvn/Ravno-App/releases/latest"
+    private const val LATEST_RELEASE_WEB_URL = "https://github.com/muitenvn/Ravno-App/releases/latest"
+    const val FALLBACK_RELEASES_URL = "https://github.com/muitenvn/Ravno-App/releases"
     private const val FAST_CDN_PREFIX = "https://gh-proxy.com/"
 
     /**
@@ -236,7 +236,7 @@ object UpdateChecker {
 
     private fun buildFastCdnUrl(apkDirectUrl: String, latestVersion: String): String {
         val resolvedDirect = apkDirectUrl.ifBlank {
-            "https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
+            "https://github.com/muitenvn/Ravno-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
         }
         return if (resolvedDirect.startsWith("https://github.com/")) "$FAST_CDN_PREFIX$resolvedDirect" else resolvedDirect
     }
@@ -439,17 +439,20 @@ object UpdateChecker {
         val sameAsCached = cachedLatest.equals(cleanLatest, ignoreCase = true)
 
         val releaseUrl = if (sameAsCached) {
-            sp.getString(KEY_CACHED_RELEASE_URL, FALLBACK_RELEASES_URL) ?: FALLBACK_RELEASES_URL
+            (sp.getString(KEY_CACHED_RELEASE_URL, FALLBACK_RELEASES_URL) ?: FALLBACK_RELEASES_URL)
+                .replace("CloudPlay-App", "Ravno-App")
         } else {
-            "https://github.com/muitenvn/CloudPlay-App/releases/tag/v$cleanLatest"
+            "https://github.com/muitenvn/Ravno-App/releases/tag/v$cleanLatest"
         }
         val releaseNotes = if (sameAsCached) sp.getString(KEY_CACHED_RELEASE_NOTES, "") ?: "" else ""
         val apkDirectUrl = if (sameAsCached) {
-            (sp.getString(KEY_CACHED_APK_DIRECT_URL, "") ?: "").ifBlank {
-                "https://github.com/muitenvn/CloudPlay-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
-            }
+            (sp.getString(KEY_CACHED_APK_DIRECT_URL, "") ?: "")
+                .replace("CloudPlay-App", "Ravno-App")
+                .ifBlank {
+                    "https://github.com/muitenvn/Ravno-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
+                }
         } else {
-            "https://github.com/muitenvn/CloudPlay-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
+            "https://github.com/muitenvn/Ravno-App/releases/download/v$cleanLatest/CloudPlay-Xbox-v$cleanLatest.apk"
         }
         val officialSha = if (sameAsCached) sp.getString(KEY_CACHED_OFFICIAL_SHA256, "") ?: "" else ""
         val shaAssetUrl = if (sameAsCached) {
@@ -635,7 +638,7 @@ object UpdateChecker {
             }
 
             if (apkDirectUrl.isBlank()) {
-                apkDirectUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
+                apkDirectUrl = "https://github.com/muitenvn/Ravno-App/releases/download/v$latestVersion/CloudPlay-Xbox-v$latestVersion.apk"
             }
             if (sha256AssetUrl.isBlank()) sha256AssetUrl = "$apkDirectUrl.sha256"
             val newerAvailable = isNewerVersion(currentVersion, latestVersion)
@@ -797,7 +800,7 @@ object UpdateChecker {
         downloadJob = scope.launch {
             try {
                 val directGitHubUrl = updateInfo.apkDirectUrl.ifBlank {
-                    "https://github.com/muitenvn/CloudPlay-App/releases/download/v${updateInfo.latestVersion}/CloudPlay-Xbox-v${updateInfo.latestVersion}.apk"
+                    "https://github.com/muitenvn/Ravno-App/releases/download/v${updateInfo.latestVersion}/CloudPlay-Xbox-v${updateInfo.latestVersion}.apk"
                 }
                 val candidates = buildOrderedMirrorChain(
                     directGitHubUrl = directGitHubUrl,

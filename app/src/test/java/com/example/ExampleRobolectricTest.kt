@@ -934,8 +934,8 @@ class ExampleRobolectricTest {
     @Test
     fun testIsoQrCodeGeneratorAndFastVpnSecurityAndStreamPause() {
         // 1. Kiểm tra bộ tạo mã QR chuẩn ISO/IEC 18004 tạo đúng kích thước Version và Finder Pattern 3 góc
-        val webMatrix = com.example.ui.components.QrCodeGenerator.encodeToMatrix("https://muitenvn.github.io/CloudPlay-App/")
-        assertEquals(29, webMatrix.size) // 41 bytes -> Version 3 (29x29)
+        val webMatrix = com.example.ui.components.QrCodeGenerator.encodeToMatrix("https://muitenvn.github.io/Ravno-App/")
+        assertEquals(29, webMatrix.size) // 37 bytes -> Version 3 (29x29)
         // Finder góc trên-trái (7x7) và tâm (3,3) đen, viền trắng (7, 0..7)
         assertTrue(webMatrix[0][0])
         assertTrue(webMatrix[3][3])
@@ -1028,7 +1028,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun testMultiMirrorFailoverChainAndApkValidation() {
-        val directUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v1.0.5/CloudPlay-v1.0.5.apk"
+        val directUrl = "https://github.com/muitenvn/Ravno-App/releases/download/v1.0.5/CloudPlay-v1.0.5.apk"
         val expectedNodeCount = com.example.data.UpdateChecker.FAST_MIRROR_NODES.size
 
         // 1. Auto mode puts gh-proxy.com first and includes all 11 mirror/direct nodes

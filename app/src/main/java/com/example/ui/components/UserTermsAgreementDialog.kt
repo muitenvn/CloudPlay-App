@@ -90,7 +90,7 @@ fun UserTermsAgreementDialog(
     var agreedToTerms by remember(isDismissible) { mutableStateOf(isDismissible) }
     var showFullInAppReader by rememberSaveable { mutableStateOf(false) }
     val scrollState = rememberScrollState()
-    val fullTermsUrl = "https://muitenvn.github.io/CloudPlay-App/terms.html"
+    val fullTermsUrl = "https://muitenvn.github.io/Ravno-App/terms.html"
 
     fun openFullTermsInBrowser() {
         try {

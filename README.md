@@ -4,9 +4,9 @@
 
 **Ravno** (**Ravno App**) is a lightweight, independent Android application built for playing **Xbox Cloud Gaming** (`xbox.com/play`) on mobile phones and Android TV, featuring customizable touch controls, the **Ravno Pad** companion controller app, real-time stream telemetry, menu localization, and optional network routing tools (inspired by the open-source [better-xcloud](https://github.com/redphx/better-xcloud) project).
 
-- **Trang chủ & Tải APK / Website & Download:** [https://muitenvn.github.io/CloudPlay-App/](https://muitenvn.github.io/CloudPlay-App/)
-- **Điều khoản & Quyền riêng tư (15 mục) / Terms & Privacy:** [https://muitenvn.github.io/CloudPlay-App/terms.html](https://muitenvn.github.io/CloudPlay-App/terms.html)
-- **Các phiên bản phát hành / Releases:** [GitHub Releases](https://github.com/muitenvn/CloudPlay-App/releases)
+- **Trang chủ & Tải APK / Website & Download:** [https://muitenvn.github.io/Ravno-App/](https://muitenvn.github.io/Ravno-App/)
+- **Điều khoản & Quyền riêng tư (15 mục) / Terms & Privacy:** [https://muitenvn.github.io/Ravno-App/terms.html](https://muitenvn.github.io/Ravno-App/terms.html)
+- **Các phiên bản phát hành / Releases:** [GitHub Releases](https://github.com/muitenvn/Ravno-App/releases)
 
 ---
 
@@ -22,7 +22,7 @@
 
 ## An toàn & Quyền riêng tư / Safety & Privacy
 
-Chi tiết đầy đủ được công bố tại [Chính sách Bảo mật (SECURITY.md)](SECURITY.md) và [Trang Điều khoản & Quyền riêng tư](https://muitenvn.github.io/CloudPlay-App/terms.html):
+Chi tiết đầy đủ được công bố tại [Chính sách Bảo mật (SECURITY.md)](SECURITY.md) và [Trang Điều khoản & Quyền riêng tư](https://muitenvn.github.io/Ravno-App/terms.html):
 
 1. **An toàn tài khoản:** Người dùng đăng nhập trực tiếp trên trang chính thức của Microsoft (`login.live.com`, `xbox.com`). Ứng dụng hoàn toàn không đọc, không thu thập và không lưu mật khẩu hay mã xác thực (OTP/2FA).
 2. **Bảo vệ khi thanh toán:** Tự động ngắt máy chủ trung gian khi mở các trang mua hàng, nạp mã hoặc quản lý tài khoản của Microsoft.

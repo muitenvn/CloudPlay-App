@@ -90,7 +90,7 @@ object QrCodeGenerator {
      * Mã hóa chuỗi văn bản/URL thành ma trận boolean 2 chiều chuẩn ISO/IEC 18004 (`true` = điểm đen, `false` = điểm trắng).
      */
     fun encodeToMatrix(content: String): Array<BooleanArray> {
-        val payload = content.trim().ifEmpty { "https://muitenvn.github.io/CloudPlay-App/" }
+        val payload = content.trim().ifEmpty { "https://muitenvn.github.io/Ravno-App/" }
         val utf8Bytes = payload.encodeToByteArray()
 
         // Chọn từ Version 3 (29x29 có Alignment Pattern góc dưới-phải giống mẫu QR chuẩn) trở lên

@@ -642,7 +642,7 @@ def main() -> None:
         lines.append("</details>")
         lines.append("")
 
-    repo_slug = os.environ.get("GITHUB_REPOSITORY", "").strip() or "muitenvn/CloudPlay-App"
+    repo_slug = os.environ.get("GITHUB_REPOSITORY", "").strip() or "muitenvn/Ravno-App"
     direct_gh_url = f"https://github.com/{repo_slug}/releases/download/{tag_name}/{apk_ver_name}"
     cdn_fast_1 = f"https://ghfast.top/{direct_gh_url}"
     cdn_fast_2 = f"https://gh-proxy.com/{direct_gh_url}"

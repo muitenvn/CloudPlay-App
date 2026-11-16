@@ -101,7 +101,7 @@ class ExampleUnitTest {
 
   @Test
   fun updateChecker_mirrorFailoverChainAndRedirectValidation() {
-    val directUrl = "https://github.com/muitenvn/CloudPlay-App/releases/download/v1.3.0/CloudPlay-Xbox-v1.3.0.apk"
+    val directUrl = "https://github.com/muitenvn/Ravno-App/releases/download/v1.3.0/CloudPlay-Xbox-v1.3.0.apk"
     val totalNodes = com.example.data.UpdateChecker.FAST_MIRROR_NODES.size
     assertEquals(11, totalNodes)
 

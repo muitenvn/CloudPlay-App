@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -208,10 +209,30 @@ internal fun TvInGameFloatingHud(
 ) {
     var isHudExpanded by rememberSaveable { mutableStateOf(false) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
+    var showRemotePadDialog by rememberSaveable { mutableStateOf(false) }
+    var showInGamePairingToast by rememberSaveable { mutableStateOf(false) }
+    val remotePadServerState by com.example.cloudplay.RemotePadTvServer.state.collectAsState()
+    var lastHandledPairTick by rememberSaveable { androidx.compose.runtime.mutableLongStateOf(0L) }
     val firstRowFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(isHudExpanded, showExitConfirmDialog) {
-        onHudOpenStateChanged(isHudExpanded || showExitConfirmDialog)
+    LaunchedEffect(remotePadServerState.pairPromptTick) {
+        val tick = remotePadServerState.pairPromptTick
+        if (tick > 0L && tick != lastHandledPairTick) {
+            lastHandledPairTick = tick
+            if (remotePadServerState.status != com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER) {
+                showInGamePairingToast = true
+            }
+        }
+    }
+
+    LaunchedEffect(remotePadServerState.status) {
+        if (remotePadServerState.status == com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER) {
+            showInGamePairingToast = false
+        }
+    }
+
+    LaunchedEffect(isHudExpanded, showExitConfirmDialog, showRemotePadDialog) {
+        onHudOpenStateChanged(isHudExpanded || showExitConfirmDialog || showRemotePadDialog)
     }
 
     val comboTick = GamepadUiNavigation.hudToggleComboTick
@@ -221,6 +242,8 @@ internal fun TvInGameFloatingHud(
             lastHandledComboTick = comboTick
             if (showExitConfirmDialog) {
                 showExitConfirmDialog = false
+            } else if (showRemotePadDialog) {
+                showRemotePadDialog = false
             } else {
                 isHudExpanded = !isHudExpanded
                 AppLogger.info(
@@ -255,7 +278,24 @@ internal fun TvInGameFloatingHud(
             NetworkMode.DISCONNECTED -> config.tr("Trực tiếp", "Direct")
         }
 
-        if (!isHudExpanded && showTvMenuGuideBanner) {
+        if (!isHudExpanded && !showRemotePadDialog && showInGamePairingToast) {
+            TvInGamePairingToast(
+                config = config,
+                serverState = remotePadServerState,
+                onRegeneratePin = { com.example.cloudplay.RemotePadTvServer.regeneratePin() },
+                onOpenFullDialog = {
+                    showInGamePairingToast = false
+                    showRemotePadDialog = true
+                },
+                onDismiss = { showInGamePairingToast = false },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(
+                        top = (14.dp * scale).coerceAtLeast(10.dp),
+                        end = (18.dp * scale).coerceAtLeast(12.dp)
+                    )
+            )
+        } else if (!isHudExpanded && showTvMenuGuideBanner) {
             val bannerCorner = (10.dp * scale).coerceAtLeast(8.dp)
             Row(
                 modifier = Modifier
@@ -295,7 +335,7 @@ internal fun TvInGameFloatingHud(
             val rowCorner = (11.dp * scale).coerceAtLeast(8.dp)
 
             GamepadSurfaceController(
-                enabled = !showExitConfirmDialog,
+                enabled = !showExitConfirmDialog && !showRemotePadDialog,
                 defaultFocusRequester = firstRowFocusRequester,
                 autoRequestDefaultFocus = true,
                 attachWindowMotionListener = true,
@@ -424,7 +464,33 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_stats_row"
                                 )
 
-                                // Hàng 4: Quay màn hình (.MP4)
+                                // Hàng 4: Dùng điện thoại làm tay cầm (Ravno Pad)
+                                val remotePadTrailing = if (
+                                    remotePadServerState.status == com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER &&
+                                    remotePadServerState.connectedDeviceName.isNotBlank()
+                                ) {
+                                    remotePadServerState.connectedDeviceName
+                                } else {
+                                    "PIN ${remotePadServerState.currentPin}"
+                                }
+                                TvHudActionRow(
+                                    title = config.tr("📱 Dùng điện thoại làm tay cầm", "📱 Use Phone as Controller"),
+                                    trailingText = remotePadTrailing,
+                                    trailingColor = if (remotePadServerState.status == com.muitenvn.cloudplay.protocol.TvServiceStatus.HAS_CONTROLLER) {
+                                        TvAccent
+                                    } else {
+                                        TvCyan
+                                    },
+                                    scale = scale,
+                                    corner = rowCorner,
+                                    onClick = {
+                                        isHudExpanded = false
+                                        showRemotePadDialog = true
+                                    },
+                                    testTag = "tv_hud_remote_pad_row"
+                                )
+
+                                // Hàng 5: Quay màn hình (.MP4)
                                 val recordSubtitle = if (recorderState.isRecording) {
                                     val mins = recorderState.elapsedSeconds / 60
                                     val secs = recorderState.elapsedSeconds % 60
@@ -442,7 +508,7 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_record_row"
                                 )
 
-                                // Hàng 5: Chuyển mạng VPN / Trực tiếp
+                                // Hàng 6: Chuyển mạng VPN / Trực tiếp
                                 TvHudActionRow(
                                     title = if (vpnState.mode == NetworkMode.VPN_JAPAN) {
                                         config.tr("Tắt VPN (Chuyển sang Trực tiếp)", "Disconnect VPN (Use Direct)")
@@ -457,7 +523,7 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_network_row"
                                 )
 
-                                // Hàng 6: Giao diện web Xbox (Cũ / Mới)
+                                // Hàng 7: Giao diện web Xbox (Cũ / Mới)
                                 TvHudActionRow(
                                     title = config.tr("Giao diện web Xbox", "Xbox Web UI"),
                                     trailingText = if (xboxWebUiMode == XboxWebUiMode.CLASSIC) {
@@ -479,7 +545,7 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_webui_row"
                                 )
 
-                                // Hàng 7: Cài đặt nhanh đầy đủ
+                                // Hàng 8: Cài đặt nhanh đầy đủ
                                 TvHudActionRow(
                                     title = config.tr("Tùy chỉnh nhanh Hiển thị & Tay cầm", "Display & Controller Quick Settings"),
                                     trailingText = "›",
@@ -493,7 +559,21 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_quick_settings_row"
                                 )
 
-                                // Hàng 8: Tải lại trang
+                                // Hàng 9: Chuyển nhanh về Giao diện Điện thoại (hỗ trợ tay cầm ảo cảm ứng)
+                                TvHudActionRow(
+                                    title = config.tr("📲 Chuyển sang Giao diện Điện thoại", "📲 Switch to Phone UI"),
+                                    trailingText = "⇄",
+                                    trailingColor = TvCyan,
+                                    scale = scale,
+                                    corner = rowCorner,
+                                    onClick = {
+                                        isHudExpanded = false
+                                        com.example.data.SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.PHONE)
+                                    },
+                                    testTag = "tv_hud_switch_phone_ui_row"
+                                )
+
+                                // Hàng 10: Tải lại trang
                                 TvHudActionRow(
                                     title = config.tr("Tải lại trang", "Reload Page"),
                                     trailingText = "↻",
@@ -507,7 +587,7 @@ internal fun TvInGameFloatingHud(
                                     testTag = "tv_hud_reload_row"
                                 )
 
-                                // Hàng 9: Thoát về Trang chủ
+                                // Hàng 11: Thoát về Trang chủ
                                 TvHudActionRow(
                                     title = config.tr("Thoát về Trang chủ", "Exit to Home"),
                                     titleColor = TvDanger,
@@ -535,6 +615,13 @@ internal fun TvInGameFloatingHud(
                 }
             }
         }
+    }
+
+    if (showRemotePadDialog) {
+        TvRemotePadDialog(
+            config = config,
+            onDismiss = { showRemotePadDialog = false }
+        )
     }
 
     if (showExitConfirmDialog) {

@@ -1080,6 +1080,9 @@ object PadNetworkClient {
         }
     }
 
+    @Volatile
+    var gameRumbleScale: Float = 1.0f
+
     fun disconnectActiveSession(navigateToList: Boolean = true) {
         autoReconnectJob?.cancel()
         releaseAllInputsImmediate()
@@ -1109,8 +1112,44 @@ object PadNetworkClient {
         }
     }
 
+    fun forgetActiveTvAndDisconnect() {
+        val curTv = _state.value.selectedTv
+        if (curTv != null) {
+            removeRememberToken(curTv.tvId)
+            discoveredMap[curTv.tvId] = curTv.copy(hasRememberToken = false)
+            publishDiscoveredList()
+        }
+        autoReconnectJob?.cancel()
+        releaseAllInputsImmediate()
+        val writer = activeControlWriterRef.getAndSet(null)
+        val socket = activeControlSocketRef.getAndSet(null)
+        scope.launch {
+            delay(35L)
+            activeUdpSessionToken = null
+            activeUdpSocketRef.getAndSet(null)?.close()
+            if (writer != null) {
+                sendFrame(writer, RemoteControlFrame.Disconnect("FORGOTTEN"))
+            }
+            runCatching { socket?.close() }
+        }
+        _state.update { cur ->
+            cur.copy(
+                route = PadScreenRoute.FIND_TV,
+                isConnecting = false,
+                isAutoReconnecting = false,
+                enteredPin = "",
+                measuredPingMs = null
+            )
+        }
+        val ctx = appContext
+        if (ctx != null) {
+            startDiscovery(ctx)
+        }
+    }
+
     fun triggerPhoneVibration(durationMs: Int, strongMag: Float, weakMag: Float) {
         val ctx = appContext ?: return
+        val scale = gameRumbleScale.coerceIn(0f, 1.5f)
         try {
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = ctx.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
@@ -1121,13 +1160,13 @@ object PadNetworkClient {
             } ?: return
             if (!vibrator.hasVibrator()) return
 
-            if (durationMs <= 0 || (strongMag <= 0.01f && weakMag <= 0.01f)) {
+            if (scale <= 0.02f || durationMs <= 0 || (strongMag <= 0.01f && weakMag <= 0.01f)) {
                 vibrator.cancel()
                 return
             }
 
             val dur = durationMs.coerceIn(12, 1500).toLong()
-            val combined = (strongMag * 0.7f + weakMag * 0.3f).coerceIn(0.08f, 1f)
+            val combined = ((strongMag * 0.7f + weakMag * 0.3f) * scale).coerceIn(0.08f, 1f)
             val amp = (combined * 255f).roundToInt().coerceIn(1, 255)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createOneShot(dur, amp))

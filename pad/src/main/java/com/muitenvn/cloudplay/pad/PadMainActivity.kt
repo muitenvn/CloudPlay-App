@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -52,7 +54,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import com.muitenvn.cloudplay.protocol.AuthFailReason
@@ -71,17 +72,20 @@ class PadMainActivity : ComponentActivity() {
     }
 }
 
-// Bảng màu phẳng đồng bộ với remote-pad-mockup.html (Flat Dark Gaming UI, không phát sáng, không làm mờ)
-internal val PadBg = Color(0xFF0B0F0E)
-internal val PadSurface = Color(0xFF131A17)
-internal val PadSurface2 = Color(0xFF1A2420)
-internal val PadBorder = Color(0xFF26352E)
-internal val PadInk = Color(0xFFEAF2EE)
-internal val PadMuted = Color(0xFF8EA399)
-internal val PadAccent = Color(0xFF2EE56B)
-internal val PadAccentFill = Color(0xFF163824)
-internal val PadDanger = Color(0xFFFF5B63)
-internal val PadWarn = Color(0xFFF5B841)
+// Bảng màu phẳng mới theo thiết kế Ravno Pad (#070B09 / #0D1511 / #142019 / #16352A / #27D884 / #3FD8EE)
+internal val PadBg = Color(0xFF070B09)
+internal val PadSurface = Color(0xFF0D1511)
+internal val PadSurface2 = Color(0xFF142019)
+internal val PadSelected = Color(0xFF16352A)
+internal val PadBorder = Color(0xFF1B2B23)
+internal val PadInk = Color(0xFFE8F1EC)
+internal val PadMuted = Color(0xFF8AA196)
+internal val PadAccent = Color(0xFF27D884)
+internal val PadOnAccent = Color(0xFF04130B)
+internal val PadAccentFill = Color(0xFF16352A)
+internal val PadCyan = Color(0xFF3FD8EE)
+internal val PadDanger = Color(0xFFF0706B)
+internal val PadWarn = Color(0xFFE3B341)
 
 internal data class PadResponsiveMetrics(
     val outerPad: Dp,
@@ -112,24 +116,24 @@ internal fun rememberPadMetrics(maxWidth: Dp, maxHeight: Dp): PadResponsiveMetri
         val unit = minSide * 0.01f
         with(density) {
             PadResponsiveMetrics(
-                outerPad = unit * 4.8f,
-                sectionGap = unit * 3.4f,
-                itemGap = unit * 2.4f,
-                cardPad = unit * 3.8f,
+                outerPad = unit * 4.4f,
+                sectionGap = unit * 3.0f,
+                itemGap = unit * 2.2f,
+                cardPad = unit * 3.6f,
                 cardRadius = unit * 3.8f,
-                buttonRadius = unit * 3.0f,
-                strokeThin = unit * 0.32f,
-                strokeFocus = unit * 0.55f,
+                buttonRadius = unit * 2.8f,
+                strokeThin = unit * 0.30f,
+                strokeFocus = unit * 0.52f,
                 dotSize = unit * 2.2f,
-                pinBoxW = unit * 14.5f,
-                pinBoxH = unit * 17.5f,
-                keyHeight = unit * 13.5f,
-                titleFont = (unit * 5.0f).toSp(),
-                headingFont = (unit * 4.3f).toSp(),
-                bodyFont = (unit * 3.5f).toSp(),
-                captionFont = (unit * 3.0f).toSp(),
-                pinDigitFont = (unit * 7.2f).toSp(),
-                keyFont = (unit * 4.8f).toSp()
+                pinBoxW = unit * 15.0f,
+                pinBoxH = unit * 18.2f,
+                keyHeight = unit * 12.8f,
+                titleFont = (unit * 4.8f).toSp(),
+                headingFont = (unit * 4.2f).toSp(),
+                bodyFont = (unit * 3.4f).toSp(),
+                captionFont = (unit * 2.9f).toSp(),
+                pinDigitFont = (unit * 7.6f).toSp(),
+                keyFont = (unit * 4.6f).toSp()
             )
         }
     }
@@ -188,7 +192,8 @@ fun CloudPlayPadRootScreen() {
                 }
                 PadLandscapeControllerScreen(
                     state = clientState,
-                    onDisconnect = { PadNetworkClient.disconnectActiveSession(navigateToList = true) }
+                    onDisconnect = { PadNetworkClient.disconnectActiveSession(navigateToList = true) },
+                    onForgetDevice = { PadNetworkClient.forgetActiveTvAndDisconnect() }
                 )
             }
 
@@ -210,8 +215,12 @@ fun CloudPlayPadRootScreen() {
 }
 
 /**
- * Màn hình Điện thoại 1 (#s3 trong remote-pad-mockup.html): Tìm TV trong mạng nội bộ.
+ * Màn hình 1: Tìm TV trong mạng nội bộ.
+ * - Hiển thị danh sách TV phát hiện qua mDNS / LAN kèm địa chỉ IP và chip trạng thái ("Sẵn sàng", "Đã nhớ").
+ * - Tên TV tự động xuống dòng, không bao giờ bị cắt chữ.
+ * - Hỗ trợ Quét lại và Nhập IP thủ công.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PadFindTvScreen(
     state: PadClientUiState,
@@ -232,7 +241,7 @@ private fun PadFindTvScreen(
             .testTag("pad_find_tv_screen"),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // 1. Thanh trên cùng: Ravno Pad + mạng Wi-Fi + nút đổi ngôn ngữ (12 ngôn ngữ)
+        // 1. Thanh trên cùng: Biểu tượng + Ravno Pad + IP LAN + Nút ngôn ngữ
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,7 +256,7 @@ private fun PadFindTvScreen(
                     contentDescription = "Ravno Pad Logo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(m.cardPad * 1.9f)
+                        .size(m.cardPad * 1.95f)
                         .clip(RoundedCornerShape(m.buttonRadius * 0.8f))
                         .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius * 0.8f))
                 )
@@ -261,11 +270,15 @@ private fun PadFindTvScreen(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(m.itemGap)
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.8f)
             ) {
                 Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(PadSurface2)
+                        .padding(horizontal = m.cardPad * 0.65f, vertical = m.cardPad * 0.3f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.6f)
+                    horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.5f)
                 ) {
                     Box(
                         modifier = Modifier
@@ -300,9 +313,9 @@ private fun PadFindTvScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(m.sectionGap))
+        Spacer(modifier = Modifier.height(m.sectionGap * 0.8f))
 
-        // 2. Danh sách TV tìm thấy trong mạng nội bộ (_cloudplaypad._tcp)
+        // 2. Danh sách TV tìm thấy
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -310,18 +323,16 @@ private fun PadFindTvScreen(
             verticalArrangement = Arrangement.spacedBy(m.itemGap)
         ) {
             Text(
-                text = PadStrings.selectTvTitle(lang),
-                color = PadInk,
-                fontSize = m.headingFont,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                text = PadStrings.selectTvGuide(lang),
+                text = PadStrings.tr(
+                    lang = lang,
+                    vi = if (state.isScanning) "Đang tìm TV trên mạng nội bộ…" else PadStrings.selectTvTitle(lang),
+                    en = if (state.isScanning) "Searching for TV on local network…" else PadStrings.selectTvTitle(lang)
+                ),
                 color = PadMuted,
-                fontSize = m.bodyFont
+                fontSize = m.captionFont,
+                fontWeight = FontWeight.SemiBold
             )
 
-            // Hiển thị cảnh báo nếu phát hiện lệch phiên bản giao thức
             if (state.versionMismatchResult != VersionCheckResult.COMPATIBLE) {
                 val verMsg = when (state.versionMismatchResult) {
                     VersionCheckResult.NEED_UPDATE_CLOUDPLAY -> PadStrings.needUpdateCloudPlay(lang)
@@ -347,36 +358,53 @@ private fun PadFindTvScreen(
             }
 
             if (state.discoveredTvs.isEmpty()) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f)
                         .clip(RoundedCornerShape(m.cardRadius))
                         .background(PadSurface)
                         .border(m.strokeThin, PadBorder, RoundedCornerShape(m.cardRadius))
-                        .padding(m.cardPad * 1.2f)
-                        .testTag("pad_empty_tv_card")
+                        .padding(m.cardPad * 1.4f)
+                        .testTag("pad_empty_tv_card"),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.7f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(m.cardPad * 2.8f)
+                            .clip(RoundedCornerShape(m.buttonRadius))
+                            .background(PadSurface2),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
-                            text = PadStrings.tr(
-                                lang = lang,
-                                vi = if (state.isScanning) "Đang tìm TV trên mạng nội bộ..." else "Chưa tìm thấy TV nào đang mở ghép đôi",
-                                en = if (state.isScanning) "Scanning local network for TV..." else "No TV found waiting for pairing"
-                            ),
-                            color = PadInk,
-                            fontSize = m.bodyFont,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = PadStrings.tr(
-                                lang = lang,
-                                vi = "Hãy mở mục Dùng điện thoại làm tay cầm trong Cài đặt của Ravno trên TV.",
-                                en = "Open 'Use Phone as Controller' in Ravno Settings on your TV."
-                            ),
-                            color = PadMuted,
-                            fontSize = m.captionFont
+                            text = "📺",
+                            fontSize = m.headingFont
                         )
                     }
+                    Spacer(modifier = Modifier.height(m.itemGap))
+                    Text(
+                        text = PadStrings.tr(
+                            lang = lang,
+                            vi = if (state.isScanning) "Đang tìm TV…" else "Không thấy TV",
+                            en = if (state.isScanning) "Searching for TV…" else "No TV Found"
+                        ),
+                        color = PadInk,
+                        fontSize = m.headingFont,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(m.itemGap * 0.4f))
+                    Text(
+                        text = PadStrings.tr(
+                            lang = lang,
+                            vi = "Mở Ravno trên TV (cùng mạng Wi-Fi), vào Cài đặt → Dùng điện thoại làm tay cầm.",
+                            en = "Open Ravno on your TV (same Wi-Fi), go to Settings → Use Phone as Controller."
+                        ),
+                        color = PadMuted,
+                        fontSize = m.bodyFont,
+                        textAlign = TextAlign.Center
+                    )
                 }
             } else {
                 LazyColumn(
@@ -384,18 +412,19 @@ private fun PadFindTvScreen(
                         .fillMaxWidth()
                         .weight(1f)
                         .testTag("pad_tv_list"),
-                    verticalArrangement = Arrangement.spacedBy(m.itemGap)
+                    verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.85f)
                 ) {
                     itemsIndexed(state.discoveredTvs, key = { _, item -> item.tvId }) { idx, tv ->
                         val isBusy = tv.status == TvServiceStatus.BUSY
-                        val statusLabel = when {
-                            tv.hasRememberToken -> PadStrings.statusRemembered(lang)
-                            tv.status == TvServiceStatus.HAS_CONTROLLER -> PadStrings.statusHasController(lang)
-                            tv.status == TvServiceStatus.BUSY -> PadStrings.statusBusy(lang)
-                            else -> PadStrings.statusReadyPair(lang)
+                        val chipLabel = when {
+                            tv.hasRememberToken -> PadStrings.tr(lang, "Đã nhớ", "Remembered")
+                            tv.status == TvServiceStatus.HAS_CONTROLLER -> PadStrings.tr(lang, "Đang có tay cầm", "Connected")
+                            tv.status == TvServiceStatus.BUSY -> PadStrings.tr(lang, "Đang bận", "Busy")
+                            else -> PadStrings.tr(lang, "Sẵn sàng", "Ready")
                         }
-                        val statusColor = when {
-                            tv.hasRememberToken || tv.status == TvServiceStatus.WAITING_FOR_PAIR -> PadAccent
+                        val chipColor = when {
+                            tv.hasRememberToken -> PadCyan
+                            tv.status == TvServiceStatus.WAITING_FOR_PAIR -> PadAccent
                             tv.status == TvServiceStatus.HAS_CONTROLLER -> PadWarn
                             else -> PadMuted
                         }
@@ -404,7 +433,7 @@ private fun PadFindTvScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(m.cardRadius))
-                                .background(PadSurface)
+                                .background(if (tv.hasRememberToken) PadSelected else PadSurface)
                                 .border(
                                     if (tv.hasRememberToken) m.strokeFocus else m.strokeThin,
                                     if (tv.hasRememberToken) PadAccent else PadBorder,
@@ -413,9 +442,24 @@ private fun PadFindTvScreen(
                                 .clickable(enabled = !isBusy) { onSelectTv(tv) }
                                 .padding(m.cardPad)
                                 .testTag("pad_tv_card_$idx"),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(m.itemGap),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Icon TV
+                            Box(
+                                modifier = Modifier
+                                    .size(m.cardPad * 2.2f)
+                                    .clip(RoundedCornerShape(m.buttonRadius))
+                                    .background(PadSurface2),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "📺",
+                                    fontSize = m.bodyFont
+                                )
+                            }
+
+                            // Tên TV (tự xuống dòng, không cắt) + IP + Chip trạng thái
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.35f)
@@ -424,19 +468,36 @@ private fun PadFindTvScreen(
                                     text = tv.tvName,
                                     color = if (isBusy) PadMuted else PadInk,
                                     fontSize = m.bodyFont,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontWeight = FontWeight.Bold
                                 )
-                                Text(
-                                    text = statusLabel,
-                                    color = statusColor,
-                                    fontSize = m.captionFont,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.6f),
+                                    verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.3f)
+                                ) {
+                                    Text(
+                                        text = tv.hostAddress,
+                                        color = PadMuted,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = m.captionFont
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(PadSurface2)
+                                            .padding(
+                                                horizontal = m.cardPad * 0.55f,
+                                                vertical = m.cardPad * 0.16f
+                                            )
+                                    ) {
+                                        Text(
+                                            text = chipLabel,
+                                            color = chipColor,
+                                            fontSize = m.captionFont,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
-
-                            Spacer(modifier = Modifier.width(m.itemGap))
 
                             Text(
                                 text = if (isBusy) "—" else "→",
@@ -449,7 +510,6 @@ private fun PadFindTvScreen(
                 }
             }
 
-            // Tùy chọn nhập IP LAN thủ công nếu router Wi-Fi chặn quảng bá mDNS
             if (showManualIpRow) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -462,7 +522,7 @@ private fun PadFindTvScreen(
                             .clip(RoundedCornerShape(m.buttonRadius))
                             .background(PadSurface)
                             .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
-                            .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.7f)
+                            .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.75f)
                             .testTag("pad_manual_ip_input")
                     ) {
                         if (manualIp.isEmpty()) {
@@ -488,74 +548,91 @@ private fun PadFindTvScreen(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(m.buttonRadius))
-                            .background(PadSurface2)
-                            .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
+                            .background(PadAccent)
                             .clickable { onProbeManualIp(manualIp) }
-                            .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.7f)
+                            .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.75f)
                             .testTag("pad_manual_ip_btn")
                     ) {
                         Text(
-                            text = PadStrings.tr(lang, "Tìm IP", "Find IP"),
-                            color = PadAccent,
-                            fontSize = m.captionFont,
-                            fontWeight = FontWeight.Bold
+                            text = PadStrings.tr(lang, "Tìm IP", "Connect IP"),
+                            color = PadOnAccent,
+                            fontSize = m.bodyFont,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
-            } else {
-                Text(
-                    text = PadStrings.tr(
-                        lang = lang,
-                        vi = "Không thấy TV? Chạm để nhập địa chỉ IP mạng nội bộ",
-                        en = "Don't see your TV? Tap to enter LAN IP manually"
-                    ),
-                    color = PadMuted,
-                    fontSize = m.captionFont,
-                    modifier = Modifier
-                        .clickable { showManualIpRow = true }
-                        .padding(vertical = m.itemGap * 0.3f)
-                        .testTag("pad_toggle_manual_ip_btn")
-                )
             }
         }
 
-        Spacer(modifier = Modifier.height(m.sectionGap))
+        Spacer(modifier = Modifier.height(m.sectionGap * 0.8f))
 
-        // 3. Thanh chân trang: Chỉ hoạt động trong mạng nội bộ + nút Quét lại
-        Row(
+        // 3. Thanh nút hành động dưới cùng: Quét lại + Nhập IP
+        Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.7f)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(m.buttonRadius))
+                        .background(PadAccent)
+                        .clickable(onClick = onRescan)
+                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
+                        .testTag("pad_rescan_btn"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "↻ ${PadStrings.rescanButton(lang)}",
+                        color = PadOnAccent,
+                        fontSize = m.bodyFont,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(m.buttonRadius))
+                        .background(if (showManualIpRow) PadSelected else PadSurface2)
+                        .border(
+                            m.strokeThin,
+                            if (showManualIpRow) PadAccent else PadBorder,
+                            RoundedCornerShape(m.buttonRadius)
+                        )
+                        .clickable { showManualIpRow = !showManualIpRow }
+                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
+                        .testTag("pad_toggle_manual_ip_btn"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = PadStrings.tr(lang, "⌨ Nhập IP", "⌨ Enter IP"),
+                        color = if (showManualIpRow) PadAccent else PadInk,
+                        fontSize = m.bodyFont,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             Text(
                 text = PadStrings.localOnlyNotice(lang),
                 color = PadMuted,
                 fontSize = m.captionFont,
-                modifier = Modifier.weight(1f)
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.width(m.itemGap))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(m.buttonRadius))
-                    .background(PadSurface2)
-                    .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
-                    .clickable(onClick = onRescan)
-                    .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.65f)
-                    .testTag("pad_rescan_btn")
-            ) {
-                Text(
-                    text = PadStrings.rescanButton(lang),
-                    color = PadInk,
-                    fontSize = m.bodyFont,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }
 
 /**
- * Màn hình Điện thoại 2 (#s4 trong remote-pad-mockup.html): Nhập mã 4 chữ số trên TV.
+ * Màn hình 2: Nhập mã 4 chữ số trên TV.
+ * - 4 ô số tỉ lệ chuẩn, tự tô sáng ô đang nhập.
+ * - Hiển thị đếm ngược 3:00 khi nhập sai 3 lần, hoặc số lần thử còn lại.
+ * - Nút "Kết nối" nổi bật + bàn phím số 3x4.
  */
 @Composable
 private fun PadEnterPinScreen(
@@ -568,6 +645,8 @@ private fun PadEnterPinScreen(
 ) {
     val lang = state.language
     val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
+    val isLocked = state.lockoutRemainingSec > 0 || state.pinErrorReason == AuthFailReason.LOCKED_OUT
+    val canSubmit = !isLocked && !state.isConnecting && state.enteredPin.length == 4
 
     Column(
         modifier = Modifier
@@ -577,51 +656,63 @@ private fun PadEnterPinScreen(
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Thanh trên cùng: ← Đổi TV + Tên TV
+        // 1. Thanh trên cùng: ← Quay lại + Tiêu đề "Nhập mã" + Tên TV
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(m.buttonRadius))
+                        .background(PadSurface2)
+                        .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
+                        .clickable(onClick = onBack)
+                        .padding(horizontal = m.cardPad * 0.85f, vertical = m.cardPad * 0.5f)
+                        .testTag("pad_back_to_tv_list_btn"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = PadStrings.changeTvBack(lang),
+                        color = PadInk,
+                        fontSize = m.captionFont,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    text = PadStrings.tr(lang, "Nhập mã", "Enter Code"),
+                    color = PadInk,
+                    fontSize = m.headingFont,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(m.buttonRadius))
+                    .clip(CircleShape)
                     .background(PadSurface2)
-                    .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = m.cardPad * 0.85f, vertical = m.cardPad * 0.5f)
-                    .testTag("pad_back_to_tv_list_btn")
+                    .padding(horizontal = m.cardPad * 0.7f, vertical = m.cardPad * 0.3f)
             ) {
                 Text(
-                    text = PadStrings.changeTvBack(lang),
-                    color = PadInk,
+                    text = tvName,
+                    color = PadAccent,
                     fontSize = m.captionFont,
                     fontWeight = FontWeight.Bold
                 )
             }
-
-            Text(
-                text = tvName,
-                color = PadMuted,
-                fontSize = m.captionFont,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
 
-        // 2. Giữa: Tiêu đề + 4 ô số PIN + Thông báo lỗi / Khóa tạm
+        // 2. Giữa: Dòng phụ + 4 ô số PIN + Dòng trạng thái lỗi/khóa + Nút Kết nối
         Column(
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(m.itemGap)
+            verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.85f)
         ) {
-            Text(
-                text = PadStrings.enterPinTitle(lang),
-                color = PadInk,
-                fontSize = m.headingFont,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center
-            )
             Text(
                 text = PadStrings.enterPinSubtitle(lang),
                 color = PadMuted,
@@ -629,28 +720,37 @@ private fun PadEnterPinScreen(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(m.itemGap * 0.4f))
-
             Row(
-                horizontalArrangement = Arrangement.spacedBy(m.itemGap),
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.85f),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.testTag("pad_pin_boxes_row")
             ) {
                 for (i in 0 until 4) {
                     val charStr = state.enteredPin.getOrNull(i)?.toString().orEmpty()
-                    val isCurrentSlot = state.enteredPin.length == i || (i == 3 && state.enteredPin.length == 4)
+                    val isCurrentSlot = !isLocked && (state.enteredPin.length == i || (i == 3 && state.enteredPin.length == 4))
+                    val isError = state.pinErrorReason != null && !isLocked
                     val borderColor = when {
-                        state.lockoutRemainingSec > 0 || state.pinErrorReason != null -> PadDanger
+                        isLocked -> PadBorder
+                        isError -> PadDanger
                         isCurrentSlot -> PadAccent
                         else -> PadBorder
+                    }
+                    val boxBg = when {
+                        isCurrentSlot -> PadSelected
+                        else -> PadSurface2
+                    }
+                    val digitColor = when {
+                        isLocked -> Color(0xFF4D6156)
+                        isError -> PadDanger
+                        else -> PadInk
                     }
                     Box(
                         modifier = Modifier
                             .size(width = m.pinBoxW, height = m.pinBoxH)
                             .clip(RoundedCornerShape(m.cardRadius))
-                            .background(PadSurface)
+                            .background(boxBg)
                             .border(
-                                if (isCurrentSlot) m.strokeFocus else m.strokeThin,
+                                if (isCurrentSlot || isError) m.strokeFocus else m.strokeThin,
                                 borderColor,
                                 RoundedCornerShape(m.cardRadius)
                             )
@@ -658,8 +758,8 @@ private fun PadEnterPinScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = charStr,
-                            color = PadInk,
+                            text = if (isLocked) "–" else charStr,
+                            color = digitColor,
                             fontFamily = FontFamily.Monospace,
                             fontSize = m.pinDigitFont,
                             fontWeight = FontWeight.ExtraBold
@@ -668,22 +768,27 @@ private fun PadEnterPinScreen(
                 }
             }
 
-            // Hiển thị thông báo lỗi / khóa tạm / đang xác thực HMAC
+            // Thông báo lỗi / đếm ngược khóa tạm 3 phút / đang kết nối
             val feedbackText = when {
                 state.isConnecting -> PadStrings.tr(
                     lang = lang,
-                    vi = "Đang xác thực chữ ký bảo mật với TV...",
-                    en = "Verifying security signature with TV..."
+                    vi = "Đang xác thực kết nối với TV…",
+                    en = "Verifying connection with TV…"
                 )
-                state.lockoutRemainingSec > 0 || state.pinErrorReason == AuthFailReason.LOCKED_OUT -> PadStrings.tr(
-                    lang = lang,
-                    vi = "Nhập sai 3 lần · TV tạm khóa ghép đôi (${state.lockoutRemainingSec} giây)",
-                    en = "3 wrong tries · TV locked pairing (${state.lockoutRemainingSec}s)"
-                )
+                isLocked -> {
+                    val mins = state.lockoutRemainingSec / 60
+                    val secs = state.lockoutRemainingSec % 60
+                    val timeStr = "%d:%02d".format(mins, secs)
+                    PadStrings.tr(
+                        lang = lang,
+                        vi = "Sai 3 lần. Chờ $timeStr rồi nhập lại.",
+                        en = "3 wrong tries. Wait $timeStr to retry."
+                    )
+                }
                 state.pinErrorReason == AuthFailReason.WRONG_PIN -> PadStrings.tr(
                     lang = lang,
-                    vi = "Mã ghép đôi chưa đúng · Còn ${state.remainingPinAttempts} lần thử",
-                    en = "Incorrect pairing code · ${state.remainingPinAttempts} attempts remaining"
+                    vi = "Mã chưa đúng. Còn ${state.remainingPinAttempts} lần thử.",
+                    en = "Incorrect code. ${state.remainingPinAttempts} attempts left."
                 )
                 state.pinErrorReason == AuthFailReason.TOKEN_REVOKED -> PadStrings.tr(
                     lang = lang,
@@ -700,22 +805,57 @@ private fun PadEnterPinScreen(
                 else -> ""
             }
 
-            if (feedbackText.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(m.keyHeight * 0.45f),
+                contentAlignment = Alignment.Center
+            ) {
+                if (feedbackText.isNotBlank()) {
+                    Text(
+                        text = feedbackText,
+                        color = when {
+                            state.isConnecting -> PadAccent
+                            isLocked -> PadWarn
+                            else -> PadDanger
+                        },
+                        fontSize = m.captionFont,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.testTag("pad_pin_feedback_text")
+                    )
+                }
+            }
+
+            // Nút Kết nối chính
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(m.buttonRadius))
+                    .background(if (canSubmit) PadAccent else PadSurface)
+                    .border(
+                        m.strokeThin,
+                        if (canSubmit) PadAccent else PadBorder,
+                        RoundedCornerShape(m.buttonRadius)
+                    )
+                    .clickable(enabled = canSubmit, onClick = onSubmit)
+                    .padding(vertical = m.cardPad * 0.75f)
+                    .testTag("pad_submit_pin_btn"),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = feedbackText,
-                    color = if (state.isConnecting) PadAccent else PadDanger,
-                    fontSize = m.captionFont,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.testTag("pad_pin_feedback_text")
+                    text = PadStrings.keypadConnect(lang),
+                    color = if (canSubmit) PadOnAccent else Color(0xFF4D6156),
+                    fontSize = m.bodyFont,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
         }
 
-        // 3. Bàn phím số 3x4 (#s4 .kpad trong remote-pad-mockup.html)
+        // 3. Bàn phím số 3x4
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.8f)
+            verticalArrangement = Arrangement.spacedBy(m.itemGap * 0.7f)
         ) {
             val rows = listOf(
                 listOf("1", "2", "3"),
@@ -725,14 +865,14 @@ private fun PadEnterPinScreen(
             rows.forEach { r ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.8f)
+                    horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.7f)
                 ) {
                     r.forEach { d ->
                         PadKeypadButton(
                             label = d,
                             m = m,
                             isPrimary = false,
-                            onClick = { onDigit(d[0]) },
+                            onClick = { if (!isLocked) onDigit(d[0]) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("pad_key_$d")
@@ -743,7 +883,7 @@ private fun PadEnterPinScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.8f)
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.7f)
             ) {
                 PadKeypadButton(
                     label = PadStrings.keypadDelete(lang),
@@ -759,7 +899,7 @@ private fun PadEnterPinScreen(
                     label = "0",
                     m = m,
                     isPrimary = false,
-                    onClick = { onDigit('0') },
+                    onClick = { if (!isLocked) onDigit('0') },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("pad_key_0")
@@ -767,9 +907,9 @@ private fun PadEnterPinScreen(
                 PadKeypadButton(
                     label = PadStrings.keypadConnect(lang),
                     m = m,
-                    isPrimary = true,
+                    isPrimary = canSubmit,
                     useCaptionFont = true,
-                    onClick = onSubmit,
+                    onClick = { if (canSubmit) onSubmit() },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("pad_key_connect")
@@ -810,96 +950,10 @@ private fun PadKeypadButton(
     }
 }
 
-@Composable
-private fun PadConnectedReadyScreen(
-    state: PadClientUiState,
-    m: PadResponsiveMetrics,
-    onDisconnect: () -> Unit
-) {
-    val lang = state.language
-    val tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
-    val pingText = state.measuredPingMs?.let { "${it} ms" } ?: PadStrings.tr(lang, "Đang đo...", "Measuring...")
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(m.outerPad)
-            .testTag("pad_connected_screen"),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(m.cardRadius))
-                .background(PadSurface)
-                .border(m.strokeFocus, PadAccent, RoundedCornerShape(m.cardRadius))
-                .padding(m.cardPad * 1.4f),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(m.itemGap)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.6f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(m.dotSize)
-                        .clip(CircleShape)
-                        .background(PadAccent)
-                )
-                Text(
-                    text = PadStrings.tr(
-                        lang = lang,
-                        vi = "Tay cầm ${state.connectedPlayerIndex} · Đã ghép đôi",
-                        en = "Controller ${state.connectedPlayerIndex} · Paired"
-                    ),
-                    color = PadAccent,
-                    fontSize = m.bodyFont,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Text(
-                text = tvName,
-                color = PadInk,
-                fontSize = m.titleFont,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Ping: $pingText",
-                color = PadMuted,
-                fontFamily = FontFamily.Monospace,
-                fontSize = m.bodyFont,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(m.buttonRadius))
-                    .background(PadSurface2)
-                    .border(m.strokeThin, PadDanger, RoundedCornerShape(m.buttonRadius))
-                    .clickable(onClick = onDisconnect)
-                    .padding(horizontal = m.cardPad * 1.2f, vertical = m.cardPad * 0.7f)
-                    .testTag("pad_disconnect_btn")
-            ) {
-                Text(
-                    text = PadStrings.tr(lang, "Ngắt kết nối", "Disconnect"),
-                    color = PadDanger,
-                    fontSize = m.bodyFont,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
 /**
- * Màn hình Điện thoại 4 (#s6 trong remote-pad-mockup.html): Mất kết nối với TV.
- * Hiển thị rõ việc mọi nút bấm đã được tự động nhả về trạng thái nghỉ để nhân vật trong game không bị kẹt nút,
- * hỗ trợ tự động kết nối lại bằng mã nhớ hoặc bấm "Thử kết nối lại" / "Chọn TV khác".
+ * Màn hình 4: Mất kết nối với TV.
+ * - Hiển thị rõ trạng thái tự nhả nút an toàn và tự kết nối lại.
+ * - Hai nút hành động: "Thử kết nối lại" (Chính) và "Chọn TV khác" (Phụ).
  */
 @Composable
 private fun PadDisconnectedSummaryScreen(
@@ -914,18 +968,18 @@ private fun PadDisconnectedSummaryScreen(
     val subtitleText = when (state.disconnectReasonCode) {
         "FORGOTTEN" -> PadStrings.tr(
             lang = lang,
-            vi = "TV ($tvName) đã xóa thiết bị đã nhớ. Mọi nút bấm đã được tự động nhả về trạng thái nghỉ.",
+            vi = "TV ($tvName) đã quên thiết bị này. Mọi nút bấm đã tự động nhả về trạng thái nghỉ.",
             en = "TV ($tvName) forgot this device. All buttons were automatically released to neutral."
         )
         "TV_DISCONNECT" -> PadStrings.tr(
             lang = lang,
-            vi = "TV ($tvName) đã ngắt kết nối tay cầm từ xa. Mọi nút bấm đã được tự động nhả về trạng thái nghỉ.",
-            en = "TV ($tvName) disconnected the remote controller. All buttons were automatically released to neutral."
+            vi = "TV ($tvName) đã ngắt kết nối tay cầm. Mọi nút bấm đã tự động nhả về trạng thái nghỉ.",
+            en = "TV ($tvName) disconnected the controller. All buttons were automatically released to neutral."
         )
         else -> PadStrings.tr(
             lang = lang,
-            vi = "Mọi nút bấm đã được tự động nhả về trạng thái nghỉ để nhân vật trong game không bị kẹt nút.",
-            en = "All buttons were automatically released to neutral so your character doesn't get stuck in-game."
+            vi = "Kiểm tra TV còn mở và cùng Wi-Fi. Mọi nút bấm đã tự động nhả để nhân vật không bị kẹt nút.",
+            en = "Check that the TV is open on the same Wi-Fi. All buttons were automatically released."
         )
     }
 
@@ -947,6 +1001,19 @@ private fun PadDisconnectedSummaryScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(m.itemGap)
         ) {
+            Box(
+                modifier = Modifier
+                    .size(m.cardPad * 2.5f)
+                    .clip(RoundedCornerShape(m.buttonRadius))
+                    .background(PadSurface2),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⚠️",
+                    fontSize = m.headingFont
+                )
+            }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(m.itemGap * 0.6f)
@@ -966,7 +1033,7 @@ private fun PadDisconnectedSummaryScreen(
             }
 
             Text(
-                text = PadStrings.tr(lang, "Đã mất kết nối với TV", "Disconnected from TV"),
+                text = PadStrings.tr(lang, "Không còn liên lạc được với TV", "Disconnected from TV"),
                 color = PadInk,
                 fontSize = m.headingFont,
                 fontWeight = FontWeight.ExtraBold,
@@ -984,8 +1051,8 @@ private fun PadDisconnectedSummaryScreen(
                 Text(
                     text = PadStrings.tr(
                         lang = lang,
-                        vi = "Đang tự kết nối lại với $tvName...",
-                        en = "Automatically reconnecting to $tvName..."
+                        vi = "Đang tự kết nối lại với $tvName…",
+                        en = "Automatically reconnecting to $tvName…"
                     ),
                     color = PadWarn,
                     fontSize = m.captionFont,
@@ -995,44 +1062,50 @@ private fun PadDisconnectedSummaryScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(m.itemGap * 0.4f))
+            Spacer(modifier = Modifier.height(m.itemGap * 0.3f))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(m.buttonRadius))
-                    .background(PadAccentFill)
-                    .border(m.strokeThin, PadAccent, RoundedCornerShape(m.buttonRadius))
-                    .clickable(onClick = onReconnect)
-                    .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
-                    .testTag("pad_reconnect_btn"),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(m.itemGap)
             ) {
-                Text(
-                    text = PadStrings.tr(lang, "Thử kết nối lại", "Try reconnecting"),
-                    color = PadAccent,
-                    fontSize = m.bodyFont,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(m.buttonRadius))
+                        .background(PadAccent)
+                        .clickable(onClick = onReconnect)
+                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.85f)
+                        .testTag("pad_reconnect_btn"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = PadStrings.tr(lang, "Thử kết nối lại", "Try reconnecting"),
+                        color = PadOnAccent,
+                        fontSize = m.bodyFont,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(m.buttonRadius))
-                    .background(PadSurface2)
-                    .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
-                    .clickable(onClick = onBackToList)
-                    .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.8f)
-                    .testTag("pad_back_to_list_btn"),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = PadStrings.tr(lang, "Chọn TV khác", "Choose another TV"),
-                    color = PadInk,
-                    fontSize = m.bodyFont,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(m.buttonRadius))
+                        .background(PadSurface2)
+                        .border(m.strokeThin, PadBorder, RoundedCornerShape(m.buttonRadius))
+                        .clickable(onClick = onBackToList)
+                        .padding(horizontal = m.cardPad, vertical = m.cardPad * 0.85f)
+                        .testTag("pad_back_to_list_btn"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = PadStrings.tr(lang, "Chọn TV khác", "Choose another TV"),
+                        color = PadInk,
+                        fontSize = m.bodyFont,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

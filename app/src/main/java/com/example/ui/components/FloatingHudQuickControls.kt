@@ -186,6 +186,29 @@ internal fun HudControlsTabContent(
                 enableGamepadFocus = false
             )
         }
+
+        HudSurfaceRow(
+            minHeight = 40.dp,
+            onClick = {
+                onInteraction()
+                SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.TV)
+            },
+            modifier = Modifier.testTag("hud_expanded_switch_tv_ui_button")
+        ) {
+            Text(
+                text = config.tr("📺 Chuyển sang Giao diện TV", "📺 Switch to TV UI"),
+                color = HudCyan,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Text(
+                text = "⇄",
+                color = HudCyan,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
     }
 }
 

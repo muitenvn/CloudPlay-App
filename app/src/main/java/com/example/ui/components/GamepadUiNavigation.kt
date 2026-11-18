@@ -65,6 +65,12 @@ object GamepadUiNavigation {
     var activeAnalogDirection by mutableStateOf<FocusDirection?>(null)
         private set
 
+    var remotePadPressSeq by mutableIntStateOf(0)
+        private set
+
+    @Volatile
+    internal var lastConsumedRemotePadSeq: Int = 0
+
     var activeHorizontalStepper: ((Int) -> Unit)? = null
     var activeFocusedClickHandler: (() -> Unit)? = null
     var activeFocusedKeyYHandler: (() -> Unit)? = null
@@ -85,10 +91,35 @@ object GamepadUiNavigation {
     internal fun registerScope(scope: ControllerScopeCallbacks) {
         activeScopes.remove(scope)
         activeScopes.add(scope)
+        activeAnalogDirection = null
+        hatOrStickDirection = null
     }
 
     internal fun unregisterScope(scope: ControllerScopeCallbacks) {
         activeScopes.remove(scope)
+        activeAnalogDirection = null
+        hatOrStickDirection = null
+    }
+
+    /**
+     * Nhả toàn bộ trạng thái giữ phím/cần điều hướng giao diện từ Ravno Pad (gọi khi trạng thái UDP về trung tính,
+     * mất gói quá hạn watchdog hoặc ngắt kết nối Pad).
+     */
+    fun releaseAllRemotePadInputs() {
+        val pendingDir = activeAnalogDirection
+        val unconsumedSeq = remotePadPressSeq > lastConsumedRemotePadSeq
+        activeAnalogDirection = null
+        hatOrStickDirection = null
+        if (pendingDir != null && unconsumedSeq && shouldRouteToAppUi) {
+            lastConsumedRemotePadSeq = remotePadPressSeq
+            activeScopes.lastOrNull()?.stepFocus?.invoke(pendingDir)
+        }
+        if (isSelectHeld || isStartHeld) {
+            isSelectHeld = false
+            isStartHeld = false
+            comboFiredForCurrentHold = false
+            mainHandler.removeCallbacks(comboHoldRunnable)
+        }
     }
 
     /**
@@ -96,8 +127,6 @@ object GamepadUiNavigation {
      * hoạt động kể cả khi Dialog tạo cửa sổ riêng hoặc khi WebView đang giữ focus gốc.
      */
     fun dispatchRemotePadButton(buttonIndex: Int, pressed: Boolean): Boolean {
-        if (!shouldRouteToAppUi) return false
-        val topScope = activeScopes.lastOrNull() ?: return false
         val dir = when (buttonIndex) {
             12 -> FocusDirection.Up
             13 -> FocusDirection.Down
@@ -106,14 +135,29 @@ object GamepadUiNavigation {
             else -> null
         }
         if (dir != null) {
-            if (pressed) {
-                onGamepadInteraction()
-                activeAnalogDirection = dir
-            } else if (activeAnalogDirection == dir) {
-                activeAnalogDirection = null
+            if (!pressed) {
+                val unconsumedSeq = remotePadPressSeq > lastConsumedRemotePadSeq
+                if (activeAnalogDirection == dir) {
+                    activeAnalogDirection = null
+                }
+                if (hatOrStickDirection == dir) {
+                    hatOrStickDirection = null
+                }
+                if (unconsumedSeq && shouldRouteToAppUi) {
+                    lastConsumedRemotePadSeq = remotePadPressSeq
+                    activeScopes.lastOrNull()?.stepFocus?.invoke(dir)
+                }
+                return true
             }
+            if (!shouldRouteToAppUi) return false
+            if (activeScopes.isEmpty()) return false
+            onGamepadInteraction()
+            activeAnalogDirection = dir
+            remotePadPressSeq++
             return true
         }
+        if (!shouldRouteToAppUi) return false
+        val topScope = activeScopes.lastOrNull() ?: return false
         if (!pressed) return true
         onGamepadInteraction()
         when (buttonIndex) {
@@ -194,10 +238,16 @@ object GamepadUiNavigation {
         }
 
         if (nextDir != hatOrStickDirection) {
+            val prevDir = hatOrStickDirection
+            val unconsumedSeq = remotePadPressSeq > lastConsumedRemotePadSeq
             hatOrStickDirection = nextDir
             activeAnalogDirection = nextDir
             if (nextDir != null) {
                 onGamepadInteraction()
+                remotePadPressSeq++
+            } else if (prevDir != null && unconsumedSeq && shouldRouteToAppUi) {
+                lastConsumedRemotePadSeq = remotePadPressSeq
+                activeScopes.lastOrNull()?.stepFocus?.invoke(prevDir)
             }
         }
         return nextDir != null
@@ -564,9 +614,12 @@ fun Modifier.gamepadControllerScope(
         null
     }
 
-    LaunchedEffect(effectiveHeldDirection, dpadPressSeq, enabled) {
+    val currentRemoteSeq = GamepadUiNavigation.remotePadPressSeq
+
+    LaunchedEffect(effectiveHeldDirection, dpadPressSeq, currentRemoteSeq, enabled) {
         val dir = effectiveHeldDirection ?: return@LaunchedEffect
         if (!enabled) return@LaunchedEffect
+        GamepadUiNavigation.lastConsumedRemotePadSeq = currentRemoteSeq
         stepFocus(dir)
         delay(300L)
         while (enabled && (heldDpadDirection == dir || GamepadUiNavigation.activeAnalogDirection == dir)) {

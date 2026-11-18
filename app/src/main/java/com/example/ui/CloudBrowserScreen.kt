@@ -913,12 +913,14 @@ fun CloudBrowserScreen(
             )
         }
         com.example.cloudplay.RemotePadTvServer.onRemotePadReleaseAll = {
+            com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
             webViewInstance?.evaluateJavascript(
                 "if(window.__cpReleaseAll){window.__cpReleaseAll();}",
                 null
             )
         }
         onDispose {
+            com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
             webViewInstance?.evaluateJavascript(
                 "if(window.__cpReleaseAll){window.__cpReleaseAll();}",
                 null
@@ -930,6 +932,9 @@ fun CloudBrowserScreen(
                 if (xAxisIndex == 0 && yAxisIndex == 1) {
                     com.example.ui.components.GamepadUiNavigation.dispatchRemotePadStick(xVal, yVal)
                 }
+            }
+            com.example.cloudplay.RemotePadTvServer.onRemotePadReleaseAll = {
+                com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
             }
         }
     }

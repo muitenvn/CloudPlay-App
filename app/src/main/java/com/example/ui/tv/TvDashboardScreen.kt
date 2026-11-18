@@ -100,7 +100,12 @@ fun TvDashboardScreen(
                 com.example.ui.components.GamepadUiNavigation.dispatchRemotePadStick(xVal, yVal)
             }
         }
-        onDispose { }
+        com.example.cloudplay.RemotePadTvServer.onRemotePadReleaseAll = {
+            com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
+        }
+        onDispose {
+            com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
+        }
     }
 
     val lastSessionPing = remember(vpnState.currentServer, recentSessions) {

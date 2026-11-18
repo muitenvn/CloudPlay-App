@@ -345,12 +345,7 @@ object RemotePadTvServer {
         val prev = lastAppliedPadState
         lastAppliedPadState = next
 
-        if (next.isNeutral() && !prev.isNeutral()) {
-            mainHandler.post {
-                onRemotePadReleaseAll?.invoke()
-            }
-            return
-        }
+        val returnedToNeutral = next.isNeutral() && !prev.isNeutral()
 
         mainHandler.post {
             val btnCallback = onRemotePadButton
@@ -369,11 +364,11 @@ object RemotePadTvServer {
                 }
 
                 // 2. Hai cò LT (index 6) và RT (index 7) từ 0.0 -> 1.0
-                if (abs(prev.lt - next.lt) >= 0.005f) {
+                if (abs(prev.lt - next.lt) >= 0.005f || (next.lt == 0f && prev.lt != 0f)) {
                     val ltPressed = next.lt > 0.12f
                     btnCallback(6, ltPressed, next.lt)
                 }
-                if (abs(prev.rt - next.rt) >= 0.005f) {
+                if (abs(prev.rt - next.rt) >= 0.005f || (next.rt == 0f && prev.rt != 0f)) {
                     val rtPressed = next.rt > 0.12f
                     btnCallback(7, rtPressed, next.rt)
                 }
@@ -381,21 +376,35 @@ object RemotePadTvServer {
 
             if (stickCallback != null) {
                 // 3. Cần trái (axes 0, 1)
-                if (abs(prev.lx - next.lx) >= 0.004f || abs(prev.ly - next.ly) >= 0.004f) {
+                if (
+                    abs(prev.lx - next.lx) >= 0.004f ||
+                    abs(prev.ly - next.ly) >= 0.004f ||
+                    ((next.lx == 0f && next.ly == 0f) && (prev.lx != 0f || prev.ly != 0f))
+                ) {
                     stickCallback(0, next.lx, 1, next.ly)
                 }
                 // 4. Cần phải (axes 2, 3)
-                if (abs(prev.rx - next.rx) >= 0.004f || abs(prev.ry - next.ry) >= 0.004f) {
+                if (
+                    abs(prev.rx - next.rx) >= 0.004f ||
+                    abs(prev.ry - next.ry) >= 0.004f ||
+                    ((next.rx == 0f && next.ry == 0f) && (prev.rx != 0f || prev.ry != 0f))
+                ) {
                     stickCallback(2, next.rx, 3, next.ry)
                 }
+            }
+
+            if (returnedToNeutral) {
+                onRemotePadReleaseAll?.invoke()
             }
         }
     }
 
     fun forceReleaseAllInputsToNeutral() {
         val hadActiveInputs = !lastAppliedPadState.isNeutral()
-        lastAppliedPadState = RemotePadState.NEUTRAL
         if (hadActiveInputs) {
+            applyIncomingPadState(RemotePadState.NEUTRAL)
+        } else {
+            lastAppliedPadState = RemotePadState.NEUTRAL
             mainHandler.post {
                 onRemotePadReleaseAll?.invoke()
             }

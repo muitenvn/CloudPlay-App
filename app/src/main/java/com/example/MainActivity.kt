@@ -409,8 +409,13 @@ fun MainContent(
                     com.example.ui.components.GamepadUiNavigation.dispatchRemotePadStick(xVal, yVal)
                 }
             }
+            com.example.cloudplay.RemotePadTvServer.onRemotePadReleaseAll = {
+                com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
+            }
         }
-        onDispose { }
+        onDispose {
+            com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
+        }
     }
 
     val launchXboxUrl: (String) -> Unit = { url ->

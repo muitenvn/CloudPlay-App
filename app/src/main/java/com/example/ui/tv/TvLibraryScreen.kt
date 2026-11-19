@@ -89,6 +89,7 @@ internal fun TvLibraryScreen(
     focusSearchTrigger: Int,
     favoriteToggleTrigger: Int,
     onLaunchGame: (String) -> Unit,
+    defaultFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     val favoriteIds by GameLibraryRepository.favoriteIds.collectAsState()
@@ -529,6 +530,7 @@ internal fun TvLibraryScreen(
                             isFavorite = isFav,
                             freeLabel = if (game.freeToPlay) config.tr("Miễn phí", "Free") else null,
                             scale = scale,
+                            focusRequester = if (index == 0) defaultFocusRequester else null,
                             onFocused = {
                                 focusedGameId = game.id
                                 if (index >= displayedGames.size - 8 && visibleLimit < filteredGames.size) {
@@ -580,6 +582,7 @@ private fun TvLibraryGameCard(
     isFavorite: Boolean,
     freeLabel: String?,
     scale: Float,
+    focusRequester: FocusRequester? = null,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClickOrDetail: () -> Unit
@@ -610,6 +613,7 @@ private fun TvLibraryGameCard(
             }
             .gamepadClickable(
                 cornerRadius = corner,
+                focusRequester = focusRequester,
                 onClick = onClick
             )
             .testTag("tv_lib_game_card_${game.id}")

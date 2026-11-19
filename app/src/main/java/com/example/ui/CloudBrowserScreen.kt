@@ -939,6 +939,59 @@ fun CloudBrowserScreen(
         }
     }
 
+    // Bộ điều khiển Con quay hồi chuyển (Gyroscope) - Mặc định TẮT hoàn toàn nếu người dùng không bật
+    val currentHoldLtOnly by androidx.compose.runtime.rememberUpdatedState(config.gyroHoldLtOnly)
+    val currentWebViewForGyro by androidx.compose.runtime.rememberUpdatedState(webViewInstance)
+    val gyroController = remember(context) {
+        com.example.cloudplay.GyroscopeController(context) { targetRightStick, outX, outY ->
+            val wv = currentWebViewForGyro ?: return@GyroscopeController
+            val rx = (outX.coerceIn(-1f, 1f) * 100f).let { kotlin.math.round(it) / 100f }
+            val ry = (outY.coerceIn(-1f, 1f) * 100f).let { kotlin.math.round(it) / 100f }
+            wv.post {
+                if (kotlin.math.abs(rx) < 0.001f && kotlin.math.abs(ry) < 0.001f && !SettingsRepository.config.value.gyroEnabled) {
+                    wv.evaluateJavascript("if(window.__cpGyroClear)window.__cpGyroClear();", null)
+                } else {
+                    wv.evaluateJavascript(
+                        "if(window.__cpGyro)window.__cpGyro($targetRightStick,$rx,$ry,$currentHoldLtOnly);",
+                        null
+                    )
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(
+        config.gyroEnabled,
+        config.gyroMode,
+        config.gyroSensitivityX,
+        config.gyroSensitivityY,
+        config.gyroDeadzone,
+        config.gyroInvertX,
+        config.gyroInvertY,
+        config.gyroHoldLtOnly,
+        webViewInstance
+    ) {
+        gyroController.updateConfiguration(
+            enabled = config.gyroEnabled,
+            mode = config.gyroMode,
+            sensitivityXPercent = kotlin.math.round(config.gyroSensitivityX * 100f).toInt(),
+            sensitivityYPercent = kotlin.math.round(config.gyroSensitivityY * 100f).toInt(),
+            deadzonePercent = kotlin.math.round(config.gyroDeadzone * 100f).toInt(),
+            invertX = config.gyroInvertX,
+            invertY = config.gyroInvertY
+        )
+        if (!config.gyroEnabled) {
+            webViewInstance?.evaluateJavascript("if(window.__cpGyroClear)window.__cpGyroClear();", null)
+        }
+    }
+
+    DisposableEffect(gyroController) {
+        onDispose {
+            gyroController.stopListening()
+            currentWebViewForGyro?.evaluateJavascript("if(window.__cpGyroClear)window.__cpGyroClear();", null)
+        }
+    }
+
     // Đồng bộ tức thì cấu hình Tay cầm thật (đổi nút, vùng chết trong/ngoài từng cần, tổ hợp phím tắt View + nút)
     LaunchedEffect(
         config.physicalGamepadButtonMap,

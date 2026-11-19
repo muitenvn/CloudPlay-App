@@ -77,6 +77,7 @@ internal fun PadGlobalSettingsSheet(
     onShowAllHiddenNodes: () -> Unit,
     onResetCurrentLayout: () -> Unit,
     onTestVibration: () -> Unit,
+    onRecenterGyro: () -> Unit = {},
     onDisconnect: () -> Unit,
     onForgetDevice: () -> Unit,
     onClose: () -> Unit
@@ -613,6 +614,214 @@ internal fun PadGlobalSettingsSheet(
                             },
                             testTag = "pad_sheet_toggle_split_abxy"
                         )
+                    }
+                }
+
+                // 3B. CON QUAY HỒI CHUYỂN (GYROSCOPE - MẶC ĐỊNH TẮT)
+                SheetSectionCard(
+                    title = PadStrings.tr(
+                        lang,
+                        "🧭 CON QUAY HỒI CHUYỂN (BẮN SÚNG / VR / ĐUA XE)",
+                        "🧭 GYROSCOPE MOTION CONTROL (FPS / VR / RACING)"
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = PadStrings.tr(
+                                    lang,
+                                    "Con quay hồi chuyển trên điện thoại",
+                                    "Phone Gyroscope Motion Control"
+                                ),
+                                color = SheetText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = PadStrings.tr(
+                                    lang,
+                                    "Mặc định TẮT. Bật khi muốn nghiêng điện thoại để xoay mọi góc (Bắn súng/VR) hoặc lái xe qua lại (Đua xe).",
+                                    "Default OFF. Turn ON to tilt phone for 360° aiming/VR or left/right steering in racing games."
+                                ),
+                                color = SheetMuted,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SheetChoiceChip(
+                                label = if (settings.gyroEnabled) {
+                                    PadStrings.tr(lang, "● Đang bật", "● Enabled")
+                                } else {
+                                    PadStrings.tr(lang, "○ Đang tắt (Mặc định)", "○ Off (Default)")
+                                },
+                                selected = settings.gyroEnabled,
+                                onClick = {
+                                    val next = !settings.gyroEnabled
+                                    onUpdateSettings(settings.copy(gyroEnabled = next))
+                                    if (next) onRecenterGyro()
+                                },
+                                testTag = "pad_sheet_toggle_gyro_btn"
+                            )
+                        }
+                    }
+
+                    if (settings.gyroEnabled) {
+                        Text(
+                            text = PadStrings.tr(lang, "Chế độ nghiêng theo thể loại game", "Gyroscope mode by game genre"),
+                            color = SheetMuted,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PadGyroMode.entries.forEach { gMode ->
+                                SheetChoiceChip(
+                                    label = gMode.shortTitle(lang),
+                                    selected = settings.gyroMode == gMode,
+                                    onClick = {
+                                        onUpdateSettings(settings.copy(gyroMode = gMode))
+                                        onRecenterGyro()
+                                    },
+                                    testTag = "pad_gyro_mode_${gMode.id}"
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = if (settings.gyroMode == PadGyroMode.RACING_STEER) {
+                                            PadStrings.tr(lang, "Độ nhạy lái (Trái/Phải)", "Steering Sensitivity")
+                                        } else {
+                                            PadStrings.tr(lang, "Độ nhạy xoay ngang", "Horizontal Sensitivity")
+                                        },
+                                        color = SheetText,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "${settings.gyroSensX}%",
+                                        color = SheetAccent,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Slider(
+                                    value = settings.gyroSensX / 100f,
+                                    onValueChange = {
+                                        onUpdateSettings(settings.copy(gyroSensX = (it * 100).roundToInt().coerceIn(10, 300)))
+                                    },
+                                    valueRange = 0.10f..3.00f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = SheetAccent,
+                                        activeTrackColor = SheetAccent,
+                                        inactiveTrackColor = SheetBorder
+                                    )
+                                )
+                            }
+
+                            if (settings.gyroMode != PadGyroMode.RACING_STEER) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = PadStrings.tr(lang, "Độ nhạy xoay dọc", "Vertical Sensitivity"),
+                                            color = SheetText,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${settings.gyroSensY}%",
+                                            color = SheetCyan,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Slider(
+                                        value = settings.gyroSensY / 100f,
+                                        onValueChange = {
+                                            onUpdateSettings(settings.copy(gyroSensY = (it * 100).roundToInt().coerceIn(10, 300)))
+                                        },
+                                        valueRange = 0.10f..3.00f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = SheetCyan,
+                                            activeTrackColor = SheetCyan,
+                                            inactiveTrackColor = SheetBorder
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SheetChoiceChip(
+                                label = if (settings.gyroHoldLtOnly) {
+                                    PadStrings.tr(lang, "🎯 Chỉ bật khi giữ LT: Bật", "🎯 Hold LT Only: On")
+                                } else {
+                                    PadStrings.tr(lang, "🎯 Chỉ bật khi giữ LT: Tắt", "🎯 Hold LT Only: Off")
+                                },
+                                selected = settings.gyroHoldLtOnly,
+                                onClick = {
+                                    onUpdateSettings(settings.copy(gyroHoldLtOnly = !settings.gyroHoldLtOnly))
+                                },
+                                testTag = "pad_gyro_hold_lt_chip"
+                            )
+
+                            SheetChoiceChip(
+                                label = if (settings.gyroInvertX) {
+                                    PadStrings.tr(lang, "⇄ Đảo ngang: Bật", "⇄ Invert X: On")
+                                } else {
+                                    PadStrings.tr(lang, "⇄ Đảo ngang: Tắt", "⇄ Invert X: Off")
+                                },
+                                selected = settings.gyroInvertX,
+                                onClick = {
+                                    onUpdateSettings(settings.copy(gyroInvertX = !settings.gyroInvertX))
+                                },
+                                testTag = "pad_gyro_invert_x_chip"
+                            )
+
+                            if (settings.gyroMode != PadGyroMode.RACING_STEER) {
+                                SheetChoiceChip(
+                                    label = if (settings.gyroInvertY) {
+                                        PadStrings.tr(lang, "⇅ Đảo dọc: Bật", "⇅ Invert Y: On")
+                                    } else {
+                                        PadStrings.tr(lang, "⇅ Đảo dọc: Tắt", "⇅ Invert Y: Off")
+                                    },
+                                    selected = settings.gyroInvertY,
+                                    onClick = {
+                                        onUpdateSettings(settings.copy(gyroInvertY = !settings.gyroInvertY))
+                                    },
+                                    testTag = "pad_gyro_invert_y_chip"
+                                )
+                            }
+
+                            SheetPillButton(
+                                label = PadStrings.tr(lang, "🎯 Đặt lại tâm con quay (0°)", "🎯 Recenter Gyro (0°)"),
+                                isPrimary = true,
+                                onClick = onRecenterGyro,
+                                testTag = "pad_gyro_recenter_btn"
+                            )
+                        }
                     }
                 }
 

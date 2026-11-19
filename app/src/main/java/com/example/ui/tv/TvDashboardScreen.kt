@@ -91,6 +91,8 @@ fun TvDashboardScreen(
     }.collectAsState(initial = NetworkOptimizer.telemetry.value.rttMs)
 
     androidx.compose.runtime.DisposableEffect(context) {
+        com.example.ui.components.GamepadUiNavigation.keepFocusVisibleInTvMode = true
+        com.example.ui.components.GamepadUiNavigation.onGamepadInteraction()
         com.example.cloudplay.RemotePadTvServer.startServerIfNeeded(context)
         com.example.cloudplay.RemotePadTvServer.onRemotePadButton = { buttonIndex, pressed, _ ->
             com.example.ui.components.GamepadUiNavigation.dispatchRemotePadButton(buttonIndex, pressed)
@@ -104,6 +106,7 @@ fun TvDashboardScreen(
             com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
         }
         onDispose {
+            com.example.ui.components.GamepadUiNavigation.keepFocusVisibleInTvMode = false
             com.example.ui.components.GamepadUiNavigation.releaseAllRemotePadInputs()
         }
     }
@@ -119,10 +122,6 @@ fun TvDashboardScreen(
         ?: lastSessionPing
 
     var currentTab by rememberSaveable { mutableStateOf(DashboardTab.HOME) }
-    val visitedTabs = remember { androidx.compose.runtime.mutableStateListOf(currentTab) }
-    if (currentTab !in visitedTabs) {
-        visitedTabs.add(currentTab)
-    }
 
     var showGuideDialog by remember { mutableStateOf(false) }
     var guideInitialSection by remember { mutableStateOf(GuideSection.QUICK_START) }
@@ -142,11 +141,22 @@ fun TvDashboardScreen(
     }
 
     val homePrimaryFocusRequester = remember { FocusRequester() }
+    val libraryPrimaryFocusRequester = remember { FocusRequester() }
+    val serversPrimaryFocusRequester = remember { FocusRequester() }
+    val settingsPrimaryFocusRequester = remember { FocusRequester() }
     val activeRailFocusRequester = remember { FocusRequester() }
     var librarySearchFocusTick by remember { mutableIntStateOf(0) }
     var libraryFavoriteToggleTick by remember { mutableIntStateOf(0) }
 
+    fun primaryRequesterForTab(tab: DashboardTab): FocusRequester = when (tab) {
+        DashboardTab.HOME -> homePrimaryFocusRequester
+        DashboardTab.LIBRARY -> libraryPrimaryFocusRequester
+        DashboardTab.SERVERS -> serversPrimaryFocusRequester
+        DashboardTab.SETTINGS -> settingsPrimaryFocusRequester
+    }
+
     fun switchTab(newTab: DashboardTab, reason: String = "") {
+        com.example.ui.components.GamepadUiNavigation.onGamepadInteraction()
         if (currentTab != newTab) {
             val nextScenario = when (newTab) {
                 DashboardTab.HOME -> PerfScenario.HOME
@@ -157,18 +167,18 @@ fun TvDashboardScreen(
             PerformanceMonitor.setScenario(nextScenario)
             val suffix = if (reason.isNotBlank()) " ($reason)" else ""
             AppLogger.info("UI", "Chuyển tab TV: ${currentTab.name} -> ${newTab.name}$suffix")
-            if (newTab !in visitedTabs) {
-                visitedTabs.add(newTab)
-            }
             currentTab = newTab
+        } else {
+            runCatching { primaryRequesterForTab(newTab).requestFocus() }
         }
     }
 
     val isAnyDialogOpen = showGuideDialog || showTranslatorDialog || showWebPortalDialog || showLanguageDialog || showRemotePadDialog
+    val activeTabPrimaryFocusRequester = primaryRequesterForTab(currentTab)
 
     GamepadSurfaceController(
         enabled = !isAnyDialogOpen,
-        defaultFocusRequester = if (currentTab == DashboardTab.HOME) homePrimaryFocusRequester else activeRailFocusRequester,
+        defaultFocusRequester = activeTabPrimaryFocusRequester,
         onPreviousTab = {
             val tabs = DashboardTab.entries
             val prevIdx = (tabs.indexOf(currentTab) - 1 + tabs.size) % tabs.size
@@ -236,9 +246,9 @@ fun TvDashboardScreen(
             val railGap = (18.dp * scale).coerceIn(10.dp, 24.dp)
 
             LaunchedEffect(currentTab) {
-                if (currentTab == DashboardTab.HOME) {
-                    runCatching { homePrimaryFocusRequester.requestFocus() }
-                }
+                com.example.ui.components.GamepadUiNavigation.onGamepadInteraction()
+                kotlinx.coroutines.delay(24)
+                runCatching { primaryRequesterForTab(currentTab).requestFocus() }
             }
 
             // Vùng an toàn ở mép màn hình (.safe)
@@ -261,6 +271,9 @@ fun TvDashboardScreen(
                         scale = scale,
                         activeRailFocusRequester = activeRailFocusRequester,
                         onSelectTab = { switchTab(it) },
+                        onMoveRightIntoTab = {
+                            runCatching { activeTabPrimaryFocusRequester.requestFocus() }
+                        },
                         onVpnChipClick = { switchTab(DashboardTab.SERVERS, "bấm chip VPN") }
                     )
 
@@ -275,107 +288,92 @@ fun TvDashboardScreen(
                             .weight(1f)
                             .fillMaxHeight()
                     ) {
-                        visitedTabs.forEach { tab ->
-                            androidx.compose.runtime.key(tab) {
-                                val isSelectedTab = (currentTab == tab)
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .focusProperties { canFocus = isSelectedTab }
-                                        .layout { measurable, constraints ->
-                                            if (isSelectedTab) {
-                                                val placeable = measurable.measure(constraints)
-                                                layout(placeable.width, placeable.height) {
-                                                    placeable.placeRelative(0, 0)
-                                                }
-                                            } else {
-                                                layout(0, 0) {}
-                                            }
-                                        }
-                                ) {
-                                    when (tab) {
-                                        DashboardTab.HOME -> {
-                                            TvHomeScreen(
-                                                config = config,
-                                                vpnState = vpnState,
-                                                measuredPingMs = measuredPingMs,
-                                                featuredGames = allGames,
-                                                scale = scale,
-                                                defaultFocusRequester = homePrimaryFocusRequester,
-                                                onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
-                                                onLaunchGame = { rawUrl ->
-                                                    onLaunchUrl(
-                                                        SettingsRepository.formatXboxUrlWithLocale(
-                                                            rawUrl,
-                                                            config.getEffectiveLocale(),
-                                                            com.example.data.XboxWebUiMode.CLASSIC
-                                                        )
-                                                    )
-                                                },
-                                                onConnectVpn = { VpnManager.connect(context) },
-                                                onDisconnectVpn = { VpnManager.disconnect(context) },
-                                                onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ TV") },
-                                                onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ TV") },
-                                                onOpenLanguagePicker = { showLanguageDialog = true },
-                                                onOpenTranslator = { showTranslatorDialog = true },
-                                                onOpenWebPortal = { showWebPortalDialog = true },
-                                                onOpenRemotePad = { showRemotePadDialog = true },
-                                                onOpenGuide = { section ->
-                                                    guideInitialSection = section
-                                                    showGuideDialog = true
-                                                }
+                        when (currentTab) {
+                            DashboardTab.HOME -> {
+                                TvHomeScreen(
+                                    config = config,
+                                    vpnState = vpnState,
+                                    measuredPingMs = measuredPingMs,
+                                    featuredGames = allGames,
+                                    scale = scale,
+                                    defaultFocusRequester = homePrimaryFocusRequester,
+                                    onOpenXboxCloud = { onLaunchUrl(config.targetRegionUrl) },
+                                    onLaunchGame = { rawUrl ->
+                                        onLaunchUrl(
+                                            SettingsRepository.formatXboxUrlWithLocale(
+                                                rawUrl,
+                                                config.getEffectiveLocale(),
+                                                com.example.data.XboxWebUiMode.CLASSIC
                                             )
-                                        }
-                                        DashboardTab.LIBRARY -> {
-                                            TvLibraryScreen(
-                                                config = config,
-                                                games = allGames,
-                                                scale = scale,
-                                                focusSearchTrigger = librarySearchFocusTick,
-                                                favoriteToggleTrigger = libraryFavoriteToggleTick,
-                                                onLaunchGame = { rawUrl ->
-                                                    onLaunchUrl(
-                                                        SettingsRepository.formatXboxUrlWithLocale(
-                                                            rawUrl,
-                                                            config.getEffectiveLocale(),
-                                                            com.example.data.XboxWebUiMode.CLASSIC
-                                                        )
-                                                    )
-                                                }
-                                            )
-                                        }
-                                        DashboardTab.SERVERS -> {
-                                            TvServersScreen(
-                                                config = config,
-                                                currentServer = vpnState.currentServer,
-                                                onSelectServer = onSelectServerStable,
-                                                isTabActive = isSelectedTab,
-                                                scale = scale
-                                            )
-                                        }
-                                        DashboardTab.SETTINGS -> {
-                                            TvSettingsScreen(
-                                                config = config,
-                                                vpnState = vpnState,
-                                                scale = scale,
-                                                onOpenGuide = { section ->
-                                                    guideInitialSection = section
-                                                    showGuideDialog = true
-                                                },
-                                                onClearCookies = {
-                                                    android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                                                    android.webkit.WebStorage.getInstance().deleteAllData()
-                                                    val msg = if (config.isSettingsEnglishUI()) {
-                                                        "Cleared saved login & web data!"
-                                                    } else {
-                                                        "Đã làm mới dữ liệu đăng nhập Xbox!"
-                                                    }
-                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                                }
-                                            )
-                                        }
+                                        )
+                                    },
+                                    onConnectVpn = { VpnManager.connect(context) },
+                                    onDisconnectVpn = { VpnManager.disconnect(context) },
+                                    onNavigateToLibrary = { switchTab(DashboardTab.LIBRARY, "từ Trang chủ TV") },
+                                    onNavigateToServers = { switchTab(DashboardTab.SERVERS, "từ Trang chủ TV") },
+                                    onOpenLanguagePicker = { showLanguageDialog = true },
+                                    onOpenTranslator = { showTranslatorDialog = true },
+                                    onOpenWebPortal = { showWebPortalDialog = true },
+                                    onOpenRemotePad = { showRemotePadDialog = true },
+                                    onOpenGuide = { section ->
+                                        guideInitialSection = section
+                                        showGuideDialog = true
                                     }
-                                }
+                                )
+                            }
+                            DashboardTab.LIBRARY -> {
+                                TvLibraryScreen(
+                                    config = config,
+                                    games = allGames,
+                                    scale = scale,
+                                    defaultFocusRequester = libraryPrimaryFocusRequester,
+                                    focusSearchTrigger = librarySearchFocusTick,
+                                    favoriteToggleTrigger = libraryFavoriteToggleTick,
+                                    onLaunchGame = { rawUrl ->
+                                        onLaunchUrl(
+                                            SettingsRepository.formatXboxUrlWithLocale(
+                                                rawUrl,
+                                                config.getEffectiveLocale(),
+                                                com.example.data.XboxWebUiMode.CLASSIC
+                                            )
+                                        )
+                                    }
+                                )
+                            }
+                            DashboardTab.SERVERS -> {
+                                TvServersScreen(
+                                    config = config,
+                                    currentServer = vpnState.currentServer,
+                                    onSelectServer = onSelectServerStable,
+                                    isTabActive = true,
+                                    scale = scale,
+                                    defaultFocusRequester = serversPrimaryFocusRequester
+                                )
+                            }
+                            DashboardTab.SETTINGS -> {
+                                TvSettingsScreen(
+                                    config = config,
+                                    vpnState = vpnState,
+                                    scale = scale,
+                                    defaultFocusRequester = settingsPrimaryFocusRequester,
+                                    onMoveLeftToRail = {
+                                        runCatching { activeRailFocusRequester.requestFocus() }
+                                    },
+                                    onOpenGuide = { section ->
+                                        guideInitialSection = section
+                                        showGuideDialog = true
+                                    },
+                                    onClearCookies = {
+                                        android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                                        android.webkit.WebStorage.getInstance().deleteAllData()
+                                        val msg = if (config.isSettingsEnglishUI()) {
+                                            "Cleared saved login & web data!"
+                                        } else {
+                                            "Đã làm mới dữ liệu đăng nhập Xbox!"
+                                        }
+                                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                             }
                         }
                     }

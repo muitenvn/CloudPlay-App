@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -66,6 +67,7 @@ import com.example.data.AppUiMode
 import com.example.data.CellularOptimizationMode
 import com.example.data.GamepadHapticLevel
 import com.example.data.GamepadLayoutPreset
+import com.example.data.GyroControlMode
 import com.example.data.POPULAR_XBOX_LANGUAGES
 import com.example.data.ScreenRecordQuality
 import com.example.data.SettingsRepository
@@ -102,6 +104,8 @@ internal fun TvSettingsScreen(
     config: AppConfig,
     vpnState: VpnConnectionState,
     scale: Float,
+    defaultFocusRequester: FocusRequester? = null,
+    onMoveLeftToRail: (() -> Unit)? = null,
     onOpenGuide: (GuideSection) -> Unit,
     onClearCookies: () -> Unit,
     modifier: Modifier = Modifier
@@ -109,6 +113,17 @@ internal fun TvSettingsScreen(
     val context = LocalContext.current
     val isEn = config.isSettingsEnglishUI()
     var selectedCat by rememberSaveable { mutableStateOf(TvSettingsCategory.GRAPHICS) }
+    val categoryFocusRequesters = remember {
+        TvSettingsCategory.entries.associateWith { FocusRequester() }
+    }
+    val firstPaneItemFocusRequester = remember { FocusRequester() }
+    val moveFocusToCategory: () -> Unit = {
+        val catReq = categoryFocusRequesters[selectedCat]
+        val moved = runCatching { catReq?.requestFocus() }.isSuccess
+        if (!moved) {
+            runCatching { defaultFocusRequester?.requestFocus() }
+        }
+    }
 
     var showWebPortalDialog by remember { mutableStateOf(false) }
     var showAppLogDialog by remember { mutableStateOf(false) }
@@ -252,15 +267,34 @@ internal fun TvSettingsScreen(
                 TvSettingsCategory.entries.forEach { cat ->
                     val isCurrent = selectedCat == cat
                     val itemCorner = (10.dp * scale).coerceAtLeast(8.dp)
+                    val catRequester = categoryFocusRequesters.getValue(cat)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .defaultMinSize(minHeight = (36.dp * scale).coerceAtLeast(30.dp))
                             .clip(RoundedCornerShape(itemCorner))
                             .background(if (isCurrent) TvSurface2 else Color.Transparent)
+                            .focusRequester(catRequester)
                             .gamepadClickable(
                                 cornerRadius = itemCorner,
-                                onClick = { selectedCat = cat }
+                                focusRequester = if (isCurrent) defaultFocusRequester else null,
+                                onFocused = { selectedCat = cat },
+                                onStepHorizontalConsumed = { dir ->
+                                    if (dir > 0) {
+                                        selectedCat = cat
+                                        runCatching { firstPaneItemFocusRequester.requestFocus() }
+                                        true
+                                    } else if (dir < 0 && onMoveLeftToRail != null) {
+                                        onMoveLeftToRail()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                                onClick = {
+                                    selectedCat = cat
+                                    runCatching { firstPaneItemFocusRequester.requestFocus() }
+                                }
                             )
                             .padding(
                                 horizontal = (11.dp * scale).coerceAtLeast(8.dp),
@@ -314,6 +348,8 @@ internal fun TvSettingsScreen(
                                     config.tr("Hiện mã 4 số", "Show 4-Digit PIN")
                                 },
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showRemotePadDialog = true },
                                 testTag = "tv_setting_quick_remote_pad_row"
                             )
@@ -342,6 +378,7 @@ internal fun TvSettingsScreen(
                                     }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_resolution_row"
                             )
                         }
@@ -361,6 +398,7 @@ internal fun TvSettingsScreen(
                                     fpsList.getOrNull(idx)?.let { SettingsRepository.updateStreamFpsCap(it) }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_fps_row"
                             )
                         }
@@ -375,6 +413,7 @@ internal fun TvSettingsScreen(
                                 checked = config.clarityBoostEnabled,
                                 onCheckedChange = { SettingsRepository.updateClarityBoost(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_clarity_row"
                             )
                         }
@@ -389,6 +428,7 @@ internal fun TvSettingsScreen(
                                 checked = config.wifiSpeedFirstPriority,
                                 onCheckedChange = { SettingsRepository.updateWifiSpeedFirstPriority(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_smooth_response_row"
                             )
                         }
@@ -403,6 +443,7 @@ internal fun TvSettingsScreen(
                                 checked = config.gpuLoadReductionEnabled,
                                 onCheckedChange = { SettingsRepository.updateGpuLoadReductionEnabled(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_gpu_reduction_row"
                             )
                         }
@@ -422,6 +463,7 @@ internal fun TvSettingsScreen(
                                     uiModes.getOrNull(idx)?.let { SettingsRepository.updateXboxWebUiMode(it) }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_xbox_web_ui_row"
                             )
                         }
@@ -436,6 +478,7 @@ internal fun TvSettingsScreen(
                                 checked = config.autoExitPreviewHandlerEnabled,
                                 onCheckedChange = { SettingsRepository.updateAutoExitPreviewHandlerEnabled(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_auto_exit_preview_row"
                             )
                         }
@@ -456,6 +499,8 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateAutoBypass(enabled)
                                 },
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_auto_vpn_row"
                             )
                         }
@@ -479,6 +524,7 @@ internal fun TvSettingsScreen(
                                     engines.getOrNull(idx)?.let { (eng, _) -> VpnManager.setEngine(eng) }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_vpn_engine_row"
                             )
                         }
@@ -497,6 +543,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateAutoBypassDelay(next)
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_vpn_delay_row"
                             )
                         }
@@ -521,6 +568,8 @@ internal fun TvSettingsScreen(
                                 subtitle = statusSub,
                                 actionLabel = config.tr("📳 Thử rung", "📳 Test Rumble"),
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = {
                                     gamepadDetector.checkControllers()
                                     triggerControllerTestRumble()
@@ -557,9 +606,92 @@ internal fun TvSettingsScreen(
                                     config.tr("Ghép đôi", "Pair Phone")
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showRemotePadDialog = true },
                                 testTag = "tv_setting_remote_pad_row"
                             )
+                        }
+
+                        item(key = "tv_set_gyro_enabled") {
+                            TvSettingToggleRow(
+                                title = config.tr("🎯 Con quay hồi chuyển (Bắn súng / VR / Đua xe)", "🎯 Gyroscope Control (Shooter / VR / Racing)"),
+                                subtitle = config.tr(
+                                    "Mặc định Tắt (giữ cảm biến gốc của game Xbox). Khi bật: nghiêng máy/tay cầm để ngắm mọi góc hoặc lái xe.",
+                                    "Default Off (uses native Xbox game gyro). When On: tilt device/controller for 360° aiming or steering."
+                                ),
+                                checked = config.gyroEnabled,
+                                onCheckedChange = { SettingsRepository.updateGyroEnabled(it) },
+                                scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
+                                testTag = "tv_setting_gyro_enabled_row"
+                            )
+                        }
+
+                        if (config.gyroEnabled) {
+                            item(key = "tv_set_gyro_mode") {
+                                val modes = GyroControlMode.entries
+                                val curIdx = modes.indexOf(config.gyroMode).coerceAtLeast(0)
+                                TvSettingSegmentRow(
+                                    title = config.tr("Chế độ con quay theo thể loại game", "Gyro Mode by Game Genre"),
+                                    subtitle = modes[curIdx].localizedDesc(isEn),
+                                    options = modes.map { it.localizedShort(isEn) },
+                                    selectedIndex = curIdx,
+                                    onSelect = { idx ->
+                                        modes.getOrNull(idx)?.let { SettingsRepository.updateGyroMode(it) }
+                                    },
+                                    scale = scale,
+                                    onMoveLeftToCategory = moveFocusToCategory,
+                                    testTag = "tv_setting_gyro_mode_row"
+                                )
+                            }
+
+                            item(key = "tv_set_gyro_sens_x") {
+                                val pctX = (config.gyroSensitivityX * 100).roundToInt()
+                                TvSettingSliderRow(
+                                    title = config.tr("Độ nhạy ngang con quay (Qua lại)", "Gyro Horizontal Sensitivity (Left/Right)"),
+                                    subtitle = config.tr("Tốc độ quay ngang hoặc đánh lái qua lại (10% – 300%).", "Horizontal rotation or steering speed (10% – 300%)."),
+                                    valueText = "$pctX%",
+                                    fraction = ((config.gyroSensitivityX - 0.10f) / 2.90f).coerceIn(0f, 1f),
+                                    onStep = { dir ->
+                                        val next = (config.gyroSensitivityX + dir * 0.10f).coerceIn(0.10f, 3.00f)
+                                        SettingsRepository.updateGyroSensitivityX(next)
+                                    },
+                                    scale = scale,
+                                    onMoveLeftToCategory = moveFocusToCategory,
+                                    testTag = "tv_setting_gyro_sens_x_row"
+                                )
+                            }
+
+                            if (config.gyroMode != GyroControlMode.RACING_STEER) {
+                                item(key = "tv_set_gyro_sens_y") {
+                                    val pctY = (config.gyroSensitivityY * 100).roundToInt()
+                                    TvSettingSliderRow(
+                                        title = config.tr("Độ nhạy dọc con quay (Lên xuống)", "Gyro Vertical Sensitivity (Up/Down)"),
+                                        subtitle = config.tr("Tốc độ ngắm lên xuống trong game bắn súng / VR (10% – 300%).", "Vertical aiming speed in shooters / VR (10% – 300%)."),
+                                        valueText = "$pctY%",
+                                        fraction = ((config.gyroSensitivityY - 0.10f) / 2.90f).coerceIn(0f, 1f),
+                                        onStep = { dir ->
+                                            val next = (config.gyroSensitivityY + dir * 0.10f).coerceIn(0.10f, 3.00f)
+                                            SettingsRepository.updateGyroSensitivityY(next)
+                                        },
+                                        scale = scale,
+                                        onMoveLeftToCategory = moveFocusToCategory,
+                                        testTag = "tv_setting_gyro_sens_y_row"
+                                    )
+                                }
+                            }
+
+                            item(key = "tv_set_gyro_hold_lt") {
+                                TvSettingToggleRow(
+                                    title = config.tr("Chỉ bật con quay khi giữ cò ngắm (LT)", "Activate Gyro Only While Holding LT (ADS)"),
+                                    subtitle = config.tr("Tắt: luôn quay theo góc nghiêng · Bật: chỉ quay khi giữ cò trái LT.", "Off: always active · On: only active while holding LT."),
+                                    checked = config.gyroHoldLtOnly,
+                                    onCheckedChange = { SettingsRepository.updateGyroHoldLtOnly(it) },
+                                    scale = scale,
+                                    onMoveLeftToCategory = moveFocusToCategory,
+                                    testTag = "tv_setting_gyro_hold_lt_row"
+                                )
+                            }
                         }
 
                         item(key = "tv_set_layout_preset") {
@@ -574,6 +706,7 @@ internal fun TvSettingsScreen(
                                     presets.getOrNull(idx)?.let { SettingsRepository.updateGamepadLayoutPreset(it) }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_layout_preset_row"
                             )
                         }
@@ -590,6 +723,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updatePhysLeftStickInnerDeadzone(next)
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_phys_l_inner_row"
                             )
                         }
@@ -606,6 +740,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updatePhysRightStickInnerDeadzone(next)
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_phys_r_inner_row"
                             )
                         }
@@ -620,6 +755,7 @@ internal fun TvSettingsScreen(
                                 checked = config.showVirtualController,
                                 onCheckedChange = { SettingsRepository.updateShowVirtualController(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_virtual_pad_row"
                             )
                         }
@@ -634,6 +770,7 @@ internal fun TvSettingsScreen(
                                 checked = config.autoHideVirtualOnPhysicalController,
                                 onCheckedChange = { SettingsRepository.updateAutoHideVirtualOnPhysicalController(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_auto_hide_virtual_row"
                             )
                         }
@@ -648,6 +785,7 @@ internal fun TvSettingsScreen(
                                 checked = config.usePerGameGamepadLayout,
                                 onCheckedChange = { SettingsRepository.updateUsePerGameGamepadLayout(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_per_game_layout_row"
                             )
                         }
@@ -662,6 +800,7 @@ internal fun TvSettingsScreen(
                                 checked = config.gamepadSprintLockEnabled,
                                 onCheckedChange = { SettingsRepository.updateGamepadSprintLockEnabled(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_auto_sprint_row"
                             )
                         }
@@ -675,6 +814,7 @@ internal fun TvSettingsScreen(
                                 ),
                                 actionLabel = config.tr("Đặt lại", "Reset"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showResetGamepadConfirmDialog = true },
                                 testTag = "tv_setting_reset_gamepad_row"
                             )
@@ -692,6 +832,8 @@ internal fun TvSettingsScreen(
                                 checked = config.isEffectiveTranslateEnabled(),
                                 onCheckedChange = { SettingsRepository.updateXcloudTranslate(it) },
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_auto_translate_row"
                             )
                         }
@@ -724,6 +866,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateTranslateLanguage(translateOptions[next].first)
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_translate_lang_row"
                             )
                         }
@@ -741,6 +884,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateAppLanguage(appLangs[next])
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_app_language_row"
                             )
                         }
@@ -762,6 +906,8 @@ internal fun TvSettingsScreen(
                                     qualities.getOrNull(idx)?.let { SettingsRepository.updateScreenRecordQuality(it) }
                                 },
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_setting_record_quality_row"
                             )
                         }
@@ -784,6 +930,8 @@ internal fun TvSettingsScreen(
                                     modes.getOrNull(idx)?.let { SettingsRepository.updateAppUiMode(it) }
                                 },
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_setting_ui_mode_row"
                             )
                         }
@@ -799,6 +947,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateVideoContrast((config.videoContrast + dir * 5).coerceIn(80, 140))
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_contrast_row"
                             )
                         }
@@ -813,6 +962,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateVideoSaturation((config.videoSaturation + dir * 5).coerceIn(80, 150))
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_saturation_row"
                             )
                         }
@@ -827,6 +977,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateVideoBrightness((config.videoBrightness + dir * 5).coerceIn(80, 130))
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_brightness_row"
                             )
                         }
@@ -837,6 +988,7 @@ internal fun TvSettingsScreen(
                                 subtitle = config.tr("Đưa Tương phản, Tươi màu và Độ sáng về 100%.", "Restore Contrast, Saturation, and Brightness to 100%."),
                                 actionLabel = config.tr("Đặt lại 100%", "Reset 100%"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = {
                                     SettingsRepository.resetVideoDisplayDefaults()
                                     Toast.makeText(
@@ -862,6 +1014,7 @@ internal fun TvSettingsScreen(
                                     SettingsRepository.updateGpuLoadReductionEnabled(enabled)
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_low_end_row"
                             )
                         }
@@ -918,7 +1071,7 @@ internal fun TvSettingsScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy((8.dp * scale).coerceAtLeast(6.dp))
                                     ) {
-                                        rowButtons.forEach { (btnIdx, shortName, _) ->
+                                        rowButtons.forEachIndexed { colIdx, (btnIdx, shortName, _) ->
                                             val mappedTarget = activeButtonMap[btnIdx] ?: btnIdx
                                             val targetLabel = SettingsRepository.getGamepadButtonShortLabel(mappedTarget)
                                             val isRemapped = mappedTarget != btnIdx
@@ -930,6 +1083,16 @@ internal fun TvSettingsScreen(
                                                     .background(if (isRemapped) TvSel else TvSurface2)
                                                     .gamepadClickable(
                                                         cornerRadius = btnCorner,
+                                                        onStepHorizontalConsumed = if (colIdx == 0) {
+                                                            { dir ->
+                                                                if (dir < 0) {
+                                                                    moveFocusToCategory()
+                                                                    true
+                                                                } else {
+                                                                    false
+                                                                }
+                                                            }
+                                                        } else null,
                                                         onClick = { activeRemapSourceBtn = btnIdx }
                                                     )
                                                     .padding(vertical = (8.dp * scale).coerceAtLeast(6.dp), horizontal = (6.dp * scale).coerceAtLeast(4.dp)),
@@ -968,6 +1131,7 @@ internal fun TvSettingsScreen(
                                 checked = config.controllerShortcutsEnabled,
                                 onCheckedChange = { SettingsRepository.updateControllerShortcutsEnabled(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_controller_shortcuts_row"
                             )
                         }
@@ -980,6 +1144,7 @@ internal fun TvSettingsScreen(
                                     subtitle = config.tr("Bấm A để đổi nút kích hoạt.", "Press A to change trigger button."),
                                     actionLabel = "View + $btnShort",
                                     scale = scale,
+                                    onMoveLeftToCategory = moveFocusToCategory,
                                     onClick = { activeShortcutTargetAction = "toggle_stats" },
                                     testTag = "tv_adv_shortcut_stats_row"
                                 )
@@ -991,6 +1156,7 @@ internal fun TvSettingsScreen(
                                     subtitle = config.tr("Bấm A để đổi nút kích hoạt.", "Press A to change trigger button."),
                                     actionLabel = "View + $btnShort",
                                     scale = scale,
+                                    onMoveLeftToCategory = moveFocusToCategory,
                                     onClick = { activeShortcutTargetAction = "toggle_recording" },
                                     testTag = "tv_adv_shortcut_record_row"
                                 )
@@ -1008,6 +1174,7 @@ internal fun TvSettingsScreen(
                                 checked = config.bilingualMode,
                                 onCheckedChange = { SettingsRepository.updateBilingualMode(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_bilingual_row"
                             )
                         }
@@ -1036,6 +1203,7 @@ internal fun TvSettingsScreen(
                                     }
                                 },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_market_row"
                             )
                         }
@@ -1051,6 +1219,7 @@ internal fun TvSettingsScreen(
                                 checked = config.enableGlobalpingProbe,
                                 onCheckedChange = { SettingsRepository.updateEnableGlobalpingProbe(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_globalping_row"
                             )
                         }
@@ -1065,6 +1234,7 @@ internal fun TvSettingsScreen(
                                 checked = config.enableGeoIpHttpsFallback,
                                 onCheckedChange = { SettingsRepository.updateEnableGeoIpHttpsFallback(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_adv_geoip_https_row"
                             )
                         }
@@ -1078,6 +1248,7 @@ internal fun TvSettingsScreen(
                                 ),
                                 actionLabel = config.tr("Sao chép", "Copy"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = {
                                     val reportText = AppLogger.buildDiagnosticReport(
                                         context = context,
@@ -1107,6 +1278,7 @@ internal fun TvSettingsScreen(
                                 ),
                                 actionLabel = config.tr("Khôi phục", "Restore"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showResetAdvancedConfirmDialog = true },
                                 testTag = "tv_adv_restore_defaults_row"
                             )
@@ -1120,6 +1292,8 @@ internal fun TvSettingsScreen(
                                 subtitle = config.tr("Theo dõi sự kiện ứng dụng, mạng và trạm đo.", "View app, network, and server probe logs."),
                                 actionLabel = config.tr("Mở nhật ký", "Open Log"),
                                 scale = scale,
+                                focusRequester = firstPaneItemFocusRequester,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showAppLogDialog = true },
                                 testTag = "tv_info_log_row"
                             )
@@ -1137,6 +1311,7 @@ internal fun TvSettingsScreen(
                                 subtitle = updateSub,
                                 actionLabel = config.tr("Kiểm tra", "Check Now"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { UpdateChecker.checkNowManual(context) },
                                 testTag = "tv_info_update_row"
                             )
@@ -1149,6 +1324,7 @@ internal fun TvSettingsScreen(
                                 checked = config.autoCheckUpdatesOnLaunch,
                                 onCheckedChange = { SettingsRepository.updateAutoCheckUpdatesOnLaunch(it) },
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 testTag = "tv_info_auto_update_row"
                             )
                         }
@@ -1159,6 +1335,7 @@ internal fun TvSettingsScreen(
                                 subtitle = config.tr("Quét mã QR bằng điện thoại để mở trang tải xuống.", "Scan QR code with your phone to open download page."),
                                 actionLabel = config.tr("Hiện mã QR", "Show QR"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showWebPortalDialog = true },
                                 testTag = "tv_info_qr_row"
                             )
@@ -1170,6 +1347,7 @@ internal fun TvSettingsScreen(
                                 subtitle = config.tr("Cách dùng VPN mở khóa vùng, tay cầm và menu nổi.", "How to use region unlock VPN, controller, and quick menu."),
                                 actionLabel = config.tr("Xem hướng dẫn", "Open Guide"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { onOpenGuide(GuideSection.QUICK_START) },
                                 testTag = "tv_info_guide_row"
                             )
@@ -1181,6 +1359,7 @@ internal fun TvSettingsScreen(
                                 subtitle = config.tr("Đọc đầy đủ 15 mục điều khoản ngay trong ứng dụng.", "Read all 15 sections in-app."),
                                 actionLabel = config.tr("Xem 15 mục", "Read Terms"),
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showFullTermsDialog = true },
                                 testTag = "tv_info_terms_row"
                             )
@@ -1193,6 +1372,7 @@ internal fun TvSettingsScreen(
                                 actionLabel = config.tr("Xóa phiên", "Sign Out"),
                                 titleColor = TvDanger,
                                 scale = scale,
+                                onMoveLeftToCategory = moveFocusToCategory,
                                 onClick = { showClearCookiesConfirmDialog = true },
                                 testTag = "tv_info_clear_cookies_row"
                             )
@@ -1476,20 +1656,39 @@ private fun TvSettingToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     scale: Float,
+    focusRequester: FocusRequester? = null,
+    onMoveLeftToCategory: (() -> Unit)? = null,
     testTag: String
 ) {
     val corner = (12.dp * scale).coerceAtLeast(9.dp)
+    var isFocused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
-            .background(TvSurface)
+            .background(if (isFocused) TvSel else TvSurface)
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { isFocused = it.isFocused }
             .gamepadClickable(
                 cornerRadius = corner,
-                onStepHorizontal = { dir ->
-                    val wantOn = dir > 0
-                    if (wantOn != checked) onCheckedChange(wantOn)
+                onStepHorizontalConsumed = { dir ->
+                    if (dir < 0) {
+                        if (checked) {
+                            onCheckedChange(false)
+                            true
+                        } else if (onMoveLeftToCategory != null) {
+                            onMoveLeftToCategory()
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        if (!checked) {
+                            onCheckedChange(true)
+                        }
+                        true
+                    }
                 },
                 onClick = { onCheckedChange(!checked) }
             )
@@ -1507,7 +1706,7 @@ private fun TvSettingToggleRow(
         ) {
             Text(
                 text = title,
-                color = TvInk,
+                color = if (isFocused) TvAccent else TvInk,
                 fontFamily = SpaceGroteskFontFamily,
                 fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
@@ -1537,20 +1736,35 @@ private fun TvSettingSegmentRow(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     scale: Float,
+    focusRequester: FocusRequester? = null,
+    onMoveLeftToCategory: (() -> Unit)? = null,
     testTag: String
 ) {
     val corner = (12.dp * scale).coerceAtLeast(9.dp)
+    var isFocused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
-            .background(TvSurface)
+            .background(if (isFocused) TvSel else TvSurface)
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { isFocused = it.isFocused }
             .gamepadClickable(
                 cornerRadius = corner,
-                onStepHorizontal = { dir ->
-                    val next = (selectedIndex + dir).coerceIn(0, options.lastIndex)
-                    if (next != selectedIndex) onSelect(next)
+                onStepHorizontalConsumed = { dir ->
+                    if (dir < 0 && selectedIndex <= 0) {
+                        if (onMoveLeftToCategory != null) {
+                            onMoveLeftToCategory()
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        val next = (selectedIndex + dir).coerceIn(0, options.lastIndex)
+                        if (next != selectedIndex) onSelect(next)
+                        true
+                    }
                 },
                 onClick = {
                     val next = (selectedIndex + 1) % options.size
@@ -1571,7 +1785,7 @@ private fun TvSettingSegmentRow(
         ) {
             Text(
                 text = title,
-                color = TvInk,
+                color = if (isFocused) TvAccent else TvInk,
                 fontFamily = SpaceGroteskFontFamily,
                 fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
@@ -1594,7 +1808,8 @@ private fun TvSettingSegmentRow(
             selectedIndex = selectedIndex,
             onSelect = onSelect,
             scale = scale,
-            containerColor = TvSurface2
+            containerColor = TvSurface2,
+            focusableItems = false
         )
     }
 }
@@ -1607,18 +1822,31 @@ private fun TvSettingSliderRow(
     fraction: Float,
     onStep: (Int) -> Unit,
     scale: Float,
+    focusRequester: FocusRequester? = null,
+    onMoveLeftToCategory: (() -> Unit)? = null,
     testTag: String
 ) {
     val corner = (12.dp * scale).coerceAtLeast(9.dp)
+    var isFocused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
-            .background(TvSurface)
+            .background(if (isFocused) TvSel else TvSurface)
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { isFocused = it.isFocused }
             .gamepadClickable(
                 cornerRadius = corner,
-                onStepHorizontal = { dir -> onStep(dir) },
+                onStepHorizontalConsumed = { dir ->
+                    if (dir < 0 && fraction <= 0.001f && onMoveLeftToCategory != null) {
+                        onMoveLeftToCategory()
+                        true
+                    } else {
+                        onStep(dir)
+                        true
+                    }
+                },
                 onClick = { onStep(1) }
             )
             .padding(
@@ -1635,7 +1863,7 @@ private fun TvSettingSliderRow(
         ) {
             Text(
                 text = title,
-                color = TvInk,
+                color = if (isFocused) TvAccent else TvInk,
                 fontFamily = SpaceGroteskFontFamily,
                 fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,
@@ -1691,18 +1919,31 @@ private fun TvSettingActionRow(
     actionLabel: String,
     scale: Float,
     titleColor: Color = TvInk,
+    focusRequester: FocusRequester? = null,
+    onMoveLeftToCategory: (() -> Unit)? = null,
     onClick: () -> Unit,
     testTag: String
 ) {
     val corner = (12.dp * scale).coerceAtLeast(9.dp)
+    var isFocused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = (48.dp * scale).coerceAtLeast(38.dp))
             .clip(RoundedCornerShape(corner))
-            .background(TvSurface)
+            .background(if (isFocused) TvSel else TvSurface)
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { isFocused = it.isFocused }
             .gamepadClickable(
                 cornerRadius = corner,
+                onStepHorizontalConsumed = { dir ->
+                    if (dir < 0 && onMoveLeftToCategory != null) {
+                        onMoveLeftToCategory()
+                        true
+                    } else {
+                        false
+                    }
+                },
                 onClick = onClick
             )
             .padding(
@@ -1719,7 +1960,7 @@ private fun TvSettingActionRow(
         ) {
             Text(
                 text = title,
-                color = titleColor,
+                color = if (isFocused && titleColor == TvInk) TvAccent else titleColor,
                 fontFamily = SpaceGroteskFontFamily,
                 fontSize = (14f * scale).coerceAtLeast(11.5f).sp,
                 fontWeight = FontWeight.Bold,

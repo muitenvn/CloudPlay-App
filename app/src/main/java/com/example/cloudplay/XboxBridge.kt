@@ -2170,6 +2170,48 @@ class XboxBridge(
                         virtualGamepadState.timestamp = nowTs();
                     };
 
+                    let gyroInputState = { active: false, rightStick: true, x: 0, y: 0, holdLtOnly: false };
+
+                    window.__cpGyro = function(rightStick, xVal, yVal, holdLtOnly) {
+                        gyroInputState.active = true;
+                        gyroInputState.rightStick = !!rightStick;
+                        gyroInputState.x = Math.max(-1, Math.min(1, xVal || 0));
+                        gyroInputState.y = Math.max(-1, Math.min(1, yVal || 0));
+                        gyroInputState.holdLtOnly = !!holdLtOnly;
+                        if (Math.abs(gyroInputState.x) > 0.005 || Math.abs(gyroInputState.y) > 0.005) {
+                            ensureGamepadConnectedEvent();
+                        }
+                        virtualGamepadState.timestamp = nowTs();
+                    };
+
+                    window.__cpGyroClear = function() {
+                        gyroInputState.active = false;
+                        gyroInputState.x = 0;
+                        gyroInputState.y = 0;
+                        virtualGamepadState.timestamp = nowTs();
+                    };
+
+                    function mixGyroIntoAxesAndButtons(axesArr, buttonsArr) {
+                        if (!gyroInputState.active) return axesArr;
+                        if (gyroInputState.holdLtOnly) {
+                            const ltBtn = buttonsArr && buttonsArr[6];
+                            const ltPressed = !!(ltBtn && (ltBtn.pressed || (ltBtn.value || 0) > 0.15));
+                            if (!ltPressed) return axesArr;
+                        }
+                        const gx = gyroInputState.x || 0;
+                        const gy = gyroInputState.y || 0;
+                        if (Math.abs(gx) < 0.001 && Math.abs(gy) < 0.001) return axesArr;
+                        const out = [axesArr[0] || 0, axesArr[1] || 0, axesArr[2] || 0, axesArr[3] || 0];
+                        if (gyroInputState.rightStick) {
+                            out[2] = Math.max(-1, Math.min(1, out[2] + gx));
+                            out[3] = Math.max(-1, Math.min(1, out[3] + gy));
+                        } else {
+                            out[0] = Math.max(-1, Math.min(1, out[0] + gx));
+                            out[1] = Math.max(-1, Math.min(1, out[1] + gy));
+                        }
+                        return out;
+                    }
+
                     window.__cpReleaseAll = function() {
                         virtViewDownAt = 0;
                         virtShortcutLatched = {};
@@ -2271,13 +2313,14 @@ class XboxBridge(
                                 btns[i] = { pressed: !!b.pressed, touched: !!b.touched, value: b.value || 0 };
                             }
                             const srcAxes = virtualGamepadState.axes;
+                            const baseAxes = [srcAxes[0] || 0, srcAxes[1] || 0, srcAxes[2] || 0, srcAxes[3] || 0];
                             return {
                                 id: virtualGamepadState.id,
                                 index: 0,
                                 connected: virtualGamepadState.connected,
                                 timestamp: virtualGamepadState.timestamp,
                                 mapping: "standard",
-                                axes: [srcAxes[0] || 0, srcAxes[1] || 0, srcAxes[2] || 0, srcAxes[3] || 0],
+                                axes: mixGyroIntoAxesAndButtons(baseAxes, btns),
                                 buttons: btns,
                                 vibrationActuator: virtualVibrationActuator
                             };
@@ -2298,7 +2341,7 @@ class XboxBridge(
                                 }
                             }
                             window.__hasPhysicalGamepadConnected = !!physPad;
-                            const shouldExposeVirtual = (!!window.__virtualGamepadEnabled || virtualGamepadActive) && virtualGamepadState.connected;
+                            const shouldExposeVirtual = ((!!window.__virtualGamepadEnabled || virtualGamepadActive || gyroInputState.active) && virtualGamepadState.connected);
                             if (!physPad) {
                                 physViewDownAt = 0;
                                 if (shouldExposeVirtual) {
@@ -2404,6 +2447,7 @@ class XboxBridge(
                                 outAxes = mergedAxes;
                                 outButtons = mergedButtons;
                             }
+                            outAxes = mixGyroIntoAxesAndButtons(outAxes, outButtons);
 
                             const physVib = physPad.vibrationActuator;
                             const combinedVibActuator = (shouldExposeVirtual && physVib && typeof physVib.playEffect === 'function') ? {

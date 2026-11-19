@@ -685,6 +685,56 @@ enum class AppUiMode(
     fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
 }
 
+enum class GyroControlMode(
+    val id: String,
+    val titleVi: String,
+    val titleEn: String,
+    val shortVi: String,
+    val shortEn: String,
+    val descVi: String,
+    val descEn: String,
+    val targetStickIndexPair: Pair<Int, Int>,
+    val horizontalOnly: Boolean
+) {
+    FPS_VR_360(
+        id = "FPS_VR_360",
+        titleVi = "Bắn súng / VR (Mọi góc • Cần Phải R)",
+        titleEn = "Shooter / VR (All Angles • Right Stick R)",
+        shortVi = "Bắn súng / VR (Mọi góc)",
+        shortEn = "Shooter / VR (360°)",
+        descVi = "Xoay/nghiêng mọi góc (Ngang + Dọc) để ngắm bắn hoặc quay góc nhìn 360°/VR bằng Cần Phải (R)",
+        descEn = "Tilt/rotate in all directions (Horizontal + Vertical) to aim or look 360°/VR via Right Stick (R)",
+        targetStickIndexPair = 2 to 3,
+        horizontalOnly = false
+    ),
+    RACING_STEER(
+        id = "RACING_STEER",
+        titleVi = "Đua xe (Chỉ nghiêng qua lại • Cần Trái L)",
+        titleEn = "Racing (Left/Right Steer Only • Left Stick L)",
+        shortVi = "Đua xe (Qua lại)",
+        shortEn = "Racing (Steer)",
+        descVi = "Chỉ nghiêng máy/tay cầm qua lại trái-phải như vô lăng để đánh lái bằng Cần Trái (L), khóa trục dọc",
+        descEn = "Only tilt left/right like a steering wheel to steer via Left Stick (L), locking vertical axis",
+        targetStickIndexPair = 0 to 1,
+        horizontalOnly = true
+    ),
+    LEFT_STICK_360(
+        id = "LEFT_STICK_360",
+        titleVi = "Di chuyển / Bay 360° (Mọi góc • Cần Trái L)",
+        titleEn = "Move / Flight 360° (All Angles • Left Stick L)",
+        shortVi = "Mọi góc (Cần Trái)",
+        shortEn = "360° (Left Stick)",
+        descVi = "Xoay/nghiêng mọi hướng (Ngang + Dọc) để di chuyển hoặc lái máy bay bằng Cần Trái (L)",
+        descEn = "Tilt/rotate in all directions (Horizontal + Vertical) to move or fly via Left Stick (L)",
+        targetStickIndexPair = 0 to 1,
+        horizontalOnly = false
+    );
+
+    fun localizedTitle(isEn: Boolean): String = if (isEn) titleEn else titleVi
+    fun localizedShort(isEn: Boolean): String = if (isEn) shortEn else shortVi
+    fun localizedDesc(isEn: Boolean): String = if (isEn) descEn else descVi
+}
+
 fun isSystemTvDevice(context: Context): Boolean {
     return try {
         val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
@@ -767,6 +817,14 @@ data class AppConfig(
     val shortcutToggleStatsButton: Int = 3, // Y
     val shortcutToggleVirtualPadButton: Int = 1, // B
     val shortcutToggleRecordingButton: Int = 5, // RB
+    val gyroEnabled: Boolean = false, // Mặc định TẮT để dùng cảm biến gốc của game/Xbox nếu có
+    val gyroMode: GyroControlMode = GyroControlMode.FPS_VR_360,
+    val gyroSensitivityX: Float = 1.0f, // 0.10f .. 3.00f
+    val gyroSensitivityY: Float = 1.0f, // 0.10f .. 3.00f
+    val gyroDeadzone: Float = 0.03f, // 0.00f .. 0.20f
+    val gyroInvertX: Boolean = false,
+    val gyroInvertY: Boolean = false,
+    val gyroHoldLtOnly: Boolean = false,
     val useSystemLanguage: Boolean = true,
     val customLocale: String = "en-US",
     val preferredServerId: String = "jp_tokyo_linode_1",
@@ -1024,6 +1082,19 @@ object SettingsRepository {
             shortcutToggleStatsButton = sp.getInt("shortcut_toggle_stats_btn", 3).coerceIn(-1, 16),
             shortcutToggleVirtualPadButton = sp.getInt("shortcut_toggle_vpad_btn", 1).coerceIn(-1, 16),
             shortcutToggleRecordingButton = sp.getInt("shortcut_toggle_rec_btn", 5).coerceIn(-1, 16),
+            gyroEnabled = sp.getBoolean("gyro_enabled", false),
+            gyroMode = try {
+                GyroControlMode.valueOf(
+                    sp.getString("gyro_control_mode", GyroControlMode.FPS_VR_360.name)
+                        ?: GyroControlMode.FPS_VR_360.name
+                )
+            } catch (_: Exception) { GyroControlMode.FPS_VR_360 },
+            gyroSensitivityX = sp.getFloat("gyro_sensitivity_x", 1.0f).coerceIn(0.10f, 3.00f),
+            gyroSensitivityY = sp.getFloat("gyro_sensitivity_y", 1.0f).coerceIn(0.10f, 3.00f),
+            gyroDeadzone = sp.getFloat("gyro_deadzone", 0.03f).coerceIn(0.00f, 0.20f),
+            gyroInvertX = sp.getBoolean("gyro_invert_x", false),
+            gyroInvertY = sp.getBoolean("gyro_invert_y", false),
+            gyroHoldLtOnly = sp.getBoolean("gyro_hold_lt_only", false),
             systemRevolutionEnabled = sp.getBoolean("system_revolution", true),
             stealthHeadersEnabled = sp.getBoolean("stealth_headers", true),
             autoHealingProxyMesh = sp.getBoolean("auto_healing_mesh", true),
@@ -1176,6 +1247,14 @@ object SettingsRepository {
             putInt("shortcut_toggle_stats_btn", c.shortcutToggleStatsButton)
             putInt("shortcut_toggle_vpad_btn", c.shortcutToggleVirtualPadButton)
             putInt("shortcut_toggle_rec_btn", c.shortcutToggleRecordingButton)
+            putBoolean("gyro_enabled", c.gyroEnabled)
+            putString("gyro_control_mode", c.gyroMode.name)
+            putFloat("gyro_sensitivity_x", c.gyroSensitivityX)
+            putFloat("gyro_sensitivity_y", c.gyroSensitivityY)
+            putFloat("gyro_deadzone", c.gyroDeadzone)
+            putBoolean("gyro_invert_x", c.gyroInvertX)
+            putBoolean("gyro_invert_y", c.gyroInvertY)
+            putBoolean("gyro_hold_lt_only", c.gyroHoldLtOnly)
             putBoolean("system_revolution", c.systemRevolutionEnabled)
             putBoolean("stealth_headers", c.stealthHeadersEnabled)
             putBoolean("auto_healing_mesh", c.autoHealingProxyMesh)
@@ -2549,5 +2628,67 @@ object SettingsRepository {
             "RESET",
             "Khôi phục mặc định: Toàn bộ cài đặt Nâng cao (lý do: người dùng bấm trong Cài đặt | xboxWebUiMode hiện tại=${_config.value.xboxWebUiMode.name}, thị trường=${_config.value.getEffectiveLocale()})"
         )
+    }
+
+    fun updateGyroEnabled(enabled: Boolean) {
+        val old = _config.value.gyroEnabled
+        _config.update { it.copy(gyroEnabled = enabled) }
+        persist(_config.value)
+        logSettingChange("Con quay hồi chuyển giả lập (Gyroscope)", old, enabled)
+    }
+
+    fun updateGyroMode(mode: GyroControlMode) {
+        val old = _config.value.gyroMode
+        _config.update { it.copy(gyroMode = mode) }
+        persist(_config.value)
+        logSettingChange("Chế độ Con quay hồi chuyển", old.name, mode.name)
+    }
+
+    fun updateGyroSensitivityX(sens: Float) {
+        val next = sens.coerceIn(0.10f, 3.00f)
+        _config.update { it.copy(gyroSensitivityX = next) }
+        persist(_config.value)
+    }
+
+    fun updateGyroSensitivityY(sens: Float) {
+        val next = sens.coerceIn(0.10f, 3.00f)
+        _config.update { it.copy(gyroSensitivityY = next) }
+        persist(_config.value)
+    }
+
+    fun updateGyroDeadzone(dz: Float) {
+        val next = dz.coerceIn(0.00f, 0.20f)
+        _config.update { it.copy(gyroDeadzone = next) }
+        persist(_config.value)
+    }
+
+    fun updateGyroInvertX(invert: Boolean) {
+        _config.update { it.copy(gyroInvertX = invert) }
+        persist(_config.value)
+    }
+
+    fun updateGyroInvertY(invert: Boolean) {
+        _config.update { it.copy(gyroInvertY = invert) }
+        persist(_config.value)
+    }
+
+    fun updateGyroHoldLtOnly(ltOnly: Boolean) {
+        _config.update { it.copy(gyroHoldLtOnly = ltOnly) }
+        persist(_config.value)
+    }
+
+    fun resetGyroDefaults() {
+        _config.update {
+            it.copy(
+                gyroMode = GyroControlMode.FPS_VR_360,
+                gyroSensitivityX = 1.0f,
+                gyroSensitivityY = 1.0f,
+                gyroDeadzone = 0.03f,
+                gyroInvertX = false,
+                gyroInvertY = false,
+                gyroHoldLtOnly = false
+            )
+        }
+        persist(_config.value)
     }
 }

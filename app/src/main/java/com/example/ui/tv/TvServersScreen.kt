@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,6 +61,7 @@ internal fun TvServersScreen(
     onSelectServer: (ServerLocation) -> Unit,
     isTabActive: Boolean,
     scale: Float,
+    defaultFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -292,10 +295,10 @@ internal fun TvServersScreen(
             verticalArrangement = Arrangement.spacedBy((10.dp * scale).coerceAtLeast(7.dp)),
             contentPadding = PaddingValues(bottom = (10.dp * scale).coerceAtLeast(6.dp))
         ) {
-            items(
+            itemsIndexed(
                 items = filteredServers,
-                key = { srv -> "tv_srv_row_${srv.id}" }
-            ) { srv ->
+                key = { _, srv -> "tv_srv_row_${srv.id}" }
+            ) { index, srv ->
                 val isSelected = srv.id == currentServer.id
                 val isRecommended = srv.id == recommendedServerId
                 val measuredPing = serverPings[srv.id] ?: -1
@@ -318,6 +321,7 @@ internal fun TvServersScreen(
                     unlockStatus = unlockStatus,
                     isTestingAll = isTestingAll,
                     scale = scale,
+                    focusRequester = if (index == 0) defaultFocusRequester else null,
                     onSelect = { onSelectServer(srv) },
                     onShowDetails = { detailServer = srv },
                     onDeleteCustom = if (srv.isCustom) {
@@ -365,6 +369,7 @@ private fun TvServerRow(
     unlockStatus: RegionUnlockStatus,
     isTestingAll: Boolean,
     scale: Float,
+    focusRequester: FocusRequester? = null,
     onSelect: () -> Unit,
     onShowDetails: () -> Unit,
     onDeleteCustom: (() -> Unit)?
@@ -402,6 +407,7 @@ private fun TvServerRow(
             .background(rowBg)
             .gamepadClickable(
                 cornerRadius = corner,
+                focusRequester = focusRequester,
                 onClick = onSelect
             )
             .padding(

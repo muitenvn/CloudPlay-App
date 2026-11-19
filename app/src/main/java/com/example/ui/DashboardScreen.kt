@@ -591,22 +591,9 @@ fun DashboardScreen(
                 visitedTabs.forEach { tab ->
                     androidx.compose.runtime.key(tab) {
                         val isSelectedTab = (currentTab == tab)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .focusProperties { canFocus = isSelectedTab }
-                                .layout { measurable, constraints ->
-                                    if (isSelectedTab) {
-                                        val placeable = measurable.measure(constraints)
-                                        layout(placeable.width, placeable.height) {
-                                            placeable.placeRelative(0, 0)
-                                        }
-                                    } else {
-                                        layout(0, 0) {}
-                                    }
-                                }
-                        ) {
-                            TrackFirstTabComposition(tab) {
+                        if (isSelectedTab) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                TrackFirstTabComposition(tab) {
                                 when (tab) {
                                     DashboardTab.HOME -> {
                                         HomeScreen(
@@ -684,6 +671,7 @@ fun DashboardScreen(
                                         )
                                     }
                                 }
+                            }
                             }
                         }
                     }

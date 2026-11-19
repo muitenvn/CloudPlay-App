@@ -150,6 +150,28 @@ data class PadNodeTuning(
     val turboHz: Int = 10
 )
 
+enum class PadGyroMode(val id: String) {
+    FPS_VR_360("fps_vr"),
+    RACING_STEER("racing"),
+    LEFT_STICK_360("left_360");
+
+    fun localizedTitle(lang: PadLanguage): String = when (this) {
+        FPS_VR_360 -> PadStrings.tr(lang, "Bắn súng / VR — Mọi góc (Cần phải)", "FPS / VR — All Angles (Right Stick)")
+        RACING_STEER -> PadStrings.tr(lang, "Đua xe — Chỉ trái/phải (Cần trái)", "Racing — Left/Right Only (Left Stick)")
+        LEFT_STICK_360 -> PadStrings.tr(lang, "Di chuyển 360° — Mọi góc (Cần trái)", "360° Move — All Angles (Left Stick)")
+    }
+
+    fun shortTitle(lang: PadLanguage): String = when (this) {
+        FPS_VR_360 -> PadStrings.tr(lang, "Bắn súng / VR (Mọi góc)", "FPS / VR (All Angles)")
+        RACING_STEER -> PadStrings.tr(lang, "Đua xe (Chỉ trái/phải)", "Racing (Left/Right)")
+        LEFT_STICK_360 -> PadStrings.tr(lang, "Cần trái (Mọi góc)", "Left Stick (All Angles)")
+    }
+
+    companion object {
+        fun fromId(id: String): PadGyroMode = entries.firstOrNull { it.id == id } ?: FPS_VR_360
+    }
+}
+
 data class PadGlobalControllerSettings(
     val globalScale: Float = 1.0f,
     val globalOpacity: Float = 0.90f,
@@ -166,7 +188,15 @@ data class PadGlobalControllerSettings(
     val dpadSplitMode: Boolean = false,
     val abxySplitMode: Boolean = false,
     val isPositionLocked: Boolean = false,
-    val showEditGrid: Boolean = true
+    val showEditGrid: Boolean = true,
+    val gyroEnabled: Boolean = false, // Mặc định TẮT hoàn toàn
+    val gyroMode: PadGyroMode = PadGyroMode.FPS_VR_360,
+    val gyroSensX: Int = 100,
+    val gyroSensY: Int = 100,
+    val gyroDeadzone: Int = 2,
+    val gyroInvertX: Boolean = false,
+    val gyroInvertY: Boolean = false,
+    val gyroHoldLtOnly: Boolean = false
 )
 
 internal object PadControllerStorage {
@@ -193,7 +223,15 @@ internal object PadControllerStorage {
             dpadSplitMode = prefs.getBoolean("pad_dpad_split_mode", false),
             abxySplitMode = prefs.getBoolean("pad_abxy_split_mode", false),
             isPositionLocked = prefs.getBoolean("pad_position_locked", false),
-            showEditGrid = prefs.getBoolean("pad_show_edit_grid", true)
+            showEditGrid = prefs.getBoolean("pad_show_edit_grid", true),
+            gyroEnabled = prefs.getBoolean("pad_gyro_enabled", false),
+            gyroMode = PadGyroMode.fromId(prefs.getString("pad_gyro_mode", PadGyroMode.FPS_VR_360.id).orEmpty()),
+            gyroSensX = prefs.getInt("pad_gyro_sens_x", 100).coerceIn(10, 300),
+            gyroSensY = prefs.getInt("pad_gyro_sens_y", 100).coerceIn(10, 300),
+            gyroDeadzone = prefs.getInt("pad_gyro_deadzone", 2).coerceIn(0, 20),
+            gyroInvertX = prefs.getBoolean("pad_gyro_invert_x", false),
+            gyroInvertY = prefs.getBoolean("pad_gyro_invert_y", false),
+            gyroHoldLtOnly = prefs.getBoolean("pad_gyro_hold_lt_only", false)
         )
     }
 
@@ -216,6 +254,14 @@ internal object PadControllerStorage {
             .putBoolean("pad_abxy_split_mode", s.abxySplitMode)
             .putBoolean("pad_position_locked", s.isPositionLocked)
             .putBoolean("pad_show_edit_grid", s.showEditGrid)
+            .putBoolean("pad_gyro_enabled", s.gyroEnabled)
+            .putString("pad_gyro_mode", s.gyroMode.id)
+            .putInt("pad_gyro_sens_x", s.gyroSensX.coerceIn(10, 300))
+            .putInt("pad_gyro_sens_y", s.gyroSensY.coerceIn(10, 300))
+            .putInt("pad_gyro_deadzone", s.gyroDeadzone.coerceIn(0, 20))
+            .putBoolean("pad_gyro_invert_x", s.gyroInvertX)
+            .putBoolean("pad_gyro_invert_y", s.gyroInvertY)
+            .putBoolean("pad_gyro_hold_lt_only", s.gyroHoldLtOnly)
             .apply()
     }
 

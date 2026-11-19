@@ -173,6 +173,21 @@ object PadNetworkClient {
     @Volatile
     private var currentRt: Float = 0f
 
+    @Volatile
+    private var gyroActive: Boolean = false
+
+    @Volatile
+    private var gyroRightStick: Boolean = true
+
+    @Volatile
+    private var gyroX: Float = 0f
+
+    @Volatile
+    private var gyroY: Float = 0f
+
+    @Volatile
+    private var gyroHoldLtOnly: Boolean = false
+
     private val udpSendLock = Any()
     private val reusableUdpBytes = ByteArray(RemotePadProtocol.UDP_PACKET_BYTES)
 
@@ -281,6 +296,31 @@ object PadNetworkClient {
         dispatchCurrentPadStateOverUdp()
     }
 
+    fun updateGyroOffset(rightStick: Boolean, gx: Float, gy: Float, holdLtOnly: Boolean) {
+        val cx = gx.coerceIn(-1f, 1f)
+        val cy = gy.coerceIn(-1f, 1f)
+        val changed = !gyroActive || gyroRightStick != rightStick || gyroHoldLtOnly != holdLtOnly ||
+            abs(gyroX - cx) >= 0.006f || abs(gyroY - cy) >= 0.006f
+        gyroActive = true
+        gyroRightStick = rightStick
+        gyroX = cx
+        gyroY = cy
+        gyroHoldLtOnly = holdLtOnly
+        if (changed) {
+            dispatchCurrentPadStateOverUdp()
+        }
+    }
+
+    fun clearGyroOffset() {
+        val wasActive = gyroActive && (abs(gyroX) > 0.001f || abs(gyroY) > 0.001f)
+        gyroActive = false
+        gyroX = 0f
+        gyroY = 0f
+        if (wasActive) {
+            dispatchCurrentPadStateOverUdp()
+        }
+    }
+
     /**
      * An toàn nút bấm (Giao thức v1 mục 6):
      * Khi vào nền, mất kết nối hoặc thoát màn tay cầm -> đưa toàn bộ nút/cần/cò về 0 và bắn gói UDP NEUTRAL ngay.
@@ -293,6 +333,9 @@ object PadNetworkClient {
         currentRy = 0f
         currentLt = 0f
         currentRt = 0f
+        gyroActive = false
+        gyroX = 0f
+        gyroY = 0f
         scope.launch {
             repeat(3) {
                 sendUdpSnapshotNow()
@@ -314,15 +357,22 @@ object PadNetworkClient {
         val port = activeUdpTargetPort
         if (dSocket.isClosed || token.size != RemotePadProtocol.SESSION_TOKEN_BYTES) return
 
+        val btns = currentButtonsBitmask.get()
+        val applyGyroNow = gyroActive && (!gyroHoldLtOnly || currentLt > 0.15f)
+        val effLx = if (applyGyroNow && !gyroRightStick) (currentLx + gyroX).coerceIn(-1f, 1f) else currentLx
+        val effLy = if (applyGyroNow && !gyroRightStick) (currentLy + gyroY).coerceIn(-1f, 1f) else currentLy
+        val effRx = if (applyGyroNow && gyroRightStick) (currentRx + gyroX).coerceIn(-1f, 1f) else currentRx
+        val effRy = if (applyGyroNow && gyroRightStick) (currentRy + gyroY).coerceIn(-1f, 1f) else currentRy
+
         val seq = udpSequenceCounter.incrementAndGet()
         val stateSnapshot = RemotePadState(
             sequenceNumber = seq,
             playerIndex = _state.value.connectedPlayerIndex.coerceIn(1, 4),
-            buttonsBitmask = currentButtonsBitmask.get(),
-            lx = currentLx,
-            ly = currentLy,
-            rx = currentRx,
-            ry = currentRy,
+            buttonsBitmask = btns,
+            lx = effLx,
+            ly = effLy,
+            rx = effRx,
+            ry = effRy,
             lt = currentLt,
             rt = currentRt
         )

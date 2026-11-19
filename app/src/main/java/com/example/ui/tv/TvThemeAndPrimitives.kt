@@ -2,6 +2,7 @@ package com.example.ui.tv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -269,7 +271,8 @@ internal fun TvSegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     scale: Float = 1f,
-    containerColor: Color = TvSurface
+    containerColor: Color = TvSurface,
+    focusableItems: Boolean = true
 ) {
     val corner = (10.dp * scale).coerceAtLeast(7.dp)
     val itemCorner = (8.dp * scale).coerceAtLeast(6.dp)
@@ -290,13 +293,28 @@ internal fun TvSegmentedControl(
                     .defaultMinSize(minHeight = itemMinH)
                     .clip(RoundedCornerShape(itemCorner))
                     .background(if (selected) TvSel else Color.Transparent)
-                    .gamepadClickable(
-                        cornerRadius = itemCorner,
-                        onStepHorizontal = { dir ->
-                            val next = (selectedIndex + dir).coerceIn(0, options.lastIndex)
-                            if (next != selectedIndex) onSelect(next)
-                        },
-                        onClick = { onSelect(idx) }
+                    .then(
+                        if (focusableItems) {
+                            Modifier.gamepadClickable(
+                                cornerRadius = itemCorner,
+                                onStepHorizontalConsumed = { dir ->
+                                    val next = (selectedIndex + dir).coerceIn(0, options.lastIndex)
+                                    if (next != selectedIndex) {
+                                        onSelect(next)
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                                onClick = { onSelect(idx) }
+                            )
+                        } else {
+                            Modifier.clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                                onClick = { onSelect(idx) }
+                            )
+                        }
                     )
                     .padding(horizontal = (11.dp * scale).coerceAtLeast(8.dp), vertical = (3.dp * scale).coerceAtLeast(2.dp)),
                 contentAlignment = Alignment.Center
@@ -324,6 +342,7 @@ internal fun TvLeftNavigationRail(
     scale: Float,
     activeRailFocusRequester: FocusRequester?,
     onSelectTab: (DashboardTab) -> Unit,
+    onMoveRightIntoTab: (() -> Unit)? = null,
     onVpnChipClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -383,6 +402,18 @@ internal fun TvLeftNavigationRail(
                     .gamepadClickable(
                         cornerRadius = (10.dp * scale).coerceAtLeast(8.dp),
                         focusRequester = if (isCurrent) activeRailFocusRequester else null,
+                        onStepHorizontalConsumed = { dir ->
+                            if (dir > 0 && onMoveRightIntoTab != null) {
+                                if (tab != currentTab) {
+                                    onSelectTab(tab)
+                                } else {
+                                    onMoveRightIntoTab()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        },
                         onClick = { onSelectTab(tab) }
                     )
                     .padding(horizontal = (10.dp * scale).coerceAtLeast(8.dp), vertical = (5.dp * scale).coerceAtLeast(3.dp))
@@ -419,6 +450,14 @@ internal fun TvLeftNavigationRail(
                 .background(TvSurface2)
                 .gamepadClickable(
                     cornerRadius = switchCorner,
+                    onStepHorizontalConsumed = { dir ->
+                        if (dir > 0 && onMoveRightIntoTab != null) {
+                            onMoveRightIntoTab()
+                            true
+                        } else {
+                            false
+                        }
+                    },
                     onClick = {
                         com.example.data.AppLogger.info("UI", "Chuyển nhanh về Giao diện Điện thoại từ thanh điều hướng TV")
                         com.example.data.SettingsRepository.updateAppUiMode(com.example.data.AppUiMode.PHONE)
@@ -462,6 +501,14 @@ internal fun TvLeftNavigationRail(
                 .background(TvSurface)
                 .gamepadClickable(
                     cornerRadius = chipCorner,
+                    onStepHorizontalConsumed = { dir ->
+                        if (dir > 0 && onMoveRightIntoTab != null) {
+                            onMoveRightIntoTab()
+                            true
+                        } else {
+                            false
+                        }
+                    },
                     onClick = onVpnChipClick
                 )
                 .padding(horizontal = (10.dp * scale).coerceAtLeast(7.dp), vertical = (7.dp * scale).coerceAtLeast(5.dp))

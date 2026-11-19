@@ -80,6 +80,91 @@ internal fun HudControlsTabContent(
             }
         )
 
+        HudSectionLabel(config.tr("Con quay hồi chuyển (Gyro)", "Gyroscope Motion"))
+
+        HudSwitchRow(
+            title = config.tr("Bật con quay hồi chuyển", "Enable Gyroscope"),
+            checked = config.gyroEnabled,
+            onCheckedChange = { enabled ->
+                onInteraction()
+                SettingsRepository.updateGyroEnabled(enabled)
+                if (enabled) {
+                    com.example.cloudplay.GyroscopeController.requestRecenterNow()
+                }
+            }
+        )
+
+        if (config.gyroEnabled) {
+            val gyroModes = com.example.data.GyroControlMode.entries
+            val curGyroIdx = gyroModes.indexOf(config.gyroMode).coerceAtLeast(0)
+            HudSegmentedControl(
+                options = listOf(
+                    config.tr("Bắn súng/VR", "FPS / VR"),
+                    config.tr("Đua xe", "Racing"),
+                    config.tr("Cần trái 360°", "Left 360°")
+                ),
+                selectedIndex = curGyroIdx,
+                onSelect = { idx ->
+                    onInteraction()
+                    gyroModes.getOrNull(idx)?.let {
+                        SettingsRepository.updateGyroMode(it)
+                        com.example.cloudplay.GyroscopeController.requestRecenterNow()
+                    }
+                },
+                tagPrefix = "hud_gyro_mode_seg"
+            )
+
+            HudSliderRow(
+                label = if (config.gyroMode == com.example.data.GyroControlMode.RACING_STEER) {
+                    config.tr("Độ nhạy lái", "Steer sens")
+                } else {
+                    config.tr("Độ nhạy ngang", "Horiz sens")
+                },
+                valueText = "${(config.gyroSensitivityX * 100f).roundToInt()}%",
+                value = config.gyroSensitivityX,
+                valueRange = 0.10f..3.00f,
+                onValueChange = {
+                    onInteraction()
+                    SettingsRepository.updateGyroSensitivityX(it)
+                }
+            )
+
+            if (config.gyroMode != com.example.data.GyroControlMode.RACING_STEER) {
+                HudSliderRow(
+                    label = config.tr("Độ nhạy dọc", "Vert sens"),
+                    valueText = "${(config.gyroSensitivityY * 100f).roundToInt()}%",
+                    value = config.gyroSensitivityY,
+                    valueRange = 0.10f..3.00f,
+                    onValueChange = {
+                        onInteraction()
+                        SettingsRepository.updateGyroSensitivityY(it)
+                    }
+                )
+            }
+
+            HudSurfaceRow(
+                minHeight = 36.dp,
+                onClick = {
+                    onInteraction()
+                    com.example.cloudplay.GyroscopeController.requestRecenterNow()
+                },
+                modifier = Modifier.testTag("hud_gyro_recenter_btn")
+            ) {
+                Text(
+                    text = config.tr("🎯 Đặt lại tâm con quay (0°)", "🎯 Recenter Gyro (0°)"),
+                    color = HudAccent,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = config.tr("Đặt lại", "Reset"),
+                    color = HudCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
         if (gameProfile?.gameId == "fortnite") {
             HudSectionLabel(config.tr("Điều khiển Fortnite", "Fortnite controls"))
             HudSegmentedControl(

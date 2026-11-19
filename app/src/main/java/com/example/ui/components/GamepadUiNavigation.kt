@@ -55,6 +55,12 @@ object GamepadUiNavigation {
         private set
 
     /**
+     * Khi đang ở chế độ giao diện TV (TvDashboardScreen), luôn giữ khung xanh hiển thị kể cả khi người dùng
+     * chạm vào màn hình điện thoại hoặc cửa sổ nổi Ravno Pad.
+     */
+    var keepFocusVisibleInTvMode by mutableStateOf(false)
+
+    /**
      * Cho biết giao diện app hiện có đang nhận điều khiển tay cầm hay không.
      * Khi đang ở màn WebView chơi game (và không mở menu nổi / hộp thoại), cờ này là false để mọi phím/cần
      * đi thẳng vào WebView của game.
@@ -72,6 +78,7 @@ object GamepadUiNavigation {
     internal var lastConsumedRemotePadSeq: Int = 0
 
     var activeHorizontalStepper: ((Int) -> Unit)? = null
+    var activeHorizontalStepperConsumed: ((Int) -> Boolean)? = null
     var activeFocusedClickHandler: (() -> Unit)? = null
     var activeFocusedKeyYHandler: (() -> Unit)? = null
     var activeFocusedLongClickHandler: (() -> Unit)? = null
@@ -377,7 +384,7 @@ object GamepadUiNavigation {
     }
 
     fun onTouchInteraction() {
-        if (isGamepadModeActive) {
+        if (isGamepadModeActive && !keepFocusVisibleInTvMode) {
             isGamepadModeActive = false
         }
         if (activeAnalogDirection != null) {
@@ -498,6 +505,7 @@ object GamepadUiNavigation {
  * - Gắn OnGenericMotionListener cho cửa sổ Dialog để cần analog trái hoạt động trong mọi hộp thoại.
  * - Phím LB / RB để chuyển tab, phím B để đóng hộp thoại / quay lại, phím X / Y cho thao tác phụ.
  */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 fun Modifier.gamepadControllerScope(
     enabled: Boolean = true,
     defaultFocusRequester: FocusRequester? = null,
@@ -510,6 +518,7 @@ fun Modifier.gamepadControllerScope(
     onSecondaryY: (() -> Unit)? = null
 ): Modifier = composed {
     val focusManager = LocalFocusManager.current
+    val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
     val view = androidx.compose.ui.platform.LocalView.current
     val currentOnPrevTab by rememberUpdatedState(onPreviousTab)
     val currentOnNextTab by rememberUpdatedState(onNextTab)
@@ -522,15 +531,33 @@ fun Modifier.gamepadControllerScope(
     var dpadPressSeq by remember { mutableIntStateOf(0) }
     var hasFocusInsideScope by remember { mutableStateOf(false) }
 
-    fun stepFocus(direction: FocusDirection) {
+    fun ensureComposeViewFocused() {
         GamepadUiNavigation.onGamepadInteraction()
-        if (!view.hasFocus()) {
-            runCatching { view.requestFocus() }
+        runCatching {
+            if (!view.isFocusable) view.isFocusable = true
+            if (!view.isFocusableInTouchMode) view.isFocusableInTouchMode = true
+            inputModeManager.requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
+            if (!view.hasFocus()) {
+                val ok = view.requestFocus()
+                if (!ok) {
+                    view.requestFocusFromTouch()
+                }
+            }
         }
-        val horizontalStepper = GamepadUiNavigation.activeHorizontalStepper
-        if (horizontalStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
-            horizontalStepper(if (direction == FocusDirection.Left) -1 else 1)
-            return
+    }
+
+    fun stepFocus(direction: FocusDirection) {
+        ensureComposeViewFocused()
+        val consumedStepper = GamepadUiNavigation.activeHorizontalStepperConsumed
+        if (consumedStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
+            val consumed = consumedStepper(if (direction == FocusDirection.Left) -1 else 1)
+            if (consumed) return
+        } else {
+            val horizontalStepper = GamepadUiNavigation.activeHorizontalStepper
+            if (horizontalStepper != null && (direction == FocusDirection.Left || direction == FocusDirection.Right)) {
+                horizontalStepper(if (direction == FocusDirection.Left) -1 else 1)
+                return
+            }
         }
         if (!hasFocusInsideScope && GamepadUiNavigation.activeFocusedClickHandler == null) {
             val req = currentDefaultRequester
@@ -549,10 +576,7 @@ fun Modifier.gamepadControllerScope(
         GamepadUiNavigation.ControllerScopeCallbacks(
             stepFocus = { dir -> stepFocus(dir) },
             onConfirmA = {
-                GamepadUiNavigation.onGamepadInteraction()
-                if (!view.hasFocus()) {
-                    runCatching { view.requestFocus() }
-                }
+                ensureComposeViewFocused()
                 val clickHandler = GamepadUiNavigation.activeFocusedClickHandler
                 if (clickHandler != null) {
                     clickHandler()
@@ -601,9 +625,9 @@ fun Modifier.gamepadControllerScope(
 
     LaunchedEffect(enabled, autoRequestDefaultFocus, defaultFocusRequester) {
         if (enabled && autoRequestDefaultFocus && defaultFocusRequester != null) {
-            GamepadUiNavigation.onGamepadInteraction()
+            ensureComposeViewFocused()
             delay(45L)
-            runCatching { view.requestFocus() }
+            ensureComposeViewFocused()
             runCatching { defaultFocusRequester.requestFocus() }
         }
     }
@@ -772,6 +796,7 @@ fun Modifier.gamepadClickable(
     focusBorderColor: Color = XboxNeonGreen,
     focusRequester: FocusRequester? = null,
     onStepHorizontal: ((Int) -> Unit)? = null,
+    onStepHorizontalConsumed: ((Int) -> Boolean)? = null,
     onFocused: (() -> Unit)? = null,
     onClick: () -> Unit
 ): Modifier = composed {
@@ -779,8 +804,10 @@ fun Modifier.gamepadClickable(
 
     var isFocused by remember { mutableStateOf(false) }
     var aButtonDown by remember { mutableStateOf(false) }
+    val internalFocusRequester = remember { FocusRequester() }
     val currentOnClick by rememberUpdatedState(onClick)
     val currentOnStepHorizontal by rememberUpdatedState(onStepHorizontal)
+    val currentOnStepHorizontalConsumed by rememberUpdatedState(onStepHorizontalConsumed)
     val currentOnFocused by rememberUpdatedState(onFocused)
     val interactionSource = remember { MutableInteractionSource() }
     val selfClickDispatcher = remember { { currentOnClick() } }
@@ -791,6 +818,9 @@ fun Modifier.gamepadClickable(
                 if (currentOnStepHorizontal != null) {
                     GamepadUiNavigation.activeHorizontalStepper = null
                 }
+                if (currentOnStepHorizontalConsumed != null) {
+                    GamepadUiNavigation.activeHorizontalStepperConsumed = null
+                }
                 if (GamepadUiNavigation.activeFocusedClickHandler === selfClickDispatcher) {
                     GamepadUiNavigation.activeFocusedClickHandler = null
                 }
@@ -799,6 +829,7 @@ fun Modifier.gamepadClickable(
     }
 
     this
+        .focusRequester(internalFocusRequester)
         .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
         .onFocusChanged { state ->
             val next = state.isFocused
@@ -808,12 +839,19 @@ fun Modifier.gamepadClickable(
                     GamepadUiNavigation.activeFocusedClickHandler = selfClickDispatcher
                     GamepadUiNavigation.activeFocusedKeyYHandler = null
                     GamepadUiNavigation.activeFocusedLongClickHandler = null
-                    if (currentOnStepHorizontal != null) {
+                    if (currentOnStepHorizontalConsumed != null) {
+                        GamepadUiNavigation.activeHorizontalStepperConsumed = { dir ->
+                            currentOnStepHorizontalConsumed?.invoke(dir) ?: false
+                        }
+                        GamepadUiNavigation.activeHorizontalStepper = null
+                    } else if (currentOnStepHorizontal != null) {
                         GamepadUiNavigation.activeHorizontalStepper = { dir ->
                             currentOnStepHorizontal?.invoke(dir)
                         }
+                        GamepadUiNavigation.activeHorizontalStepperConsumed = null
                     } else {
                         GamepadUiNavigation.activeHorizontalStepper = null
+                        GamepadUiNavigation.activeHorizontalStepperConsumed = null
                     }
                     currentOnFocused?.invoke()
                 } else {
@@ -822,6 +860,9 @@ fun Modifier.gamepadClickable(
                     }
                     if (currentOnStepHorizontal != null) {
                         GamepadUiNavigation.activeHorizontalStepper = null
+                    }
+                    if (currentOnStepHorizontalConsumed != null) {
+                        GamepadUiNavigation.activeHorizontalStepperConsumed = null
                     }
                     aButtonDown = false
                 }
@@ -857,17 +898,20 @@ fun Modifier.gamepadClickable(
             interactionSource = interactionSource,
             indication = null,
             onClick = {
+                if (GamepadUiNavigation.keepFocusVisibleInTvMode || GamepadUiNavigation.isGamepadModeActive) {
+                    runCatching { internalFocusRequester.requestFocus() }
+                }
                 currentOnClick()
             }
         )
         .drawWithContent {
             drawContent()
-            if (isFocused && GamepadUiNavigation.isGamepadModeActive) {
-                val strokeWidthPx = 2.dp.toPx()
+            if (isFocused && (GamepadUiNavigation.isGamepadModeActive || GamepadUiNavigation.keepFocusVisibleInTvMode)) {
+                val strokeWidthPx = 2.5.dp.toPx()
                 val halfStroke = strokeWidthPx / 2f
                 val radiusPx = cornerRadius.toPx()
                 drawRoundRect(
-                    color = focusBorderColor.copy(alpha = 0.08f),
+                    color = focusBorderColor.copy(alpha = 0.12f),
                     topLeft = Offset(halfStroke, halfStroke),
                     size = Size(
                         (size.width - strokeWidthPx).coerceAtLeast(0f),

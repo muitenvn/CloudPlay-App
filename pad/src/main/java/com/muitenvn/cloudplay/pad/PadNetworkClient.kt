@@ -357,8 +357,13 @@ object PadNetworkClient {
         val port = activeUdpTargetPort
         if (dSocket.isClosed || token.size != RemotePadProtocol.SESSION_TOKEN_BYTES) return
 
-        val btns = currentButtonsBitmask.get()
-        val applyGyroNow = gyroActive && (!gyroHoldLtOnly || currentLt > 0.15f)
+        val rawBtns = currentButtonsBitmask.get()
+        val btns = rawBtns and 0xFFFF
+        val synthLt = if ((rawBtns and PAD_SYNTH_BIT_LT) != 0) 1f else 0f
+        val synthRt = if ((rawBtns and PAD_SYNTH_BIT_RT) != 0) 1f else 0f
+        val effLt = maxOf(currentLt, synthLt)
+        val effRt = maxOf(currentRt, synthRt)
+        val applyGyroNow = gyroActive && (!gyroHoldLtOnly || effLt > 0.15f)
         val effLx = if (applyGyroNow && !gyroRightStick) (currentLx + gyroX).coerceIn(-1f, 1f) else currentLx
         val effLy = if (applyGyroNow && !gyroRightStick) (currentLy + gyroY).coerceIn(-1f, 1f) else currentLy
         val effRx = if (applyGyroNow && gyroRightStick) (currentRx + gyroX).coerceIn(-1f, 1f) else currentRx
@@ -373,8 +378,8 @@ object PadNetworkClient {
             ly = effLy,
             rx = effRx,
             ry = effRy,
-            lt = currentLt,
-            rt = currentRt
+            lt = effLt,
+            rt = effRt
         )
 
         synchronized(udpSendLock) {

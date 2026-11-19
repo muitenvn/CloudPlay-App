@@ -54,12 +54,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect as ComposeRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -69,8 +72,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -156,6 +161,11 @@ internal fun PadLandscapeControllerScreen(
     var showGlobalSettingsSheet by remember { mutableStateOf(false) }
     var showManageButtonsModal by remember { mutableStateOf(false) }
     var selectedNodeKey by remember { mutableStateOf("abxy") }
+    var activePopoverNodeKey by remember { mutableStateOf<String?>(null) }
+
+    var rootSizePx by remember { mutableStateOf(IntSize.Zero) }
+    var rootPosInWindow by remember { mutableStateOf(Offset.Zero) }
+    val nodeBoundsMap = remember { mutableStateMapOf<String, ComposeRect>() }
 
     val activeGameKey = remember(state.activeGameTitle) {
         state.activeGameTitle.trim().lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_')
@@ -281,7 +291,7 @@ internal fun PadLandscapeControllerScreen(
     // 2B. Con quay hồi chuyển (Gyroscope) trên Ravno Pad - Mặc định TẮT hoàn toàn nếu người dùng không bật
     var gyroRecenterTick by remember { mutableIntStateOf(0) }
     val currentGyroSettings by rememberUpdatedState(globalSettings)
-    val shouldRunPadGyro = globalSettings.gyroEnabled && !isCustomizeMode && !showGlobalSettingsSheet && !showManageButtonsModal
+    val shouldRunPadGyro = globalSettings.gyroEnabled && !isCustomizeMode && !showGlobalSettingsSheet && !showManageButtonsModal && activePopoverNodeKey == null
     DisposableEffect(context, shouldRunPadGyro) {
         if (!shouldRunPadGyro) {
             PadNetworkClient.clearGyroOffset()
@@ -420,7 +430,12 @@ internal fun PadLandscapeControllerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(PadBg)
+            .onGloballyPositioned { coords ->
+                rootSizePx = coords.size
+                rootPosInWindow = coords.positionInWindow()
+            }
             .onSizeChanged { sz ->
+                rootSizePx = sz
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && sz.width > 0 && sz.height > 0) {
                     val edgeW = (sz.width * 0.08f).roundToInt().coerceAtLeast(1)
                     runCatching {
@@ -460,13 +475,26 @@ internal fun PadLandscapeControllerScreen(
             return !t.hidden || isCustomizeMode
         }
 
+        fun Modifier.trackNodeBounds(key: String): Modifier = this.onGloballyPositioned { coords ->
+            val p = coords.positionInWindow() - rootPosInWindow
+            val s = coords.size
+            nodeBoundsMap[key] = ComposeRect(
+                left = p.x,
+                top = p.y,
+                right = p.x + s.width,
+                bottom = p.y + s.height
+            )
+        }
+
         fun Modifier.draggableOfficialNode(nodeKey: String): Modifier {
             val t = tuningFor(nodeKey)
             val dxPx = with(density) { (w * t.dxNorm).roundToPx() }
             val dyPx = with(density) { (h * t.dyNorm).roundToPx() }
-            val baseMod = this.offset { IntOffset(dxPx, dyPx) }
+            val baseMod = this
+                .offset { IntOffset(dxPx, dyPx) }
+                .trackNodeBounds(nodeKey)
             if (!isCustomizeMode) return baseMod
-            val isSelected = selectedNodeKey == nodeKey
+            val isSelected = selectedNodeKey == nodeKey || activePopoverNodeKey == nodeKey
             val outlineMod = if (isSelected) {
                 baseMod
                     .border(strokeActive, OfficialHudAccent, RoundedCornerShape(pillCorner))
@@ -497,6 +525,8 @@ internal fun PadLandscapeControllerScreen(
                         onDoubleTap = {
                             triggerLocalTouchTick(true)
                             selectedNodeKey = nodeKey
+                            activePopoverNodeKey = nodeKey
+                            showManageButtonsModal = false
                         }
                     )
                 }
@@ -513,10 +543,12 @@ internal fun PadLandscapeControllerScreen(
                                 change.consume()
                                 selectedNodeKey = nodeKey
                                 val curT = nodeTunings[nodeKey] ?: PadNodeTuning()
-                                val nextDx = (curT.dxNorm + dragAmount.x / size.width.coerceAtLeast(1).toFloat() * 0.25f)
-                                    .coerceIn(-0.42f, 0.42f)
-                                val nextDy = (curT.dyNorm + dragAmount.y / size.height.coerceAtLeast(1).toFloat() * 0.25f)
-                                    .coerceIn(-0.42f, 0.42f)
+                                val rw = rootSizePx.width.coerceAtLeast(1).toFloat()
+                                val rh = rootSizePx.height.coerceAtLeast(1).toFloat()
+                                val nextDx = (curT.dxNorm + dragAmount.x / rw)
+                                    .coerceIn(-0.45f, 0.45f)
+                                val nextDy = (curT.dyNorm + dragAmount.y / rh)
+                                    .coerceIn(-0.45f, 0.45f)
                                 nodeTunings[nodeKey] = curT.copy(dxNorm = nextDx, dyNorm = nextDy)
                             }
                         }
@@ -610,6 +642,7 @@ internal fun PadLandscapeControllerScreen(
                             label = "LB",
                             primaryBit = RemotePadButtons.LB,
                             comboMask = lbTuning.comboMask,
+                            directionalSwipeEnabled = lbTuning.directionalSwipeEnabled,
                             swipeUpBit = lbTuning.swipeUpBit,
                             swipeDownBit = lbTuning.swipeDownBit.takeIf { it != 0 } ?: defaultLbSwipe,
                             swipeLeftBit = lbTuning.swipeLeftBit,
@@ -698,6 +731,7 @@ internal fun PadLandscapeControllerScreen(
                             label = "RB",
                             primaryBit = RemotePadButtons.RB,
                             comboMask = rbTuning.comboMask,
+                            directionalSwipeEnabled = rbTuning.directionalSwipeEnabled,
                             swipeUpBit = rbTuning.swipeUpBit,
                             swipeDownBit = rbTuning.swipeDownBit.takeIf { it != 0 } ?: defaultRbSwipe,
                             swipeLeftBit = rbTuning.swipeLeftBit,
@@ -756,13 +790,13 @@ internal fun PadLandscapeControllerScreen(
             }
         }
 
-        // === 2. CỤM TRUNG TÂM TRÊN CÙNG: ⧉ View · ◉ Xbox Guide · ☰ Menu · ⚙ Cài đặt · ✥ Sửa nút + Thanh trạng thái ===
+        // === 2. CỤM TRUNG TÂM TRÊN CÙNG GỌN NHẸ (đồng bộ y hệt app chính): ⧉ View · ◉ Xbox Guide · ☰ Menu · ⚙ ===
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = outerPadV),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(unit * 1.1f)
+            verticalArrangement = Arrangement.spacedBy(unit * 0.85f)
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(unit * 1.3f),
@@ -838,128 +872,77 @@ internal fun PadLandscapeControllerScreen(
                     }
                 }
 
-                // Nút ⚙ Mở bảng Cài đặt tay cầm toàn diện (Screen 5)
+                // Nút ⚙ Duy nhất (như app chính): mở popover gọn nhẹ (Mẫu bố cục, Cỡ chung, Độ mờ, Sửa vị trí, Thêm/Ẩn nút, Cài đặt nâng cao)
+                val isTuneOpen = activePopoverNodeKey == "all" || isCustomizeMode
                 Box(
                     modifier = Modifier
+                        .trackNodeBounds("all")
                         .size(width = w * 0.048f, height = h * 0.086f)
                         .clip(RoundedCornerShape(pillCorner * 0.85f))
-                        .background(if (showGlobalSettingsSheet) OfficialHudSelBg else OfficialHudSurface2)
+                        .background(if (isTuneOpen) OfficialHudSelBg else OfficialHudSurface2.copy(alpha = (gOpacity * 0.85f).coerceIn(0.18f, 0.94f)))
                         .border(
-                            if (showGlobalSettingsSheet) strokeActive else strokeThin,
-                            if (showGlobalSettingsSheet) OfficialHudAccent else OfficialHudBorder,
+                            if (isTuneOpen) strokeActive else strokeThin,
+                            if (isTuneOpen) OfficialHudAccent else OfficialHudBorder,
                             RoundedCornerShape(pillCorner * 0.85f)
                         )
                         .clickable {
                             PadNetworkClient.releaseAllInputsImmediate()
-                            showGlobalSettingsSheet = !showGlobalSettingsSheet
+                            activePopoverNodeKey = if (activePopoverNodeKey == "all") null else "all"
                             triggerLocalTouchTick(false)
                         }
                         .testTag("pad_global_settings_btn"),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = PadStrings.tr(lang, "Cài đặt tay cầm", "Controller settings"),
-                        tint = if (showGlobalSettingsSheet) OfficialHudAccent else OfficialPadBtnText,
-                        modifier = Modifier.size(unit * 4.0f)
-                    )
-                }
-
-                // Nút ✥ Bật/Tắt nhanh Chế độ Sửa vị trí & tùy chỉnh từng nút
-                Box(
-                    modifier = Modifier
-                        .size(width = w * 0.048f, height = h * 0.086f)
-                        .clip(RoundedCornerShape(pillCorner * 0.85f))
-                        .background(if (isCustomizeMode) OfficialHudSelBg else OfficialHudSurface2)
-                        .border(
-                            if (isCustomizeMode) strokeActive else strokeThin,
-                            if (isCustomizeMode) OfficialHudAccent else OfficialHudBorder,
-                            RoundedCornerShape(pillCorner * 0.85f)
-                        )
-                        .clickable {
-                            if (!isCustomizeMode) {
-                                PadNetworkClient.releaseAllInputsImmediate()
-                            } else {
-                                persistCurrentTunings()
-                            }
-                            isCustomizeMode = !isCustomizeMode
-                            triggerLocalTouchTick(false)
-                        }
-                        .testTag("pad_customize_toggle_btn"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
                         imageVector = Icons.Default.Tune,
-                        contentDescription = PadStrings.tr(lang, "Sửa vị trí nút", "Edit layout"),
-                        tint = if (isCustomizeMode) OfficialHudAccent else OfficialPadBtnText,
+                        contentDescription = PadStrings.tr(lang, "Tùy chỉnh tay cầm", "Customize controller"),
+                        tint = if (isTuneOpen) OfficialHudAccent else OfficialPadBtnText,
                         modifier = Modifier.size(unit * 4.0f)
                     )
                 }
             }
 
-            // Thanh trạng thái trung tâm: Tên TV · Ping thật · Mẫu bố cục · Ngắt kết nối
-            Row(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(pillCorner))
-                    .background(OfficialHudSurface.copy(alpha = 0.90f))
-                    .border(strokeThin, OfficialHudBorder, RoundedCornerShape(pillCorner))
-                    .padding(horizontal = unit * 1.9f, vertical = unit * 0.75f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(unit * 1.3f)
-            ) {
-                Box(
+            // Viên thuốc trạng thái siêu gọn (chỉ hiện Tên TV + Ping ms thật khi không ở chế độ sửa, bấm vào cũng mở bảng ⚙)
+            if (!isCustomizeMode) {
+                Row(
                     modifier = Modifier
-                        .size(unit * 1.6f)
-                        .clip(CircleShape)
-                        .background(OfficialHudAccent)
-                )
-                val tvTitle = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
-                val gameBadge = state.activeGameTitle.trim().takeIf {
-                    it.isNotEmpty() && !it.equals("generic", ignoreCase = true)
+                        .clip(RoundedCornerShape(pillCorner))
+                        .background(OfficialHudSurface.copy(alpha = 0.72f))
+                        .border(strokeThin, OfficialHudBorder.copy(alpha = 0.55f), RoundedCornerShape(pillCorner))
+                        .clickable {
+                            PadNetworkClient.releaseAllInputsImmediate()
+                            activePopoverNodeKey = if (activePopoverNodeKey == "all") null else "all"
+                            triggerLocalTouchTick(false)
+                        }
+                        .padding(horizontal = unit * 1.4f, vertical = unit * 0.35f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(unit * 0.9f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(unit * 1.3f)
+                            .clip(CircleShape)
+                            .background(OfficialHudAccent)
+                    )
+                    val tvTitle = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" }
+                    Text(
+                        text = tvTitle,
+                        color = OfficialPadBtnText.copy(alpha = 0.85f),
+                        fontSize = fontTiny,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val pingStr = state.measuredPingMs?.let { "$it ms" } ?: "-- ms"
+                    Text(
+                        text = "· $pingStr",
+                        color = OfficialHudAccent,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = fontTiny,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.testTag("pad_live_ping_text")
+                    )
                 }
-                Text(
-                    text = if (gameBadge != null) "$tvTitle · $gameBadge" else tvTitle,
-                    color = OfficialPadBtnText,
-                    fontSize = fontTiny,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val pingStr = state.measuredPingMs?.let { "$it ms" } ?: "-- ms"
-                Text(
-                    text = "· $pingStr",
-                    color = OfficialHudAccent,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = fontTiny,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.testTag("pad_live_ping_text")
-                )
-
-                PadTopBarButton(
-                    label = currentPreset.localizedTitle(lang),
-                    corner = pillCorner * 0.75f,
-                    stroke = strokeThin,
-                    fontSize = fontTiny,
-                    isActive = false,
-                    onClick = {
-                        val list = PadLayoutPreset.entries
-                        val next = list[(list.indexOf(currentPreset) + 1) % list.size]
-                        currentPreset = next
-                        prefs.edit().putString("active_preset_id", next.id).apply()
-                        triggerLocalTouchTick()
-                    },
-                    testTag = "pad_preset_cycle_btn"
-                )
-
-                PadTopBarButton(
-                    label = PadStrings.tr(lang, "Ngắt", "Disconnect"),
-                    corner = pillCorner * 0.75f,
-                    stroke = strokeThin,
-                    fontSize = fontTiny,
-                    isDanger = true,
-                    onClick = onDisconnect,
-                    testTag = "pad_controller_disconnect_btn"
-                )
             }
         }
 
@@ -1172,8 +1155,8 @@ internal fun PadLandscapeControllerScreen(
                         opacity = effectiveOpacity(rightStickTuning),
                         sensitivity = globalSettings.rightStickSens,
                         responseCurve = globalSettings.rightStickCurve,
-                        innerDeadzone = globalSettings.innerDeadzone,
-                        outerDeadzone = globalSettings.outerDeadzone,
+                        innerDeadzone = globalSettings.rightInnerDeadzone,
+                        outerDeadzone = globalSettings.rightOuterDeadzone,
                         autoSprintL3 = false,
                         isEditMode = isCustomizeMode,
                         onSelectInEdit = { selectedNodeKey = "stick_right" },
@@ -1315,68 +1298,239 @@ internal fun PadLandscapeControllerScreen(
             }
         }
 
-        // === 6. HỘP CÔNG CỤ SỬA TỪNG NÚT KHI BẬT CHẾ ĐỘ SỬA (✥) ===
+        // === 6. THANH CÔNG CỤ SỬA GỌN NHẸ & POPOVER NỔI CẠNH NÚT KHI CHẠM 2 LẦN (đồng bộ y hệt app chính) ===
         if (isCustomizeMode) {
-            val curTuning = tuningFor(selectedNodeKey)
-            PadEditNodeToolbar(
+            val hiddenCountInEdit = nodeTunings.values.count { it.hidden }
+            PadCompactEditToolbar(
                 lang = lang,
-                selectedNodeKey = selectedNodeKey,
-                curTuning = curTuning,
-                customButtons = customButtons,
+                hiddenCount = hiddenCountInEdit,
+                showAddButtonModal = showManageButtonsModal,
                 showEditGrid = globalSettings.showEditGrid,
                 isPositionLocked = globalSettings.isPositionLocked,
-                dpadSplitMode = globalSettings.dpadSplitMode,
-                abxySplitMode = globalSettings.abxySplitMode,
-                onUpdateTuning = { nextTuning ->
-                    nodeTunings[selectedNodeKey] = nextTuning
+                onToggleAddButtonModal = {
+                    activePopoverNodeKey = null
+                    showManageButtonsModal = !showManageButtonsModal
+                },
+                onToggleGrid = {
+                    updateGlobalSettings(globalSettings.copy(showEditGrid = !globalSettings.showEditGrid))
+                },
+                onToggleLock = { nextLocked ->
+                    updateGlobalSettings(globalSettings.copy(isPositionLocked = nextLocked))
+                },
+                onDone = {
+                    persistCurrentTunings()
+                    activePopoverNodeKey = null
+                    isCustomizeMode = false
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = outerPadV + h * 0.095f)
+            )
+
+            if (activePopoverNodeKey == null && !showManageButtonsModal) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 10.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(OfficialHudSurface.copy(alpha = 0.88f))
+                        .border(1.dp, OfficialHudBorder, RoundedCornerShape(999.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = PadStrings.tr(
+                            lang,
+                            "Chạm 2 lần vào một nút để chỉnh riêng nút đó",
+                            "Double-tap any button to customize it"
+                        ),
+                        color = OfficialPadBtnText.copy(alpha = 0.72f),
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        }
+
+        // === 6B. POPOVER NỔI CẠNH NÚT (mở khi bấm ⚙ hoặc chạm 2 lần vào một nút bất kỳ) ===
+        val popNodeKey = activePopoverNodeKey
+        if (popNodeKey != null) {
+            // Lớp nền trong suốt: chạm ra ngoài để đóng popover
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(popNodeKey) {
+                        detectTapGestures(
+                            onTap = {
+                                persistCurrentTunings()
+                                activePopoverNodeKey = null
+                            }
+                        )
+                    }
+            )
+
+            val popWidthDp = 262.dp
+            val popEstHeightDp = if (popNodeKey == "all") 335.dp else 315.dp
+            val popWpx = with(density) { popWidthDp.toPx() }
+            val popHpx = with(density) { popEstHeightDp.toPx() }
+            val padPx = with(density) { 10.dp.toPx() }
+            val gapPx = with(density) { 10.dp.toPx() }
+
+            val anchorRect = nodeBoundsMap[popNodeKey] ?: nodeBoundsMap["all"]
+            val rootW = rootSizePx.width.coerceAtLeast(1).toFloat()
+            val rootH = rootSizePx.height.coerceAtLeast(1).toFloat()
+
+            val offsetPx = if (anchorRect == null || popNodeKey == "all") {
+                val ax = anchorRect?.center?.x ?: (rootW / 2f)
+                val ay = anchorRect?.bottom ?: with(density) { 54.dp.toPx() }
+                val x = (ax - popWpx / 2f).coerceIn(padPx, (rootW - popWpx - padPx).coerceAtLeast(padPx))
+                val y = (ay + gapPx).coerceIn(padPx, (rootH - popHpx - padPx).coerceAtLeast(padPx))
+                IntOffset(x.roundToInt(), y.roundToInt())
+            } else {
+                val placeRight = anchorRect.center.x < rootW * 0.5f
+                val rawX = if (placeRight) {
+                    anchorRect.right + gapPx
+                } else {
+                    anchorRect.left - popWpx - gapPx
+                }
+                val x = rawX.coerceIn(padPx, (rootW - popWpx - padPx).coerceAtLeast(padPx))
+                val rawY = anchorRect.center.y - popHpx * 0.45f
+                val y = rawY.coerceIn(padPx, (rootH - popHpx - padPx).coerceAtLeast(padPx))
+                IntOffset(x.roundToInt(), y.roundToInt())
+            }
+
+            val curNodeTuning = tuningFor(popNodeKey)
+            val curCustomSpec = customButtons.firstOrNull { it.id == popNodeKey }
+            val hasActiveGame = activeGameKey.isNotEmpty() && activeGameKey != "generic"
+            val hasPerGameCustom = hasActiveGame && globalSettings.layoutScope == PadLayoutScope.PER_GAME
+            PadNodePopover(
+                nodeKey = popNodeKey,
+                lang = lang,
+                tvName = state.selectedTv?.tvName.orEmpty().ifBlank { "Ravno TV" },
+                pingMs = state.measuredPingMs,
+                activeGameTitle = state.activeGameTitle,
+                hasActiveGameKey = hasActiveGame,
+                hasPerGameCustomLayout = hasPerGameCustom,
+                isEditPositionMode = isCustomizeMode,
+                currentPreset = currentPreset,
+                globalSettings = globalSettings,
+                nodeTuning = curNodeTuning,
+                customButtonSpec = curCustomSpec,
+                screenW = rootW,
+                screenH = rootH,
+                onSelectPreset = { preset ->
+                    currentPreset = preset
+                    prefs.edit().putString("active_preset_id", preset.id).apply()
+                    triggerLocalTouchTick()
+                },
+                onUpdateGlobalSettings = { next ->
+                    updateGlobalSettings(next)
+                },
+                onUpdateNodeTuning = { nextTuning ->
+                    nodeTunings[popNodeKey] = nextTuning
                     persistCurrentTunings()
                 },
+                onUpdateCustomButtonSpec = { updatedSpec ->
+                    val idx = customButtons.indexOfFirst { it.id == updatedSpec.id }
+                    if (idx >= 0) {
+                        customButtons[idx] = updatedSpec
+                        persistCustomButtons()
+                    }
+                },
+                onNudgePx = { dxPxDelta, dyPxDelta ->
+                    val cur = nodeTunings[popNodeKey] ?: PadNodeTuning()
+                    val nextDx = (cur.dxNorm + dxPxDelta / rootW).coerceIn(-0.45f, 0.45f)
+                    val nextDy = (cur.dyNorm + dyPxDelta / rootH).coerceIn(-0.45f, 0.45f)
+                    nodeTunings[popNodeKey] = cur.copy(dxNorm = nextDx, dyNorm = nextDy)
+                    persistCurrentTunings()
+                },
+                onHideOrDeleteNode = {
+                    if (curCustomSpec != null) {
+                        customButtons.removeAll { it.id == popNodeKey }
+                        nodeTunings.remove(popNodeKey)
+                        persistCustomButtons()
+                        persistCurrentTunings()
+                        activePopoverNodeKey = null
+                        selectedNodeKey = "abxy"
+                    } else {
+                        val cur = nodeTunings[popNodeKey] ?: PadNodeTuning()
+                        nodeTunings[popNodeKey] = cur.copy(hidden = !cur.hidden)
+                        persistCurrentTunings()
+                        if (!isCustomizeMode && !cur.hidden) {
+                            activePopoverNodeKey = null
+                        }
+                    }
+                },
                 onResetSingleNode = {
-                    nodeTunings.remove(selectedNodeKey)
+                    nodeTunings.remove(popNodeKey)
+                    persistCurrentTunings()
+                },
+                onToggleAbxySplit = {
+                    val nextSplit = !globalSettings.abxySplitMode
+                    updateGlobalSettings(globalSettings.copy(abxySplitMode = nextSplit))
+                    val nextKey = if (nextSplit) "btn_a" else "abxy"
+                    selectedNodeKey = nextKey
+                    activePopoverNodeKey = nextKey
+                },
+                onToggleDpadSplit = {
+                    val nextSplit = !globalSettings.dpadSplitMode
+                    updateGlobalSettings(globalSettings.copy(dpadSplitMode = nextSplit))
+                    val nextKey = if (nextSplit) "dpad_up" else "dpad"
+                    selectedNodeKey = nextKey
+                    activePopoverNodeKey = nextKey
+                },
+                onEnterOrExitEditMode = {
+                    isCustomizeMode = !isCustomizeMode
+                    activePopoverNodeKey = null
+                },
+                onUseGlobalLayout = {
+                    updateGlobalSettings(
+                        globalSettings.copy(
+                            layoutScope = if (globalSettings.layoutScope == PadLayoutScope.PER_GAME) {
+                                PadLayoutScope.GLOBAL
+                            } else {
+                                PadLayoutScope.PER_GAME
+                            }
+                        )
+                    )
+                },
+                onShowAllNodes = {
+                    val keys = nodeTunings.keys.toList()
+                    for (k in keys) {
+                        val cur = nodeTunings[k] ?: continue
+                        if (cur.hidden) nodeTunings[k] = cur.copy(hidden = false)
+                    }
                     persistCurrentTunings()
                 },
                 onResetAllNodes = {
                     nodeTunings.clear()
                     persistCurrentTunings()
+                    updateGlobalSettings(
+                        globalSettings.copy(
+                            globalScale = 1.0f,
+                            globalOpacity = 0.85f
+                        )
+                    )
                 },
-                onDeleteCustomNode = { customId ->
-                    customButtons.removeAll { it.id == customId }
-                    nodeTunings.remove(customId)
-                    persistCustomButtons()
-                    persistCurrentTunings()
-                    selectedNodeKey = "abxy"
+                onRecenterGyro = {
+                    gyroRecenterTick++
+                    triggerLocalTouchTick()
                 },
-                onToggleGrid = {
-                    updateGlobalSettings(globalSettings.copy(showEditGrid = !globalSettings.showEditGrid))
-                },
-                onToggleLock = {
-                    updateGlobalSettings(globalSettings.copy(isPositionLocked = !globalSettings.isPositionLocked))
-                },
-                onToggleSplitDpad = {
-                    val nextSplit = !globalSettings.dpadSplitMode
-                    updateGlobalSettings(globalSettings.copy(dpadSplitMode = nextSplit))
-                    selectedNodeKey = if (nextSplit) "dpad_up" else "dpad"
-                },
-                onToggleSplitAbxy = {
-                    val nextSplit = !globalSettings.abxySplitMode
-                    updateGlobalSettings(globalSettings.copy(abxySplitMode = nextSplit))
-                    selectedNodeKey = if (nextSplit) "btn_a" else "abxy"
-                },
-                onOpenGlobalSettings = {
+                onOpenFullSettingsSheet = {
+                    activePopoverNodeKey = null
                     showGlobalSettingsSheet = true
                 },
-                onOpenManageButtons = {
-                    showManageButtonsModal = true
+                onDisconnect = {
+                    activePopoverNodeKey = null
+                    onDisconnect()
                 },
-                onDoneEditMode = {
+                onClose = {
                     persistCurrentTunings()
-                    isCustomizeMode = false
+                    activePopoverNodeKey = null
                 },
-                modifier = Modifier.align(Alignment.Center)
+                modifier = Modifier.offset { offsetPx }
             )
         }
 
-        // === 7. BẢNG CÀI ĐẶT TAY CẦM CHUNG (Screen 5) ===
+        // === 7. BẢNG CÀI ĐẶT TAY CẦM CHUNG (Con quay hồi chuyển, Rung, Deadzone, Bố cục chung/riêng) ===
         if (showGlobalSettingsSheet) {
             val hiddenCount = nodeTunings.values.count { it.hidden }
             PadGlobalSettingsSheet(
@@ -1438,7 +1592,7 @@ internal fun PadLandscapeControllerScreen(
             )
         }
 
-        // === 8. BẢNG THÊM NÚT TRỐNG & ẨN / HIỆN NÚT ===
+        // === 8. BẢNG THÊM NÚT TRỐNG (1 CHẠM) & ẨN / HIỆN NÚT ===
         if (showManageButtonsModal) {
             PadManageButtonsModal(
                 lang = lang,
@@ -1459,13 +1613,14 @@ internal fun PadLandscapeControllerScreen(
                     }
                     persistCurrentTunings()
                 },
-                onAddCustomButton = { label, shape, mask ->
+                onAddBlankCustomButton = {
+                    val nextNum = customButtons.size + 1
                     val newId = "custom_${System.currentTimeMillis()}"
                     val spec = PadCustomButtonSpec(
                         id = newId,
-                        label = label,
-                        shape = shape,
-                        assignedMask = mask
+                        label = "M$nextNum",
+                        shape = PadCustomBtnShape.ROUND,
+                        assignedMask = 0
                     )
                     customButtons.add(spec)
                     val idx = customButtons.size - 1
@@ -1475,7 +1630,16 @@ internal fun PadLandscapeControllerScreen(
                     )
                     persistCustomButtons()
                     persistCurrentTunings()
+                    isCustomizeMode = true
                     selectedNodeKey = newId
+                    showManageButtonsModal = false
+                    activePopoverNodeKey = newId
+                },
+                onSelectCustomButton = { customId ->
+                    isCustomizeMode = true
+                    selectedNodeKey = customId
+                    showManageButtonsModal = false
+                    activePopoverNodeKey = customId
                 },
                 onDeleteCustomButton = { id ->
                     customButtons.removeAll { it.id == id }
@@ -1628,60 +1792,59 @@ private fun OfficialGamepadTriggerButton(
                 },
                 RoundedCornerShape(corner)
             )
-            .pointerInput(isEditMode, pressMode, analogDragMode, comboMask) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val down = awaitPointerEvent()
-                        if (down.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    fingerDown = true
-                    val startY = down.position.y
+                    Modifier
+                } else {
+                    Modifier.pointerInput(pressMode, analogDragMode, comboMask) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            fingerDown = true
+                            val startY = down.position.y
 
-                    when (pressMode) {
-                        PadPressMode.NORMAL -> {
-                            val initV = if (analogDragMode) 0.35f else 1.0f
-                            activeVal = initV
-                            updateTriggerAndCombo(initV, true)
-                        }
-                        PadPressMode.TOGGLE_HOLD -> {
-                            latched = !latched
-                            activeVal = if (latched) 1.0f else 0f
-                            updateTriggerAndCombo(activeVal, latched)
-                        }
-                        PadPressMode.TURBO -> {
-                            updateTriggerAndCombo(1.0f, true)
-                        }
-                    }
-
-                    do {
-                        val event = awaitPointerEvent()
-                        val activeChange = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
-                        if (activeChange != null && activeChange.pressed) {
-                            activeChange.consume()
-                            val dy = activeChange.position.y - startY
-                            val hPx = size.height.coerceAtLeast(1).toFloat()
-                            if (analogDragMode || abs(dy) >= hPx * 0.18f) {
-                                val v = ((dy / hPx) + 0.65f).coerceIn(0.15f, 1.0f)
-                                activeVal = v
-                                if (pressMode == PadPressMode.NORMAL || (pressMode == PadPressMode.TOGGLE_HOLD && latched)) {
-                                    updateTriggerAndCombo(v, false)
+                            when (pressMode) {
+                                PadPressMode.NORMAL -> {
+                                    val initV = if (analogDragMode) 0.35f else 1.0f
+                                    activeVal = initV
+                                    updateTriggerAndCombo(initV, true)
+                                }
+                                PadPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    activeVal = if (latched) 1.0f else 0f
+                                    updateTriggerAndCombo(activeVal, latched)
+                                }
+                                PadPressMode.TURBO -> {
+                                    updateTriggerAndCombo(1.0f, true)
                                 }
                             }
-                        }
-                    } while (event.changes.any { it.pressed })
 
-                    fingerDown = false
-                    if (pressMode == PadPressMode.NORMAL) {
-                        activeVal = 0f
-                        updateTriggerAndCombo(0f, false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val activeChange = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
+                                if (activeChange != null && activeChange.pressed) {
+                                    activeChange.consume()
+                                    val dy = activeChange.position.y - startY
+                                    val hPx = size.height.coerceAtLeast(1).toFloat()
+                                    if (analogDragMode || abs(dy) >= hPx * 0.18f) {
+                                        val v = ((dy / hPx) + 0.65f).coerceIn(0.15f, 1.0f)
+                                        activeVal = v
+                                        if (pressMode == PadPressMode.NORMAL || (pressMode == PadPressMode.TOGGLE_HOLD && latched)) {
+                                            updateTriggerAndCombo(v, false)
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            fingerDown = false
+                            if (pressMode == PadPressMode.NORMAL) {
+                                activeVal = 0f
+                                updateTriggerAndCombo(0f, false)
+                            }
+                        }
                     }
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (analogDragMode && isPressedVisual) {
@@ -1712,13 +1875,14 @@ private fun OfficialGamepadTriggerButton(
 }
 
 /**
- * Nút vai LB / RB hỗ trợ vuốt 4 hướng (↑ ↓ ← →) + gửi kèm hoặc thay thế nút vai + Combo.
+ * Nút vai LB / RB hỗ trợ bật/tắt vuốt 4 hướng (↑ ↓ ← →) + gửi kèm hoặc thay thế nút vai + Combo.
  */
 @Composable
 private fun OfficialGamepadShoulderButton(
     label: String,
     primaryBit: Int,
     comboMask: Int,
+    directionalSwipeEnabled: Boolean,
     swipeUpBit: Int,
     swipeDownBit: Int,
     swipeLeftBit: Int,
@@ -1742,16 +1906,29 @@ private fun OfficialGamepadShoulderButton(
     var fingerDown by remember { mutableStateOf(false) }
     var latched by remember { mutableStateOf(false) }
     var activeSwipeBit by remember { mutableIntStateOf(0) }
+    var activeSwipeDir by remember { mutableIntStateOf(0) } // 1: Up, 2: Down, 3: Left, 4: Right
+    var tapPulseToken by remember { mutableIntStateOf(0) }
 
     val fullPrimaryMask = primaryBit or comboMask
+
+    LaunchedEffect(tapPulseToken) {
+        if (tapPulseToken > 0) {
+            PadNetworkClient.updateButtonsMask(fullPrimaryMask, fullPrimaryMask)
+            delay(65L)
+            if (!fingerDown && !latched) {
+                PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
+            }
+        }
+    }
 
     LaunchedEffect(isEditMode, pressMode) {
         if (isEditMode) {
             fingerDown = false
             latched = false
             if (activeSwipeBit != 0) {
-                PadNetworkClient.updateButtonBit(activeSwipeBit, false)
+                PadNetworkClient.updateButtonsMask(activeSwipeBit, 0)
                 activeSwipeBit = 0
+                activeSwipeDir = 0
             }
             PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
         } else if (pressMode != PadPressMode.TOGGLE_HOLD && latched) {
@@ -1785,12 +1962,14 @@ private fun OfficialGamepadShoulderButton(
     val borderAlpha = (opacity * 0.40f).coerceIn(0.05f, 0.65f)
     val textAlpha = opacity.coerceIn(0.05f, 1.0f)
 
-    val defaultBadgeBit = activeSwipeBit.takeIf { it != 0 }
-        ?: swipeDownBit.takeIf { it != 0 }
-        ?: swipeUpBit.takeIf { it != 0 }
-        ?: swipeLeftBit.takeIf { it != 0 }
-        ?: swipeRightBit
-    val swipeBadge = formatMaskBadge(defaultBadgeBit)
+    val activeSwipeBadge = if (isSwiped) formatMaskBadge(activeSwipeBit) else ""
+    val activeDirArrow = when (activeSwipeDir) {
+        1 -> "↑"
+        2 -> "↓"
+        3 -> "←"
+        4 -> "→"
+        else -> ""
+    }
 
     Box(
         modifier = modifier
@@ -1812,94 +1991,147 @@ private fun OfficialGamepadShoulderButton(
                 },
                 RoundedCornerShape(corner)
             )
-            .pointerInput(
-                isEditMode,
-                fullPrimaryMask,
-                swipeUpBit,
-                swipeDownBit,
-                swipeLeftBit,
-                swipeRightBit,
-                swipeIncludeShoulder,
-                pressMode
-            ) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val down = awaitPointerEvent()
-                        if (down.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    val startPos = down.position
-                    var triggeredSwipeBit = 0
-                    fingerDown = true
-                    onHaptic(false)
+                    Modifier
+                } else {
+                    Modifier.pointerInput(
+                        fullPrimaryMask,
+                        directionalSwipeEnabled,
+                        swipeUpBit,
+                        swipeDownBit,
+                        swipeLeftBit,
+                        swipeRightBit,
+                        swipeIncludeShoulder,
+                        pressMode
+                    ) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            val startPos = down.position
+                            var triggeredSwipeBit = 0
+                            var triggeredDir = 0
+                            fingerDown = true
+                            onHaptic(false)
 
-                    when (pressMode) {
-                        PadPressMode.NORMAL -> PadNetworkClient.updateButtonsMask(fullPrimaryMask, fullPrimaryMask)
-                        PadPressMode.TOGGLE_HOLD -> {
-                            latched = !latched
-                            PadNetworkClient.updateButtonsMask(fullPrimaryMask, if (latched) fullPrimaryMask else 0)
-                        }
-                        PadPressMode.TURBO -> {}
-                    }
-
-                    do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
-                        if (change != null && change.pressed) {
-                            change.consume()
-                            val dx = change.position.x - startPos.x
-                            val dy = change.position.y - startPos.y
-                            val dist = hypot(dx, dy)
-                            val threshold = size.height.coerceAtLeast(24) * 0.40f
-                            if (triggeredSwipeBit == 0 && dist >= threshold) {
-                                val candidate = if (abs(dx) > abs(dy)) {
-                                    if (dx < 0) swipeLeftBit else swipeRightBit
-                                } else {
-                                    if (dy < 0) swipeUpBit else swipeDownBit
-                                }.takeIf { it != 0 } ?: swipeDownBit
-
-                                if (candidate != 0) {
-                                    triggeredSwipeBit = candidate
-                                    activeSwipeBit = candidate
-                                    onHaptic(true)
-                                    if (!swipeIncludeShoulder && pressMode == PadPressMode.NORMAL) {
-                                        PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
+                            val holdPrimaryImmediately = !directionalSwipeEnabled || swipeIncludeShoulder
+                            when (pressMode) {
+                                PadPressMode.NORMAL -> {
+                                    if (holdPrimaryImmediately) {
+                                        PadNetworkClient.updateButtonsMask(fullPrimaryMask, fullPrimaryMask)
                                     }
-                                    PadNetworkClient.updateButtonBit(candidate, true)
+                                }
+                                PadPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    PadNetworkClient.updateButtonsMask(fullPrimaryMask, if (latched) fullPrimaryMask else 0)
+                                }
+                                PadPressMode.TURBO -> {}
+                            }
+
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
+                                if (change != null && change.pressed) {
+                                    change.consume()
+                                    if (directionalSwipeEnabled) {
+                                        val dx = change.position.x - startPos.x
+                                        val dy = change.position.y - startPos.y
+                                        val dist = hypot(dx, dy)
+                                        val threshold = minOf(size.width, size.height).coerceAtLeast(24) * 0.34f
+                                        if (dist >= threshold) {
+                                            val (candDir, candBit) = if (abs(dx) > abs(dy)) {
+                                                if (dx < 0) 3 to swipeLeftBit else 4 to swipeRightBit
+                                            } else {
+                                                if (dy < 0) 1 to swipeUpBit else 2 to swipeDownBit
+                                            }
+                                            if (candBit != 0 && candBit != triggeredSwipeBit) {
+                                                if (triggeredSwipeBit != 0) {
+                                                    PadNetworkClient.updateButtonsMask(triggeredSwipeBit, 0)
+                                                }
+                                                triggeredSwipeBit = candBit
+                                                triggeredDir = candDir
+                                                activeSwipeBit = candBit
+                                                activeSwipeDir = candDir
+                                                onHaptic(true)
+                                                if (!swipeIncludeShoulder && pressMode == PadPressMode.NORMAL) {
+                                                    PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
+                                                }
+                                                PadNetworkClient.updateButtonsMask(candBit, candBit)
+                                            }
+                                        }
+                                    }
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            fingerDown = false
+                            if (pressMode == PadPressMode.NORMAL) {
+                                if (holdPrimaryImmediately) {
+                                    PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
+                                } else if (triggeredSwipeBit == 0 && triggeredDir == 0) {
+                                    tapPulseToken++
                                 }
                             }
+                            if (triggeredSwipeBit != 0) {
+                                activeSwipeBit = 0
+                                activeSwipeDir = 0
+                                PadNetworkClient.updateButtonsMask(triggeredSwipeBit, 0)
+                            }
                         }
-                    } while (event.changes.any { it.pressed })
-
-                    fingerDown = false
-                    if (pressMode == PadPressMode.NORMAL) {
-                        PadNetworkClient.updateButtonsMask(fullPrimaryMask, 0)
-                    }
-                    if (triggeredSwipeBit != 0) {
-                        activeSwipeBit = 0
-                        PadNetworkClient.updateButtonBit(triggeredSwipeBit, false)
                     }
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
-        if (swipeBadge.isNotEmpty()) {
-            Text(
-                text = "▾$swipeBadge",
-                color = if (isSwiped) OfficialHudCyan else OfficialPadBtnText.copy(alpha = (textAlpha * 0.60f).coerceIn(0.05f, 0.80f)),
-                fontSize = badgeFontSize,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = corner * 0.35f, top = corner * 0.12f)
-            )
+        if (directionalSwipeEnabled) {
+            val hintColor = OfficialPadBtnText.copy(alpha = (textAlpha * 0.62f).coerceIn(0.05f, 0.82f))
+            if (swipeUpBit != 0) {
+                Text(
+                    text = "↑${formatMaskBadge(swipeUpBit)}",
+                    color = if (activeSwipeDir == 1) OfficialHudCyan else hintColor,
+                    fontSize = badgeFontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = corner * 0.08f)
+                )
+            }
+            if (swipeDownBit != 0) {
+                Text(
+                    text = "↓${formatMaskBadge(swipeDownBit)}",
+                    color = if (activeSwipeDir == 2) OfficialHudCyan else hintColor,
+                    fontSize = badgeFontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = corner * 0.08f)
+                )
+            }
+            if (swipeLeftBit != 0) {
+                Text(
+                    text = "←${formatMaskBadge(swipeLeftBit)}",
+                    color = if (activeSwipeDir == 3) OfficialHudCyan else hintColor,
+                    fontSize = badgeFontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = corner * 0.22f)
+                )
+            }
+            if (swipeRightBit != 0) {
+                Text(
+                    text = "→${formatMaskBadge(swipeRightBit)}",
+                    color = if (activeSwipeDir == 4) OfficialHudCyan else hintColor,
+                    fontSize = badgeFontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = corner * 0.22f)
+                )
+            }
         }
         val textLabel = when {
-            isSwiped && swipeBadge.isNotEmpty() -> "$label+$swipeBadge"
+            isSwiped && activeSwipeBadge.isNotEmpty() ->
+                if (swipeIncludeShoulder) "$label+$activeSwipeBadge" else "$activeDirArrow$activeSwipeBadge"
             latched -> "$label •"
             else -> label
         }
@@ -1994,38 +2226,37 @@ private fun OfficialGamepadPillButton(
                 },
                 RoundedCornerShape(corner)
             )
-            .pointerInput(isEditMode, fullMask, pressMode) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    fingerDown = true
-                    onHaptic()
-                    when (pressMode) {
-                        PadPressMode.NORMAL -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
-                        PadPressMode.TOGGLE_HOLD -> {
-                            latched = !latched
-                            PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
-                        }
-                        PadPressMode.TURBO -> {}
-                    }
-                    do {
-                        val event = awaitPointerEvent()
-                        event.changes.forEach { if (it.pressed) it.consume() }
-                    } while (event.changes.any { it.pressed })
+                    Modifier
+                } else {
+                    Modifier.pointerInput(fullMask, pressMode) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            fingerDown = true
+                            onHaptic()
+                            when (pressMode) {
+                                PadPressMode.NORMAL -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
+                                PadPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
+                                }
+                                PadPressMode.TURBO -> {}
+                            }
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { if (it.pressed) it.consume() }
+                            } while (event.changes.any { it.pressed })
 
-                    fingerDown = false
-                    if (pressMode == PadPressMode.NORMAL) {
-                        PadNetworkClient.updateButtonsMask(fullMask, 0)
+                            fingerDown = false
+                            if (pressMode == PadPressMode.NORMAL) {
+                                PadNetworkClient.updateButtonsMask(fullMask, 0)
+                            }
+                        }
                     }
                 }
-            }
+            )
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
@@ -2104,37 +2335,36 @@ private fun OfficialXboxNexusButton(
                 },
                 CircleShape
             )
-            .pointerInput(isEditMode, pressMode, turboHz, fullMask) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    fingerDown = true
-                    onHaptic()
-                    when (pressMode) {
-                        PadPressMode.NORMAL, PadPressMode.TURBO -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
-                        PadPressMode.TOGGLE_HOLD -> {
-                            latched = !latched
-                            PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
+                    Modifier
+                } else {
+                    Modifier.pointerInput(pressMode, turboHz, fullMask) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            fingerDown = true
+                            onHaptic()
+                            when (pressMode) {
+                                PadPressMode.NORMAL, PadPressMode.TURBO -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
+                                PadPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
+                                }
+                            }
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { if (it.pressed) it.consume() }
+                            } while (event.changes.any { it.pressed })
+
+                            fingerDown = false
+                            if (pressMode != PadPressMode.TOGGLE_HOLD) {
+                                PadNetworkClient.updateButtonsMask(fullMask, 0)
+                            }
                         }
                     }
-                    do {
-                        val event = awaitPointerEvent()
-                        event.changes.forEach { if (it.pressed) it.consume() }
-                    } while (event.changes.any { it.pressed })
-
-                    fingerDown = false
-                    if (pressMode != PadPressMode.TOGGLE_HOLD) {
-                        PadNetworkClient.updateButtonsMask(fullMask, 0)
-                    }
                 }
-            }
+            )
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
@@ -2193,56 +2423,55 @@ private fun OfficialVirtualDpadCross(
             .clip(RoundedCornerShape(corner))
             .background(OfficialHudSurface.copy(alpha = containerBgAlpha))
             .border(strokeThin, OfficialHudBorder.copy(alpha = borderAlpha), RoundedCornerShape(corner))
-            .pointerInput(isEditMode) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
+                    Modifier
+                } else {
+                    Modifier.pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            val cx = this.size.width / 2f
+                            val cy = this.size.height / 2f
+                            val minDeadRadius = this.size.width * 0.12f
+
+                            fun evaluatePos(pos: Offset) {
+                                val dx = pos.x - cx
+                                val dy = pos.y - cy
+                                val dist = sqrt(dx * dx + dy * dy)
+                                var mask = 0
+                                if (dist >= minDeadRadius) {
+                                    val deg = atan2(dy, dx) * (180f / PI.toFloat())
+                                    if (deg in -157.5f..-22.5f) mask = mask or RemotePadButtons.DPAD_UP
+                                    if (deg in 22.5f..157.5f) mask = mask or RemotePadButtons.DPAD_DOWN
+                                    if (deg in -67.5f..67.5f) mask = mask or RemotePadButtons.DPAD_RIGHT
+                                    if (deg <= -112.5f || deg >= 112.5f) mask = mask or RemotePadButtons.DPAD_LEFT
+                                }
+                                if (mask != activeMask) {
+                                    if (mask != 0) onHaptic()
+                                    activeMask = mask
+                                    PadNetworkClient.updateButtonsMask(allDpadMask, mask)
+                                }
+                            }
+
+                            evaluatePos(down.position)
+                            do {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
+                                if (change != null && change.pressed) {
+                                    change.consume()
+                                    evaluatePos(change.position)
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (activeMask != 0) {
+                                activeMask = 0
+                                PadNetworkClient.updateButtonsMask(allDpadMask, 0)
+                            }
+                        }
                     }
-                    return@pointerInput
                 }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    val cx = this.size.width / 2f
-                    val cy = this.size.height / 2f
-                    val minDeadRadius = this.size.width * 0.12f
-
-                    fun evaluatePos(pos: Offset) {
-                        val dx = pos.x - cx
-                        val dy = pos.y - cy
-                        val dist = sqrt(dx * dx + dy * dy)
-                        var mask = 0
-                        if (dist >= minDeadRadius) {
-                            val deg = atan2(dy, dx) * (180f / PI.toFloat())
-                            if (deg in -157.5f..-22.5f) mask = mask or RemotePadButtons.DPAD_UP
-                            if (deg in 22.5f..157.5f) mask = mask or RemotePadButtons.DPAD_DOWN
-                            if (deg in -67.5f..67.5f) mask = mask or RemotePadButtons.DPAD_RIGHT
-                            if (deg <= -112.5f || deg >= 112.5f) mask = mask or RemotePadButtons.DPAD_LEFT
-                        }
-                        if (mask != activeMask) {
-                            if (mask != 0) onHaptic()
-                            activeMask = mask
-                            PadNetworkClient.updateButtonsMask(allDpadMask, mask)
-                        }
-                    }
-
-                    evaluatePos(down.position)
-                    do {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
-                        if (change != null && change.pressed) {
-                            change.consume()
-                            evaluatePos(change.position)
-                        }
-                    } while (event.changes.any { it.pressed })
-
-                    if (activeMask != 0) {
-                        activeMask = 0
-                        PadNetworkClient.updateButtonsMask(allDpadMask, 0)
-                    }
-                }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         OfficialDpadVisualKey(
@@ -2393,52 +2622,51 @@ private fun OfficialVirtualAbxyPad(
             .clip(CircleShape)
             .background(OfficialHudSurface.copy(alpha = containerBgAlpha))
             .border(strokeThin, OfficialHudBorder.copy(alpha = borderAlpha), CircleShape)
-            .pointerInput(isEditMode, swapSwitchAbxy) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    do {
-                        val event = awaitPointerEvent()
-                        var mask = 0
-                        val wPx = this.size.width.coerceAtLeast(1).toFloat()
-                        val hPx = this.size.height.coerceAtLeast(1).toFloat()
-                        val hitRadius = minOf(wPx, hPx) * 0.28f
+                    Modifier
+                } else {
+                    Modifier.pointerInput(swapSwitchAbxy) {
+                        awaitEachGesture {
+                            do {
+                                val event = awaitPointerEvent()
+                                var mask = 0
+                                val wPx = this.size.width.coerceAtLeast(1).toFloat()
+                                val hPx = this.size.height.coerceAtLeast(1).toFloat()
+                                val hitRadius = minOf(wPx, hPx) * 0.28f
 
-                        val topCenter = Offset(wPx * 0.50f, hPx * 0.18f)
-                        val bottomCenter = Offset(wPx * 0.50f, hPx * 0.82f)
-                        val leftCenter = Offset(wPx * 0.18f, hPx * 0.50f)
-                        val rightCenter = Offset(wPx * 0.82f, hPx * 0.50f)
+                                val topCenter = Offset(wPx * 0.50f, hPx * 0.18f)
+                                val bottomCenter = Offset(wPx * 0.50f, hPx * 0.82f)
+                                val leftCenter = Offset(wPx * 0.18f, hPx * 0.50f)
+                                val rightCenter = Offset(wPx * 0.82f, hPx * 0.50f)
 
-                        for (ch in event.changes) {
-                            if (!ch.pressed) continue
-                            ch.consume()
-                            val p = ch.position
-                            if (hypot(p.x - topCenter.x, p.y - topCenter.y) <= hitRadius) mask = mask or topBit
-                            if (hypot(p.x - bottomCenter.x, p.y - bottomCenter.y) <= hitRadius) mask = mask or bottomBit
-                            if (hypot(p.x - leftCenter.x, p.y - leftCenter.y) <= hitRadius) mask = mask or leftBit
-                            if (hypot(p.x - rightCenter.x, p.y - rightCenter.y) <= hitRadius) mask = mask or rightBit
-                        }
+                                for (ch in event.changes) {
+                                    if (!ch.pressed) continue
+                                    ch.consume()
+                                    val p = ch.position
+                                    if (hypot(p.x - topCenter.x, p.y - topCenter.y) <= hitRadius) mask = mask or topBit
+                                    if (hypot(p.x - bottomCenter.x, p.y - bottomCenter.y) <= hitRadius) mask = mask or bottomBit
+                                    if (hypot(p.x - leftCenter.x, p.y - leftCenter.y) <= hitRadius) mask = mask or leftBit
+                                    if (hypot(p.x - rightCenter.x, p.y - rightCenter.y) <= hitRadius) mask = mask or rightBit
+                                }
 
-                        if (mask != activeMask) {
-                            if ((mask and activeMask.inv()) != 0) {
-                                onHaptic()
+                                if (mask != activeMask) {
+                                    if ((mask and activeMask.inv()) != 0) {
+                                        onHaptic()
+                                    }
+                                    activeMask = mask
+                                    PadNetworkClient.updateButtonsMask(allAbxyMask, mask)
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            if (activeMask != 0) {
+                                activeMask = 0
+                                PadNetworkClient.updateButtonsMask(allAbxyMask, 0)
                             }
-                            activeMask = mask
-                            PadNetworkClient.updateButtonsMask(allAbxyMask, mask)
                         }
-                    } while (event.changes.any { it.pressed })
-
-                    if (activeMask != 0) {
-                        activeMask = 0
-                        PadNetworkClient.updateButtonsMask(allAbxyMask, 0)
                     }
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         OfficialAbxyVisualButton(
@@ -2608,38 +2836,37 @@ private fun OfficialStandaloneColoredAbxyButton(
                 },
                 CircleShape
             )
-            .pointerInput(isEditMode, fullMask, pressMode) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    fingerDown = true
-                    onHaptic()
-                    when (pressMode) {
-                        PadPressMode.NORMAL -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
-                        PadPressMode.TOGGLE_HOLD -> {
-                            latched = !latched
-                            PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
-                        }
-                        PadPressMode.TURBO -> {}
-                    }
-                    do {
-                        val event = awaitPointerEvent()
-                        event.changes.forEach { if (it.pressed) it.consume() }
-                    } while (event.changes.any { it.pressed })
+                    Modifier
+                } else {
+                    Modifier.pointerInput(fullMask, pressMode) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            fingerDown = true
+                            onHaptic()
+                            when (pressMode) {
+                                PadPressMode.NORMAL -> PadNetworkClient.updateButtonsMask(fullMask, fullMask)
+                                PadPressMode.TOGGLE_HOLD -> {
+                                    latched = !latched
+                                    PadNetworkClient.updateButtonsMask(fullMask, if (latched) fullMask else 0)
+                                }
+                                PadPressMode.TURBO -> {}
+                            }
+                            do {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { if (it.pressed) it.consume() }
+                            } while (event.changes.any { it.pressed })
 
-                    fingerDown = false
-                    if (pressMode == PadPressMode.NORMAL) {
-                        PadNetworkClient.updateButtonsMask(fullMask, 0)
+                            fingerDown = false
+                            if (pressMode == PadPressMode.NORMAL) {
+                                PadNetworkClient.updateButtonsMask(fullMask, 0)
+                            }
+                        }
                     }
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -2709,106 +2936,104 @@ private fun OfficialVirtualAnalogStick(
                 },
                 shape = CircleShape
             )
-            .pointerInput(
-                isEditMode,
-                autoSprintL3,
-                maxRadiusPx,
-                sensitivity,
-                responseCurve,
-                innerDeadzone,
-                outerDeadzone
-            ) {
+            .then(
                 if (isEditMode) {
-                    awaitEachGesture {
-                        val ev = awaitPointerEvent()
-                        if (ev.changes.any { it.pressed }) onSelectInEdit()
-                    }
-                    return@pointerInput
-                }
-                var lastDownTimeMs = 0L
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = true)
-                    down.consume()
-                    isTouching = true
-                    var doubleTapHeld = false
-                    val now = System.currentTimeMillis()
-                    if (now - lastDownTimeMs <= 260L) {
-                        doubleTapHeld = true
-                        onDoubleTapStickClick(true)
-                    }
-                    lastDownTimeMs = now
+                    Modifier
+                } else {
+                    Modifier.pointerInput(
+                        autoSprintL3,
+                        maxRadiusPx,
+                        sensitivity,
+                        responseCurve,
+                        innerDeadzone,
+                        outerDeadzone
+                    ) {
+                        var lastDownTimeMs = 0L
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            down.consume()
+                            isTouching = true
+                            var doubleTapHeld = false
+                            val now = System.currentTimeMillis()
+                            if (now - lastDownTimeMs <= 260L) {
+                                doubleTapHeld = true
+                                onDoubleTapStickClick(true)
+                            }
+                            lastDownTimeMs = now
 
-                    val centerX = this.size.width / 2f
-                    val centerY = this.size.height / 2f
+                            val centerX = this.size.width / 2f
+                            val centerY = this.size.height / 2f
 
-                    fun applyAxisShaping(raw: Float): Float {
-                        val mag = abs(raw)
-                        val inDz = innerDeadzone.coerceIn(0.02f, 0.25f)
-                        val outDz = outerDeadzone.coerceIn(0.75f, 1.0f)
-                        if (mag < inDz) return 0f
-                        val remapped = ((mag - inDz) / (outDz - inDz).coerceAtLeast(0.1f)).coerceIn(0f, 1f)
-                        val signed = if (raw < 0f) -remapped else remapped
-                        val curved = responseCurve.applyCurve(signed)
-                        return (curved * sensitivity).coerceIn(-1f, 1f)
-                    }
+                            fun applyAxisShaping(raw: Float): Float {
+                                val mag = abs(raw)
+                                val inDz = innerDeadzone.coerceIn(0.00f, 0.30f)
+                                val outDz = outerDeadzone.coerceIn(0.70f, 1.0f)
+                                if (mag < inDz) return 0f
+                                val remapped = ((mag - inDz) / (outDz - inDz).coerceAtLeast(0.1f)).coerceIn(0f, 1f)
+                                val signed = if (raw < 0f) -remapped else remapped
+                                val curved = responseCurve.applyCurve(signed)
+                                return (curved * sensitivity).coerceIn(-1f, 1f)
+                            }
 
-                    fun updateFromPos(pos: Offset) {
-                        val dx = pos.x - centerX
-                        val dy = pos.y - centerY
-                        val dist = sqrt(dx * dx + dy * dy)
-                        if (dist <= maxRadiusPx) {
-                            stickPxX = dx
-                            stickPxY = dy
-                        } else if (dist > 0.001f) {
-                            stickPxX = (dx / dist) * maxRadiusPx
-                            stickPxY = (dy / dist) * maxRadiusPx
-                        } else {
+                            fun updateFromPos(pos: Offset) {
+                                val dx = pos.x - centerX
+                                val dy = pos.y - centerY
+                                val dist = sqrt(dx * dx + dy * dy)
+                                if (dist <= maxRadiusPx) {
+                                    stickPxX = dx
+                                    stickPxY = dy
+                                } else if (dist > 0.001f) {
+                                    stickPxX = (dx / dist) * maxRadiusPx
+                                    stickPxY = (dy / dist) * maxRadiusPx
+                                } else {
+                                    stickPxX = 0f
+                                    stickPxY = 0f
+                                }
+
+                                val rawX = (stickPxX / maxRadiusPx).coerceIn(-1f, 1f)
+                                val rawY = (stickPxY / maxRadiusPx).coerceIn(-1f, 1f)
+                                val nx = applyAxisShaping(rawX)
+                                val ny = applyAxisShaping(rawY)
+
+                                if (autoSprintL3) {
+                                    val rawUnclampedX = dx / maxRadiusPx
+                                    val rawUnclampedY = dy / maxRadiusPx
+                                    val shouldSprint = if (!isAutoSprinting) {
+                                        rawUnclampedY < -1.18f && abs(rawUnclampedX) < 0.58f
+                                    } else {
+                                        rawY < -0.60f && abs(rawX) < 0.68f
+                                    }
+                                    isAutoSprinting = shouldSprint
+                                } else {
+                                    isAutoSprinting = false
+                                }
+
+                                val sprintBit = if (isAutoSprinting) RemotePadButtons.L3 else 0
+                                onStickChanged(nx, ny, sprintBit)
+                            }
+
+                            updateFromPos(down.position)
+                            do {
+                                val event = awaitPointerEvent()
+                                val ch = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
+                                if (ch != null && ch.pressed) {
+                                    ch.consume()
+                                    updateFromPos(ch.position)
+                                }
+                            } while (event.changes.any { it.pressed })
+
+                            isTouching = false
                             stickPxX = 0f
                             stickPxY = 0f
-                        }
-
-                        val rawX = (stickPxX / maxRadiusPx).coerceIn(-1f, 1f)
-                        val rawY = (stickPxY / maxRadiusPx).coerceIn(-1f, 1f)
-                        val nx = applyAxisShaping(rawX)
-                        val ny = applyAxisShaping(rawY)
-
-                        if (autoSprintL3) {
-                            val rawUnclampedX = dx / maxRadiusPx
-                            val rawUnclampedY = dy / maxRadiusPx
-                            val shouldSprint = if (!isAutoSprinting) {
-                                rawUnclampedY < -1.18f && abs(rawUnclampedX) < 0.58f
-                            } else {
-                                rawY < -0.60f && abs(rawX) < 0.68f
-                            }
-                            isAutoSprinting = shouldSprint
-                        } else {
                             isAutoSprinting = false
+                            onStickChanged(0f, 0f, 0)
+                            if (doubleTapHeld) {
+                                onDoubleTapStickClick(false)
+                            }
                         }
-
-                        val sprintBit = if (isAutoSprinting) RemotePadButtons.L3 else 0
-                        onStickChanged(nx, ny, sprintBit)
-                    }
-
-                    updateFromPos(down.position)
-                    do {
-                        val event = awaitPointerEvent()
-                        val ch = event.changes.firstOrNull { it.id == down.id } ?: event.changes.firstOrNull()
-                        if (ch != null && ch.pressed) {
-                            ch.consume()
-                            updateFromPos(ch.position)
-                        }
-                    } while (event.changes.any { it.pressed })
-
-                    isTouching = false
-                    stickPxX = 0f
-                    stickPxY = 0f
-                    isAutoSprinting = false
-                    onStickChanged(0f, 0f, 0)
-                    if (doubleTapHeld) {
-                        onDoubleTapStickClick(false)
                     }
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         // Vòng vùng chết ngoài & trong + Tia vector nối tâm

@@ -136,6 +136,7 @@ data class PadNodeTuning(
     val widthMult: Float = 1.0f,
     val heightMult: Float = 1.0f,
     val opacity: Float = 0.85f,
+    val directionalSwipeEnabled: Boolean = false,
     val swipeBit: Int = 0,
     val swipeUpBit: Int = 0,
     val swipeDownBit: Int = 0,
@@ -148,7 +149,10 @@ data class PadNodeTuning(
     val hidden: Boolean = false,
     val pressMode: PadPressMode = PadPressMode.NORMAL,
     val turboHz: Int = 10
-)
+) {
+    fun hasCustomDimensions(): Boolean =
+        kotlin.math.abs(widthMult - 1.0f) >= 0.02f || kotlin.math.abs(heightMult - 1.0f) >= 0.02f
+}
 
 enum class PadGyroMode(val id: String) {
     FPS_VR_360("fps_vr"),
@@ -184,6 +188,8 @@ data class PadGlobalControllerSettings(
     val rightStickCurve: PadStickCurve = PadStickCurve.LINEAR,
     val innerDeadzone: Float = 0.06f,
     val outerDeadzone: Float = 0.96f,
+    val rightInnerDeadzone: Float = 0.06f,
+    val rightOuterDeadzone: Float = 0.96f,
     val autoSprintL3Override: Int = -1, // -1 = theo preset, 0 = tắt, 1 = bật
     val dpadSplitMode: Boolean = false,
     val abxySplitMode: Boolean = false,
@@ -203,6 +209,8 @@ internal object PadControllerStorage {
     fun loadGlobalSettings(prefs: SharedPreferences): PadGlobalControllerSettings {
         val legacyHaptic = prefs.getBoolean("pad_touch_haptic", true)
         val defaultBtnHaptic = if (legacyHaptic) PadHapticLevel.MEDIUM.id else PadHapticLevel.OFF.id
+        val inDz = prefs.getFloat("pad_inner_deadzone", 0.06f).coerceIn(0.00f, 0.30f)
+        val outDz = prefs.getFloat("pad_outer_deadzone", 0.96f).coerceIn(0.70f, 1.0f)
         return PadGlobalControllerSettings(
             globalScale = prefs.getFloat("pad_global_scale", 1.0f).coerceIn(0.60f, 1.65f),
             globalOpacity = prefs.getFloat("pad_global_opacity", 0.90f).coerceIn(0.05f, 1.0f),
@@ -217,8 +225,10 @@ internal object PadControllerStorage {
             rightStickSens = prefs.getFloat("pad_right_stick_sens", 1.0f).coerceIn(0.60f, 1.60f),
             leftStickCurve = PadStickCurve.fromId(prefs.getString("pad_left_stick_curve", "linear").orEmpty()),
             rightStickCurve = PadStickCurve.fromId(prefs.getString("pad_right_stick_curve", "linear").orEmpty()),
-            innerDeadzone = prefs.getFloat("pad_inner_deadzone", 0.06f).coerceIn(0.02f, 0.25f),
-            outerDeadzone = prefs.getFloat("pad_outer_deadzone", 0.96f).coerceIn(0.75f, 1.0f),
+            innerDeadzone = inDz,
+            outerDeadzone = outDz,
+            rightInnerDeadzone = prefs.getFloat("pad_right_inner_deadzone", inDz).coerceIn(0.00f, 0.30f),
+            rightOuterDeadzone = prefs.getFloat("pad_right_outer_deadzone", outDz).coerceIn(0.70f, 1.0f),
             autoSprintL3Override = prefs.getInt("pad_auto_sprint_override", -1),
             dpadSplitMode = prefs.getBoolean("pad_dpad_split_mode", false),
             abxySplitMode = prefs.getBoolean("pad_abxy_split_mode", false),
@@ -247,8 +257,10 @@ internal object PadControllerStorage {
             .putFloat("pad_right_stick_sens", s.rightStickSens.coerceIn(0.60f, 1.60f))
             .putString("pad_left_stick_curve", s.leftStickCurve.id)
             .putString("pad_right_stick_curve", s.rightStickCurve.id)
-            .putFloat("pad_inner_deadzone", s.innerDeadzone.coerceIn(0.02f, 0.25f))
-            .putFloat("pad_outer_deadzone", s.outerDeadzone.coerceIn(0.75f, 1.0f))
+            .putFloat("pad_inner_deadzone", s.innerDeadzone.coerceIn(0.00f, 0.30f))
+            .putFloat("pad_outer_deadzone", s.outerDeadzone.coerceIn(0.70f, 1.0f))
+            .putFloat("pad_right_inner_deadzone", s.rightInnerDeadzone.coerceIn(0.00f, 0.30f))
+            .putFloat("pad_right_outer_deadzone", s.rightOuterDeadzone.coerceIn(0.70f, 1.0f))
             .putInt("pad_auto_sprint_override", s.autoSprintL3Override)
             .putBoolean("pad_dpad_split_mode", s.dpadSplitMode)
             .putBoolean("pad_abxy_split_mode", s.abxySplitMode)
@@ -279,18 +291,25 @@ internal object PadControllerStorage {
                 val obj = root.optJSONObject(k) ?: continue
                 val modeId = obj.optString("pm", PadPressMode.NORMAL.id)
                 val mode = PadPressMode.entries.firstOrNull { it.id == modeId } ?: PadPressMode.NORMAL
+                val swU = obj.optInt("swU", 0)
+                val swD = obj.optInt("swD", 0)
+                val swL = obj.optInt("swL", 0)
+                val swR = obj.optInt("swR", 0)
+                val swLegacy = obj.optInt("sw", 0)
+                val hasAnySwipe = swU != 0 || swD != 0 || swL != 0 || swR != 0 || swLegacy != 0
                 out[k] = PadNodeTuning(
                     dxNorm = obj.optDouble("dx", 0.0).toFloat().coerceIn(-0.42f, 0.42f),
                     dyNorm = obj.optDouble("dy", 0.0).toFloat().coerceIn(-0.42f, 0.42f),
                     scaleMult = obj.optDouble("sc", 1.0).toFloat().coerceIn(0.55f, 1.75f),
-                    widthMult = obj.optDouble("wm", 1.0).toFloat().coerceIn(0.60f, 1.80f),
-                    heightMult = obj.optDouble("hm", 1.0).toFloat().coerceIn(0.60f, 1.80f),
+                    widthMult = obj.optDouble("wm", 1.0).toFloat().coerceIn(0.50f, 2.50f),
+                    heightMult = obj.optDouble("hm", 1.0).toFloat().coerceIn(0.50f, 2.50f),
                     opacity = obj.optDouble("op", 0.85).toFloat().coerceIn(0.05f, 1.0f),
-                    swipeBit = obj.optInt("sw", 0),
-                    swipeUpBit = obj.optInt("swU", 0),
-                    swipeDownBit = obj.optInt("swD", 0),
-                    swipeLeftBit = obj.optInt("swL", 0),
-                    swipeRightBit = obj.optInt("swR", 0),
+                    directionalSwipeEnabled = obj.optBoolean("ds", hasAnySwipe),
+                    swipeBit = swLegacy,
+                    swipeUpBit = swU,
+                    swipeDownBit = swD,
+                    swipeLeftBit = swL,
+                    swipeRightBit = swR,
                     swipeIncludeShoulder = obj.optBoolean("swInc", true),
                     comboMask = obj.optInt("cb", 0),
                     analogTriggerDrag = obj.optInt("atd", -1),
@@ -323,6 +342,7 @@ internal object PadControllerStorage {
                         put("wm", v.widthMult.toDouble())
                         put("hm", v.heightMult.toDouble())
                         put("op", v.opacity.toDouble())
+                        put("ds", v.directionalSwipeEnabled)
                         put("sw", v.swipeBit)
                         put("swU", v.swipeUpBit)
                         put("swD", v.swipeDownBit)
@@ -390,6 +410,9 @@ internal object PadControllerStorage {
     }
 }
 
+internal const val PAD_SYNTH_BIT_LT: Int = 1 shl 16
+internal const val PAD_SYNTH_BIT_RT: Int = 1 shl 17
+
 internal data class PadAssignableButtonOption(
     val bit: Int,
     val shortLabel: String
@@ -402,6 +425,8 @@ internal val AllPadAssignableButtons: List<PadAssignableButtonOption> = listOf(
     PadAssignableButtonOption(RemotePadButtons.Y, "Y"),
     PadAssignableButtonOption(RemotePadButtons.LB, "LB"),
     PadAssignableButtonOption(RemotePadButtons.RB, "RB"),
+    PadAssignableButtonOption(PAD_SYNTH_BIT_LT, "LT"),
+    PadAssignableButtonOption(PAD_SYNTH_BIT_RT, "RT"),
     PadAssignableButtonOption(RemotePadButtons.L3, "L3"),
     PadAssignableButtonOption(RemotePadButtons.R3, "R3"),
     PadAssignableButtonOption(RemotePadButtons.DPAD_UP, "▲"),
@@ -412,6 +437,27 @@ internal val AllPadAssignableButtons: List<PadAssignableButtonOption> = listOf(
     PadAssignableButtonOption(RemotePadButtons.MENU, "Menu"),
     PadAssignableButtonOption(RemotePadButtons.XBOX, "Xbox")
 )
+
+internal fun primaryBitForNodeKey(nodeKey: String): Int = when (nodeKey) {
+    "btn_a" -> RemotePadButtons.A
+    "btn_b" -> RemotePadButtons.B
+    "btn_x" -> RemotePadButtons.X
+    "btn_y" -> RemotePadButtons.Y
+    "btn_lb" -> RemotePadButtons.LB
+    "btn_rb" -> RemotePadButtons.RB
+    "btn_lt" -> PAD_SYNTH_BIT_LT
+    "btn_rt" -> PAD_SYNTH_BIT_RT
+    "btn_l3" -> RemotePadButtons.L3
+    "btn_r3" -> RemotePadButtons.R3
+    "dpad_up" -> RemotePadButtons.DPAD_UP
+    "dpad_down" -> RemotePadButtons.DPAD_DOWN
+    "dpad_left" -> RemotePadButtons.DPAD_LEFT
+    "dpad_right" -> RemotePadButtons.DPAD_RIGHT
+    "btn_view" -> RemotePadButtons.VIEW
+    "btn_menu" -> RemotePadButtons.MENU
+    "btn_xbox" -> RemotePadButtons.XBOX
+    else -> 0
+}
 
 internal fun formatMaskBadge(mask: Int): String {
     if (mask == 0) return ""

@@ -6,25 +6,28 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -35,14 +38,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,21 +52,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.data.SettingsRepository
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -78,8 +69,6 @@ import com.example.ui.theme.SpaceGroteskFontFamily
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
-import com.example.ui.theme.XboxDark
-import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
@@ -94,9 +83,7 @@ fun WebDownloadPortalDialog(
     val isEn = config.isEnglishUI()
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var apkUrlInput by remember(config.customApkDownloadUrl) { mutableStateOf(config.customApkDownloadUrl) }
-    var webUrlInput by remember(config.publicWebPortalUrl) { mutableStateOf(config.publicWebPortalUrl) }
-    var repoSlugInput by remember(config.githubRepoSlug) { mutableStateOf(config.githubRepoSlug) }
+    var qrUseDirectApk by rememberSaveable { mutableStateOf(false) }
 
     fun copyToClipboard(label: String, text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -122,531 +109,560 @@ fun WebDownloadPortalDialog(
         context.startActivity(Intent.createChooser(intent, if (isEn) "Share Ravno APK" else "Chia sẻ link tải Ravno"))
     }
 
-    val shareBtnFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-    val closeBtnFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    val openApkLink: () -> Unit = {
+        try {
+            val browserIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(config.customApkDownloadUrl)
+            )
+            context.startActivity(browserIntent)
+        } catch (_: Exception) {
+            Toast.makeText(
+                context,
+                config.tr("Link không hợp lệ", "Invalid URL"),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
-    Dialog(
+    val shareBtnFocusRequester = remember { FocusRequester() }
+    val closeBtnFocusRequester = remember { FocusRequester() }
+
+    val activeQrUrl = if (qrUseDirectApk) {
+        config.customApkDownloadUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
+    } else {
+        config.publicWebPortalUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
+    }
+
+    val portalSyncJs = remember(config.customApkDownloadUrl, config.githubRepoSlug, isEn) {
+        val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")
+        val escapedRepo = config.githubRepoSlug.replace("'", "\\'")
+        val targetLang = if (isEn) "en" else "vi"
+        """
+        (function() {
+            try {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('cp_lang', '$targetLang');
+                if (window.setPortalLang) window.setPortalLang('$targetLang');
+                if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');
+            } catch (e) {}
+        })();
+        """.trimIndent()
+    }
+
+    AdaptivePopupFrame(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        dialogTestTag = "web_download_portal_dialog",
+        defaultFocusRequester = if (selectedTab == 0) shareBtnFocusRequester else closeBtnFocusRequester,
+        wideWidthFraction = 0.95f,
+        portraitWidthFraction = 0.95f,
+        onPreviousTab = { selectedTab = (selectedTab - 1 + 2) % 2 },
+        onNextTab = { selectedTab = (selectedTab + 1) % 2 },
+        onBackPress = onDismiss
     ) {
-        GamepadSurfaceController(
-            enabled = true,
-            defaultFocusRequester = if (selectedTab == 0) shareBtnFocusRequester else closeBtnFocusRequester,
-            autoRequestDefaultFocus = true,
-            attachWindowMotionListener = true,
-            onPreviousTab = { selectedTab = (selectedTab - 1 + 2) % 2 },
-            onNextTab = { selectedTab = (selectedTab + 1) % 2 },
-            onBackPress = onDismiss
-        ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.88f)
-                .clip(RoundedCornerShape(22.dp))
-                .testTag("web_download_portal_dialog"),
-            color = XboxSurfaceVariant
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Header
-                Surface(
-                    color = XboxSurfaceVariant
+        @Composable
+        fun HeaderSection() {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(gapMed),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .size(iconBoxSize)
+                            .clip(RoundedCornerShape(btnCorner))
+                            .background(XboxNeonGreen.copy(alpha = 0.16f))
+                            .border(borderThin, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(btnCorner)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Public,
+                            contentDescription = null,
+                            tint = XboxNeonGreen,
+                            modifier = Modifier.size(iconSize)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = config.tr("Chia sẻ ứng dụng Ravno", "Share Ravno App"),
+                            color = TextPrimary,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = rSp(15f),
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = config.tr("Quét mã QR hoặc gửi link tải cho bạn bè", "Scan QR code or send download link"),
+                            color = DirectCyan,
+                            fontSize = rSp(10.5f),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = XboxSurface,
+                    border = BorderStroke(borderThin, XboxCardBorder),
+                    modifier = Modifier
+                        .size(rDp(30f))
+                        .clip(CircleShape)
+                        .gamepadClickable(
+                            cornerRadius = rDp(15f),
+                            focusRequester = closeBtnFocusRequester,
+                            onClick = onDismiss
+                        )
+                        .testTag("close_web_portal_button")
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = config.tr("Đóng", "Close"),
+                            tint = TextSecondary,
+                            modifier = Modifier.size(rDp(16f))
+                        )
+                    }
+                }
+            }
+        }
+
+        @Composable
+        fun TabsRow() {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gapSmall)
+            ) {
+                val tabs = listOf(
+                    Triple(0, config.tr("Mã QR & Link tải", "QR Code & Link"), Icons.Default.QrCode2),
+                    Triple(1, config.tr("Trang giới thiệu", "Web Page"), Icons.Default.Language)
+                )
+                tabs.forEach { (index, label, icon) ->
+                    val active = selectedTab == index
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(btnCorner))
+                            .border(
+                                borderThin,
+                                if (active) XboxNeonGreen else XboxCardBorder,
+                                RoundedCornerShape(btnCorner)
+                            )
+                            .gamepadClickable(
+                                cornerRadius = btnCorner,
+                                onStepHorizontal = { dir ->
+                                    selectedTab = (selectedTab + dir).coerceIn(0, 1)
+                                }
+                            ) { selectedTab = index }
+                            .testTag("web_portal_tab_$index"),
+                        color = if (active) Color(0xFF13261B) else XboxSurface
                     ) {
                         Row(
+                            modifier = Modifier.padding(vertical = gapMed, horizontal = gapSmall),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(XboxNeonGreen.copy(alpha = 0.16f))
-                                    .border(1.dp, XboxNeonGreen.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Public,
-                                    contentDescription = null,
-                                    tint = XboxNeonGreen,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = config.tr("Chia sẻ ứng dụng Ravno", "Share Ravno App"),
-                                    color = TextPrimary,
-                                    fontFamily = SpaceGroteskFontFamily,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = config.tr("Quét mã QR hoặc gửi link tải cho bạn bè", "Scan QR code or send download link"),
-                                    color = DirectCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .gamepadActionButton(
-                                    cornerRadius = 18.dp,
-                                    focusRequester = closeBtnFocusRequester,
-                                    onClick = onDismiss
-                                )
-                                .testTag("close_web_portal_button")
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = config.tr("Đóng", "Close"),
-                                tint = TextSecondary
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = if (active) XboxNeonGreen else TextSecondary,
+                                modifier = Modifier.size(rDp(15f))
                             )
-                        }
-                    }
-                }
-
-                // 2 User-facing Tabs (Share & QR | Web Preview)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val tabs = listOf(
-                        Triple(0, config.tr("Mã QR & Link tải", "QR Code & Link"), Icons.Default.QrCode2),
-                        Triple(1, config.tr("Trang giới thiệu", "Web Page"), Icons.Default.Language)
-                    )
-                    tabs.forEach { (index, label, icon) ->
-                        val active = selectedTab == index
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(11.dp))
-                                .border(
-                                    1.dp,
-                                    if (active) XboxNeonGreen else XboxCardBorder,
-                                    RoundedCornerShape(11.dp)
-                                )
-                                .gamepadClickable(
-                                    cornerRadius = 11.dp,
-                                    onStepHorizontal = { dir ->
-                                        selectedTab = (selectedTab + dir).coerceIn(0, 1)
-                                    }
-                                ) { selectedTab = index }
-                                .testTag("web_portal_tab_$index"),
-                            color = if (active) Color(0xFF13261B) else XboxSurface
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(vertical = 9.dp, horizontal = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = if (active) XboxNeonGreen else TextSecondary,
-                                    modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.size(5.dp))
-                                Text(
-                                    text = label,
-                                    color = if (active) XboxNeonGreen else TextPrimary,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Body content
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 14.dp, vertical = 4.dp)
-                ) {
-                    when (selectedTab) {
-                        0 -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState()),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                // QR Code + Direct Link Card
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, XboxCardBorder)
-                                ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        var qrUseDirectApk by rememberSaveable { mutableStateOf(false) }
-                                        val activeQrUrl = if (qrUseDirectApk) {
-                                            config.customApkDownloadUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
-                                        } else {
-                                            config.publicWebPortalUrl.ifBlank { "https://muitenvn.github.io/Ravno-App/" }
-                                        }
-
-                                        Text(
-                                            text = config.tr("QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG", "SCAN QR TO DOWNLOAD"),
-                                            color = XboxNeonGreen,
-                                            fontFamily = SpaceGroteskFontFamily,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-
-                                        // Toggle QR mode: Web Portal (faster scan, fewer modules) vs Direct APK file
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            listOf(
-                                                false to config.tr("🌐 Trang Web tải", "🌐 Web Download"),
-                                                true to config.tr("📥 Link file APK", "📥 Direct APK")
-                                            ).forEach { (isDirectMode, modeLabel) ->
-                                                val selected = qrUseDirectApk == isDirectMode
-                                                Surface(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(999.dp))
-                                                        .gamepadClickable(
-                                                            cornerRadius = 999.dp,
-                                                            onStepHorizontal = { dir -> qrUseDirectApk = dir > 0 }
-                                                        ) { qrUseDirectApk = isDirectMode },
-                                                    shape = RoundedCornerShape(999.dp),
-                                                    color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant,
-                                                    border = androidx.compose.foundation.BorderStroke(
-                                                        1.dp,
-                                                        if (selected) XboxNeonGreen else XboxCardBorder
-                                                    )
-                                                ) {
-                                                    Text(
-                                                        text = modeLabel,
-                                                        color = if (selected) XboxNeonGreen else TextSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .size(212.dp)
-                                                .clip(RoundedCornerShape(16.dp))
-                                                .background(Color.White)
-                                                .border(2.dp, XboxNeonGreen.copy(alpha = 0.65f), RoundedCornerShape(16.dp))
-                                                .padding(10.dp)
-                                                .testTag("qr_code_matrix_box"),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            DeterministicQrMatrixCanvas(
-                                                seedText = activeQrUrl,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
-
-                                        Text(
-                                            text = if (qrUseDirectApk) {
-                                                config.tr(
-                                                    "✓ Mã QR đang trỏ tới: 📥 Link tải trực tiếp file APK",
-                                                    "✓ QR encodes: 📥 Direct APK File Link"
-                                                )
-                                            } else {
-                                                config.tr(
-                                                    "✓ Mã QR đang trỏ tới: 🌐 Trang web giới thiệu & tải ứng dụng",
-                                                    "✓ QR encodes: 🌐 Download Web Page"
-                                                )
-                                            },
-                                            color = if (qrUseDirectApk) XboxNeonGreen else DirectCyan,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = TextAlign.Center
-                                        )
-
-                                        Text(
-                                            text = config.tr(
-                                                "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải.",
-                                                "Open Camera or a QR scanner app on another phone to open the download link."
-                                            ),
-                                            color = TextSecondary,
-                                            fontSize = 11.5.sp,
-                                            textAlign = TextAlign.Center
-                                        )
-
-                                        // Web URL Box
-                                        Surface(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .gamepadClickable(cornerRadius = 10.dp) { qrUseDirectApk = false },
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = if (!qrUseDirectApk) DirectCyan.copy(alpha = 0.14f) else XboxSurfaceVariant,
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                if (!qrUseDirectApk) 1.4.dp else 0.8.dp,
-                                                if (!qrUseDirectApk) DirectCyan else DirectCyan.copy(alpha = 0.35f)
-                                            )
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = (if (!qrUseDirectApk) "✓ " else "") +
-                                                            config.tr("🌐 Trang web giới thiệu & tải ứng dụng", "🌐 Download Web Page"),
-                                                        color = DirectCyan,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                    Text(
-                                                        text = config.publicWebPortalUrl,
-                                                        color = TextPrimary,
-                                                        fontFamily = JetBrainsMonoFontFamily,
-                                                        fontSize = 11.sp,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                                IconButton(
-                                                    onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) },
-                                                    modifier = Modifier.gamepadActionButton(
-                                                        cornerRadius = 18.dp,
-                                                        onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) }
-                                                    )
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.ContentCopy,
-                                                        contentDescription = "Copy Web Link",
-                                                        tint = DirectCyan,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Direct APK Download URL Box
-                                        Surface(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .gamepadClickable(cornerRadius = 10.dp) { qrUseDirectApk = true },
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = if (qrUseDirectApk) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurfaceVariant,
-                                            border = androidx.compose.foundation.BorderStroke(
-                                                if (qrUseDirectApk) 1.4.dp else 0.8.dp,
-                                                if (qrUseDirectApk) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.35f)
-                                            )
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = (if (qrUseDirectApk) "✓ " else "") +
-                                                            config.tr("📥 Link tải trực tiếp file APK", "📥 Direct APK File Link"),
-                                                        color = XboxNeonGreen,
-                                                        fontSize = 10.sp,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                    Text(
-                                                        text = config.customApkDownloadUrl,
-                                                        color = TextPrimary,
-                                                        fontFamily = JetBrainsMonoFontFamily,
-                                                        fontSize = 11.sp,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                                IconButton(
-                                                    onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) },
-                                                    modifier = Modifier.gamepadActionButton(
-                                                        cornerRadius = 18.dp,
-                                                        onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) }
-                                                    )
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.ContentCopy,
-                                                        contentDescription = "Copy APK Link",
-                                                        tint = XboxNeonGreen,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Button(
-                                                onClick = { sharePortalLink() },
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .gamepadActionButton(
-                                                        cornerRadius = 12.dp,
-                                                        focusRequester = shareBtnFocusRequester,
-                                                        onClick = { sharePortalLink() }
-                                                    )
-                                                    .testTag("share_apk_portal_btn"),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = XboxNeonGreen,
-                                                    contentColor = Color(0xFF03140B)
-                                                ),
-                                                shape = RoundedCornerShape(12.dp)
-                                            ) {
-                                                Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF03140B), modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.size(6.dp))
-                                                Text(
-                                                    text = config.tr("Chia sẻ đường dẫn", "Share Link"),
-                                                    color = Color(0xFF03140B),
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-
-                                            val openApkLink: () -> Unit = {
-                                                try {
-                                                    val browserIntent = Intent(
-                                                        Intent.ACTION_VIEW,
-                                                        Uri.parse(config.customApkDownloadUrl)
-                                                    )
-                                                    context.startActivity(browserIntent)
-                                                } catch (_: Exception) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        config.tr("Link không hợp lệ", "Invalid URL"),
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
-                                            }
-                                            OutlinedButton(
-                                                onClick = openApkLink,
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .gamepadActionButton(
-                                                        cornerRadius = 10.dp,
-                                                        onClick = openApkLink
-                                                    ),
-                                                shape = RoundedCornerShape(10.dp)
-                                            ) {
-                                                Icon(Icons.Default.Download, contentDescription = null, tint = DirectCyan, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.size(6.dp))
-                                                Text(
-                                                    text = config.tr("Tải file APK", "Download APK"),
-                                                    color = DirectCyan,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        else -> {
-                            // Live Preview of the bundled Web Landing Page (assets/web/index.html)
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp)),
-                                    color = XboxSurface
-                                ) {
-                                    val portalSyncJs = remember(config.customApkDownloadUrl, config.githubRepoSlug, isEn) {
-                                        val escapedApk = config.customApkDownloadUrl.replace("'", "\\'")
-                                        val escapedRepo = config.githubRepoSlug.replace("'", "\\'")
-                                        val targetLang = if (isEn) "en" else "vi"
-                                        """
-                                        (function() {
-                                            try {
-                                                document.documentElement.setAttribute('data-theme', 'dark');
-                                                localStorage.setItem('cp_lang', '$targetLang');
-                                                if (window.setPortalLang) window.setPortalLang('$targetLang');
-                                                if (window.__updatePortalConfig) window.__updatePortalConfig('$escapedApk', '$escapedRepo');
-                                            } catch (e) {}
-                                        })();
-                                        """.trimIndent()
-                                    }
-                                    AndroidView(
-                                        modifier = Modifier.fillMaxSize(),
-                                        factory = { ctx ->
-                                            WebView(ctx).apply {
-                                                setBackgroundColor(android.graphics.Color.parseColor("#0B1412"))
-                                                settings.javaScriptEnabled = true
-                                                settings.domStorageEnabled = true
-                                                webViewClient = object : WebViewClient() {
-                                                    private fun handleExternalUri(uri: Uri?): Boolean {
-                                                        val scheme = uri?.scheme?.lowercase() ?: return false
-                                                        if (scheme == "http" || scheme == "https") {
-                                                            try {
-                                                                ctx.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
-                                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                                })
-                                                            } catch (_: Exception) {}
-                                                            return true
-                                                        }
-                                                        return false
-                                                    }
-
-                                                    override fun shouldOverrideUrlLoading(
-                                                        view: WebView?,
-                                                        request: android.webkit.WebResourceRequest?
-                                                    ): Boolean = handleExternalUri(request?.url)
-
-                                                    @Deprecated("Deprecated in Java")
-                                                    override fun shouldOverrideUrlLoading(
-                                                        view: WebView?,
-                                                        url: String?
-                                                    ): Boolean = handleExternalUri(url?.let { Uri.parse(it) })
-
-                                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                                        super.onPageFinished(view, url)
-                                                        view?.evaluateJavascript(portalSyncJs, null)
-                                                    }
-                                                }
-                                                loadUrl("file:///android_asset/web/index.html")
-                                            }
-                                        },
-                                        update = { webView ->
-                                            webView.evaluateJavascript(portalSyncJs, null)
-                                        }
-                                    )
-                                }
-                            }
+                            Spacer(modifier = Modifier.width(rDp(4f)))
+                            Text(
+                                text = label,
+                                color = if (active) XboxNeonGreen else TextPrimary,
+                                fontSize = rSp(11.5f),
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
             }
         }
+
+        @Composable
+        fun QrMatrixPreviewCard(qrSize: androidx.compose.ui.unit.Dp) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(sectionCorner),
+                color = XboxSurface,
+                border = BorderStroke(borderThin, XboxCardBorder)
+            ) {
+                Column(
+                    modifier = Modifier.padding(padInner),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(gapSmall)
+                ) {
+                    Text(
+                        text = config.tr("QUÉT MÃ QR ĐỂ TẢI ỨNG DỤNG", "SCAN QR TO DOWNLOAD"),
+                        color = XboxNeonGreen,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontSize = rSp(11.5f),
+                        fontWeight = FontWeight.ExtraBold
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(gapSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(
+                            false to config.tr("🌐 Trang Web tải", "🌐 Web Download"),
+                            true to config.tr("📥 Link file APK", "📥 Direct APK")
+                        ).forEach { (isDirectMode, modeLabel) ->
+                            val selected = qrUseDirectApk == isDirectMode
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(cardCorner))
+                                    .gamepadClickable(
+                                        cornerRadius = cardCorner,
+                                        onStepHorizontal = { dir -> qrUseDirectApk = dir > 0 }
+                                    ) { qrUseDirectApk = isDirectMode },
+                                shape = RoundedCornerShape(cardCorner),
+                                color = if (selected) XboxNeonGreen.copy(alpha = 0.18f) else XboxSurfaceVariant,
+                                border = BorderStroke(
+                                    borderThin,
+                                    if (selected) XboxNeonGreen else XboxCardBorder
+                                )
+                            ) {
+                                Text(
+                                    text = modeLabel,
+                                    color = if (selected) XboxNeonGreen else TextSecondary,
+                                    fontSize = rSp(10.5f),
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = padInner, vertical = rDp(4.5f))
+                                )
+                            }
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(qrSize)
+                            .clip(RoundedCornerShape(sectionCorner))
+                            .background(Color.White)
+                            .border(borderFocus, XboxNeonGreen.copy(alpha = 0.65f), RoundedCornerShape(sectionCorner))
+                            .padding(rDp(8f))
+                            .testTag("qr_code_matrix_box"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DeterministicQrMatrixCanvas(
+                            seedText = activeQrUrl,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Text(
+                        text = if (qrUseDirectApk) {
+                            config.tr(
+                                "✓ Mã QR đang trỏ tới: 📥 Link tải trực tiếp file APK",
+                                "✓ QR encodes: 📥 Direct APK File Link"
+                            )
+                        } else {
+                            config.tr(
+                                "✓ Mã QR đang trỏ tới: 🌐 Trang web giới thiệu & tải ứng dụng",
+                                "✓ QR encodes: 🌐 Download Web Page"
+                            )
+                        },
+                        color = if (qrUseDirectApk) XboxNeonGreen else DirectCyan,
+                        fontSize = rSp(10.5f),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        @Composable
+        fun LinksAndShareSection() {
+            Column(verticalArrangement = Arrangement.spacedBy(gapSmall)) {
+                Text(
+                    text = config.tr(
+                        "Dùng Camera hoặc ứng dụng quét mã trên điện thoại khác để mở trang tải.",
+                        "Open Camera or a QR scanner app on another phone to open the download link."
+                    ),
+                    color = TextSecondary,
+                    fontSize = rSp(10.5f)
+                )
+
+                // Web URL Box
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(btnCorner))
+                        .gamepadClickable(cornerRadius = btnCorner) { qrUseDirectApk = false },
+                    shape = RoundedCornerShape(btnCorner),
+                    color = if (!qrUseDirectApk) DirectCyan.copy(alpha = 0.14f) else XboxSurface,
+                    border = BorderStroke(
+                        if (!qrUseDirectApk) borderFocus else borderThin,
+                        if (!qrUseDirectApk) DirectCyan else DirectCyan.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = padInner, vertical = gapSmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = (if (!qrUseDirectApk) "✓ " else "") +
+                                    config.tr("🌐 Trang web giới thiệu & tải ứng dụng", "🌐 Download Web Page"),
+                                color = DirectCyan,
+                                fontSize = rSp(10f),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = config.publicWebPortalUrl,
+                                color = TextPrimary,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = rSp(10.5f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        AdaptiveFlatActionButton(
+                            onClick = { copyToClipboard("Web URL", config.publicWebPortalUrl) },
+                            isPrimary = false,
+                            containerColor = XboxSurfaceVariant,
+                            contentColor = DirectCyan,
+                            borderColor = DirectCyan.copy(alpha = 0.5f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy Web Link",
+                                tint = DirectCyan,
+                                modifier = Modifier.size(rDp(14f))
+                            )
+                        }
+                    }
+                }
+
+                // Direct APK Download URL Box
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(btnCorner))
+                        .gamepadClickable(cornerRadius = btnCorner) { qrUseDirectApk = true },
+                    shape = RoundedCornerShape(btnCorner),
+                    color = if (qrUseDirectApk) XboxNeonGreen.copy(alpha = 0.14f) else XboxSurface,
+                    border = BorderStroke(
+                        if (qrUseDirectApk) borderFocus else borderThin,
+                        if (qrUseDirectApk) XboxNeonGreen else XboxNeonGreen.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = padInner, vertical = gapSmall),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = (if (qrUseDirectApk) "✓ " else "") +
+                                    config.tr("📥 Link tải trực tiếp file APK", "📥 Direct APK File Link"),
+                                color = XboxNeonGreen,
+                                fontSize = rSp(10f),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = config.customApkDownloadUrl,
+                                color = TextPrimary,
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontSize = rSp(10.5f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        AdaptiveFlatActionButton(
+                            onClick = { copyToClipboard("APK Link", config.customApkDownloadUrl) },
+                            isPrimary = false,
+                            containerColor = XboxSurfaceVariant,
+                            contentColor = XboxNeonGreen,
+                            borderColor = XboxNeonGreen.copy(alpha = 0.5f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy APK Link",
+                                tint = XboxNeonGreen,
+                                modifier = Modifier.size(rDp(14f))
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(gapSmall)
+                ) {
+                    AdaptiveFlatActionButton(
+                        onClick = { sharePortalLink() },
+                        isPrimary = true,
+                        focusRequester = shareBtnFocusRequester,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("share_apk_portal_btn")
+                    ) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            tint = Color(0xFF04150B),
+                            modifier = Modifier.size(rDp(15f))
+                        )
+                        Spacer(modifier = Modifier.width(rDp(4f)))
+                        Text(
+                            text = config.tr("Chia sẻ đường dẫn", "Share Link"),
+                            color = Color(0xFF04150B),
+                            fontSize = rSp(11.5f),
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    AdaptiveFlatActionButton(
+                        onClick = openApkLink,
+                        isPrimary = false,
+                        containerColor = XboxSurface,
+                        contentColor = DirectCyan,
+                        borderColor = DirectCyan.copy(alpha = 0.65f),
+                        focusedBorderColor = DirectCyan,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            tint = DirectCyan,
+                            modifier = Modifier.size(rDp(15f))
+                        )
+                        Spacer(modifier = Modifier.width(rDp(4f)))
+                        Text(
+                            text = config.tr("Tải file APK", "Download APK"),
+                            color = DirectCyan,
+                            fontSize = rSp(11.5f),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        @Composable
+        fun WebPreviewBox(previewHeight: androidx.compose.ui.unit.Dp) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(previewHeight)
+                    .clip(RoundedCornerShape(sectionCorner))
+                    .border(borderThin, XboxCardBorder, RoundedCornerShape(sectionCorner)),
+                color = XboxSurface
+            ) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            setBackgroundColor(android.graphics.Color.parseColor("#0B1412"))
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            webViewClient = object : WebViewClient() {
+                                private fun handleExternalUri(uri: Uri?): Boolean {
+                                    val scheme = uri?.scheme?.lowercase() ?: return false
+                                    if (scheme == "http" || scheme == "https") {
+                                        try {
+                                            ctx.startActivity(Intent(Intent.ACTION_VIEW, uri).apply {
+                                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            })
+                                        } catch (_: Exception) {}
+                                        return true
+                                    }
+                                    return false
+                                }
+
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView?,
+                                    request: WebResourceRequest?
+                                ): Boolean = handleExternalUri(request?.url)
+
+                                @Deprecated("Deprecated in Java")
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView?,
+                                    url: String?
+                                ): Boolean = handleExternalUri(url?.let { Uri.parse(it) })
+
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    view?.evaluateJavascript(portalSyncJs, null)
+                                }
+                            }
+                            loadUrl("file:///android_asset/web/index.html")
+                        }
+                    },
+                    update = { webView ->
+                        webView.evaluateJavascript(portalSyncJs, null)
+                    }
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(gapMed)
+        ) {
+            HeaderSection()
+            TabsRow()
+
+            if (selectedTab == 0) {
+                val leftScroll = rememberScrollState()
+                val rightScroll = rememberScrollState()
+                val portraitScroll = rememberScrollState()
+
+                AdaptiveTwoColumnLayout(
+                    leftWeight = 0.90f,
+                    rightWeight = 1.10f,
+                    leftColumn = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = winH * 0.66f)
+                                .verticalScroll(leftScroll)
+                        ) {
+                            QrMatrixPreviewCard(qrSize = (winH * 0.36f).coerceIn(rDp(130f), rDp(190f)))
+                        }
+                    },
+                    rightColumn = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = winH * 0.66f)
+                                .verticalScroll(rightScroll)
+                        ) {
+                            LinksAndShareSection()
+                        }
+                    },
+                    portraitColumn = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = winH * 0.68f)
+                                .verticalScroll(portraitScroll),
+                            verticalArrangement = Arrangement.spacedBy(gapMed)
+                        ) {
+                            QrMatrixPreviewCard(qrSize = rDp(185f))
+                            LinksAndShareSection()
+                        }
+                    }
+                )
+            } else {
+                WebPreviewBox(previewHeight = winH * (if (useTwoColumnLayout) 0.66f else 0.68f))
+            }
         }
     }
 }
@@ -661,7 +677,6 @@ private fun DeterministicQrMatrixCanvas(
     }
     Canvas(modifier = modifier) {
         val matrixSize = qrMatrix.size
-        // Chuẩn ISO/IEC 18004: lề trắng tĩnh (Quiet Zone) xung quanh ma trận 29x29 giúp mọi camera bắt nét tức thì
         val quietZoneModules = 3
         val totalModules = matrixSize + quietZoneModules * 2
         val boardSide = minOf(size.width, size.height)

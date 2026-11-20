@@ -1155,189 +1155,29 @@ internal fun SettingsAdvancedGamepadControlsCard(
 
     if (activeRemapSourceBtn != null) {
         val srcIdx = activeRemapSourceBtn ?: 0
-        val srcName = SettingsRepository.getGamepadButtonLabel(srcIdx, isEn)
-        val currentMap = SettingsRepository.parsePhysicalButtonMap(config.physicalGamepadButtonMap)
-        val currentDest = currentMap[srcIdx] ?: srcIdx
-        val closeRemapFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        AlertDialog(
-            onDismissRequest = { activeRemapSourceBtn = null },
-            modifier = Modifier.gamepadControllerScope(
-                enabled = true,
-                defaultFocusRequester = closeRemapFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { activeRemapSourceBtn = null }
-            ),
-            containerColor = XboxSurfaceVariant,
-            shape = RoundedCornerShape(22.dp),
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
-            title = {
-                Text(
-                    text = if (isEn) "Remap Physical Button: $srcName" else "Đổi nút tay cầm thật: $srcName",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 15.sp
-                )
+        com.example.ui.components.AdaptiveGamepadRemapDialog(
+            srcIdx = srcIdx,
+            isEn = isEn,
+            physicalGamepadButtonMap = config.physicalGamepadButtonMap,
+            onSelectDestButton = { dstIdx ->
+                SettingsRepository.updatePhysicalGamepadSingleButtonMap(srcIdx, dstIdx)
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = if (isEn) {
-                            "Select which Xbox button signal is sent when you press $srcName on your physical controller:"
-                        } else {
-                            "Chọn tín hiệu nút Xbox sẽ gửi vào game khi bạn bấm nút $srcName trên tay cầm thật:"
-                        },
-                        fontSize = 12.sp
-                    )
-                    SettingsRepository.STANDARD_GAMEPAD_BUTTONS.chunked(3).forEach { rowBtns ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            rowBtns.forEach { (dstIdx, dstShort, _) ->
-                                val selected = dstIdx == currentDest
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .gamepadClickable(cornerRadius = 8.dp) {
-                                            SettingsRepository.updatePhysicalGamepadSingleButtonMap(srcIdx, dstIdx)
-                                            activeRemapSourceBtn = null
-                                        }
-                                        .semantics {
-                                            contentDescription = if (isEn) "Map $srcName to $dstShort" else "Gán $srcName thành $dstShort"
-                                        },
-                                    color = if (selected) Color(0xFF16352A) else XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (selected) XboxNeonGreen else XboxCardBorder
-                                    )
-                                ) {
-                                    Text(
-                                        text = dstShort,
-                                        color = if (selected) XboxNeonGreen else TextPrimary,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 7.dp)
-                                    )
-                                }
-                            }
-                            repeat(3 - rowBtns.size) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { activeRemapSourceBtn = null },
-                    modifier = Modifier
-                        .focusRequester(closeRemapFocusRequester)
-                        .gamepadActionButton(cornerRadius = 8.dp) { activeRemapSourceBtn = null }
-                        .semantics {
-                            contentDescription = if (isEn) "Close button remap dialog" else "Đóng hộp thoại đổi nút"
-                        }
-                ) {
-                    Text(text = if (isEn) "Close" else "Đóng", color = TextSecondary)
-                }
-            }
+            onDismiss = { activeRemapSourceBtn = null }
         )
     }
 
     if (activeShortcutTargetAction != null) {
         val actionKey = activeShortcutTargetAction ?: ""
-        val selectableButtons = remember {
-            SettingsRepository.STANDARD_GAMEPAD_BUTTONS.filter { it.first != 8 && it.first != 16 }
-        }
-        val closeShortcutFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        AlertDialog(
-            onDismissRequest = { activeShortcutTargetAction = null },
-            modifier = Modifier.gamepadControllerScope(
-                enabled = true,
-                defaultFocusRequester = closeShortcutFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { activeShortcutTargetAction = null }
-            ),
-            containerColor = XboxSurfaceVariant,
-            shape = RoundedCornerShape(22.dp),
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
-            title = {
-                Text(
-                    text = if (isEn) "Select Trigger Button (View + Button)" else "Chọn nút kích hoạt (Giữ View + nút)",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 15.sp
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = if (isEn) {
-                            "Choose the secondary button to press while holding View (Back) for 400ms:"
-                        } else {
-                            "Chọn nút thứ hai để bấm khi đang giữ nút View (Back) từ 400ms trở lên:"
-                        },
-                        fontSize = 12.sp
-                    )
-                    selectableButtons.chunked(3).forEach { rowBtns ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            rowBtns.forEach { (btnIdx, btnShort, _) ->
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .gamepadClickable(cornerRadius = 8.dp) {
-                                            when (actionKey) {
-                                                "toggle_stats" -> SettingsRepository.updateShortcutToggleStatsButton(btnIdx)
-                                                "toggle_virtual_pad" -> SettingsRepository.updateShortcutToggleVirtualPadButton(btnIdx)
-                                                "toggle_recording" -> SettingsRepository.updateShortcutToggleRecordingButton(btnIdx)
-                                            }
-                                            activeShortcutTargetAction = null
-                                        }
-                                        .semantics {
-                                            contentDescription = if (isEn) "Set shortcut to View plus $btnShort" else "Đặt phím tắt là View cộng $btnShort"
-                                        },
-                                    color = XboxSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, DirectCyan)
-                                ) {
-                                    Text(
-                                        text = "View + $btnShort",
-                                        color = DirectCyan,
-                                        fontSize = 10.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 7.dp)
-                                    )
-                                }
-                            }
-                            repeat(3 - rowBtns.size) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
+        com.example.ui.components.AdaptiveGamepadShortcutDialog(
+            isEn = isEn,
+            onSelectButton = { btnIdx ->
+                when (actionKey) {
+                    "toggle_stats" -> SettingsRepository.updateShortcutToggleStatsButton(btnIdx)
+                    "toggle_virtual_pad" -> SettingsRepository.updateShortcutToggleVirtualPadButton(btnIdx)
+                    "toggle_recording" -> SettingsRepository.updateShortcutToggleRecordingButton(btnIdx)
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = { activeShortcutTargetAction = null },
-                    modifier = Modifier
-                        .focusRequester(closeShortcutFocusRequester)
-                        .gamepadActionButton(cornerRadius = 8.dp) { activeShortcutTargetAction = null }
-                        .semantics {
-                            contentDescription = if (isEn) "Close shortcut button dialog" else "Đóng hộp thoại chọn phím tắt"
-                        }
-                ) {
-                    Text(text = if (isEn) "Close" else "Đóng", color = TextSecondary)
-                }
-            }
+            onDismiss = { activeShortcutTargetAction = null }
         )
     }
 }

@@ -1483,168 +1483,29 @@ internal fun TvSettingsScreen(
 
     if (activeRemapSourceBtn != null) {
         val srcIdx = activeRemapSourceBtn ?: 0
-        val srcName = SettingsRepository.getGamepadButtonLabel(srcIdx, isEn)
-        val currentMap = SettingsRepository.parsePhysicalButtonMap(config.physicalGamepadButtonMap)
-        val currentDest = currentMap[srcIdx] ?: srcIdx
-        val closeRemapFocusRequester = remember { FocusRequester() }
-        AlertDialog(
-            onDismissRequest = { activeRemapSourceBtn = null },
-            modifier = Modifier.gamepadControllerScope(
-                enabled = true,
-                defaultFocusRequester = closeRemapFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { activeRemapSourceBtn = null }
-            ),
-            containerColor = TvSurface2,
-            shape = RoundedCornerShape(22.dp),
-            titleContentColor = TvInk,
-            textContentColor = TvMuted,
-            title = {
-                Text(
-                    text = config.tr("Đổi nút tay cầm thật: $srcName", "Remap Physical Button: $srcName"),
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp
-                )
+        com.example.ui.components.AdaptiveGamepadRemapDialog(
+            srcIdx = srcIdx,
+            isEn = isEn,
+            physicalGamepadButtonMap = config.physicalGamepadButtonMap,
+            onSelectDestButton = { dstIdx ->
+                SettingsRepository.updatePhysicalGamepadSingleButtonMap(srcIdx, dstIdx)
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = config.tr(
-                            "Chọn tín hiệu nút Xbox sẽ gửi vào game khi bạn bấm nút $srcName:",
-                            "Select which Xbox button signal is sent when pressing $srcName:"
-                        ),
-                        fontSize = 14.sp
-                    )
-                    SettingsRepository.STANDARD_GAMEPAD_BUTTONS.chunked(3).forEach { rowBtns ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowBtns.forEach { (dstIdx, dstShort, _) ->
-                                val selected = dstIdx == currentDest
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .gamepadClickable(cornerRadius = 10.dp) {
-                                            SettingsRepository.updatePhysicalGamepadSingleButtonMap(srcIdx, dstIdx)
-                                            activeRemapSourceBtn = null
-                                        },
-                                    color = if (selected) TvSel else TvSurface,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (selected) TvAccent else TvLine
-                                    )
-                                ) {
-                                    Text(
-                                        text = dstShort,
-                                        color = if (selected) TvAccent else TvInk,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 9.dp)
-                                    )
-                                }
-                            }
-                            repeat(3 - rowBtns.size) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { activeRemapSourceBtn = null },
-                    modifier = Modifier
-                        .focusRequester(closeRemapFocusRequester)
-                        .gamepadActionButton(cornerRadius = 10.dp) { activeRemapSourceBtn = null }
-                ) {
-                    Text(text = config.tr("Đóng", "Close"), color = TvAccent, fontWeight = FontWeight.Bold)
-                }
-            }
+            onDismiss = { activeRemapSourceBtn = null }
         )
     }
 
     if (activeShortcutTargetAction != null) {
         val actionKey = activeShortcutTargetAction ?: ""
-        val selectableButtons = remember {
-            SettingsRepository.STANDARD_GAMEPAD_BUTTONS.filter { it.first != 8 && it.first != 16 }
-        }
-        val closeShortcutFocusRequester = remember { FocusRequester() }
-        AlertDialog(
-            onDismissRequest = { activeShortcutTargetAction = null },
-            modifier = Modifier.gamepadControllerScope(
-                enabled = true,
-                defaultFocusRequester = closeShortcutFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { activeShortcutTargetAction = null }
-            ),
-            containerColor = TvSurface2,
-            shape = RoundedCornerShape(22.dp),
-            titleContentColor = TvInk,
-            textContentColor = TvMuted,
-            title = {
-                Text(
-                    text = config.tr("Chọn nút kích hoạt (Giữ View + nút)", "Select Trigger Button (View + Button)"),
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    selectableButtons.chunked(3).forEach { rowBtns ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowBtns.forEach { (btnIdx, btnShort, _) ->
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .gamepadClickable(cornerRadius = 10.dp) {
-                                            when (actionKey) {
-                                                "toggle_stats" -> SettingsRepository.updateShortcutToggleStatsButton(btnIdx)
-                                                "toggle_virtual_pad" -> SettingsRepository.updateShortcutToggleVirtualPadButton(btnIdx)
-                                                "toggle_recording" -> SettingsRepository.updateShortcutToggleRecordingButton(btnIdx)
-                                            }
-                                            activeShortcutTargetAction = null
-                                        },
-                                    color = TvSurface,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, TvCyan)
-                                ) {
-                                    Text(
-                                        text = "View + $btnShort",
-                                        color = TvCyan,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 9.dp)
-                                    )
-                                }
-                            }
-                            repeat(3 - rowBtns.size) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
+        com.example.ui.components.AdaptiveGamepadShortcutDialog(
+            isEn = isEn,
+            onSelectButton = { btnIdx ->
+                when (actionKey) {
+                    "toggle_stats" -> SettingsRepository.updateShortcutToggleStatsButton(btnIdx)
+                    "toggle_virtual_pad" -> SettingsRepository.updateShortcutToggleVirtualPadButton(btnIdx)
+                    "toggle_recording" -> SettingsRepository.updateShortcutToggleRecordingButton(btnIdx)
                 }
             },
-            confirmButton = {
-                TextButton(
-                    onClick = { activeShortcutTargetAction = null },
-                    modifier = Modifier
-                        .focusRequester(closeShortcutFocusRequester)
-                        .gamepadActionButton(cornerRadius = 10.dp) { activeShortcutTargetAction = null }
-                ) {
-                    Text(text = config.tr("Đóng", "Close"), color = TvAccent, fontWeight = FontWeight.Bold)
-                }
-            }
+            onDismiss = { activeShortcutTargetAction = null }
         )
     }
 }

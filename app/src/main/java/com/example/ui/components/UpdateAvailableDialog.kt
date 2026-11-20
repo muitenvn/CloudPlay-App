@@ -889,6 +889,7 @@ fun UpdateAvailableDialog(
                             fontSize = rSp(2.45f),
                             verticalPad = rDp(1.65f),
                             horizontalPad = rDp(1.9f),
+                            gamepadHint = "B",
                             focusRequester = laterBtnFocusRequester,
                             onClick = onDismiss,
                             modifier = Modifier
@@ -1008,7 +1009,7 @@ fun UpdateAvailableDialog(
 }
 
 /**
- * Nút hành động phẳng hỗ trợ cả cảm ứng và D-Pad TV với vòng chọn phẳng nổi bật (luôn hiển thị rõ khi được focus).
+ * Nút hành động phẳng hỗ trợ cả cảm ứng và D-Pad TV với vòng chọn phẳng nổi bật và gợi ý phím A/B khi nhận diện tay cầm.
  */
 @Composable
 private fun UpdateDialogFlatActionButton(
@@ -1022,12 +1023,25 @@ private fun UpdateDialogFlatActionButton(
     fontSize: TextUnit,
     verticalPad: Dp,
     horizontalPad: Dp,
+    gamepadHint: String? = null,
     focusRequester: FocusRequester? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val hasHardwarePad = remember { isPhysicalGamepadConnectedNow() }
+    val remotePadServerState by com.example.cloudplay.RemotePadTvServer.state.collectAsState()
+    val showGamepadHint = GamepadUiNavigation.isGamepadModeActive ||
+        GamepadUiNavigation.keepFocusVisibleInTvMode ||
+        hasHardwarePad ||
+        remotePadServerState.connectedDeviceId.isNotBlank()
+    val effectiveHint = when {
+        !showGamepadHint -> null
+        !gamepadHint.isNullOrBlank() -> gamepadHint
+        isFocused -> "A"
+        else -> null
+    }
 
     Surface(
         modifier = modifier
@@ -1066,6 +1080,42 @@ private fun UpdateDialogFlatActionButton(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (effectiveHint != null) {
+                val isBrightPrimary = containerColor == XboxNeonGreen && effectiveHint == "A"
+                val badgeBg = when {
+                    isBrightPrimary -> Color(0xFF04150B).copy(alpha = 0.85f)
+                    effectiveHint == "B" -> com.example.ui.theme.JapanRed.copy(alpha = 0.24f)
+                    else -> XboxNeonGreen.copy(alpha = 0.24f)
+                }
+                val badgeBorder = when {
+                    isBrightPrimary -> Color(0xFF04150B)
+                    effectiveHint == "B" -> com.example.ui.theme.JapanRed
+                    else -> XboxNeonGreen
+                }
+                val badgeText = when {
+                    isBrightPrimary -> XboxNeonGreen
+                    effectiveHint == "B" -> Color(0xFFFFB4AB)
+                    else -> XboxNeonGreen
+                }
+                Box(modifier = Modifier.padding(start = horizontalPad * 0.35f))
+                Box(
+                    modifier = Modifier
+                        .size(verticalPad * 2.1f)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(badgeBg)
+                        .border(borderWidth, badgeBorder, androidx.compose.foundation.shape.CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = effectiveHint,
+                        color = badgeText,
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = fontSize * 0.8f,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }

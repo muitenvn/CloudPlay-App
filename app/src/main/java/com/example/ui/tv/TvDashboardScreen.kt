@@ -422,93 +422,22 @@ fun TvDashboardScreen(
 
     if (showLanguageDialog) {
         val isEnUi = config.isEnglishUI()
-        val langFocusRequester = remember { FocusRequester() }
-        GamepadSurfaceController(
-            enabled = true,
-            defaultFocusRequester = langFocusRequester,
-            onBackPress = { showLanguageDialog = false }
-        ) {
-            AlertDialog(
-                onDismissRequest = { showLanguageDialog = false },
-                containerColor = TvSurface2,
-                shape = RoundedCornerShape(22.dp),
-                titleContentColor = TvInk,
-                textContentColor = TvMuted,
-                title = {
-                    Text(
-                        text = config.tr("Ngôn ngữ ứng dụng", "App Language"),
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 19.sp
-                    )
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AppLanguage.entries.forEachIndexed { idx, langOption ->
-                            val isSelected = config.appLanguage == langOption
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) TvAccent else TvLine,
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .gamepadClickable(
-                                        cornerRadius = 12.dp,
-                                        focusRequester = if (isSelected || idx == 0) langFocusRequester else null,
-                                        onClick = {
-                                            showLanguageDialog = false
-                                            SettingsRepository.updateAppLanguage(langOption)
-                                            Toast.makeText(
-                                                context,
-                                                "✓ ${langOption.flag} ${langOption.title}",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    ),
-                                color = if (isSelected) TvSel else TvSurface
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Text(text = langOption.flag, fontSize = 18.sp)
-                                    Text(
-                                        text = langOption.localizedTitle(isEnUi),
-                                        color = if (isSelected) TvAccent else TvInk,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 15.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { showLanguageDialog = false },
-                        modifier = Modifier.gamepadClickable(cornerRadius = 10.dp) {
-                            showLanguageDialog = false
-                        }
-                    ) {
-                        Text(
-                            text = config.tr("Đóng", "Close"),
-                            color = TvAccent,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            )
-        }
+        com.example.ui.components.AdaptiveLanguagePickerDialog(
+            currentLanguage = config.appLanguage,
+            isEnUi = isEnUi,
+            titleText = config.tr("Ngôn ngữ ứng dụng", "App Language"),
+            closeText = config.tr("Đóng", "Close"),
+            onSelectLanguage = { langOption ->
+                showLanguageDialog = false
+                SettingsRepository.updateAppLanguage(langOption)
+                Toast.makeText(
+                    context,
+                    "✓ ${langOption.flag} ${langOption.title}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
     }
 
     if (showGuideDialog) {

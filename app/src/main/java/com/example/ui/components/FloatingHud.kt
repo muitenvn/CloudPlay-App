@@ -909,110 +909,27 @@ fun FloatingHud(
         }
     }
 
-    // Hộp thoại Xác nhận thoát theo khuôn .dlg của hud-mockup.html
+    // Hộp thoại Xác nhận thoát theo khung popup dùng chung (hỗ trợ TV / màn ngang / dọc + gợi ý nút A/B)
     if (showExitConfirmDialog) {
-        Dialog(
-            onDismissRequest = {
+        AdaptiveConfirmPopupDialog(
+            title = stringResource(R.string.dialog_exit_title),
+            message = stringResource(R.string.dialog_exit_message),
+            confirmText = stringResource(R.string.btn_confirm_exit),
+            dismissText = stringResource(R.string.btn_cancel),
+            onConfirm = {
+                AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
+                showExitConfirmDialog = false
+                onNavigateHome()
+            },
+            onDismiss = {
                 AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
                 showExitConfirmDialog = false
-            }
-        ) {
-            GamepadSurfaceController(
-                enabled = true,
-                defaultFocusRequester = cancelExitFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = {
-                    AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
-                    showExitConfirmDialog = false
-                }
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .widthIn(max = 340.dp)
-                        .fillMaxWidth()
-                        .testTag("hud_exit_confirm_dialog"),
-                    shape = RoundedCornerShape(22.dp),
-                    color = HudSurface2,
-                    shadowElevation = 0.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.dialog_exit_title),
-                            color = HudInk,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 17.sp
-                        )
-                        Text(
-                            text = stringResource(R.string.dialog_exit_message),
-                            color = HudDialogBody,
-                            fontSize = 14.sp,
-                            lineHeight = 19.sp
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Button(
-                                onClick = {
-                                    AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
-                                    showExitConfirmDialog = false
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = HudSurface,
-                                    contentColor = HudInk
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .heightIn(min = 42.dp)
-                                    .focusRequester(cancelExitFocusRequester)
-                                    .gamepadActionButton(cornerRadius = 12.dp) {
-                                        AppLogger.info("UI", "Hủy hộp thoại Thoát game từ HUD")
-                                        showExitConfirmDialog = false
-                                    }
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.btn_cancel),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.5.sp
-                                )
-                            }
-                            Button(
-                                onClick = {
-                                    AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
-                                    showExitConfirmDialog = false
-                                    onNavigateHome()
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = HudDanger,
-                                    contentColor = HudDangerOn
-                                ),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier
-                                    .heightIn(min = 42.dp)
-                                    .gamepadActionButton(cornerRadius = 12.dp) {
-                                        AppLogger.info("UI", "Xác nhận Thoát game từ HUD -> về Trang chủ")
-                                        showExitConfirmDialog = false
-                                        onNavigateHome()
-                                    }
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.btn_confirm_exit),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.5.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+            },
+            dialogTestTag = "hud_exit_confirm_dialog",
+            confirmContainerColor = HudDanger,
+            confirmContentColor = HudDangerOn,
+            defaultFocusOnDismiss = true
+        )
     }
 }
 

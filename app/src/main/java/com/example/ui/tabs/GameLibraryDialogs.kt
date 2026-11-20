@@ -1,33 +1,31 @@
 package com.example.ui.tabs
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,22 +35,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import androidx.compose.ui.focus.FocusRequester
 import com.example.data.GameBookmark
 import com.example.data.GameLibraryRepository
-import com.example.ui.components.gamepadActionButton
-import com.example.ui.components.gamepadClickable
-import com.example.ui.components.gamepadControllerScope
+import com.example.data.SettingsRepository
+import com.example.ui.components.AdaptiveFlatActionButton
+import com.example.ui.components.AdaptivePopupFrame
+import com.example.ui.components.AdaptivePopupScope
+import com.example.ui.components.AdaptiveTwoColumnLayout
 import com.example.ui.components.gamepadTextFieldFocus
 import com.example.ui.theme.DirectCyan
 import com.example.ui.theme.GoldStar
@@ -63,7 +62,6 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.theme.XboxCardBorder
 import com.example.ui.theme.XboxDark
-import com.example.ui.theme.XboxGreen
 import com.example.ui.theme.XboxNeonGreen
 import com.example.ui.theme.XboxSurface
 import com.example.ui.theme.XboxSurfaceVariant
@@ -77,55 +75,62 @@ internal fun XboxGameDetailDialog(
     onDismiss: () -> Unit,
     onPlay: () -> Unit
 ) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val config by SettingsRepository.config.collectAsState()
     val isEn = config.isEnglishUI()
     val productId = remember(game.playUrl) { GameLibraryRepository.extractProductId(game.playUrl) }
     val heroUrl = game.heroImageUrl ?: game.imageUrl
     val playBtnFocusRequester = remember { FocusRequester() }
 
-    AlertDialog(
+    AdaptivePopupFrame(
         onDismissRequest = onDismiss,
-        modifier = Modifier.gamepadControllerScope(
-            enabled = true,
-            defaultFocusRequester = playBtnFocusRequester,
-            autoRequestDefaultFocus = true,
-            attachWindowMotionListener = true,
-            onBackPress = onDismiss,
-            onSecondaryY = onToggleFavorite
-        ),
-        title = {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        dialogTestTag = "xbox_game_detail_dialog",
+        defaultFocusRequester = playBtnFocusRequester,
+        wideWidthFraction = 0.88f,
+        portraitWidthFraction = 0.92f,
+        onSecondaryY = onToggleFavorite
+    ) {
+        val descScroll = rememberScrollState()
+
+        @Composable
+        fun AdaptivePopupScope.TitleAndPublisher() {
+            Column(verticalArrangement = Arrangement.spacedBy(rDp(2.5f))) {
                 Text(
                     text = game.title,
                     color = TextPrimary,
                     fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.Black,
-                    fontSize = 17.sp
+                    fontSize = rSp(16.5f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (!game.publisher.isNullOrBlank()) {
                     Text(
                         text = game.publisher,
                         color = XboxNeonGreen,
                         fontFamily = SpaceGroteskFontFamily,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = rSp(11.5f),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        }
+
+        @Composable
+        fun AdaptivePopupScope.HeroAndBadges(heroHeight: Dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(gapMed)) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(145.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .height(heroHeight)
+                        .clip(RoundedCornerShape(sectionCorner))
                         .background(
                             Brush.linearGradient(
                                 listOf(Color(game.accentColorHex).copy(alpha = 0.55f), XboxDark)
                             )
                         )
-                        .border(1.dp, XboxCardBorder, RoundedCornerShape(14.dp))
+                        .border(borderThin, XboxCardBorder, RoundedCornerShape(sectionCorner))
                 ) {
                     if (!isImportingCatalog && !heroUrl.isNullOrBlank()) {
                         val context = LocalContext.current
@@ -144,19 +149,19 @@ internal fun XboxGameDetailDialog(
                         Column(
                             modifier = Modifier.align(Alignment.Center),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                            verticalArrangement = Arrangement.spacedBy(rDp(4f))
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Gamepad,
                                 contentDescription = null,
                                 tint = XboxNeonGreen,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(rDp(28f))
                             )
                             Text(
                                 text = game.localizedBadge(isEn) ?: "Xbox Cloud Gaming",
                                 color = Color.White,
                                 fontFamily = SpaceGroteskFontFamily,
-                                fontSize = 11.5.sp,
+                                fontSize = rSp(11.5f),
                                 fontWeight = FontWeight.ExtraBold
                             )
                         }
@@ -165,59 +170,74 @@ internal fun XboxGameDetailDialog(
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp),
-                    color = XboxSurface
+                    shape = RoundedCornerShape(chipCorner),
+                    color = XboxSurface,
+                    border = BorderStroke(borderThin, XboxCardBorder)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            .padding(gapMed),
+                        horizontalArrangement = Arrangement.spacedBy(gapSmall),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(chipCorner),
                             color = Color(0xFF2E2408)
                         ) {
                             Text(
                                 text = "★ ${game.rating}",
                                 color = GoldStar,
                                 fontFamily = JetBrainsMonoFontFamily,
-                                fontSize = 11.sp,
+                                fontSize = rSp(10.8f),
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = rDp(7f), vertical = rDp(3.5f))
                             )
                         }
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(chipCorner),
                             color = XboxSurfaceVariant
                         ) {
                             Text(
                                 text = game.localizedCategory(isEn),
                                 color = TextPrimary,
-                                fontSize = 11.sp,
+                                fontSize = rSp(10.8f),
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = rDp(7f), vertical = rDp(3.5f))
                             )
                         }
                         if (productId.isNotBlank()) {
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(chipCorner),
                                 color = DirectCyan.copy(alpha = 0.14f)
                             ) {
                                 Text(
                                     text = "ID: $productId",
                                     color = DirectCyan,
                                     fontFamily = JetBrainsMonoFontFamily,
-                                    fontSize = 10.sp,
+                                    fontSize = rSp(9.8f),
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = rDp(6.5f), vertical = rDp(3.5f))
                                 )
                             }
                         }
                     }
                 }
+            }
+        }
 
+        @Composable
+        fun AdaptivePopupScope.DescriptionBox(maxDescHeight: Dp) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxDescHeight)
+                    .verticalScroll(descScroll)
+            ) {
                 Text(
                     text = game.description ?: if (isEn) {
                         "Official Xbox Cloud Gaming title linked directly from Microsoft Store. Supports instant cloud streaming without downloading."
@@ -225,68 +245,103 @@ internal fun XboxGameDetailDialog(
                         "Tựa game chính thức liên kết trực tiếp từ máy chủ Microsoft Xbox Cloud Gaming. Hỗ trợ chơi ngay trên đám mây không cần tải về."
                     },
                     color = TextSecondary,
-                    fontSize = 12.5.sp,
-                    maxLines = 5,
-                    overflow = TextOverflow.Ellipsis
+                    fontSize = rSp(12f),
+                    lineHeight = rSp(16.8f)
                 )
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = onPlay,
-                modifier = Modifier.gamepadActionButton(
-                    cornerRadius = 12.dp,
-                    focusRequester = playBtnFocusRequester,
-                    onClick = onPlay
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = XboxNeonGreen,
-                    contentColor = Color(0xFF03140B)
-                )
+        }
+
+        @Composable
+        fun AdaptivePopupScope.ActionButtonsColumn() {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(gapMed)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF03140B), modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = config.tr("Chơi ngay", "Play now"),
-                    color = Color(0xFF03140B),
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.gamepadActionButton(
-                        cornerRadius = 8.dp,
-                        onClick = onToggleFavorite
-                    )
+                AdaptiveFlatActionButton(
+                    onClick = onPlay,
+                    isPrimary = true,
+                    gamepadHint = "A",
+                    focusRequester = playBtnFocusRequester,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color(0xFF03140B),
+                        modifier = Modifier.size(rDp(16f))
+                    )
+                    Spacer(modifier = Modifier.width(rDp(5f)))
                     Text(
-                        text = if (isFavorite) {
-                            config.tr("♥ Đã thích", "♥ Saved")
-                        } else {
-                            config.tr("♡ Yêu thích", "♡ Favorite")
-                        },
-                        color = if (isFavorite) JapanRed else XboxNeonGreen,
-                        fontWeight = FontWeight.Bold
+                        text = config.tr("Chơi ngay", "Play now"),
+                        color = Color(0xFF03140B),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = rSp(12.5f)
                     )
                 }
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.gamepadActionButton(
-                        cornerRadius = 8.dp,
-                        onClick = onDismiss
-                    )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(gapMed)
                 ) {
-                    Text(config.tr("Đóng", "Close"), color = TextSecondary, fontWeight = FontWeight.Bold)
+                    AdaptiveFlatActionButton(
+                        onClick = onToggleFavorite,
+                        isPrimary = false,
+                        gamepadHint = "Y",
+                        borderColor = if (isFavorite) JapanRed else XboxNeonGreen,
+                        contentColor = if (isFavorite) JapanRed else XboxNeonGreen,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (isFavorite) {
+                                config.tr("♥ Đã thích", "♥ Saved")
+                            } else {
+                                config.tr("♡ Yêu thích", "♡ Favorite")
+                            },
+                            color = if (isFavorite) JapanRed else XboxNeonGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = rSp(11.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    AdaptiveFlatActionButton(
+                        onClick = onDismiss,
+                        isPrimary = false,
+                        gamepadHint = "B",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = config.tr("Đóng", "Close"),
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = rSp(11.8f),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
-        },
-        shape = RoundedCornerShape(22.dp),
-        containerColor = XboxSurfaceVariant
-    )
+        }
+
+        AdaptiveTwoColumnLayout(
+            leftWeight = 1.08f,
+            rightWeight = 0.92f,
+            leftColumn = {
+                TitleAndPublisher()
+                HeroAndBadges(heroHeight = rDp(118f))
+            },
+            rightColumn = {
+                DescriptionBox(maxDescHeight = winH * 0.44f)
+                ActionButtonsColumn()
+            },
+            portraitColumn = {
+                TitleAndPublisher()
+                HeroAndBadges(heroHeight = rDp(136f))
+                DescriptionBox(maxDescHeight = winH * 0.28f)
+                ActionButtonsColumn()
+            }
+        )
+    }
 }
 
 @Composable
@@ -295,7 +350,7 @@ internal fun AddGameDialog(
     onAdd: (String, String) -> Unit,
     onLaunchDirect: (GameBookmark) -> Unit = {}
 ) {
-    val config by com.example.data.SettingsRepository.config.collectAsState()
+    val config by SettingsRepository.config.collectAsState()
     val isSearchingLiveXbox by GameLibraryRepository.isSearchingLiveXbox.collectAsState()
     val isEn = config.isEnglishUI()
     var title by remember { mutableStateOf("") }
@@ -303,26 +358,53 @@ internal fun AddGameDialog(
     var liveResults by remember { mutableStateOf<List<GameBookmark>>(emptyList()) }
     val addBtnFocusRequester = remember { FocusRequester() }
 
-    AlertDialog(
+    val canSearch = !isSearchingLiveXbox && title.trim().length >= 2
+    val triggerSearch: () -> Unit = {
+        if (title.trim().length >= 2) {
+            GameLibraryRepository.searchMicrosoftXboxCatalog(title) { found ->
+                liveResults = found.take(5)
+                found.firstOrNull()?.let { first ->
+                    title = first.title
+                    url = first.playUrl
+                }
+            }
+        }
+    }
+
+    val canAdd = title.isNotBlank() && url.isNotBlank()
+    val submitAdd: () -> Unit = {
+        if (canAdd) {
+            onAdd(title.trim(), url.trim())
+        }
+    }
+
+    AdaptivePopupFrame(
         onDismissRequest = onDismiss,
-        modifier = Modifier.gamepadControllerScope(
-            enabled = true,
-            defaultFocusRequester = addBtnFocusRequester,
-            autoRequestDefaultFocus = true,
-            attachWindowMotionListener = true,
-            onBackPress = onDismiss
-        ),
-        title = {
-            Text(
-                text = if (isEn) "Add Xbox Cloud Game" else "Thêm game vào thư viện",
-                color = TextPrimary,
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 17.sp
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        dialogTestTag = "add_game_dialog",
+        defaultFocusRequester = addBtnFocusRequester,
+        wideWidthFraction = 0.90f,
+        portraitWidthFraction = 0.92f
+    ) {
+        val resultsScroll = rememberScrollState()
+        val fieldColors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = XboxNeonGreen,
+            unfocusedBorderColor = XboxCardBorder,
+            focusedContainerColor = XboxSurface,
+            unfocusedContainerColor = XboxSurface,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary
+        )
+
+        @Composable
+        fun AdaptivePopupScope.HeaderAndInputs() {
+            Column(verticalArrangement = Arrangement.spacedBy(gapMed)) {
+                Text(
+                    text = if (isEn) "Add Xbox Cloud Game" else "Thêm game vào thư viện",
+                    color = TextPrimary,
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = rSp(16f)
+                )
                 Text(
                     text = if (isEn) {
                         "Type a game name to search on Xbox Store or paste a game URL."
@@ -330,11 +412,13 @@ internal fun AddGameDialog(
                         "Gõ tên game rồi bấm Tìm trên Xbox để tự lấy đường dẫn, hoặc dán đường dẫn có sẵn."
                     },
                     color = TextSecondary,
-                    fontSize = 12.5.sp
+                    fontSize = rSp(11.5f),
+                    lineHeight = rSp(15.8f)
                 )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(gapSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
@@ -342,105 +426,32 @@ internal fun AddGameDialog(
                         onValueChange = { title = it },
                         modifier = Modifier
                             .weight(1f)
-                            .gamepadTextFieldFocus(cornerRadius = 12.dp),
-                        label = { Text(if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên game (VD: Black Ops 6)") },
+                            .gamepadTextFieldFocus(cornerRadius = btnCorner),
+                        label = {
+                            Text(
+                                text = if (isEn) "Game Name (e.g. Black Ops 6)" else "Tên game (VD: Black Ops 6)",
+                                fontSize = rSp(11f)
+                            )
+                        },
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = XboxNeonGreen,
-                            unfocusedBorderColor = XboxCardBorder,
-                            focusedContainerColor = XboxSurface,
-                            unfocusedContainerColor = XboxSurface,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
+                        shape = RoundedCornerShape(btnCorner),
+                        colors = fieldColors
                     )
-                    val canSearch = !isSearchingLiveXbox && title.trim().length >= 2
-                    val triggerSearch: () -> Unit = {
-                        if (title.trim().length >= 2) {
-                            GameLibraryRepository.searchMicrosoftXboxCatalog(title) { found ->
-                                liveResults = found.take(5)
-                                found.firstOrNull()?.let { first ->
-                                    title = first.title
-                                    url = first.playUrl
-                                }
-                            }
-                        }
-                    }
-                    Button(
+
+                    AdaptiveFlatActionButton(
                         onClick = triggerSearch,
                         enabled = canSearch,
-                        modifier = Modifier.gamepadActionButton(
-                            enabled = canSearch,
-                            cornerRadius = 12.dp,
-                            onClick = triggerSearch
-                        ),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = XboxSurface,
-                            contentColor = XboxNeonGreen
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 14.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        isPrimary = false,
+                        borderColor = XboxNeonGreen,
+                        contentColor = XboxNeonGreen
                     ) {
                         Text(
                             text = if (isSearchingLiveXbox) "..." else if (isEn) "Find Xbox" else "Tìm trên Xbox",
                             color = XboxNeonGreen,
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = rSp(11.5f)
                         )
-                    }
-                }
-
-                if (liveResults.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = if (isEn) "Found on Xbox Store (tap to launch):" else "Đã tìm thấy trên Xbox Store (chạm để mở ngay):",
-                            color = XboxNeonGreen,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        liveResults.forEach { item ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = XboxSurface,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .gamepadClickable(cornerRadius = 12.dp) { onLaunchDirect(item) }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = item.title,
-                                            color = TextPrimary,
-                                            fontFamily = SpaceGroteskFontFamily,
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = item.publisher ?: item.localizedCategory(isEn),
-                                            color = TextSecondary,
-                                            fontSize = 11.sp,
-                                            maxLines = 1
-                                        )
-                                    }
-                                    Text(
-                                        text = if (isEn) "Play ▶" else "Chơi ▶",
-                                        color = XboxNeonGreen,
-                                        fontFamily = SpaceGroteskFontFamily,
-                                        fontSize = 11.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -449,55 +460,133 @@ internal fun AddGameDialog(
                     onValueChange = { url = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .gamepadTextFieldFocus(cornerRadius = 12.dp),
-                    label = { Text(if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud") },
+                        .gamepadTextFieldFocus(cornerRadius = btnCorner),
+                    label = {
+                        Text(
+                            text = if (isEn) "Xbox Cloud URL" else "Đường dẫn Xbox Cloud",
+                            fontSize = rSp(11f)
+                        )
+                    },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = XboxNeonGreen,
-                        unfocusedBorderColor = XboxCardBorder,
-                        focusedContainerColor = XboxSurface,
-                        unfocusedContainerColor = XboxSurface,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    )
+                    shape = RoundedCornerShape(btnCorner),
+                    colors = fieldColors
                 )
             }
-        },
-        confirmButton = {
-            val submitAdd: () -> Unit = {
-                if (title.isNotBlank() && url.isNotBlank()) {
-                    onAdd(title.trim(), url.trim())
+        }
+
+        @Composable
+        fun AdaptivePopupScope.LiveSearchResultsList(maxListHeight: Dp) {
+            if (liveResults.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = maxListHeight)
+                        .verticalScroll(resultsScroll),
+                    verticalArrangement = Arrangement.spacedBy(gapSmall)
+                ) {
+                    Text(
+                        text = if (isEn) "Found on Xbox Store (tap to launch):" else "Đã tìm thấy trên Xbox Store (chạm để mở ngay):",
+                        color = XboxNeonGreen,
+                        fontSize = rSp(11f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    liveResults.forEach { item ->
+                        AdaptiveFlatActionButton(
+                            onClick = { onLaunchDirect(item) },
+                            isPrimary = false,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.title,
+                                        color = TextPrimary,
+                                        fontFamily = SpaceGroteskFontFamily,
+                                        fontSize = rSp(12f),
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = item.publisher ?: item.localizedCategory(isEn),
+                                        color = TextSecondary,
+                                        fontSize = rSp(10.5f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(gapSmall))
+                                Text(
+                                    text = if (isEn) "Play ▶" else "Chơi ▶",
+                                    color = XboxNeonGreen,
+                                    fontFamily = SpaceGroteskFontFamily,
+                                    fontSize = rSp(11f),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            Button(
-                onClick = submitAdd,
-                modifier = Modifier.gamepadActionButton(
-                    cornerRadius = 12.dp,
+        }
+
+        @Composable
+        fun AdaptivePopupScope.BottomActions() {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(gapMed)
+            ) {
+                AdaptiveFlatActionButton(
+                    onClick = submitAdd,
+                    enabled = canAdd,
+                    isPrimary = true,
+                    gamepadHint = "A",
                     focusRequester = addBtnFocusRequester,
-                    onClick = submitAdd
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = XboxNeonGreen,
-                    contentColor = Color(0xFF03140B)
-                )
-            ) {
-                Text(if (isEn) "Add Game" else "Thêm game", color = Color(0xFF03140B), fontWeight = FontWeight.Bold)
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (isEn) "Add Game" else "Thêm game",
+                        color = if (canAdd) Color(0xFF03140B) else TextSecondary,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = rSp(12.5f)
+                    )
+                }
+
+                AdaptiveFlatActionButton(
+                    onClick = onDismiss,
+                    isPrimary = false,
+                    gamepadHint = "B",
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (isEn) "Cancel" else "Hủy",
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = rSp(12.2f)
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.gamepadActionButton(
-                    cornerRadius = 8.dp,
-                    onClick = onDismiss
-                )
-            ) {
-                Text(if (isEn) "Cancel" else "Hủy", color = TextSecondary, fontWeight = FontWeight.Bold)
+        }
+
+        AdaptiveTwoColumnLayout(
+            leftWeight = 1.15f,
+            rightWeight = 0.85f,
+            leftColumn = {
+                HeaderAndInputs()
+            },
+            rightColumn = {
+                LiveSearchResultsList(maxListHeight = winH * 0.44f)
+                BottomActions()
+            },
+            portraitColumn = {
+                HeaderAndInputs()
+                LiveSearchResultsList(maxListHeight = winH * 0.28f)
+                BottomActions()
             }
-        },
-        shape = RoundedCornerShape(22.dp),
-        containerColor = XboxSurfaceVariant
-    )
+        )
+    }
 }

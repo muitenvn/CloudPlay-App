@@ -918,89 +918,32 @@ internal fun SettingsAdvancedSection(
     }
 
     if (showResetAdvancedConfirmDialog) {
-        val cancelAdvResetFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        AlertDialog(
-            onDismissRequest = { showResetAdvancedConfirmDialog = false },
-            modifier = Modifier.gamepadControllerScope(
-                enabled = true,
-                defaultFocusRequester = cancelAdvResetFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { showResetAdvancedConfirmDialog = false }
-            ),
-            containerColor = XboxSurface,
-            titleContentColor = TextPrimary,
-            textContentColor = TextSecondary,
-            title = {
-                Text(
-                    text = if (isEn) "Restore Advanced Defaults?" else "Khôi phục mặc định mục Nâng cao?",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 16.sp
-                )
+        com.example.ui.components.AdaptiveConfirmPopupDialog(
+            title = if (isEn) "Restore Advanced Defaults?" else "Khôi phục mặc định mục Nâng cao?",
+            message = if (isEn) {
+                "This will reset only the settings inside the Advanced section (image colors, stick deadzones, button remaps, Xbox market to en-US, and technical network switches). Your Xbox login, session history, game library, and basic settings will NOT be affected."
+            } else {
+                "Chỉ đặt lại các tùy chỉnh trong mục Nâng cao (màu sắc hình ảnh, 8 thanh vùng chết, đổi nút tay cầm, thị trường Xbox về en-US và công tắc mạng kỹ thuật). Phiên đăng nhập Xbox, lịch sử chơi, danh sách game và các cài đặt cơ bản được giữ nguyên."
             },
-            text = {
-                Text(
-                    text = if (isEn) {
-                        "This will reset only the settings inside the Advanced section (image colors, stick deadzones, button remaps, Xbox market to en-US, and technical network switches). Your Xbox login, session history, game library, and basic settings will NOT be affected."
-                    } else {
-                        "Chỉ đặt lại các tùy chỉnh trong mục Nâng cao (màu sắc hình ảnh, 8 thanh vùng chết, đổi nút tay cầm, thị trường Xbox về en-US và công tắc mạng kỹ thuật). Phiên đăng nhập Xbox, lịch sử chơi, danh sách game và các cài đặt cơ bản được giữ nguyên."
-                    },
-                    fontSize = 13.sp
-                )
+            confirmText = if (isEn) "Restore" else "Khôi phục",
+            dismissText = if (isEn) "Cancel" else "Hủy",
+            onConfirm = {
+                SettingsRepository.resetAdvancedSettingsOnly()
+                showResetAdvancedConfirmDialog = false
+                Toast.makeText(
+                    context,
+                    if (isEn) "Restored Advanced settings to default" else "Đã khôi phục mặc định các cài đặt Nâng cao",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        SettingsRepository.resetAdvancedSettingsOnly()
-                        showResetAdvancedConfirmDialog = false
-                        Toast.makeText(
-                            context,
-                            if (isEn) "Restored Advanced settings to default" else "Đã khôi phục mặc định các cài đặt Nâng cao",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    },
-                    modifier = Modifier
-                        .gamepadActionButton(cornerRadius = 8.dp) {
-                            SettingsRepository.resetAdvancedSettingsOnly()
-                            showResetAdvancedConfirmDialog = false
-                            Toast.makeText(
-                                context,
-                                if (isEn) "Restored Advanced settings to default" else "Đã khôi phục mặc định các cài đặt Nâng cao",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        .semantics {
-                            contentDescription = if (isEn) "Confirm restore advanced defaults" else "Xác nhận khôi phục mặc định nâng cao"
-                        }
-                        .testTag("confirm_reset_advanced_settings_btn")
-                ) {
-                    Text(
-                        text = if (isEn) "Restore" else "Khôi phục",
-                        color = XboxNeonGreen,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showResetAdvancedConfirmDialog = false },
-                    modifier = Modifier
-                        .focusRequester(cancelAdvResetFocusRequester)
-                        .gamepadActionButton(cornerRadius = 8.dp) {
-                            showResetAdvancedConfirmDialog = false
-                        }
-                        .semantics {
-                            contentDescription = if (isEn) "Cancel restore advanced defaults" else "Hủy khôi phục mặc định nâng cao"
-                        }
-                        .testTag("cancel_reset_advanced_settings_btn")
-                ) {
-                    Text(
-                        text = if (isEn) "Cancel" else "Hủy",
-                        color = TextSecondary
-                    )
-                }
-            }
+            onDismiss = { showResetAdvancedConfirmDialog = false },
+            confirmButtonTestTag = "confirm_reset_advanced_settings_btn",
+            dismissButtonTestTag = "cancel_reset_advanced_settings_btn",
+            confirmContentDescription = if (isEn) "Confirm restore advanced defaults" else "Xác nhận khôi phục mặc định nâng cao",
+            dismissContentDescription = if (isEn) "Cancel restore advanced defaults" else "Hủy khôi phục mặc định nâng cao",
+            confirmContainerColor = XboxNeonGreen,
+            confirmContentColor = Color(0xFF04150B),
+            defaultFocusOnDismiss = true
         )
     }
 }

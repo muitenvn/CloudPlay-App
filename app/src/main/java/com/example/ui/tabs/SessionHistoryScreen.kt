@@ -333,102 +333,27 @@ fun SessionHistoryScreen(
         )
     }
 
-    // Hộp xác nhận xóa tất cả lịch sử theo khuôn .dlg
+    // Hộp xác nhận xóa tất cả lịch sử theo khung popup dùng chung
     if (showClearConfirmDialog) {
-        val cancelClearFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        Dialog(onDismissRequest = { showClearConfirmDialog = false }) {
-            com.example.ui.components.GamepadSurfaceController(
-                enabled = true,
-                defaultFocusRequester = cancelClearFocusRequester,
-                autoRequestDefaultFocus = true,
-                attachWindowMotionListener = true,
-                onBackPress = { showClearConfirmDialog = false }
-            ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .testTag("clear_history_confirm_dialog"),
-                shape = RoundedCornerShape(22.dp),
-                color = XboxSurfaceVariant
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = if (isEn) "Clear all history?" else "Xóa tất cả lịch sử?",
-                        color = TextPrimary,
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp
-                    )
-                    Text(
-                        text = if (isEn) {
-                            "All recorded play sessions will be permanently removed."
-                        } else {
-                            "Toàn bộ lịch sử các phiên chơi đã lưu sẽ bị xóa."
-                        },
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { showClearConfirmDialog = false },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = XboxSurface,
-                                contentColor = TextPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .gamepadActionButton(
-                                    cornerRadius = 12.dp,
-                                    focusRequester = cancelClearFocusRequester
-                                ) {
-                                    showClearConfirmDialog = false
-                                }
-                        ) {
-                            Text(
-                                text = if (isEn) "Cancel" else "Hủy",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
-                        Button(
-                            onClick = {
-                                SessionHistoryRepository.clearAllSessions()
-                                showClearConfirmDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = JapanRed,
-                                contentColor = Color(0xFF2A0A09)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp)
-                                .gamepadActionButton(cornerRadius = 12.dp) {
-                                    SessionHistoryRepository.clearAllSessions()
-                                    showClearConfirmDialog = false
-                                }
-                                .testTag("confirm_clear_history_button")
-                        ) {
-                            Text(
-                                text = if (isEn) "Delete All" else "Xóa tất cả",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                }
-            }
-            }
-        }
+        com.example.ui.components.AdaptiveConfirmPopupDialog(
+            title = if (isEn) "Clear all history?" else "Xóa tất cả lịch sử?",
+            message = if (isEn) {
+                "All recorded play sessions will be permanently removed."
+            } else {
+                "Toàn bộ lịch sử các phiên chơi đã lưu sẽ bị xóa."
+            },
+            confirmText = if (isEn) "Delete All" else "Xóa tất cả",
+            dismissText = if (isEn) "Cancel" else "Hủy",
+            onConfirm = {
+                SessionHistoryRepository.clearAllSessions()
+                showClearConfirmDialog = false
+            },
+            onDismiss = { showClearConfirmDialog = false },
+            dialogTestTag = "clear_history_confirm_dialog",
+            confirmButtonTestTag = "confirm_clear_history_button",
+            confirmContainerColor = JapanRed,
+            confirmContentColor = Color(0xFF2A0A09),
+            defaultFocusOnDismiss = true
+        )
     }
 }
